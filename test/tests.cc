@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <filesystem>
+#include <unordered_map>
 #include <fstream>
 #include <iostream>
 
@@ -529,15 +530,13 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
   auto result = run_test_case("test_files/big_decimal/");
   REQUIRE(result.stdout_ == expected);
 
-#ifndef EMSCRIPTEN
   BENCHMARK("Big decimal #2") {
     auto result = run_test_case("test_files/big_decimal/");
   };
-#endif
 }
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/playground/", false);
+  auto result = run_test_case("test_files/compiler/", false);
 }
 
 

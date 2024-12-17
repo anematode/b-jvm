@@ -1,8 +1,8 @@
 #define AGGRESSIVE_DEBUG 0
 
-#define CACHE_INVOKESTATIC 1
-#define CACHE_INVOKENONSTATIC 1
-#define ONE_GOTO_PER_INSN 1
+#define CACHE_INVOKESTATIC 0
+#define CACHE_INVOKENONSTATIC 0
+#define ONE_GOTO_PER_INSN 0
 
 #include <assert.h>
 #include <limits.h>
@@ -235,7 +235,7 @@ void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
   bjvm_hash_table_entry *_prev,
       *entry =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
-  return equal ? entry->data : nullptr;
+  return equal ? entry->data : NULL;
 }
 
 void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
@@ -399,11 +399,14 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);
 
-int unimplemented_native(bjvm_thread *, bjvm_obj_header *, bjvm_stack_value *,
-                         int, bjvm_stack_value *ret) {
-  if (ret)
-    ret->obj = NULL;
-  return 0;
+// Generally, use this to indicate that a native function is returning void or null
+bjvm_stack_value value_null() {
+  return (bjvm_stack_value) { .obj = NULL };
+}
+
+bjvm_stack_value unimplemented_native(bjvm_thread *, bjvm_obj_header *, bjvm_stack_value *,
+                         int) {
+  return value_null();
 }
 
 // Raise an UnsatisfiedLinkError relating to the given method.
@@ -457,10 +460,6 @@ void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length) 
   bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException", complaint);
 }
 
-bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
-                                    size_t len);
-
-
 void read_string(bjvm_obj_header *obj, short **buf, size_t *len) {
   assert(utf8_equals(&obj->descriptor->name, "java/lang/String"));
   bjvm_obj_header *array = ((struct bjvm_native_String*)obj)->value;
@@ -468,9 +467,9 @@ void read_string(bjvm_obj_header *obj, short **buf, size_t *len) {
   *len = *array_length(array);
 }
 
-int bjvm_System_initProperties(bjvm_thread *thread, bjvm_obj_header *,
-                               bjvm_stack_value *args, int,
-                               bjvm_stack_value *) {
+// TODO read the properties from the VM instead of hardcoding them
+bjvm_stack_value bjvm_System_initProperties(bjvm_thread *thread, bjvm_obj_header *,
+                               bjvm_stack_value *args, int) {
   bjvm_obj_header *props_obj = args[0].obj;
   const wchar_t *const props[][2] = {
       {L"file.encoding", L"UTF-8"},   {L"stdout.encoding", L"UTF-8"},
@@ -489,22 +488,12 @@ int bjvm_System_initProperties(bjvm_thread *thread, bjvm_obj_header *,
     // call put() with String key and value
     bjvm_thread_run(thread, put, put_args, &result);
   }
-  return 0;
+  return value_null();
 }
 
-int bjvm_System_registerNatives(bjvm_thread *, bjvm_obj_header *obj,
-                                bjvm_stack_value *, int argc,
-                                bjvm_stack_value *) {
-  assert(obj == NULL);
-  assert(argc == 0);
-  return 0;
-}
-
-int bjvm_System_mapLibraryName(bjvm_thread *, bjvm_obj_header *,
-                               bjvm_stack_value *args, int,
-                               bjvm_stack_value *ret) {
-  *ret = args[0];
-  return 0;
+bjvm_stack_value bjvm_System_mapLibraryName(bjvm_thread *, bjvm_obj_header *,
+                               bjvm_stack_value *args, int) {
+  return args[0];
 }
 
 void *array_data(bjvm_obj_header *array);
@@ -515,25 +504,24 @@ bool is_1d_primitive_array(bjvm_obj_header * src) {
     ((bjvm_primitive_array_classdesc*) src->descriptor)->dimensions == 1;
 }
 
-int bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
-                          bjvm_stack_value *args, int argc,
-                          bjvm_stack_value *) {
+bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
+                          bjvm_stack_value *args, int argc) {
   assert(argc == 5);
   bjvm_obj_header *src = args[0].obj;
   bjvm_obj_header *dest = args[2].obj;
   if (src == NULL || dest == NULL) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    return value_null();
   }
   if (src->descriptor->kind == BJVM_CD_KIND_ORDINARY || dest->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
     // Can't copy non-array objects to each other
     bjvm_array_store_exception(thread);
-    return 0;
+    return value_null();
   }
   bool src_is_1d_primitive = is_1d_primitive_array(src), dst_is_1d_primitive = is_1d_primitive_array(dest);
   if (src_is_1d_primitive != dst_is_1d_primitive) {
     bjvm_array_store_exception(thread);
-    return 0;
+    return value_null();
   }
 
   int src_pos = args[1].i;
@@ -545,7 +533,7 @@ int bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   // TODO add more descriptive error messages
   if (src_pos < 0 || dest_pos < 0 || length < 0 || (int64_t)src_pos + length > src_length || (int64_t)dest_pos + length > dest_length) {
     bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException", NULL);
-    return 0;
+    return value_null();
   }
 
 #define GEN_PRIMITIVE_IMPL(array_type, underlying)                                       \
@@ -554,7 +542,7 @@ int bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
     underlying *dest_data = array_data(dest);                                  \
     for (int i = 0; i < length; ++i)                                           \
       dest_data[dest_pos + i] = src_data[src_pos + i];                         \
-    return 0;                                                                  \
+    return value_null();                                                               \
   }
 
   if (src_is_1d_primitive) {
@@ -573,31 +561,23 @@ int bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   // and raise an ArrayStoreException as appropriate.
   if (bjvm_instanceof(src->descriptor->one_fewer_dim, dest->descriptor->one_fewer_dim)) {
     memcpy(array_data(dest) + dest_pos, array_data(src) + src_pos, length * sizeof(void *));
-    return 0;
+    return value_null();
   }
 
   for (int i = 0; i < length; ++i) {
     bjvm_obj_header *src_elem = ((bjvm_obj_header **)array_data(src))[src_pos + i];
     if (src_elem && !bjvm_instanceof(src_elem->descriptor, dest->descriptor->one_fewer_dim)) {
       bjvm_array_store_exception(thread);
-      return 0;
+      return value_null();
     }
     ((bjvm_obj_header **)array_data(dest))[dest_pos + i] = src_elem;
   }
-  return 0;
 
-  UNREACHABLE();
+  return value_null();
 }
 
-int bjvm_Object_registerNatives(bjvm_thread *, bjvm_obj_header *,
-                                bjvm_stack_value *, int,
-                                bjvm_stack_value *) {
-  return 0;
-}
-
-int bjvm_System_setOut(bjvm_thread *thread, bjvm_obj_header *,
-                       bjvm_stack_value *args, int,
-                       bjvm_stack_value *) {
+bjvm_stack_value bjvm_System_setOut(bjvm_thread *thread, bjvm_obj_header *,
+                       bjvm_stack_value *args, int) {
   // Look up the field System.out
   bjvm_classdesc *system_class =
       bootstrap_class_create(thread, L"java/lang/System");
@@ -607,11 +587,11 @@ int bjvm_System_setOut(bjvm_thread *thread, bjvm_obj_header *,
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
 
-  return 0;
+  return value_null();
 }
 
-int bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
-                      bjvm_stack_value *, int, bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
+                      bjvm_stack_value *, int) {
   switch (obj->descriptor->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
     bjvm_array_classdesc *array_desc = (bjvm_array_classdesc *)obj->descriptor;
@@ -621,8 +601,7 @@ int bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
       memcpy(array_data(new_array), array_data(obj),
              *array_length(obj) * sizeof(void *));
     }
-    ret->obj = new_array;
-    return 0;
+    return (bjvm_stack_value) { .obj = new_array };
   }
   case BJVM_CD_KIND_BYTE_ARRAY:
     break;
@@ -643,33 +622,29 @@ int bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
   case BJVM_CD_KIND_ORDINARY:
     break;
   }
-  UNREACHABLE();
-  return 0;
+  UNREACHABLE();  // TODO implement
+  return value_null();
 }
 
-int bjvm_Object_hashCode(bjvm_thread *, bjvm_obj_header *obj,
-                         bjvm_stack_value *, int,
-                         bjvm_stack_value *ret) {
-  ret->i = (int)obj->mark_word;
-  return 0;
+// Get the default hash code of an Object, which is stored in its mark word
+bjvm_stack_value bjvm_Object_hashCode(bjvm_thread *, bjvm_obj_header *obj,
+                         bjvm_stack_value *, int) {
+  return (bjvm_stack_value) { .i = (int)obj->mark_word };
 }
 
-int bjvm_Class_getPrimitiveClass(bjvm_thread * thread, bjvm_obj_header *,
-                                 bjvm_stack_value *args, int argc,
-                                 bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_getPrimitiveClass(bjvm_thread * thread, bjvm_obj_header *,
+                                 bjvm_stack_value *args, int argc) {
   assert(argc == 1);
   short *chars;
   size_t len;
   read_string(args[0].obj, &chars, &len);
   if (len > 10) {
-    ret->obj = NULL;
-    return 0;
+    return value_null();
   }
   char as_cstr[11] = {0};
   for (size_t i = 0; i < len; ++i) {
     as_cstr[i] = chars[i];
   }
-
   bjvm_type_kind kind;
   if (strcmp(as_cstr, "boolean") == 0) {
     kind = BJVM_TYPE_KIND_BOOLEAN;
@@ -690,77 +665,57 @@ int bjvm_Class_getPrimitiveClass(bjvm_thread * thread, bjvm_obj_header *,
   } else if (strcmp(as_cstr, "void") == 0) {
     kind = BJVM_TYPE_KIND_VOID;
   } else {
-    ret->obj = NULL;
-    return 0;
+    return value_null();
   }
 
-  ret->obj = (void*)bjvm_primitive_class_mirror(thread, kind);
-  return 0;
+  return (bjvm_stack_value) { .obj = (void*)bjvm_primitive_class_mirror(thread, kind) };
 }
 
-int bjvm_Class_getComponentType(bjvm_thread *, bjvm_obj_header * obj,
-                                 bjvm_stack_value*, int,
-                                 bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_getComponentType(bjvm_thread *, bjvm_obj_header * obj,
+                                 bjvm_stack_value*, int) {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj);
   if (desc->kind == BJVM_CD_KIND_ORDINARY) {
-    ret->obj = NULL;
-    return 0;
+    return value_null();
   }
-  ret->obj = (void*)desc->one_fewer_dim->mirror;
-  return 0;
+  return  (bjvm_stack_value) { .obj = (void*)desc->one_fewer_dim->mirror };
 }
 
-int bjvm_Class_getModifiers(bjvm_thread *, bjvm_obj_header *obj,
-                            bjvm_stack_value *, int ,
-                            bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_getModifiers(bjvm_thread *, bjvm_obj_header *obj,
+                            bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  ret->i = classdesc->access_flags;
-  return 0;
+  return  (bjvm_stack_value) { .i = classdesc->access_flags };
 }
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                        bjvm_classdesc *classdesc);
 
-int bjvm_Object_getClass(bjvm_thread *thread, bjvm_obj_header *obj,
-                         bjvm_stack_value *, int, bjvm_stack_value *ret) {
-  ret->obj = (void*)bjvm_get_class_mirror(thread, obj->descriptor);
-  return 0;
+bjvm_stack_value bjvm_Object_getClass(bjvm_thread *thread, bjvm_obj_header *obj,
+                         bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .obj = (void*)bjvm_get_class_mirror(thread, obj->descriptor) };
 }
 
-int bjvm_Class_getSuperclass(bjvm_thread *, bjvm_obj_header *,
-                             bjvm_stack_value *, int, bjvm_stack_value *ret) {
-  ret->obj = NULL; // TODO
-  /*
-  if (obj->descriptor->access_flags & BJVM_ACCESS_INTERFACE)
-    ret->obj = NULL;
-  else
-    ret->obj = bjvm_get_class_mirror(thread,
-  obj->descriptor->super_class->classdesc);
-    */
-  return 0;
+bjvm_stack_value bjvm_Class_getSuperclass(bjvm_thread *, bjvm_obj_header *obj,
+                             bjvm_stack_value *, int) {
+
+  return value_null(); // TODO
 }
 
-int bjvm_Class_getClassLoader(bjvm_thread *, bjvm_obj_header *,
-                              bjvm_stack_value *, int,
-                              bjvm_stack_value *ret) {
-  ret->obj = NULL;
-  return 0;
+bjvm_stack_value bjvm_Class_getClassLoader(bjvm_thread *, bjvm_obj_header *,
+                              bjvm_stack_value *, int) {
+  return value_null();  // TODO
 }
 
 bjvm_obj_header *make_string(bjvm_thread *thread, const wchar_t *chars, int len);
 
-int bjvm_Class_getName(bjvm_thread *thread, bjvm_obj_header *obj,
-                       bjvm_stack_value *, int,
-                       bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_getName(bjvm_thread *thread, bjvm_obj_header *obj,
+                       bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  ret->obj = bjvm_intern_string(thread, classdesc->name.chars, classdesc->name.len);
-  return 0;
+  return  (bjvm_stack_value) { .obj = bjvm_intern_string(thread, classdesc->name.chars, classdesc->name.len) };
 }
 
 // Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class; static
-int bjvm_Class_forName(bjvm_thread *thread, bjvm_obj_header *,
-                       bjvm_stack_value *args, int,
-                       bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_forName(bjvm_thread *thread, bjvm_obj_header *,
+                       bjvm_stack_value *args, int) {
   // Read args[0] as a string
   bjvm_obj_header *name_obj = args[0].obj;
   short *name;
@@ -772,16 +727,14 @@ int bjvm_Class_forName(bjvm_thread *thread, bjvm_obj_header *,
   }
   bjvm_classdesc *c = bootstrap_class_create(thread, name_wchar);
   if (c) {
-    *ret = (bjvm_stack_value){.obj = (void*)bjvm_get_class_mirror(thread, c)};
+    return (bjvm_stack_value){.obj = (void*)bjvm_get_class_mirror(thread, c)};
   }
-  return 0;
+  return value_null();
 }
 
-int bjvm_Class_desiredAssertionStatus(bjvm_thread *, bjvm_obj_header *,
-                                      bjvm_stack_value *, int ,
-                                      bjvm_stack_value *ret) {
-  ret->i = 1;
-  return 0;
+bjvm_stack_value bjvm_Class_desiredAssertionStatus(bjvm_thread *, bjvm_obj_header *,
+                                      bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 1 };  // TODO add thread option
 }
 
 bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
@@ -834,27 +787,25 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
       method->parsed_descriptor->args_count);
 }
 
-int bjvm_Class_getDeclaredFields(bjvm_thread *thread, bjvm_obj_header *obj,
-                                 bjvm_stack_value *, int ,
-                                 bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_getDeclaredFields(bjvm_thread *thread, bjvm_obj_header *obj,
+                                 bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  ret->obj = create_object_array(
+  bjvm_stack_value ret;
+  ret.obj = create_object_array(
       thread, bootstrap_class_create(thread, L"java/lang/reflect/Field"),
       classdesc->fields_count);
 
   for (int i = 0; i < classdesc->fields_count; ++i) {
     bjvm_reflect_initialize_field(thread, classdesc, classdesc->fields + i);
-    *((struct bjvm_native_Field**)array_data(ret->obj) + i) =
+    *((struct bjvm_native_Field**)array_data(ret.obj) + i) =
         classdesc->fields[i].reflection_field;
   }
-
-  return 0;
+  return ret;
 }
 
-int bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
+bjvm_stack_value bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
                                        bjvm_obj_header *obj,
-                                       bjvm_stack_value *, int,
-                                       bjvm_stack_value *ret) {
+                                       bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
 
   int count = 0;
@@ -866,240 +817,192 @@ int bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
     }
   }
 
-  ret->obj = create_object_array(
+  bjvm_stack_value ret;
+  ret.obj = create_object_array(
       thread, bootstrap_class_create(thread, L"java/lang/reflect/Constructor"),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
     if (utf8_equals(classdesc->methods[i].name, "<init>")) {
-      *((struct bjvm_native_Constructor **)array_data(ret->obj) + j++) =
+      *((struct bjvm_native_Constructor **)array_data(ret.obj) + j++) =
           classdesc->methods[i].reflection_ctor;
     }
   }
-
-  return 0;
+  return ret;
 }
 
-int bjvm_Class_isAssignableFrom(bjvm_thread *, bjvm_obj_header *,
-                                bjvm_stack_value *, int,
-                                bjvm_stack_value *ret) {
-  ret->i = 1; // TODO
-  return 0;
+bjvm_stack_value bjvm_Class_isAssignableFrom(bjvm_thread *, bjvm_obj_header *,
+                                bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 1 }; // TODO
 }
 
-int bjvm_Class_isArray(bjvm_thread *, bjvm_obj_header * obj,
-                                bjvm_stack_value *, int,
-                                bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Class_isArray(bjvm_thread *, bjvm_obj_header * obj,
+                                bjvm_stack_value *, int) {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj);
-  ret->i = desc->kind != BJVM_CD_KIND_ORDINARY;
-  return 0;
+  return  (bjvm_stack_value) { .i = desc->kind != BJVM_CD_KIND_ORDINARY };
 }
 
-int bjvm_Float_floatToRawIntBits(bjvm_thread *, bjvm_obj_header *,
-                                 bjvm_stack_value *args, int,
-                                 bjvm_stack_value *ret) {
-  ret->i = args[0].i;
-  return 0;
+bjvm_stack_value bjvm_Float_floatToRawIntBits(bjvm_thread *, bjvm_obj_header *,
+                                 bjvm_stack_value *args, int) {
+  return  (bjvm_stack_value) { .i = args[0].i };
 }
 
-int bjvm_Double_doubleToRawLongBits(bjvm_thread *, bjvm_obj_header *,
-                                    bjvm_stack_value *args, int,
-                                    bjvm_stack_value *ret) {
-  ret->l = args[0].l;
-  return 0;
+bjvm_stack_value bjvm_Double_doubleToRawLongBits(bjvm_thread *, bjvm_obj_header *,
+                                    bjvm_stack_value *args, int) {
+  return  (bjvm_stack_value) { .l = args[0].l };
 }
 
-int bjvm_Unsafe_arrayBaseOffset(bjvm_thread *, bjvm_obj_header *,
-                                bjvm_stack_value *, int,
-                                bjvm_stack_value *ret) {
-  ret->i = 24;
-  return 0;
+bjvm_stack_value bjvm_Unsafe_arrayBaseOffset(bjvm_thread *, bjvm_obj_header *,
+                                bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 24 };
 }
 
 // (Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z
-int bjvm_Unsafe_compareAndSwapObject(bjvm_thread *, bjvm_obj_header *,
-                                     bjvm_stack_value *, int,
-                                     bjvm_stack_value *ret) {
-  ret->i = 1;
-  return 0;
+bjvm_stack_value bjvm_Unsafe_compareAndSwapObject(bjvm_thread *, bjvm_obj_header *,
+                                     bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 1 }; // TODO
 }
 
-int bjvm_Unsafe_objectFieldOffset(bjvm_thread *, bjvm_obj_header *,
-                                  bjvm_stack_value *args, int argc,
-                                  bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_objectFieldOffset(bjvm_thread *, bjvm_obj_header *,
+                                  bjvm_stack_value *args, int argc) {
   assert(argc == 1);
   bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].obj);
-  ret->l = reflect_field->byte_offset;
-  return 0;
+  return  (bjvm_stack_value) { .l = reflect_field->byte_offset };
 }
 
-int bjvm_Unsafe_getIntVolatile(bjvm_thread *, bjvm_obj_header *,
-                               bjvm_stack_value *args, int argc,
-                               bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_getIntVolatile(bjvm_thread *, bjvm_obj_header *,
+                               bjvm_stack_value *args, int argc) {
   assert(argc == 2);
-  ret->i = *(int *)((char *)args[0].obj + args[1].l);
-  return 0;
+  return  (bjvm_stack_value) { .i = *(int *)((char *)args[0].obj + args[1].l) };
 }
 
 // (Ljava/lang/Object;JII)Z
-int bjvm_Unsafe_compareAndSwapInt(bjvm_thread *, bjvm_obj_header *,
-                                  bjvm_stack_value *args, int argc,
-                                  bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_compareAndSwapInt(bjvm_thread *, bjvm_obj_header *,
+                                  bjvm_stack_value *args, int argc) {
   assert(argc == 4);
   bjvm_obj_header *obj = args[0].obj;
   int64_t offset = args[1].l;
   int expected = args[2].i, update = args[3].i;
-  ret->i = __sync_bool_compare_and_swap((int *)((char *)obj + offset), expected,
+  int ret = __sync_bool_compare_and_swap((int *)((char *)obj + offset), expected,
                                         update);
-  return 0;
+  return  (bjvm_stack_value) { .i = ret };
 }
 
-int bjvm_Unsafe_arrayIndexScale(bjvm_thread *, bjvm_obj_header *,
-                                bjvm_stack_value *args, int argc,
-                                bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_arrayIndexScale(bjvm_thread *, bjvm_obj_header *,
+                                bjvm_stack_value *args, int argc) {
   assert(argc == 1);
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].obj);
   switch (desc->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY:
-    ret->i = sizeof(void *);
-    return 0;
+    return  (bjvm_stack_value) { .i = sizeof(void *) };
   case BJVM_CD_KIND_BYTE_ARRAY:
   case BJVM_CD_KIND_CHAR_ARRAY:
   case BJVM_CD_KIND_FLOAT_ARRAY:
   case BJVM_CD_KIND_SHORT_ARRAY:
   case BJVM_CD_KIND_BOOLEAN_ARRAY:
   case BJVM_CD_KIND_INT_ARRAY:
-    ret->i = 4;
-    return 0;
+    return  (bjvm_stack_value) { .i = 4 };
   case BJVM_CD_KIND_DOUBLE_ARRAY:
   case BJVM_CD_KIND_LONG_ARRAY:
-    ret->i = 8;
-    return 0;
+    return  (bjvm_stack_value) { .i = 8 };
   case BJVM_CD_KIND_ORDINARY:
   default:  // invalid
-    ret->i = 0;
-    return 0;
+    return  (bjvm_stack_value) { .i = 0 };
   }
 }
 
-int bjvm_Unsafe_addressSize(bjvm_thread *, bjvm_obj_header *,
-                            bjvm_stack_value *, int,
-                            bjvm_stack_value *ret) {
-  ret->i = sizeof(void *);
-  return 0;
+bjvm_stack_value bjvm_Unsafe_addressSize(bjvm_thread *, bjvm_obj_header *,
+                            bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = sizeof(void*) };
 }
 
-int bjvm_Unsafe_allocateMemory(bjvm_thread *, bjvm_obj_header *,
-                               bjvm_stack_value *args, int argc,
-                               bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_allocateMemory(bjvm_thread *, bjvm_obj_header *,
+                               bjvm_stack_value *args, int argc) {
   assert(argc == 1);
-  ret->l = (int64_t)malloc(args[0].l);
-  return 0;
+  return  (bjvm_stack_value) { .l = (int64_t)malloc(args[0].l) };
 }
 
-int bjvm_Unsafe_freeMemory(bjvm_thread *, bjvm_obj_header *,
-                           bjvm_stack_value *args, int argc,
-                           bjvm_stack_value *) {
+bjvm_stack_value bjvm_Unsafe_freeMemory(bjvm_thread *, bjvm_obj_header *,
+                           bjvm_stack_value *args, int argc) {
   assert(argc == 1);
   free((void *)args[0].l);
-  return 0;
+  return value_null();
 }
 
-int bjvm_Unsafe_putLong(bjvm_thread *, bjvm_obj_header *,
-                        bjvm_stack_value *args, int argc,
-                        bjvm_stack_value *) {
+bjvm_stack_value bjvm_Unsafe_putLong(bjvm_thread *, bjvm_obj_header *,
+                        bjvm_stack_value *args, int argc) {
   assert(argc == 2);
   *(int64_t *)args[0].l = args[1].l;
-  return 0;
+  return value_null();
 }
 
-int bjvm_Unsafe_getByte(bjvm_thread *, bjvm_obj_header *,
-                        bjvm_stack_value *args, int argc,
-                        bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Unsafe_getByte(bjvm_thread *, bjvm_obj_header *,
+                        bjvm_stack_value *args, int argc) {
   assert(argc == 1);
-  ret->i = *(int8_t *)args[0].l;
-  return 0;
+  return  (bjvm_stack_value) { .i = *(int8_t *)args[0].l };
 }
 
-int bjvm_AtomicLong_VMSupportsCS8(bjvm_thread *, bjvm_obj_header *,
-                                  bjvm_stack_value *, int,
-                                  bjvm_stack_value *ret) {
-  ret->i = 1;
-  return 0;
+bjvm_stack_value bjvm_AtomicLong_VMSupportsCS8(bjvm_thread *, bjvm_obj_header *,
+                                  bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 1 };
 }
 
-int bjvm_FileDescriptor_set(bjvm_thread *, bjvm_obj_header *,
-                            bjvm_stack_value *args, int,
-                            bjvm_stack_value *ret) {
-  ret->l = args[0].i;
-  return 0;
+bjvm_stack_value bjvm_FileDescriptor_set(bjvm_thread *, bjvm_obj_header *,
+                            bjvm_stack_value *args, int) {
+  return  (bjvm_stack_value) { .l = args[0].i };
 }
 
-int bjvm_Reflection_getCallerClass(bjvm_thread *thread, bjvm_obj_header *,
-                                   bjvm_stack_value *, int,
-                                   bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Reflection_getCallerClass(bjvm_thread *thread, bjvm_obj_header *,
+                                   bjvm_stack_value *, int) {
   // Look at frame before latest frame
   if (thread->frames_count < 2) {
-    ret->obj = nullptr;
-    return 0;
+    return value_null();
   }
   bjvm_stack_frame *frame = thread->frames[thread->frames_count - 2];
-  ret->obj = (void*) bjvm_get_class_mirror(thread, frame->method->my_class);
-  return 0;
+  return  (bjvm_stack_value) { .obj = (void*) bjvm_get_class_mirror(thread, frame->method->my_class) };
 }
 
-int bjvm_Reflection_getClassAccessFlags(bjvm_thread *, bjvm_obj_header *,
-                                        bjvm_stack_value *args, int,
-                                        bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_Reflection_getClassAccessFlags(bjvm_thread *, bjvm_obj_header *,
+                                        bjvm_stack_value *args, int) {
   bjvm_obj_header *obj = args[0].obj;
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  ret->i = classdesc->access_flags;
-  return 0;
+  return  (bjvm_stack_value) { .i = classdesc->access_flags };
 }
 
-int bjvm_NativeConstructorAccessImpl_newInstance(bjvm_thread *thread,
+bjvm_stack_value bjvm_NativeConstructorAccessImpl_newInstance(bjvm_thread *thread,
                                                  bjvm_obj_header *,
-                                                 bjvm_stack_value *args, int,
-                                                 bjvm_stack_value *ret) {
+                                                 bjvm_stack_value *args, int) {
   bjvm_cp_method *method = *bjvm_unmirror_ctor(args[0].obj);
   bjvm_stack_value result;
-  int error = bjvm_initialize_class(thread, method->my_class);
-  if (error)
-    return error;
+  if (bjvm_initialize_class(thread, method->my_class))
+    return value_null();
   bjvm_obj_header *obj = new_object(thread, method->my_class);
 
   bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}}, &result);
-  ret->obj = obj;
-
-  return 0;
+  return  (bjvm_stack_value) { .obj = obj };
 }
 
-int bjvm_Thread_currentThread(bjvm_thread *thread, bjvm_obj_header *,
-                              bjvm_stack_value *, int, bjvm_stack_value *ret) {
-  ret->obj = (void*) thread->thread_obj;
-  return 0;
+bjvm_stack_value bjvm_Thread_currentThread(bjvm_thread *thread, bjvm_obj_header *,
+                              bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .obj = (void*) thread->thread_obj };
 }
 
-int bjvm_Thread_isAlive(bjvm_thread *, bjvm_obj_header *,
-                        bjvm_stack_value *, int, bjvm_stack_value *ret) {
-  ret->i = 0; // TODO
-  return 0;
+bjvm_stack_value bjvm_Thread_isAlive(bjvm_thread *, bjvm_obj_header *,
+                        bjvm_stack_value *, int) {
+  return  (bjvm_stack_value) { .i = 0 }; // TODO
 }
 
-int bjvm_Thread_start(bjvm_thread *, bjvm_obj_header *,
-                      bjvm_stack_value *, int, bjvm_stack_value *) {
-  return 0;
+bjvm_stack_value bjvm_Thread_start(bjvm_thread *, bjvm_obj_header *,
+                      bjvm_stack_value *, int) {
+  return value_null(); // TODO
 }
 
-int bjvm_Throwable_fillInStackTrace(bjvm_thread *, bjvm_obj_header *,
-                                    bjvm_stack_value *args, int,
-                                    bjvm_stack_value *ret) {
-  ret->obj = args[0].obj;
-  return 0;
+bjvm_stack_value bjvm_Throwable_fillInStackTrace(bjvm_thread *, bjvm_obj_header *,
+                                    bjvm_stack_value *args, int) {
+  return args[0];  // TODO
 }
 
-int bjvm_AccessController_doPrivileged(bjvm_thread *thread, bjvm_obj_header *,
-                                       bjvm_stack_value *args, int argc,
-                                       bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_AccessController_doPrivileged(bjvm_thread *thread, bjvm_obj_header *,
+                                       bjvm_stack_value *args, int argc) {
   // Look up method "run" on obj
   assert(argc == 1);
 
@@ -1109,14 +1012,15 @@ int bjvm_AccessController_doPrivileged(bjvm_thread *thread, bjvm_obj_header *,
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
       bjvm_easy_method_lookup(classdesc, "run", NULL, true, true);
-
   if (!method) {
+    // TODO figure out what JVM normally does here
     UNREACHABLE();
   }
 
   bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = obj}};
-  bjvm_thread_run(thread, method, method_args, ret);
-  return 0;
+  bjvm_stack_value ret;
+  bjvm_thread_run(thread, method, method_args, &ret);
+  return ret;
 }
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
@@ -1210,34 +1114,31 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
   Void->reflected_class = bjvm_make_primitive_classdesc(L"void", Void);
 }
 
-int bjvm_String_intern(bjvm_thread *thread, bjvm_obj_header *obj,
-                       bjvm_stack_value *, int, bjvm_stack_value *ret) {
+bjvm_stack_value bjvm_String_intern(bjvm_thread *thread, bjvm_obj_header *obj,
+                       bjvm_stack_value *, int) {
   if (obj == NULL) {
     bjvm_raise_exception(thread, L"NullPointerException", NULL);
-    return -1;
+    return value_null();
   }
   short *buf;
   size_t len;
   read_string(obj, &buf, &len);
   wchar_t *data = malloc((len + 1) * sizeof(wchar_t));
-  for (size_t i = 0; i < len; ++i) {
+  for (size_t i = 0; i < len; ++i)
     data[i] = buf[i];
-  }
   data[len] = 0;
-  ret->obj = bjvm_intern_string(thread, data, len);
+  bjvm_stack_value result;
+  result.obj = bjvm_intern_string(thread, data, len);
   free(data);
-  return 0;
+  return result;
 }
 
-int bjvm_FileOutputStream_writeBytes(bjvm_thread *thread, bjvm_obj_header *,
-                                     bjvm_stack_value *args, int,
-                                     bjvm_stack_value *) {
+bjvm_stack_value bjvm_FileOutputStream_writeBytes(bjvm_thread *thread, bjvm_obj_header *,
+                                     bjvm_stack_value *args, int) {
   bjvm_obj_header *bytes = args[0].obj;
   int offset = args[1].i;
   int length = args[2].i;
-
   assert(bytes->descriptor->kind == BJVM_CD_KIND_BYTE_ARRAY);
-
   char *data = (char *)array_data(bytes);
   for (int i = 0; i < length; ++i) {
     if (thread->vm->write_stdout)
@@ -1245,19 +1146,27 @@ int bjvm_FileOutputStream_writeBytes(bjvm_thread *thread, bjvm_obj_header *,
     else
       fprintf(stderr, "%c", data[offset + i]);
   }
-
-  return 0;
+  return (bjvm_stack_value) { .i = 0 };
 }
 
-int bjvm_StrictMath_log(bjvm_thread *, bjvm_obj_header*,
-                       bjvm_stack_value *args, int argc, bjvm_stack_value *ret) {
+/** Begin StrictMath natives */
+
+bjvm_stack_value bjvm_StrictMath_log(bjvm_thread *, bjvm_obj_header*,
+                       bjvm_stack_value *args, int argc) {
   assert(argc == 1);
-  ret->d = log(args[0].d);
-  return 0;
+  return (bjvm_stack_value) { .d = log(args[0].d) };
 }
 
+// Natives for the java.lang.StrictMath class.
 void bjvm_register_natives_StrictMath(bjvm_vm *vm) {
   bjvm_register_native(vm, "java/lang/StrictMath", "log", "(D)D", bjvm_StrictMath_log);
+}
+
+/** End StrictMath natives, begin Class natives */
+
+// Natives for the java.lang.Class class.
+void bjvm_register_natives_Class(bjvm_vm *vm) {
+
 }
 
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
@@ -1283,7 +1192,7 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   bjvm_register_natives_StrictMath(vm);
 
   bjvm_register_native(vm, "java/lang/System", "registerNatives", "()V",
-                       bjvm_System_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/lang/System", "mapLibraryName",
                        "(Ljava/lang/String;)Ljava/lang/String;",
                        bjvm_System_mapLibraryName);
@@ -1304,11 +1213,11 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   bjvm_register_native(vm, "java/lang/String", "intern", "()Ljava/lang/String;",
                        bjvm_String_intern);
   bjvm_register_native(vm, "java/lang/Object", "registerNatives", "()V",
-                       bjvm_Object_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/lang/Object", "clone", "()Ljava/lang/Object;",
                        bjvm_Object_clone);
   bjvm_register_native(vm, "java/lang/Class", "registerNatives", "()V",
-                       bjvm_Object_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/lang/Class", "getPrimitiveClass",
                        "(Ljava/lang/String;)Ljava/lang/Class;",
                        bjvm_Class_getPrimitiveClass);
@@ -1355,15 +1264,15 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   bjvm_register_native(vm, "java/lang/Double", "longBitsToDouble", "(J)D",
                        bjvm_Double_doubleToRawLongBits);
   bjvm_register_native(vm, "java/io/FileInputStream", "initIDs", "()V",
-                       bjvm_System_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/io/WinNTFileSystem", "initIDs", "()V",
-                       bjvm_System_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/io/FileOutputStream", "initIDs", "()V",
-                       bjvm_System_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/io/FileOutputStream", "writeBytes", "([BIIZ)V",
                        bjvm_FileOutputStream_writeBytes);
   bjvm_register_native(vm, "java/io/FileDescriptor", "initIDs", "()V",
-                       bjvm_System_registerNatives);
+                       unimplemented_native);
   bjvm_register_native(vm, "java/io/FileDescriptor", "set", "(I)J",
                        bjvm_FileDescriptor_set);
 
@@ -2548,9 +2457,9 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_byte
       return -1;
     }
 
-    method->native_handle(thread, target,
+    invoked_result = method->native_handle(thread, target,
                           frame->values + frame->stack_depth - args + 1,
-                          args - 1, &invoked_result);
+                          args - 1);
     frame->stack_depth -= args;
     if (thread->current_exception)
       return -1;
@@ -2611,9 +2520,8 @@ int bjvm_invokestatic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytec
       return -1;
     }
 
-    method->native_handle(thread, NULL,
-                          frame->values + frame->stack_depth - args, args,
-                          &invoked_result);
+    invoked_result = method->native_handle(thread, NULL,
+                          frame->values + frame->stack_depth - args, args);
     frame->stack_depth -= args;
     if (thread->current_exception)
       return -1;
@@ -2674,6 +2582,10 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame, struct bjv
 
 bool bjvm_invokedynamic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytecode_insn * insn) {
   UNREACHABLE("bjvm_invokedynamic");
+
+  (void) thread;
+  (void) frame;
+  (void) insn;
 }
 
 int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
@@ -2993,9 +2905,9 @@ start:
       checked_push(frame, (bjvm_stack_value){.f = -a });
       NEXT_INSN;
     }
-    bjvm_insn_frem: bjvm_insn_drem: { // deprecated
-      float b = checked_pop(frame).d, a = checked_pop(frame).d;
-      checked_push(frame, (bjvm_stack_value) { .d = fmodf(a, b) });
+    bjvm_insn_frem: { // deprecated
+      float b = checked_pop(frame).f, a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value) { .f = fmodf(a, b) });
       NEXT_INSN;
     }
     bjvm_insn_fsub: {
@@ -3645,7 +3557,7 @@ done:;
         if (ent.start_insn <= pc && pc < ent.end_insn) {
           if (ent.catch_type) {
             int error = bjvm_resolve_class(thread, ent.catch_type);
-            assert(!error);
+            if (error) goto done;  // O dear
           }
           if (!ent.catch_type ||
               bjvm_instanceof(thread->current_exception->descriptor,
