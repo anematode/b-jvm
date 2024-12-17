@@ -2189,6 +2189,21 @@ char *parse_method_descriptor(const bjvm_utf8 *entry,
   return error ? err_while_parsing_md(result, error) : NULL;
 }
 
+// Go through the InvokeDynamic entries and link their bootstrap method pointers
+void link_bootstrap_methods(bjvm_classdesc *cf) {
+  bjvm_constant_pool *cp = cf->pool;
+  for (int i = 1; i < cp->entries_len; i++) {
+    if (cp->entries[i].kind == BJVM_CP_KIND_INVOKE_DYNAMIC) {
+      bjvm_cp_indy_info *indy = &cp->entries[i].indy_info;
+      int index = (int)(uintptr_t)indy->method;
+      if (index < 0 || index >= cf->bootstrap_methods->count) {
+        format_error_static("Invalid bootstrap method index");
+      }
+      indy->method = &cf->bootstrap_methods->methods[index];
+    }
+  }
+}
+
 char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
@@ -2298,6 +2313,8 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
       cf->bootstrap_methods = &attr->bootstrap_methods;
     }
   }
+
+  link_bootstrap_methods(cf);
 
   result->state = BJVM_CD_STATE_LOADED;
   free(ctx.free_on_error); // we made it :)

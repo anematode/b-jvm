@@ -349,7 +349,7 @@ name_and_type_entry_to_string(const bjvm_cp_name_and_type *name_and_type) {
   return strdup(result);
 }
 
-char *indy_entry_to_string(const bjvm_cp_invoke_dynamic_info *indy_info) {
+char *indy_entry_to_string(const bjvm_cp_indy_info *indy_info) {
   char *name_and_type = name_and_type_entry_to_string(
       indy_info->name_and_type); // TODO add bootstrap method
   return name_and_type;

@@ -312,7 +312,7 @@ typedef struct {
   bjvm_bootstrap_method *method; // TODO convert to pointer
   bjvm_cp_name_and_type *name_and_type;
   bjvm_method_descriptor *method_descriptor;
-} bjvm_cp_invoke_dynamic_info;
+} bjvm_cp_indy_info;
 
 typedef enum {
   BJVM_CP_KIND_INVALID = 0,
@@ -351,7 +351,7 @@ typedef struct bjvm_cp_entry {
     bjvm_cp_method_info methodref;
     bjvm_cp_method_handle_info method_handle_info;
     bjvm_cp_method_type_info method_type_info;
-    bjvm_cp_invoke_dynamic_info indy_info;
+    bjvm_cp_indy_info indy_info;
   };
 } bjvm_cp_entry;
 
