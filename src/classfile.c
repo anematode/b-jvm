@@ -598,11 +598,18 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_UTF8, .utf8 = utf8};
   }
   case CONSTANT_MethodHandle: {
+    uint8_t handle_kind = reader_next_u8(reader, "method handle kind");
+    uint16_t reference_index = reader_next_u16(reader, "reference index");
+    bjvm_cp_entry *entry = skip_linking ? NULL : checked_cp_entry(
+                                                     ctx->cp, reference_index,
+                                                     -1,
+                                                     "method handle reference");
+    // TODO validate both
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_METHOD_HANDLE,
         .method_handle_info = {
-            .handle_kind = reader_next_u8(reader, "method handle kind"),
-            .reference_index = reader_next_u16(reader, "reference index")}};
+            .handle_kind = handle_kind,
+            .reference = entry}};
   }
   case CONSTANT_MethodType: {
     uint16_t desc_index = reader_next_u16(reader, "descriptor index");

@@ -232,6 +232,7 @@ struct bjvm_bc_invokeinterface_data {
 typedef struct bjvm_classdesc bjvm_classdesc;
 typedef struct bjvm_obj_header bjvm_obj_header;
 typedef struct bjvm_bootstrap_method bjvm_bootstrap_method;
+typedef struct bjvm_cp_entry bjvm_cp_entry;
 
 typedef struct {
   bjvm_classdesc *classdesc;
@@ -301,7 +302,7 @@ typedef enum {
 
 typedef struct {
   bjvm_method_handle_kind handle_kind;
-  uint16_t reference_index; // TODO
+  bjvm_cp_entry *reference;
 } bjvm_cp_method_handle_info;
 
 typedef struct {
