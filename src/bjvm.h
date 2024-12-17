@@ -303,6 +303,8 @@ typedef enum {
 typedef struct {
   bjvm_method_handle_kind handle_kind;
   bjvm_cp_entry *reference;
+
+  struct bjvm_native_MethodType* resolved_mt;
 } bjvm_cp_method_handle_info;
 
 typedef struct {

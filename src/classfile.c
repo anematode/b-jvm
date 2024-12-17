@@ -2315,10 +2315,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
     cf->methods[i].my_class = result;
 
     // Mark signature polymorphic functions
-    if (in_MethodHandle && (utf8_equals(cf->methods[i].name, "invoke") ||
-                            utf8_equals(cf->methods[i].name, "invokeExact"))) {
-      // "In Java SE 8, the only signature polymorphic methods are the invoke
-      // and invokeExact methods of the class java.lang.invoke.MethodHandle."
+    if (in_MethodHandle && cf->methods[i].access_flags & BJVM_ACCESS_NATIVE) {
       cf->methods[i].is_signature_polymorphic = true;
     }
   }
