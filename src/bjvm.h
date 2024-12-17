@@ -509,9 +509,8 @@ typedef union {
   bjvm_obj_header *obj; // reference type
 } bjvm_stack_value;
 
-typedef int (*bjvm_native_callback)(bjvm_thread *vm, bjvm_obj_header *obj,
-                                    bjvm_stack_value *args, int argc,
-                                    bjvm_stack_value *ret);
+typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm, bjvm_obj_header *obj,
+                                    bjvm_stack_value *args, int argc);
 
 typedef struct bjvm_cp_method {
   bjvm_access_flags access_flags;
@@ -752,7 +751,7 @@ typedef struct bjvm_vm {
   // Passed to write_stdout/write_stderr
   void *write_byte_param;
 
-  // Primitive classes (int.class, etc., boolean (4) through void (12) )
+  // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8) )
   struct bjvm_native_Class *primitive_classes[9];
 } bjvm_vm;
 
@@ -966,6 +965,8 @@ int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name, con
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind);
 
+bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
+                                    size_t len);
 #include "natives.h"
 
 #ifdef __cplusplus
