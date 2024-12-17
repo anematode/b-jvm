@@ -596,6 +596,9 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   bjvm_compressed_bitset *insn_index_to_references =
       calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
 
+  for (int i = 0; i < code->insn_count; ++i)
+    insn_index_to_references[i] = bjvm_empty_bitset();
+
   bjvm_analy_stack_state stack;
   stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
 

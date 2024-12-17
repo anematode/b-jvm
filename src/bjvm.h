@@ -231,6 +231,7 @@ struct bjvm_bc_invokeinterface_data {
 
 typedef struct bjvm_classdesc bjvm_classdesc;
 typedef struct bjvm_obj_header bjvm_obj_header;
+typedef struct bjvm_bootstrap_method bjvm_bootstrap_method;
 
 typedef struct {
   bjvm_classdesc *classdesc;
@@ -308,7 +309,7 @@ typedef struct {
 } bjvm_cp_method_type_info;
 
 typedef struct {
-  uint16_t bootstrap_method_attr_index; // TODO convert to pointer
+  bjvm_bootstrap_method *method; // TODO convert to pointer
   bjvm_cp_name_and_type *name_and_type;
   bjvm_method_descriptor *method_descriptor;
 } bjvm_cp_invoke_dynamic_info;
@@ -421,6 +422,7 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_CODE = 0,
   BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE = 1,
   BJVM_ATTRIBUTE_KIND_UNKNOWN = 2,
+  BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS = 3,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -457,6 +459,17 @@ typedef struct {
   int attributes_count;
 } bjvm_attribute_code;
 
+typedef struct bjvm_bootstrap_method {
+  bjvm_cp_method_handle_info* ref;
+  bjvm_cp_entry **args;
+  int args_count;
+} bjvm_bootstrap_method;
+
+typedef struct {
+  int count;
+  bjvm_bootstrap_method * methods;
+} bjvm_attribute_bootstrap_methods;
+
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
   bjvm_utf8 *name;
@@ -465,6 +478,7 @@ typedef struct bjvm_attribute {
   union {
     bjvm_attribute_code code;
     bjvm_cp_entry *constant_value;
+    bjvm_attribute_bootstrap_methods bootstrap_methods;
   };
 } bjvm_attribute;
 
@@ -585,6 +599,9 @@ typedef struct bjvm_classdesc {
 
   int methods_count;
   bjvm_cp_method *methods;
+
+  int bootstrap_methods_count;
+  bjvm_attribute_bootstrap_methods *bootstrap_methods;
 
   int attributes_count;
   bjvm_attribute *attributes;
@@ -898,6 +915,7 @@ char *print_analy_stack_state(const bjvm_analy_stack_state *state);
 bjvm_compressed_bitset bjvm_init_compressed_bitset(int bits_capacity);
 void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits);
 bool bjvm_is_bitset_compressed(bjvm_compressed_bitset bits);
+bjvm_compressed_bitset bjvm_empty_bitset();
 int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity);

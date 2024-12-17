@@ -148,7 +148,6 @@ std::vector<std::string> ListDirectory(const std::string &path,
 #endif
 }
 
-#if 0
 TEST_CASE("Test classfile parsing") {
   bool fuzz = false;
 
@@ -226,7 +225,6 @@ TEST_CASE("Test classfile parsing") {
     });
   };
 }
-#endif
 
 int preregister_all_classes(bjvm_vm *vm) {
   auto files = ListDirectory("jre8", true);

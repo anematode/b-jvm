@@ -132,10 +132,20 @@ void bjvm_free_code_attribute(bjvm_attribute_code *code) {
   free(code->code);
 }
 
+void bjvm_free_bootstrap_methods_attribute(bjvm_attribute_bootstrap_methods *bm) {
+  for (int i = 0; i < bm->count; ++i) {
+    free(bm->methods[i].args);
+  }
+  free(bm->methods);
+}
+
 void bjvm_free_attribute(bjvm_attribute *attribute) {
   switch (attribute->kind) {
   case BJVM_ATTRIBUTE_KIND_CODE:
     bjvm_free_code_attribute(&attribute->code);
+    break;
+  case BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS:
+    bjvm_free_bootstrap_methods_attribute(&attribute->bootstrap_methods);
     break;
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
@@ -184,9 +194,13 @@ void free_method_descriptor(void *descriptor_) {
 void free_code_analysis(bjvm_code_analysis *code_analysis) {
   if (!code_analysis)
     return;
-  for (int i = 0; i < code_analysis->insn_count; ++i)
-    bjvm_free_compressed_bitset(code_analysis->insn_index_to_references[i]);
-  free(code_analysis->insn_index_to_references);
+  if (code_analysis->insn_index_to_references) {
+    printf("%p\n", code_analysis->insn_index_to_references);
+    fflush(stdout);
+    for (int i = 0; i < code_analysis->insn_count; ++i)
+      bjvm_free_compressed_bitset(code_analysis->insn_index_to_references[i]);
+    free(code_analysis->insn_index_to_references);
+  }
   free(code_analysis);
 }
 
@@ -613,8 +627,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                             ->name_and_type;
 
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
-                           .indy_info = {.bootstrap_method_attr_index =
-                                             bootstrap_method_attr_index,
+                           .indy_info = {.method = (void*)bootstrap_method_attr_index,  // will be fixed up later
                                          .name_and_type = name_and_type,
                                          .method_descriptor = NULL}};
   }
@@ -1714,6 +1727,31 @@ void convert_pc_offsets_to_insn_offsets(bjvm_bytecode_insn *code,
   }
 }
 
+void parse_bootstrap_methods_attribute(cf_byteslice attr_reader, bjvm_attribute* attr, bjvm_classfile_parse_ctx * ctx) {
+  attr->kind = BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS;
+  uint16_t count = attr->bootstrap_methods.count = reader_next_u16(&attr_reader, "bootstrap methods count");
+  bjvm_bootstrap_method* methods = attr->bootstrap_methods.methods = calloc(count, sizeof(bjvm_bootstrap_method));
+  free_on_format_error(ctx, methods);
+  for (int i = 0; i < count; ++i) {
+    bjvm_bootstrap_method *method = methods + i;
+    method->ref = &checked_cp_entry(
+                       ctx->cp, reader_next_u16(&attr_reader, "bootstrap method ref"),
+                       BJVM_CP_KIND_METHOD_HANDLE, "bootstrap method ref")->method_handle_info;
+    uint16_t arg_count =
+        reader_next_u16(&attr_reader, "bootstrap method arg count");
+    method->args_count = arg_count;
+    method->args = calloc(arg_count, sizeof(bjvm_cp_entry *));
+    free_on_format_error(ctx, method->args);
+    for (int j = 0; j < arg_count; ++j) {
+      const int allowed = BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_FLOAT |
+                          BJVM_CP_KIND_LONG | BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_METHOD_HANDLE | BJVM_CP_KIND_METHOD_TYPE;
+      method->args[j] = checked_cp_entry(ctx->cp,
+                                         reader_next_u16(&attr_reader, "bootstrap method arg"),
+                                         allowed, "bootstrap method arg");
+    }
+  }
+}
+
 void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
                      bjvm_attribute *attr);
 
@@ -1827,6 +1865,8 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
         BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_FLOAT |
             BJVM_CP_KIND_LONG | BJVM_CP_KIND_DOUBLE,
         "constant value");
+  } else if (utf8_equals(attr->name, "BootstrapMethods")) {
+      parse_bootstrap_methods_attribute(attr_reader, attr, ctx);
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
@@ -2230,6 +2270,8 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf->methods = malloc(cf->methods_count * sizeof(bjvm_cp_method));
   free_on_format_error(&ctx, cf->methods);
 
+  cf->bootstrap_methods = NULL;
+
   bool in_MethodHandle =
       utf8_equals(&cf->name, "java/lang/invoke/MethodHandle");
   for (int i = 0; i < cf->methods_count; ++i) {
@@ -2250,11 +2292,14 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf->attributes = malloc(cf->attributes_count * sizeof(bjvm_attribute));
   free_on_format_error(&ctx, cf->attributes);
   for (int i = 0; i < cf->attributes_count; i++) {
-    parse_attribute(&reader, &ctx, cf->attributes + i);
+    bjvm_attribute *attr = cf->attributes + i;
+    parse_attribute(&reader, &ctx, attr);
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS) {
+      cf->bootstrap_methods = &attr->bootstrap_methods;
+    }
   }
 
   result->state = BJVM_CD_STATE_LOADED;
-
   free(ctx.free_on_error); // we made it :)
   return NULL;
 }
