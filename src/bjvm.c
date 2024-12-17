@@ -125,6 +125,10 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
     free_method_descriptor(entry->methodref.method_descriptor);
     break;
   }
+  case BJVM_CP_KIND_METHOD_TYPE: {
+    free_method_descriptor(entry->method_type_info.parsed_descriptor);
+    break;
+  }
   default: // TODO will need to add more as we resolve descriptors
     break;
   }
@@ -782,7 +786,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
-    char *error = parse_method_descriptor(nat->descriptor, desc);
+    char *error = parse_method_descriptor(nat->descriptor, desc);  // TODO free on FormatError
     if (error) {
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%S' has invalid descriptor '%S': %s",
@@ -790,6 +794,16 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
       format_error_dynamic(buf);
     }
     entry->methodref.method_descriptor = desc;
+    break;
+  }
+  case BJVM_CP_KIND_METHOD_TYPE: {
+    bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
+    free_on_format_error(ctx, desc);
+    char *error = parse_method_descriptor(
+        entry->method_type_info.descriptor, desc); // TODO free on FormatError
+    if (error)
+      format_error_dynamic(error);
+    entry->method_type_info.parsed_descriptor = desc;
     break;
   }
   default:
@@ -5265,6 +5279,31 @@ bjvm_classdesc *ordinary_arr_classdesc(bjvm_thread *thread,
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
+
+int bjvm_resolve_method_type(bjvm_thread *thread, bjvm_cp_method_type_info *info) {
+  // Resolve each class in the arguments list, as well as the return type if it exists
+  bjvm_method_descriptor *method = info->parsed_descriptor;
+  assert(method);
+
+  // TODO create reflected objects
+
+  for (int i = 0; i < method->args_count; ++i) {
+    bjvm_classdesc *desc = bootstrap_class_create(thread, method->args[i].class_name.chars);
+    if (!desc) {
+      // TODO
+      UNREACHABLE();
+    }
+  }
+  if (method->return_type.kind != BJVM_TYPE_KIND_VOID) {
+    bjvm_classdesc *desc = bootstrap_class_create(thread, method->return_type.class_name.chars);
+    if (!desc) {
+      // TODO
+      UNREACHABLE();
+    }
+  }
+
+  return 0;
+}
 
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,

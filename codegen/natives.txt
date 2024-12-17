@@ -10,3 +10,7 @@ java/lang/reflect/Constructor
   bjvm_cp_method *reflected_ctor;
 java/lang/Thread
   bjvm_thread *vm_thread;
+java/lang/invoke/MethodHandle
+  bjvm_cp_method_handle_info *reflected_mh;
+java/lang/invoke/MethodType
+  bjvm_cp_method_type_info *reflected_mt;
