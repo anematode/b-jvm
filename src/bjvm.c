@@ -6246,7 +6246,8 @@ start:
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         // ArrayIndexOutOfBoundsException
-        UNREACHABLE();
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
       }
       bjvm_obj_header *obj = *((bjvm_obj_header **)array_data(array) + index);
       checked_push(frame, (bjvm_stack_value){.obj = obj});
@@ -6272,7 +6273,8 @@ start:
       bjvm_obj_header *obj = checked_pop(frame).obj;
       if (!obj) {
         // NullPointerException
-        UNREACHABLE();
+        bjvm_null_pointer_exception(thread);
+        goto done;
       }
       assert(obj->descriptor->kind != BJVM_CD_KIND_ORDINARY);
       checked_push(frame, (bjvm_stack_value){.i = *array_length(obj)});
@@ -6289,7 +6291,8 @@ start:
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         // ArrayIndexOutOfBoundsException
-        UNREACHABLE();
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
       }
       checked_push(frame, (bjvm_stack_value){
                               .i = *((int8_t *)array_data(array) + index)});
@@ -6389,9 +6392,11 @@ start:
       checked_push(frame, (bjvm_stack_value) { .d = -a });
       NEXT_INSN;
     }
-    bjvm_insn_drem:
-      UNREACHABLE("bjvm_insn_drem");
+    bjvm_insn_drem: { // deprecated
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = fmod(a, b) });
       NEXT_INSN;
+    }
     bjvm_insn_dsub: {
       double b = checked_pop(frame).d, a = checked_pop(frame).d;
       checked_push(frame, (bjvm_stack_value) { .d = a - b });
@@ -6411,9 +6416,16 @@ start:
       checked_push(frame, val1);
       NEXT_INSN;
     }
-    bjvm_insn_dup_x2:
-      UNREACHABLE("bjvm_insn_dup_x2");
+    bjvm_insn_dup_x2: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      checked_push(frame, val1);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
       NEXT_INSN;
+    }
     bjvm_insn_dup2: {
       bjvm_stack_value val1 = checked_pop(frame), val2 = checked_pop(frame);
       checked_push(frame, val2);
@@ -6422,12 +6434,30 @@ start:
       checked_push(frame, val1);
       NEXT_INSN;
     }
-    bjvm_insn_dup2_x1:
-      UNREACHABLE("bjvm_insn_dup2_x1");
+    bjvm_insn_dup2_x1: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
       NEXT_INSN;
-    bjvm_insn_dup2_x2:
-      UNREACHABLE("bjvm_insn_dup2_x2");
+    }
+    bjvm_insn_dup2_x2: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      bjvm_stack_value val4 = checked_pop(frame);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      checked_push(frame, val4);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
       NEXT_INSN;
+    }
     bjvm_insn_f2d: {
       checked_push(frame, (bjvm_stack_value){.d = (double)checked_pop(frame).f});
       NEXT_INSN;
@@ -6486,9 +6516,11 @@ start:
       checked_push(frame, (bjvm_stack_value){.f = -a });
       NEXT_INSN;
     }
-    bjvm_insn_frem:
-      UNREACHABLE("bjvm_insn_frem");
+    bjvm_insn_frem: bjvm_insn_drem: { // deprecated
+      float b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = fmodf(a, b) });
       NEXT_INSN;
+    }
     bjvm_insn_fsub: {
       float b = checked_pop(frame).f, a = checked_pop(frame).f;
       checked_push(frame, (bjvm_stack_value){.f = a - b });
