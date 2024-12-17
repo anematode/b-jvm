@@ -714,6 +714,22 @@ bool is_kind_wide(bjvm_type_kind kind) {
   return kind == BJVM_TYPE_KIND_LONG || kind == BJVM_TYPE_KIND_DOUBLE;
 }
 
+char primitive_type_kind_to_char(bjvm_type_kind kind) {
+  switch (kind) {
+    case BJVM_TYPE_KIND_BOOLEAN: return 'Z';
+    case BJVM_TYPE_KIND_CHAR: return 'C';
+    case BJVM_TYPE_KIND_FLOAT: return 'F';
+    case BJVM_TYPE_KIND_DOUBLE: return 'D';
+    case BJVM_TYPE_KIND_BYTE: return 'B';
+    case BJVM_TYPE_KIND_SHORT: return 'S';
+    case BJVM_TYPE_KIND_INT: return 'I';
+    case BJVM_TYPE_KIND_LONG: return 'J';
+    case BJVM_TYPE_KIND_VOID: return 'V';
+    case BJVM_TYPE_KIND_REFERENCE: return 'L';
+    default: UNREACHABLE();
+  }
+}
+
 void primitive_type_kind_to_array_info(bjvm_type_kind kind,
                                        const wchar_t **type, int *size) {
   switch (kind) {
@@ -3644,10 +3660,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
     cf->methods[i].my_class = result;
 
     // Mark signature polymorphic functions
-    if (in_MethodHandle && (utf8_equals(cf->methods[i].name, "invoke") ||
-                            utf8_equals(cf->methods[i].name, "invokeExact"))) {
-      // "In Java SE 8, the only signature polymorphic methods are the invoke
-      // and invokeExact methods of the class java.lang.invoke.MethodHandle."
+    if (in_MethodHandle && cf->methods[i].access_flags & BJVM_ACCESS_NATIVE) {
       cf->methods[i].is_signature_polymorphic = true;
     }
   }
@@ -4398,7 +4411,27 @@ bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
   }
   if (chars[0] == '[')
     return bootstrap_class_create(thread, chars);
-  return NULL; // TODO
+  switch (chars[0]) {
+    case 'Z':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_BOOLEAN)->reflected_class;
+    case 'B':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_BYTE)->reflected_class;
+    case 'C':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_CHAR)->reflected_class;
+    case 'S':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_SHORT)->reflected_class;
+    case 'I':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_INT)->reflected_class;
+    case 'J':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_LONG)->reflected_class;
+    case 'F':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_FLOAT)->reflected_class;
+    case 'D':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_DOUBLE)->reflected_class;
+    case 'V':
+      return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_VOID)->reflected_class;
+  }
+  UNREACHABLE();
 }
 
 void bjvm_reflect_initialize_field(bjvm_thread *thread,
@@ -5280,29 +5313,63 @@ bjvm_classdesc *ordinary_arr_classdesc(bjvm_thread *thread,
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
-int bjvm_resolve_method_type(bjvm_thread *thread, bjvm_cp_method_type_info *info) {
-  // Resolve each class in the arguments list, as well as the return type if it exists
-  bjvm_method_descriptor *method = info->parsed_descriptor;
-  assert(method);
+bjvm_utf8 field_descriptor_to_name(bjvm_field_descriptor desc) {
+  wchar_t* result = calloc(desc.dimensions + 4 + desc.kind == BJVM_TYPE_KIND_REFERENCE ? desc.class_name.len : 0, sizeof(wchar_t)), *write = result;
+  if (desc.dimensions) {
+    wmemset(write, L'[', desc.dimensions);
+    write += desc.dimensions;
+  }
+  if (desc.kind == BJVM_TYPE_KIND_REFERENCE) {
+    *write++ = L'L';
+    wmemcpy(write, desc.class_name.chars, desc.class_name.len);
+    write += desc.class_name.len;
+  } else {
+    *write++ = primitive_type_kind_to_char(desc.kind);
+  }
+  return (bjvm_utf8) { .chars = result, .len = write - result };
+}
 
-  // TODO create reflected objects
+struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
+  // Resolve each class in the arguments list, as well as the return type if it exists
+  assert(method);
+  bjvm_classdesc *MethodType = bootstrap_class_create(thread, L"java/lang/invoke/MethodType"),
+    *Class = bootstrap_class_create(thread, L"java/lang/Class");
+
+  assert(MethodType);
+  bjvm_initialize_class(thread, MethodType);
+
+  bjvm_obj_header *ptypes = create_object_array(thread, Class, method->args_count);
+  struct bjvm_native_Class *rtype;
 
   for (int i = 0; i < method->args_count; ++i) {
-    bjvm_classdesc *desc = bootstrap_class_create(thread, method->args[i].class_name.chars);
-    if (!desc) {
-      // TODO
-      UNREACHABLE();
-    }
-  }
-  if (method->return_type.kind != BJVM_TYPE_KIND_VOID) {
-    bjvm_classdesc *desc = bootstrap_class_create(thread, method->return_type.class_name.chars);
-    if (!desc) {
-      // TODO
-      UNREACHABLE();
-    }
+    bjvm_utf8 name = field_descriptor_to_name(method->args[i]);
+    bjvm_classdesc* arg_desc = load_class_of_field_descriptor(thread, name.chars);
+    free_utf8(name);
+    if (!arg_desc) return NULL;
+    *((struct bjvm_native_Class**)array_data(ptypes) + i) = arg_desc->mirror;
   }
 
-  return 0;
+  bjvm_utf8 name = field_descriptor_to_name(method->return_type);
+  bjvm_classdesc* ret_desc = load_class_of_field_descriptor(thread, name.chars);
+  free_utf8(name);
+  if (!ret_desc) return NULL;
+
+  rtype = ret_desc->mirror;
+
+  // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
+  bjvm_cp_method *init = bjvm_easy_method_lookup(MethodType, "<init>", "(Ljava/lang/Class;[Ljava/lang/Class;Z)V", false, false);
+  struct bjvm_native_MethodType *result = (void*)new_object(thread, MethodType);
+
+  bjvm_thread_run(thread, init, (bjvm_stack_value[]){{.obj = (void*)result}, {.obj = (void*)rtype}, {.obj = ptypes}, {.i = 1 /* trusted */}}, NULL);
+  return result;
+}
+
+int bjvm_resolve_method_handle(bjvm_thread *thread, bjvm_cp_method_handle_info *info) {
+  if (info->resolved_mt) return 0;  // already resolved
+
+  // "Third, a reference to an instance of java.lang.invoke.MethodType is obtained as if by resolution of an
+  // unresolved symbolic reference to a method type that contains the method descriptor specified in Table 5.4.3.5-B
+  // for the kind of MH."
 }
 
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
@@ -6218,6 +6285,14 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame, struct bjv
 }
 
 bool bjvm_invokedynamic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytecode_insn * insn) {
+
+  bjvm_cp_indy_info *indy = &insn->cp->indy_info;
+
+  // "The call site specifier is resolved (§5.4.3.6) for this specific dynamic call site to obtain a reference to a
+  // java.lang.invoke.MethodHandle instance that will serve as the bootstrap method, a reference to a
+  // java.lang.invoke.MethodType instance, and references to static arguments."
+
+
   UNREACHABLE("bjvm_invokedynamic");
 
   (void) thread;
