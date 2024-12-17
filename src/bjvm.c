@@ -2672,6 +2672,10 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame, struct bjv
   return 0;
 }
 
+bool bjvm_invokedynamic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytecode_insn * insn) {
+  UNREACHABLE("bjvm_invokedynamic");
+}
+
 int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
                             bjvm_stack_value *result) {
   bjvm_cp_method *method = frame->method;
@@ -2698,7 +2702,7 @@ start:
 #endif
 
     static const void* insn_jump_table[] = { &&bjvm_insn_nop, &&bjvm_insn_aaload, &&bjvm_insn_aastore, &&bjvm_insn_aconst_null,   &&bjvm_insn_areturn,   &&bjvm_insn_arraylength,   &&bjvm_insn_athrow,   &&bjvm_insn_baload,   &&bjvm_insn_bastore,   &&bjvm_insn_caload,   &&bjvm_insn_castore,   &&bjvm_insn_d2f,   &&bjvm_insn_d2i,   &&bjvm_insn_d2l,   &&bjvm_insn_dadd,   &&bjvm_insn_daload,   &&bjvm_insn_dastore,   &&bjvm_insn_dcmpg,   &&bjvm_insn_dcmpl,   &&bjvm_insn_ddiv,   &&bjvm_insn_dmul,   &&bjvm_insn_dneg,   &&bjvm_insn_drem,   &&bjvm_insn_dreturn,   &&bjvm_insn_dsub,   &&bjvm_insn_dup,   &&bjvm_insn_dup_x1,   &&bjvm_insn_dup_x2,   &&bjvm_insn_dup2,   &&bjvm_insn_dup2_x1,   &&bjvm_insn_dup2_x2,   &&bjvm_insn_f2d,   &&bjvm_insn_f2i,   &&bjvm_insn_f2l,   &&bjvm_insn_fadd,   &&bjvm_insn_faload,   &&bjvm_insn_fastore,   &&bjvm_insn_fcmpg,   &&bjvm_insn_fcmpl,   &&bjvm_insn_fdiv,   &&bjvm_insn_fmul,   &&bjvm_insn_fneg,   &&bjvm_insn_frem,   &&bjvm_insn_freturn,   &&bjvm_insn_fsub,   &&bjvm_insn_i2b,   &&bjvm_insn_i2c,   &&bjvm_insn_i2d,   &&bjvm_insn_i2f,   &&bjvm_insn_i2l,   &&bjvm_insn_i2s,   &&bjvm_insn_iadd,   &&bjvm_insn_iaload,   &&bjvm_insn_iand,   &&bjvm_insn_iastore,   &&bjvm_insn_idiv,   &&bjvm_insn_imul,   &&bjvm_insn_ineg,   &&bjvm_insn_ior,   &&bjvm_insn_irem,   &&bjvm_insn_ireturn,   &&bjvm_insn_ishl,   &&bjvm_insn_ishr,   &&bjvm_insn_isub,   &&bjvm_insn_iushr,   &&bjvm_insn_ixor,   &&bjvm_insn_l2d,   &&bjvm_insn_l2f,   &&bjvm_insn_l2i,   &&bjvm_insn_ladd,   &&bjvm_insn_laload,   &&bjvm_insn_land,   &&bjvm_insn_lastore,   &&bjvm_insn_lcmp,   &&bjvm_insn_ldiv,   &&bjvm_insn_lmul,   &&bjvm_insn_lneg,   &&bjvm_insn_lor,   &&bjvm_insn_lrem,   &&bjvm_insn_lreturn,   &&bjvm_insn_lshl,   &&bjvm_insn_lshr,   &&bjvm_insn_lsub,   &&bjvm_insn_lushr,   &&bjvm_insn_lxor,   &&bjvm_insn_monitorenter,   &&bjvm_insn_monitorexit,   &&bjvm_insn_pop,   &&bjvm_insn_pop2,   &&bjvm_insn_return,   &&bjvm_insn_saload,   &&bjvm_insn_sastore,   &&bjvm_insn_swap,   &&bjvm_insn_anewarray,   &&bjvm_insn_checkcast,   &&bjvm_insn_getfield,   &&bjvm_insn_getstatic,   &&bjvm_insn_instanceof,   &&bjvm_insn_invokedynamic,   &&bjvm_insn_new,   &&bjvm_insn_putfield,   &&bjvm_insn_putstatic,   &&bjvm_insn_invokevirtual,   &&bjvm_insn_invokespecial,   &&bjvm_insn_invokestatic,   &&bjvm_insn_ldc,   &&bjvm_insn_ldc2_w,   &&bjvm_insn_dload,   &&bjvm_insn_fload,   &&bjvm_insn_iload,   &&bjvm_insn_lload,   &&bjvm_insn_dstore,   &&bjvm_insn_fstore,   &&bjvm_insn_istore,   &&bjvm_insn_lstore,   &&bjvm_insn_aload,   &&bjvm_insn_astore,   &&bjvm_insn_goto,   &&bjvm_insn_jsr,   &&bjvm_insn_if_acmpeq,   &&bjvm_insn_if_acmpne,   &&bjvm_insn_if_icmpeq,   &&bjvm_insn_if_icmpne,   &&bjvm_insn_if_icmplt,   &&bjvm_insn_if_icmpge,   &&bjvm_insn_if_icmpgt,   &&bjvm_insn_if_icmple,   &&bjvm_insn_ifeq,   &&bjvm_insn_ifne,   &&bjvm_insn_iflt,   &&bjvm_insn_ifge,   &&bjvm_insn_ifgt,   &&bjvm_insn_ifle,   &&bjvm_insn_ifnonnull,   &&bjvm_insn_ifnull,   &&bjvm_insn_iconst,   &&bjvm_insn_dconst,   &&bjvm_insn_fconst,   &&bjvm_insn_lconst,   &&bjvm_insn_iinc,   &&bjvm_insn_invokeinterface,   &&bjvm_insn_multianewarray,   &&bjvm_insn_newarray,   &&bjvm_insn_tableswitch,   &&bjvm_insn_lookupswitch,   &&bjvm_insn_ret };
-    goto *table[insn->kind];
+    goto *insn_jump_table[insn->kind];
 
 #if ONE_GOTO_PER_INSN
 #define NEXT_INSN { insn = &method->code->code[++frame->program_counter]; goto *insn_jump_table[insn->kind]; }
@@ -2825,27 +2829,51 @@ start:
                               .d = checked_pop(frame).d + checked_pop(frame).d});
       NEXT_INSN;
     }
-    bjvm_insn_dcmpg:
-      UNREACHABLE("bjvm_insn_dcmpg");
+    bjvm_insn_dcmpg: {
+      double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
+      if (value1 < value2) {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      }
       NEXT_INSN;
-    bjvm_insn_dcmpl:
-      UNREACHABLE("bjvm_insn_dcmpl");
+    }
+    bjvm_insn_dcmpl: {
+      double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
+      if (value1 > value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      }
       NEXT_INSN;
-    bjvm_insn_ddiv:
-      UNREACHABLE("bjvm_insn_ddiv");
+  }
+    bjvm_insn_ddiv: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = a / b });
       NEXT_INSN;
-    bjvm_insn_dmul:
-      UNREACHABLE("bjvm_insn_dmul");
+    }
+    bjvm_insn_dmul: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = a * b });
       NEXT_INSN;
-    bjvm_insn_dneg:
-      UNREACHABLE("bjvm_insn_dneg");
+    }
+    bjvm_insn_dneg: {
+      double a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = -a });
       NEXT_INSN;
+    }
     bjvm_insn_drem:
       UNREACHABLE("bjvm_insn_drem");
       NEXT_INSN;
-    bjvm_insn_dsub:
-      UNREACHABLE("bjvm_insn_dsub");
+    bjvm_insn_dsub: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value) { .d = a - b });
       NEXT_INSN;
+    }
     bjvm_insn_dup: {
       bjvm_stack_value val = checked_pop(frame);
       checked_push(frame, val);
@@ -2974,9 +3002,8 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_iadd: {
-      int a = checked_pop(frame).i, b = checked_pop(frame).i, c;
-      __builtin_add_overflow(a, b, &c);
-      checked_push(frame, (bjvm_stack_value){.i = c});
+      uint32_t a = checked_pop(frame).i, b = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a + b});
       NEXT_INSN;
     }
     bjvm_insn_faload:
@@ -3026,9 +3053,8 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_ineg: {
-      int a = checked_pop(frame).i, b;
-      __builtin_sub_overflow(0, a, &b); // fuck u UB
-      checked_push(frame, (bjvm_stack_value){.i = b});
+      uint32_t a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = -a});
       NEXT_INSN;
     }
     bjvm_insn_ior: {
@@ -3055,7 +3081,7 @@ start:
     }
     bjvm_insn_ishl: {
       int b = checked_pop(frame).i, a = checked_pop(frame).i;
-      uint32_t c = ((uint32_t)a) << (b & 0x1f); // fuck u UB
+      uint32_t c = (uint32_t)a << (b & 0x1f); // fuck u UB
       checked_push(frame, (bjvm_stack_value){.i = (int)c});
       NEXT_INSN;
     }
@@ -3065,14 +3091,13 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_isub: {
-      int b = checked_pop(frame).i, a = checked_pop(frame).i, c;
-      __builtin_sub_overflow(a, b, &c);
-      checked_push(frame, (bjvm_stack_value){.i = c});
+      uint32_t b = checked_pop(frame).i, a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a - b});
       NEXT_INSN;
     }
     bjvm_insn_iushr: {
       int b = checked_pop(frame).i, a = checked_pop(frame).i;
-      uint32_t c = ((uint32_t)a) >> (b & 0x1f);
+      uint32_t c = (uint32_t)a >> (b & 0x1f);
       checked_push(frame, (bjvm_stack_value){.i = (int)c});
       NEXT_INSN;
     }
@@ -3095,9 +3120,8 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_ladd: {
-      int64_t a = checked_pop(frame).l, b = checked_pop(frame).l, c;
-      __builtin_add_overflow(a, b, &c);
-      checked_push(frame, (bjvm_stack_value){.l = c});
+      uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a + b});
       NEXT_INSN;
     }
     bjvm_insn_laload:
@@ -3147,15 +3171,13 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_lmul: {
-      int64_t a = checked_pop(frame).l, b = checked_pop(frame).l, c;
-      __builtin_mul_overflow(a, b, &c);
-      checked_push(frame, (bjvm_stack_value){.l = c});
+      uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a * b});
       NEXT_INSN;
     }
     bjvm_insn_lneg: {
-      int64_t a = checked_pop(frame).l, b;
-      __builtin_sub_overflow(0, a, &b);
-      checked_push(frame, (bjvm_stack_value){.l = b});
+      uint64_t a = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = -a});
       NEXT_INSN;
     }
     bjvm_insn_lor: {
@@ -3174,7 +3196,7 @@ start:
     }
     bjvm_insn_lshl: {
       int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-      uint64_t c = ((uint64_t)a) << (b & 0x3f); // fuck u UB
+      uint64_t c = (uint64_t)a << (b & 0x3f); // fuck u UB
       checked_push(frame, (bjvm_stack_value){.l = (int64_t)c});
       NEXT_INSN;
     }
@@ -3184,14 +3206,13 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_lsub: {
-      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l, c;
-      __builtin_sub_overflow(a, b, &c);
-      checked_push(frame, (bjvm_stack_value){.l = c});
+      uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a - b});
       NEXT_INSN;
     }
     bjvm_insn_lushr: {
-      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-      checked_push(frame, (bjvm_stack_value){.l = (int64_t)((uint64_t)a >> b)});
+      uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a >> b});
       NEXT_INSN;
     }
     bjvm_insn_lxor: {
@@ -3228,9 +3249,12 @@ start:
                               .i = *((int16_t *)array_data(array) + index)});
       NEXT_INSN;
     }
-    bjvm_insn_swap:
-      UNREACHABLE("bjvm_insn_swap");
+    bjvm_insn_swap: {
+      bjvm_stack_value a = checked_pop(frame), b = checked_pop(frame);
+      checked_push(frame, a);
+      checked_push(frame, b);
       NEXT_INSN;
+    }
     bjvm_insn_anewarray: {
       int count = checked_pop(frame).i;
       bjvm_cp_class_info *info = &insn->cp->class_info;
@@ -3259,8 +3283,7 @@ start:
         if (bjvm_instanceof(obj->descriptor, info->classdesc)) {
           checked_push(frame, (bjvm_stack_value){.obj = obj});
         } else {
-          // TODO ClassCastException
-          bjvm_raise_exception(thread, L"java/lang/ClassCastException", L"");
+          bjvm_raise_exception(thread, L"java/lang/ClassCastException", NULL);
           goto done;
         }
       } else {
@@ -3281,19 +3304,19 @@ start:
                                              : 0});
       NEXT_INSN;
     }
-    bjvm_insn_invokedynamic:
-      UNREACHABLE("bjvm_insn_invokedynamic");
+    bjvm_insn_invokedynamic: {
+      if (bjvm_invokedynamic(thread, frame, insn))
+        goto done;
       NEXT_INSN;
+    }
     bjvm_insn_new: {
       bjvm_cp_class_info *info = &insn->cp->class_info;
       int error = bjvm_resolve_class(thread, info);
       if (error)
         goto done;
-
       error = bjvm_initialize_class(thread, info->classdesc);
       if (error)
         goto done;
-
       // Create an instance of the class
       bjvm_obj_header *obj = new_object(thread, info->classdesc);
       checked_push(frame, (bjvm_stack_value){.obj = obj});
@@ -3303,12 +3326,12 @@ start:
     bjvm_insn_putfield: {
       bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
       int error = bjvm_resolve_field(thread, field_info);
-      if (error) {
-        UNREACHABLE();
-        // TODO IncompatibleClassChangeError
+      if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
+        wchar_t complaint[1000];
+        swprintf(complaint, 1000, L"Expected nonstatic field %S on class %S", field_info->nat->name, field_info->class_info->name->chars);
+        bjvm_incompatible_class_change_error(thread, complaint);
         goto done;
       }
-      assert(!(field_info->field->access_flags & BJVM_ACCESS_STATIC));
       bjvm_stack_value val;
       if (insn->kind == bjvm_insn_putfield)
         val = checked_pop(frame);
@@ -3329,20 +3352,26 @@ start:
     bjvm_insn_getstatic:
     bjvm_insn_putstatic: {
       bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
-      bjvm_cp_class_info *class = field_info->class_info;
+      if (!field_info->field) {
+        bjvm_cp_class_info *class = field_info->class_info;
 
-      int error = bjvm_resolve_class(thread, class);
-      if (error)
-        goto done;
+        int error = bjvm_resolve_class(thread, class);
+        if (error)
+          goto done;
 
-      bjvm_initialize_class(thread, class->classdesc);
-      bjvm_cp_field *field = bjvm_field_lookup(
-          class->classdesc, field_info->nat->name, field_info->nat->descriptor);
-      if (!field) {
-        // TODO IncompatibleClassChangeError
-        UNREACHABLE();
+        bjvm_initialize_class(thread, class->classdesc);
+        bjvm_cp_field *field = bjvm_field_lookup(
+            class->classdesc, field_info->nat->name, field_info->nat->descriptor);
+        field_info->field = field;
+        if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
+          wchar_t complaint[1000];
+          swprintf(complaint, 1000, L"Expected static field %S on class %S", field_info->nat->name, field_info->class_info->name->chars);
+          bjvm_incompatible_class_change_error(thread, complaint);
+          goto done;
+        }
       }
 
+      bjvm_cp_field *field = field_info->field;
       void *field_location =
           &field->my_class->static_fields[field->byte_offset];
       bjvm_type_kind kind =
@@ -3384,7 +3413,6 @@ start:
         error = bjvm_link_class(thread, ent->class_info.classdesc);
         if (error)
           goto done;
-
         bjvm_obj_header *obj = (void*) bjvm_get_class_mirror(thread, ent->class_info.classdesc);
         checked_push(frame, (bjvm_stack_value){.obj = obj});
         break;
