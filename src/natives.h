@@ -109,6 +109,7 @@ struct bjvm_native_Thread {
   bjvm_obj_header base;
   // implementation-dependent fields
   bjvm_thread *vm_thread;
+
   // my fields
   bjvm_obj_header *name;  // Ljava/lang/String;
   int32_t priority;  // I
@@ -135,11 +136,36 @@ struct bjvm_native_Thread {
   int32_t threadLocalRandomProbe;  // I
   int32_t threadLocalRandomSecondarySeed;  // I
 };
-static void bjvm_register_native_padding(bjvm_vm *vm) {
+struct bjvm_native_MethodHandle {
+  bjvm_obj_header base;
+  // implementation-dependent fields
+  bjvm_cp_method_handle_info *reflected_mh;
+
+  // my fields
+  bjvm_obj_header *type;  // Ljava/lang/invoke/MethodType;
+  bjvm_obj_header *form;  // Ljava/lang/invoke/LambdaForm;
+  bjvm_obj_header *asTypeCache;  // Ljava/lang/invoke/MethodHandle;
+  int32_t customizationCount;  // B
+};
+struct bjvm_native_MethodType {
+  bjvm_obj_header base;
+  // implementation-dependent fields
+  bjvm_cp_method_type_info *reflected_mt;
+  // my fields
+  bjvm_obj_header *rtype;  // Ljava/lang/Class;
+  bjvm_obj_header *ptypes;  // [Ljava/lang/Class;
+  bjvm_obj_header *form;  // Ljava/lang/invoke/MethodTypeForm;
+  bjvm_obj_header *wrapAlt;  // Ljava/lang/Object;
+  bjvm_obj_header *invokers;  // Ljava/lang/invoke/Invokers;
+  bjvm_obj_header *methodDescriptor;  // Ljava/lang/String;
+};
+static inline void bjvm_register_native_padding(bjvm_vm *vm) {
   (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/Class", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/reflect/Field", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/reflect/Method", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/reflect/Constructor", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/Thread", -1, (void*) (1 * sizeof(void*)));
+  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/invoke/MethodHandle", -1, (void*) (1 * sizeof(void*)));
+  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/invoke/MethodType", -1, (void*) (1 * sizeof(void*)));
 }
 /** END CODEGEN SECTION (gen_natives.c) */

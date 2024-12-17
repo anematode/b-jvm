@@ -1668,6 +1668,28 @@ bjvm_classdesc *ordinary_arr_classdesc(bjvm_thread *thread,
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
+int bjvm_resolve_method_type(bjvm_thread *thread, bjvm_cp_method_type_info *info) {
+  // Resolve each class in the arguments list, as well as the return type if it exists
+  bjvm_method_descriptor *method = info->parsed_descriptor;
+  assert(method);
+  // TODO create reflected objects
+  for (int i = 0; i < method->args_count; ++i) {
+    bjvm_classdesc *desc = bootstrap_class_create(thread, method->args[i].class_name.chars);
+    if (!desc) {
+      // TODO
+      UNREACHABLE();
+    }
+  }
+  if (method->return_type.kind != BJVM_TYPE_KIND_VOID) {
+    bjvm_classdesc *desc = bootstrap_class_create(thread, method->return_type.class_name.chars);
+    if (!desc) {
+      // TODO
+      UNREACHABLE();
+    }
+  }
+  return 0;
+}
+
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const wchar_t *name) {

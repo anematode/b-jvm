@@ -85,6 +85,10 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
     free_method_descriptor(entry->methodref.method_descriptor);
     break;
   }
+  case BJVM_CP_KIND_METHOD_TYPE: {
+    free_method_descriptor(entry->method_type_info.parsed_descriptor);
+    break;
+  }
   default: // TODO will need to add more as we resolve descriptors
     break;
   }
@@ -682,7 +686,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
-    char *error = parse_method_descriptor(nat->descriptor, desc);
+    char *error = parse_method_descriptor(nat->descriptor, desc);  // TODO free on FormatError
     if (error) {
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%S' has invalid descriptor '%S': %s",
@@ -690,6 +694,16 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
       format_error_dynamic(buf);
     }
     entry->methodref.method_descriptor = desc;
+    break;
+  }
+  case BJVM_CP_KIND_METHOD_TYPE: {
+    bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
+    free_on_format_error(ctx, desc);
+    char *error = parse_method_descriptor(
+        entry->method_type_info.descriptor, desc); // TODO free on FormatError
+    if (error)
+      format_error_dynamic(error);
+    entry->method_type_info.parsed_descriptor = desc;
     break;
   }
   default:

@@ -307,6 +307,9 @@ typedef struct {
 
 typedef struct {
   bjvm_utf8 *descriptor;
+  bjvm_method_descriptor *parsed_descriptor;
+
+  struct bjvm_native_MethodType* resolved_mt;
 } bjvm_cp_method_type_info;
 
 typedef struct {
