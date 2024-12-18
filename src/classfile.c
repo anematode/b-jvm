@@ -153,6 +153,7 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
     break;
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
+  case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
     break;
   }
 }
@@ -1888,6 +1889,16 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
         "constant value");
   } else if (utf8_equals(attr->name, "BootstrapMethods")) {
       parse_bootstrap_methods_attribute(attr_reader, attr, ctx);
+  } else if (utf8_equals(attr->name, "EnclosingMethod")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD;
+    uint16_t enclosing_class_index = reader_next_u16(&attr_reader, "enclosing class index");
+    uint16_t enclosing_method_index = reader_next_u16(&attr_reader, "enclosing method index");
+    attr->enclosing_method = (bjvm_attribute_enclosing_method) {
+        enclosing_class_index ? &checked_cp_entry(ctx->cp, enclosing_class_index,
+                                                  BJVM_CP_KIND_CLASS, "enclosing class")->class_info : NULL,
+        enclosing_method_index ? &checked_cp_entry(ctx->cp, enclosing_method_index,
+                                                   BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")->name_and_type : NULL
+    };
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }

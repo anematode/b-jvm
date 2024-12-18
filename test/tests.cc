@@ -533,8 +533,12 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
   };
 }
 
+TEST_CASE("Signature polymorphism") {
+  auto result = run_test_case("test_files/signature_polymorphism/", false);
+}
+
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/compiler/", false);
+  auto result = run_test_case("test_files/playground/", false);
 }
 
 

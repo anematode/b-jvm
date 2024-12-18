@@ -429,6 +429,7 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE = 1,
   BJVM_ATTRIBUTE_KIND_UNKNOWN = 2,
   BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS = 3,
+  BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -476,6 +477,11 @@ typedef struct {
   bjvm_bootstrap_method * methods;
 } bjvm_attribute_bootstrap_methods;
 
+typedef struct {
+  bjvm_cp_class_info *class_info;
+  bjvm_cp_name_and_type *nat;
+} bjvm_attribute_enclosing_method;
+
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
   bjvm_utf8 *name;
@@ -485,6 +491,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_code code;
     bjvm_cp_entry *constant_value;
     bjvm_attribute_bootstrap_methods bootstrap_methods;
+    bjvm_attribute_enclosing_method enclosing_method;
   };
 } bjvm_attribute;
 
@@ -546,7 +553,9 @@ typedef struct bjvm_cp_method {
   bjvm_classdesc *my_class;
 
   bjvm_native_callback native_handle;
+
   struct bjvm_native_Constructor *reflection_ctor;
+  struct bjvm_native_MethodType *method_type_obj;
 } bjvm_cp_method;
 
 typedef struct bjvm_cp_field {
@@ -988,7 +997,12 @@ struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
                                     size_t len);
+int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
+
 #include "natives.h"
+
+struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
+                                     bjvm_classdesc *classdesc);
 
 #ifdef __cplusplus
 }
