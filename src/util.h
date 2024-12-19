@@ -1,6 +1,10 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <string.h>
 #include <stdio.h>
 #include <wchar.h>
@@ -54,5 +58,9 @@ bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right);
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8);
 bjvm_utf8 bjvm_make_utf8(const wchar_t *c_literal);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -5,8 +5,13 @@
 #ifndef BJVM_ADT_H
 #define BJVM_ADT_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
+
 typedef struct {
   union {
     // Used if the number of bits in the local variable table/stack is less than
@@ -104,5 +109,9 @@ void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
                              int len);
 
 void bjvm_free_hash_table(bjvm_string_hash_table tbl);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // BJVM_ADT_H

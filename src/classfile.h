@@ -5,14 +5,21 @@
 #ifndef BJVM_CLASSFILE_H
 #define BJVM_CLASSFILE_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "util.h"
 #include "adt.h"
 
 typedef struct bjvm_cp_entry bjvm_cp_entry;
+typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
                                    const char *reason);
 
+char *parse_field_descriptor(const wchar_t **chars, size_t len,
+                             bjvm_field_descriptor *result);
 /**
  * Instruction code. Similar instructions like aload_0 are canonicalised to
  * aload with an argument of 0.
@@ -201,7 +208,6 @@ typedef enum {
   BJVM_TYPE_KIND_RETURN_ADDRESS = 14 // used by jsr/jsr_w
 } bjvm_type_kind;
 
-
 typedef enum {
   BJVM_CD_KIND_ORDINARY_ARRAY = 0,
   BJVM_CD_KIND_BYTE_ARRAY = 1,
@@ -237,12 +243,12 @@ typedef struct bjvm_cp_name_and_type {
   bjvm_utf8 *descriptor;
 } bjvm_cp_name_and_type;
 
-typedef struct {
+struct bjvm_field_descriptor {
   bjvm_type_kind kind;
   // Can be nonzero for any kind
   int dimensions;
   bjvm_utf8 class_name; // For reference and array types only
-} bjvm_field_descriptor;
+};
 
 bool bjvm_is_field_wide(bjvm_field_descriptor desc);
 
@@ -295,14 +301,14 @@ typedef struct {
   bjvm_method_handle_kind handle_kind;
   bjvm_cp_entry *reference;
 
-  struct bjvm_native_MethodType* resolved_mt;
+  struct bjvm_native_MethodType *resolved_mt;
 } bjvm_cp_method_handle_info;
 
 typedef struct {
   bjvm_utf8 *descriptor;
   bjvm_method_descriptor *parsed_descriptor;
 
-  struct bjvm_native_MethodType* resolved_mt;
+  struct bjvm_native_MethodType *resolved_mt;
 } bjvm_cp_method_type_info;
 
 typedef struct {
@@ -485,14 +491,14 @@ typedef struct {
 } bjvm_attribute_code;
 
 typedef struct bjvm_bootstrap_method {
-  bjvm_cp_method_handle_info* ref;
+  bjvm_cp_method_handle_info *ref;
   bjvm_cp_entry **args;
   int args_count;
 } bjvm_bootstrap_method;
 
 typedef struct {
   int count;
-  bjvm_bootstrap_method * methods;
+  bjvm_bootstrap_method *methods;
 } bjvm_attribute_bootstrap_methods;
 
 typedef struct {
@@ -599,5 +605,8 @@ typedef struct bjvm_classdesc {
   bjvm_classdesc *base_component;
 } bjvm_classdesc;
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif // BJVM_CLASSFILE_H

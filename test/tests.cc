@@ -11,6 +11,8 @@
 #include <iostream>
 
 #include "../src/bjvm.h"
+#include "../src/adt.h"
+#include "../src/util.h"
 
 bool EndsWith(const std::string &s, const std::string &suffix) {
   if (s.size() < suffix.size()) {
