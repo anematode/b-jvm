@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-#include "util.h"
 #include "adt.h"
+#include "util.h"
 
 typedef struct bjvm_cp_entry bjvm_cp_entry;
 typedef struct bjvm_field_descriptor bjvm_field_descriptor;
@@ -602,11 +602,11 @@ typedef struct bjvm_classdesc {
   bjvm_compressed_bitset static_references;
   bjvm_compressed_bitset instance_references;
 
-  bjvm_classdesc *one_fewer_dim;  // NULL for non-array types
+  bjvm_classdesc *one_fewer_dim; // NULL for non-array types
   bjvm_classdesc *base_component;
 
-  int dimensions;  // array types only
-  bjvm_type_kind primitive_component;  // primitives and array types only
+  int dimensions;                     // array types only
+  bjvm_type_kind primitive_component; // primitives and array types only
 } bjvm_classdesc;
 
 char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

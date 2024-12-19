@@ -6,12 +6,12 @@
 #include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <filesystem>
-#include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <unordered_map>
 
-#include "../src/bjvm.h"
 #include "../src/adt.h"
+#include "../src/bjvm.h"
 #include "../src/util.h"
 
 bool EndsWith(const std::string &s, const std::string &suffix) {
@@ -45,7 +45,8 @@ std::vector<uint8_t> ReadFile(const std::string &file) {
         return fs.existsSync(UTF8ToString($0));
       },
       file.c_str());
-  if (!exists) return {};
+  if (!exists)
+    return {};
 
   void *length_and_data = EM_ASM_PTR(
       {
@@ -436,8 +437,8 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(
-      desc, "main", "([Ljava/lang/String;)V", false, false);
+  method = bjvm_easy_method_lookup(desc, "main", "([Ljava/lang/String;)V",
+                                   false, false);
 
   bjvm_thread_run(thr, method, args, nullptr);
 
@@ -446,7 +447,6 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
   return result;
 }
-
 
 TEST_CASE("String hash table") {
   bjvm_string_hash_table tbl = bjvm_make_hash_table(free, 0.75, 48);
@@ -494,7 +494,8 @@ TEST_CASE("Malformed classfiles") {
 
 TEST_CASE("Interning") {
   auto result = run_test_case("test_files/interning/");
-  REQUIRE(result.stdout_ == "false\nfalse\ntrue\ntrue\ntrue\nfalse\ntrue\nfalse\n");
+  REQUIRE(result.stdout_ ==
+          "false\nfalse\ntrue\ntrue\ntrue\nfalse\ntrue\nfalse\n");
 }
 
 TEST_CASE("NegativeArraySizeException") {
@@ -525,7 +526,8 @@ TEST_CASE("Big decimal #1") {
 pi * pi is 9.869604401089358618834490999876151135199537704046847772071781337378379488504041
 )";
 
-  for (int i = 0; i < 10; ++i) expected += expected;  // repeat 1024 times
+  for (int i = 0; i < 10; ++i)
+    expected += expected; // repeat 1024 times
 
   auto result = run_test_case("test_files/big_decimal/");
   REQUIRE(result.stdout_ == expected);
@@ -542,7 +544,6 @@ TEST_CASE("Signature polymorphism") {
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }
-
 
 #if 0
 TEST_CASE("Class circularity error") {

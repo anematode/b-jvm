@@ -2,9 +2,9 @@
 // Created by alec on 12/18/24.
 //
 
-#include <stdlib.h>
-#include <setjmp.h>
 #include <assert.h>
+#include <setjmp.h>
+#include <stdlib.h>
 
 // SIMD support
 #ifdef __ARM_NEON__
@@ -137,7 +137,8 @@ void bjvm_free_code_attribute(bjvm_attribute_code *code) {
   free(code->code);
 }
 
-void bjvm_free_bootstrap_methods_attribute(bjvm_attribute_bootstrap_methods *bm) {
+void bjvm_free_bootstrap_methods_attribute(
+    bjvm_attribute_bootstrap_methods *bm) {
   for (int i = 0; i < bm->count; ++i) {
     free(bm->methods[i].args);
   }
@@ -413,11 +414,11 @@ inval:
 }
 
 bjvm_utf8 bjvm_make_utf8_cstr(const char *c_literal) {
-  return parse_modified_utf8((const uint8_t*) c_literal, strlen(c_literal));
+  return parse_modified_utf8((const uint8_t *)c_literal, strlen(c_literal));
 }
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
-                              const char *reason) {
+                                   const char *reason) {
   assert(reason);
   if (entry->kind & expected_kinds)
     return entry;
@@ -616,16 +617,14 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
   case CONSTANT_MethodHandle: {
     uint8_t handle_kind = reader_next_u8(reader, "method handle kind");
     uint16_t reference_index = reader_next_u16(reader, "reference index");
-    bjvm_cp_entry *entry = skip_linking ? nullptr : checked_cp_entry(
-                                                     ctx->cp, reference_index,
-                                                     -1,
-                                                     "method handle reference");
+    bjvm_cp_entry *entry = skip_linking
+                               ? nullptr
+                               : checked_cp_entry(ctx->cp, reference_index, -1,
+                                                  "method handle reference");
     // TODO validate both
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_METHOD_HANDLE,
-        .method_handle_info = {
-            .handle_kind = handle_kind,
-            .reference = entry}};
+        .method_handle_info = {.handle_kind = handle_kind, .reference = entry}};
   }
   case CONSTANT_MethodType: {
     uint16_t desc_index = reader_next_u16(reader, "descriptor index");
@@ -649,10 +648,13 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                                          "indy name and type")
                             ->name_and_type;
 
-    return (bjvm_cp_entry){.kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
-                           .indy_info = {.method = (void*)bootstrap_method_attr_index,  // will be fixed up later
-                                         .name_and_type = name_and_type,
-                                         .method_descriptor = nullptr}};
+    return (bjvm_cp_entry){
+        .kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
+        .indy_info = {
+            .method =
+                (void *)bootstrap_method_attr_index, // will be fixed up later
+            .name_and_type = name_and_type,
+            .method_descriptor = nullptr}};
   }
   default:
     format_error_static("Invalid constant pool entry kind");
@@ -698,7 +700,8 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
-    char *error = parse_method_descriptor(nat->descriptor, desc);  // TODO free on FormatError
+    char *error = parse_method_descriptor(nat->descriptor,
+                                          desc); // TODO free on FormatError
     if (error) {
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%S' has invalid descriptor '%S': %s",
@@ -711,8 +714,8 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   case BJVM_CP_KIND_METHOD_TYPE: {
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
-    char *error = parse_method_descriptor(
-        entry->method_type_info.descriptor, desc); // TODO free on FormatError
+    char *error = parse_method_descriptor(entry->method_type_info.descriptor,
+                                          desc); // TODO free on FormatError
     if (error)
       format_error_dynamic(error);
     entry->method_type_info.parsed_descriptor = desc;
@@ -848,14 +851,22 @@ bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
 
 bjvm_type_kind parse_atype(uint8_t atype) {
   switch (atype) {
-  case 4: return BJVM_TYPE_KIND_BOOLEAN;
-  case 5: return BJVM_TYPE_KIND_CHAR;
-    case 6: return BJVM_TYPE_KIND_FLOAT;
-        case 7: return BJVM_TYPE_KIND_DOUBLE;
-    case 8: return BJVM_TYPE_KIND_BYTE;
-        case 9: return BJVM_TYPE_KIND_SHORT;
-    case 10: return BJVM_TYPE_KIND_INT;
-        case 11: return BJVM_TYPE_KIND_LONG;
+  case 4:
+    return BJVM_TYPE_KIND_BOOLEAN;
+  case 5:
+    return BJVM_TYPE_KIND_CHAR;
+  case 6:
+    return BJVM_TYPE_KIND_FLOAT;
+  case 7:
+    return BJVM_TYPE_KIND_DOUBLE;
+  case 8:
+    return BJVM_TYPE_KIND_BYTE;
+  case 9:
+    return BJVM_TYPE_KIND_SHORT;
+  case 10:
+    return BJVM_TYPE_KIND_INT;
+  case 11:
+    return BJVM_TYPE_KIND_LONG;
   default: {
     char buf[64];
     snprintf(buf, sizeof(buf), "invalid newarray type %d", atype);
@@ -1061,7 +1072,8 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
     arraylength = 0xbe,
     athrow = 0xbf,
     checkcast = 0xc0,
-    instanceof = 0xc1,
+    instanceof
+    = 0xc1,
     monitorenter = 0xc2,
     monitorexit = 0xc3,
     wide = 0xc4,
@@ -1760,27 +1772,35 @@ void convert_pc_offsets_to_insn_offsets(bjvm_bytecode_insn *code,
   }
 }
 
-void parse_bootstrap_methods_attribute(cf_byteslice attr_reader, bjvm_attribute* attr, bjvm_classfile_parse_ctx * ctx) {
+void parse_bootstrap_methods_attribute(cf_byteslice attr_reader,
+                                       bjvm_attribute *attr,
+                                       bjvm_classfile_parse_ctx *ctx) {
   attr->kind = BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS;
-  uint16_t count = attr->bootstrap_methods.count = reader_next_u16(&attr_reader, "bootstrap methods count");
-  bjvm_bootstrap_method* methods = attr->bootstrap_methods.methods = calloc(count, sizeof(bjvm_bootstrap_method));
+  uint16_t count = attr->bootstrap_methods.count =
+      reader_next_u16(&attr_reader, "bootstrap methods count");
+  bjvm_bootstrap_method *methods = attr->bootstrap_methods.methods =
+      calloc(count, sizeof(bjvm_bootstrap_method));
   free_on_format_error(ctx, methods);
   for (int i = 0; i < count; ++i) {
     bjvm_bootstrap_method *method = methods + i;
-    method->ref = &checked_cp_entry(
-                       ctx->cp, reader_next_u16(&attr_reader, "bootstrap method ref"),
-                       BJVM_CP_KIND_METHOD_HANDLE, "bootstrap method ref")->method_handle_info;
+    method->ref =
+        &checked_cp_entry(ctx->cp,
+                          reader_next_u16(&attr_reader, "bootstrap method ref"),
+                          BJVM_CP_KIND_METHOD_HANDLE, "bootstrap method ref")
+             ->method_handle_info;
     uint16_t arg_count =
         reader_next_u16(&attr_reader, "bootstrap method arg count");
     method->args_count = arg_count;
     method->args = calloc(arg_count, sizeof(bjvm_cp_entry *));
     free_on_format_error(ctx, method->args);
     for (int j = 0; j < arg_count; ++j) {
-      const int allowed = BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_FLOAT |
-                          BJVM_CP_KIND_LONG | BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_METHOD_HANDLE | BJVM_CP_KIND_METHOD_TYPE;
-      method->args[j] = checked_cp_entry(ctx->cp,
-                                         reader_next_u16(&attr_reader, "bootstrap method arg"),
-                                         allowed, "bootstrap method arg");
+      const int allowed = BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER |
+                          BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_LONG |
+                          BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_METHOD_HANDLE |
+                          BJVM_CP_KIND_METHOD_TYPE;
+      method->args[j] = checked_cp_entry(
+          ctx->cp, reader_next_u16(&attr_reader, "bootstrap method arg"),
+          allowed, "bootstrap method arg");
     }
   }
 }
@@ -1899,17 +1919,24 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
             BJVM_CP_KIND_LONG | BJVM_CP_KIND_DOUBLE,
         "constant value");
   } else if (utf8_equals(attr->name, "BootstrapMethods")) {
-      parse_bootstrap_methods_attribute(attr_reader, attr, ctx);
+    parse_bootstrap_methods_attribute(attr_reader, attr, ctx);
   } else if (utf8_equals(attr->name, "EnclosingMethod")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD;
-    uint16_t enclosing_class_index = reader_next_u16(&attr_reader, "enclosing class index");
-    uint16_t enclosing_method_index = reader_next_u16(&attr_reader, "enclosing method index");
-    attr->enclosing_method = (bjvm_attribute_enclosing_method) {
-        enclosing_class_index ? &checked_cp_entry(ctx->cp, enclosing_class_index,
-                                                  BJVM_CP_KIND_CLASS, "enclosing class")->class_info : nullptr,
-        enclosing_method_index ? &checked_cp_entry(ctx->cp, enclosing_method_index,
-                                                   BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")->name_and_type : nullptr
-    };
+    uint16_t enclosing_class_index =
+        reader_next_u16(&attr_reader, "enclosing class index");
+    uint16_t enclosing_method_index =
+        reader_next_u16(&attr_reader, "enclosing method index");
+    attr->enclosing_method = (bjvm_attribute_enclosing_method){
+        enclosing_class_index
+            ? &checked_cp_entry(ctx->cp, enclosing_class_index,
+                                BJVM_CP_KIND_CLASS, "enclosing class")
+                   ->class_info
+            : nullptr,
+        enclosing_method_index
+            ? &checked_cp_entry(ctx->cp, enclosing_method_index,
+                                BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")
+                   ->name_and_type
+            : nullptr};
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
@@ -2227,4 +2254,3 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   free(ctx.free_on_error); // we made it :)
   return nullptr;
 }
-

@@ -2,8 +2,8 @@
 // Created by alec on 12/18/24.
 //
 
-#include <stdlib.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "analysis.h"
 #include "classfile.h"
@@ -538,8 +538,8 @@ fail:;
   char *a_str = print_analy_stack_state(&a),
        *b_str = print_analy_stack_state(&b);
   char *buf = malloc(strlen(a_str) + strlen(b_str) + 128);
-  snprintf(buf, strlen(a_str) + strlen(b_str) + 128, "Stack mismatch:\nPreviously inferred: %s\nFound: %s", a_str,
-          b_str);
+  snprintf(buf, strlen(a_str) + strlen(b_str) + 128,
+           "Stack mismatch:\nPreviously inferred: %s\nFound: %s", a_str, b_str);
   free(a_str);
   free(b_str);
   return buf;
@@ -999,7 +999,7 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     case bjvm_insn_getstatic: {
       bjvm_field_descriptor *field =
           bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
-                         "getstatic/getfield argument")
+                              "getstatic/getfield argument")
               ->fieldref_info.parsed_descriptor;
       PUSH_KIND(field_to_representable_kind(field));
       break;
@@ -1010,7 +1010,7 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     case bjvm_insn_invokedynamic: {
       bjvm_method_descriptor *descriptor =
           bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_INVOKE_DYNAMIC,
-                         "invokedynamic argument")
+                              "invokedynamic argument")
               ->indy_info.method_descriptor;
       for (int j = descriptor->args_count - 1; j >= 0; --j) {
         bjvm_field_descriptor *field = descriptor->args + j;
@@ -1040,9 +1040,9 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     case bjvm_insn_invokestatic: {
       bjvm_method_descriptor *descriptor =
           bjvm_check_cp_entry(insn->cp,
-                         BJVM_CP_KIND_METHOD_REF |
-                             BJVM_CP_KIND_INTERFACE_METHOD_REF,
-                         "invoke* argument")
+                              BJVM_CP_KIND_METHOD_REF |
+                                  BJVM_CP_KIND_INTERFACE_METHOD_REF,
+                              "invoke* argument")
               ->methodref.method_descriptor;
       for (int j = descriptor->args_count - 1; j >= 0; --j) {
         bjvm_field_descriptor *field = descriptor->args + j;
@@ -1058,9 +1058,9 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     case bjvm_insn_ldc: {
       bjvm_cp_entry *ent =
           bjvm_check_cp_entry(insn->cp,
-                         BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
-                             BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
-                         "ldc argument");
+                              BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
+                                  BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
+                              "ldc argument");
       PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
                 : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT
                                                   : BJVM_TYPE_KIND_REFERENCE)

@@ -5,10 +5,10 @@
 extern "C" {
 #endif
 
-#include <string.h>
-#include <stdio.h>
-#include <wchar.h>
 #include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <wchar.h>
 
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
@@ -19,10 +19,10 @@ extern "C" {
 #include <byteswap.h>
 #endif
 
-#if !defined(__cplusplus) && !defined(nullptr) && \
-   (!defined(__STDC_VERSION__) || __STDC_VERSION__ <= 201710)
+#if !defined(__cplusplus) && !defined(nullptr) &&                              \
+    (!defined(__STDC_VERSION__) || __STDC_VERSION__ <= 201710)
 /* -Wundef is avoided by using short circuiting in the condition */
-#define nullptr ((void*)0)
+#define nullptr ((void *)0)
 #endif
 
 #define UNREACHABLE(optional_msg)                                              \

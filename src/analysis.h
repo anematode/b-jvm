@@ -18,7 +18,6 @@ typedef struct {
   int insn_count;
 } bjvm_code_analysis;
 
-
 typedef bjvm_type_kind bjvm_analy_stack_entry;
 
 // State of the stack (or local variable table) during analysis, indexed by

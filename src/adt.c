@@ -110,7 +110,6 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
   return test;
 }
 
-
 bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
                                             double load_factor,
                                             size_t initial_capacity) {

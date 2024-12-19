@@ -9,8 +9,8 @@
 #include <wchar.h>
 
 #include "adt.h"
-#include "util.h"
 #include "classfile.h"
+#include "util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,8 +32,10 @@ typedef union {
   bjvm_obj_header *obj; // reference type
 } bjvm_stack_value;
 
-typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm, bjvm_obj_header *obj,
-                                    bjvm_stack_value *args, int argc);
+typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
+                                                 bjvm_obj_header *obj,
+                                                 bjvm_stack_value *args,
+                                                 int argc);
 
 typedef struct bjvm_array_classdesc bjvm_array_classdesc;
 
@@ -79,7 +81,8 @@ typedef struct bjvm_vm {
   // Interned strings (string -> instance of java/lang/String)
   bjvm_string_hash_table interned_strings;
 
-  // Classes with implementation-required padding before other fields (map class name -> padding bytes)
+  // Classes with implementation-required padding before other fields (map class
+  // name -> padding bytes)
   bjvm_string_hash_table class_padding;
 
   // Write byte of stdout/stderr (if nullptr, uses the default implementation)
@@ -89,7 +92,8 @@ typedef struct bjvm_vm {
   // Passed to write_stdout/write_stderr
   void *write_byte_param;
 
-  // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8) )
+  // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8)
+  // )
   bjvm_classdesc *primitive_classes[9];
 } bjvm_vm;
 
@@ -169,7 +173,8 @@ typedef struct {
   uint32_t stack_space;
   // Whether to enable JavaScript JIT compilation
   bool js_jit_enabled;
-  // What thread group to construct the thread in (nullptr = default thread group)
+  // What thread group to construct the thread in (nullptr = default thread
+  // group)
   bjvm_obj_header *thread_group;
   // Write byte of stdout/stderr (if nullptr, prints directly to stdout/stderr)
   bjvm_write_byte write_stdout;
@@ -233,7 +238,7 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         bool superinterfaces);
 bjvm_utf8 bjvm_make_utf8_cstr(const char *c_literal);
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
-                     bjvm_stack_value *args, bjvm_stack_value *result);
+                    bjvm_stack_value *args, bjvm_stack_value *result);
 int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 void bjvm_register_native(bjvm_vm *vm, const char *class_name,
                           const char *method_name,
@@ -262,10 +267,12 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
                                       const wchar_t *name,
                                       const wchar_t *descriptor);
 bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field);
-int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name, const wchar_t *exception_string);
+int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name,
+                         const wchar_t *exception_string);
 
 // e.g. int.class
-struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind);
+struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,
+                                                      bjvm_type_kind prim_kind);
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
                                     size_t len);
@@ -274,7 +281,7 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 #include "natives.h"
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
-                                     bjvm_classdesc *classdesc);
+                                                bjvm_classdesc *classdesc);
 
 #ifdef __cplusplus
 }
