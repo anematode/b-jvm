@@ -15,6 +15,7 @@
 // variables are references, so that the GC can follow them.
 typedef struct {
   bjvm_compressed_bitset *insn_index_to_references;
+  uint16_t *insn_index_to_stack_depth;
   int insn_count;
 } bjvm_code_analysis;
 
@@ -27,10 +28,14 @@ typedef struct {
   bjvm_analy_stack_entry *entries;
   int entries_count;
   int entries_cap;
+
   bool from_jump_target;
+  bool is_exc_handler;
+
+  int exc_handler_start;
 } bjvm_analy_stack_state;
 
-char *bjvm_locals_on_function_entry(const bjvm_utf8 *descriptor,
+int bjvm_locals_on_method_entry(const bjvm_cp_method *descriptor,
                                     bjvm_analy_stack_state *locals);
 
 char *bjvm_analyze_method_code_segment(bjvm_cp_method *method);

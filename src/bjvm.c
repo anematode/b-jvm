@@ -96,16 +96,22 @@ char *stack_value_to_string(bjvm_stack_value value) {
 char *dump_frame(const bjvm_stack_frame *frame) {
   char buf[2000] = {0}, *write = buf, *end = buf + sizeof(buf);
 
+  bjvm_compressed_bitset refs = ((bjvm_code_analysis*)frame->method->code_analysis)
+    ->insn_index_to_references[frame->program_counter];
+
   for (int i = 0; i < frame->stack_depth; ++i) {
     char *stack_val = stack_value_to_string(frame->values[i]);
-    write += snprintf(write, end - write, " stack[%d] = %s\n", i, stack_val);
+    const char* is_ref = bjvm_test_compressed_bitset(refs, i) ? "<ref>" : "";
+    write += snprintf(write, end - write, " stack[%d] = %s %s\n", i, stack_val, is_ref);
     free(stack_val);
   }
 
   for (int i = 0; i < frame->max_locals; ++i) {
+    int j = i + frame->max_stack;
     char *stack_val =
-        stack_value_to_string(frame->values[i + frame->max_stack]);
-    write += snprintf(write, end - write, "locals[%d] = %s\n", i, stack_val);
+        stack_value_to_string(frame->values[j]);
+    const char* is_ref = bjvm_test_compressed_bitset(refs, j) ? "<ref>" : "";
+    write += snprintf(write, end - write, "locals[%d] = %s %s\n", i, stack_val, is_ref);
     free(stack_val);
   }
 

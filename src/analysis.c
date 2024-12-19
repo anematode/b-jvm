@@ -526,13 +526,11 @@ char *expect_analy_stack_states_equal(bjvm_analy_stack_state a,
                                       bjvm_analy_stack_state b) {
   if (a.entries_count != b.entries_count)
     goto fail;
-
   for (int i = 0; i < a.entries_count; ++i) {
     if (a.entries[i] != b.entries[i]) {
       goto fail;
     }
   }
-
   return nullptr;
 fail:;
   char *a_str = print_analy_stack_state(&a),
@@ -577,6 +575,45 @@ bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->kind);
 }
 
+void write_references_to_bitset(const bjvm_analy_stack_state *inferred_stack, int offset, bjvm_compressed_bitset *bjvm_compressed_bitset) {
+  for (int i = 0; i < inferred_stack->entries_count; ++i) {
+    if (inferred_stack->entries[i] == BJVM_TYPE_KIND_REFERENCE)
+      bjvm_test_set_compressed_bitset(bjvm_compressed_bitset, offset + i);
+  }
+}
+
+int bjvm_locals_on_method_entry(const bjvm_cp_method *method, bjvm_analy_stack_state *locals) {
+  const bjvm_attribute_code *code = method->code;
+  const bjvm_method_descriptor *desc = method->parsed_descriptor;
+  assert(code);
+  locals->entries = calloc(code->max_locals, sizeof(bjvm_analy_stack_entry));
+  for (int i = 0; i < code->max_locals; ++i)
+    locals->entries[i] = BJVM_TYPE_KIND_VOID;
+  int i = 0, j = 0;
+  if (!(method->access_flags & BJVM_ACCESS_STATIC)) {
+    // if the method is nonstatic, the first local is  'this'
+    if (code->max_locals == 0)
+      goto fail;
+    locals->entries[j++] = BJVM_TYPE_KIND_REFERENCE;
+  }
+  locals->entries_cap = locals->entries_count = code->max_locals;
+  for (; i < desc->args_count && j < code->max_locals; ++i, ++j) {
+    bjvm_field_descriptor arg = desc->args[i];
+    locals->entries[j] = arg.kind;
+    if (bjvm_is_field_wide(arg)) {
+      if (++j >= code->max_locals)
+        goto fail;
+      locals->entries[j] = BJVM_TYPE_KIND_VOID;
+    }
+  }
+  if (i == desc->args_count)
+    return 0; // packed all arguments
+
+fail:
+  free(locals->entries);
+  return -1;
+}
+
 /**
  * Analyze the method's code segment if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
@@ -591,27 +628,35 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks =
-      calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
+    calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
+  bjvm_analy_stack_state *inferred_locals =
+    calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_compressed_bitset *insn_index_to_references =
-      calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
+    calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
+  uint16_t *insn_index_to_stack_depth =
+    calloc(code->insn_count, sizeof(uint16_t));
 
-  for (int i = 0; i < code->insn_count; ++i)
-    insn_index_to_references[i] = bjvm_empty_bitset();
+  bjvm_analy_stack_state stack, locals;
 
-  bjvm_analy_stack_state stack;
   stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
+  bjvm_locals_on_method_entry(method, &locals);
 
-  // Initialize stack to exception handler--looking stack
+  // Initialize stack to the stack at exception handler entry
   stack.entries_cap = code->max_stack + 1;
   stack.entries_count = 1;
   stack.entries[0] = BJVM_TYPE_KIND_REFERENCE;
 
   // Mark all exception handlers as having a stack which is just a reference
+  // (that reference is the exception object)
   if (code->exception_table) {
     for (int i = 0; i < code->exception_table->entries_count; ++i) {
       bjvm_exception_table_entry *ent = code->exception_table->entries + i;
-      if (!inferred_stacks[ent->handler_pc].entries)
-        copy_analy_stack_state(stack, &inferred_stacks[ent->handler_pc]);
+      if (!inferred_stacks[ent->handler_pc].entries) {
+        bjvm_analy_stack_state *target = inferred_stacks + ent->handler_pc;
+        copy_analy_stack_state(stack, target);
+        target->is_exc_handler = true;
+        target->exc_handler_start = ent->start_insn;
+      }
     }
   }
 
@@ -622,6 +667,7 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
 
   analy->insn_count = code->insn_count;
   analy->insn_index_to_references = insn_index_to_references;
+  analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
 
   int *branch_targets_to_process = calloc(code->max_formal_pc, sizeof(int));
   int branch_targets_count = 0;
@@ -648,6 +694,13 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   }
 #define PUSH(kind) PUSH_KIND(BJVM_TYPE_KIND_##kind)
 
+#define SET_LOCAL(index, kind)                                                 \
+  {                                                                            \
+    if (index >= code->max_locals)                                             \
+      goto local_overflow;                                                     \
+    locals.entries[index] = BJVM_TYPE_KIND_ ## kind;                           \
+  }
+
 #define PUSH_BRANCH_TARGET(target)                                             \
   {                                                                            \
     assert((int)target < code->insn_count && target >= 0);                     \
@@ -673,8 +726,22 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   for (int i = 0; i < code->insn_count; ++i) {
     if (inferred_stacks[i].entries) {
       copy_analy_stack_state(inferred_stacks[i], &stack);
+      bjvm_analy_stack_state *this_locals = &inferred_locals[i];
+
+      if (inferred_locals[i].is_exc_handler) {
+        // At exception handlers, use the local variable table of the start of
+        // the exception block. Later we'll properly validate this by taking
+        // the intersection of all types.
+        copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start], &locals);
+        copy_analy_stack_state(locals, this_locals);
+      }
+
       inferred_stacks[i].from_jump_target = false;
       stack_terminated = false;
+    }
+
+    if (inferred_locals[i].entries) {
+      copy_analy_stack_state(inferred_locals[i], &locals);
     }
 
     if (stack_terminated) {
@@ -683,11 +750,12 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
       // there will be weeping and wailing and gnashing of teeth, and we'll
       // choose a different branch to continue analyzing from.
       if (branch_targets_count == 0) {
-        break; // gahhhhhh
+        break;
       }
 
       i = branch_targets_to_process[--branch_targets_count];
       copy_analy_stack_state(inferred_stacks[i], &stack);
+      copy_analy_stack_state(inferred_locals[i], &locals);
       inferred_stacks[i].from_jump_target = false;
       stack_terminated = false;
     }
@@ -695,6 +763,8 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     copy_analy_stack_state(stack, &stack_before);
     if (!inferred_stacks[i].entries)
       copy_analy_stack_state(stack, &inferred_stacks[i]);
+    if (!inferred_locals[i].entries)
+      copy_analy_stack_state(locals, &inferred_locals[i]);
 
     bjvm_bytecode_insn *insn = &code->code[i];
     switch (insn->kind) {
@@ -1091,18 +1161,22 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     }
     case bjvm_insn_dstore: {
       POP(DOUBLE)
+      SET_LOCAL(insn->index, DOUBLE)
       break;
     }
     case bjvm_insn_fstore: {
       POP(FLOAT)
+      SET_LOCAL(insn->index, FLOAT)
       break;
     }
     case bjvm_insn_istore: {
       POP(INT)
+      SET_LOCAL(insn->index, INT)
       break;
     }
     case bjvm_insn_lstore: {
       POP(LONG)
+      SET_LOCAL(insn->index, LONG)
       break;
     }
     case bjvm_insn_aload: {
@@ -1111,6 +1185,7 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
     }
     case bjvm_insn_astore: {
       POP(REFERENCE)
+      SET_LOCAL(insn->index, REFERENCE)
       break;
     }
     case bjvm_insn_goto: {
@@ -1190,6 +1265,9 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
 
     continue;
 
+  local_overflow:
+    error_str = "Local overflow:";
+    goto error;
   stack_overflow:
     error_str = "Stack overflow:";
     goto error;
@@ -1229,7 +1307,16 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
 
   free(branch_targets_to_process);
   for (int i = 0; i < code->insn_count; ++i) {
+    insn_index_to_stack_depth[i] = inferred_stacks[i].entries_count;
+
+    bjvm_compressed_bitset *bitset = insn_index_to_references + i;
+    *bitset = bjvm_init_compressed_bitset(code->max_stack + code->max_locals);
+
+    write_references_to_bitset(&inferred_stacks[i], 0, bitset);
+    write_references_to_bitset(&inferred_locals[i], code->max_stack, bitset);
+
     free(inferred_stacks[i].entries);
+    free(inferred_locals[i].entries);
   }
   free(inferred_stacks);
   free(stack.entries);
