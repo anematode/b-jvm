@@ -361,13 +361,15 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
     bjvm_null_pointer_exception(thread);
     return value_null();
   }
-  if (src->descriptor->kind == BJVM_CD_KIND_ORDINARY || dest->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
+  bool src_not_array = src->descriptor->kind == BJVM_CD_KIND_ORDINARY;
+  if (src_not_array || dest->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
     // Can't copy non-array objects to each other
     bjvm_array_store_exception(thread);
     return value_null();
   }
   bool src_is_1d_primitive = is_1d_primitive_array(src), dst_is_1d_primitive = is_1d_primitive_array(dest);
-  if (src_is_1d_primitive != dst_is_1d_primitive) {
+  if (src_is_1d_primitive != dst_is_1d_primitive ||
+    (src_is_1d_primitive && src->descriptor->primitive_component != dest->descriptor->primitive_component)) {
     bjvm_array_store_exception(thread);
     return value_null();
   }
