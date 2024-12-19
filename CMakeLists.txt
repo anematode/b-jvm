@@ -38,7 +38,7 @@ if (FALSE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif()
 
-add_library(bjvm OBJECT src/bjvm.h src/bjvm.c src/natives.h
+add_library(bjvm OBJECT src/bjvm.h src/bjvm.c src/natives_gen.h
         src/classfile.c
         src/classfile.h
         src/analysis.c
