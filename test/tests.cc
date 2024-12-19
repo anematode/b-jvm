@@ -6,10 +6,13 @@
 #include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <filesystem>
+#include <unordered_map>
 #include <fstream>
 #include <iostream>
 
 #include "../src/bjvm.h"
+#include "../src/adt.h"
+#include "../src/util.h"
 
 bool EndsWith(const std::string &s, const std::string &suffix) {
   if (s.size() < suffix.size()) {
@@ -147,7 +150,6 @@ std::vector<std::string> ListDirectory(const std::string &path,
 #endif
 }
 
-#if 0
 TEST_CASE("Test classfile parsing") {
   bool fuzz = false;
 
@@ -155,7 +157,7 @@ TEST_CASE("Test classfile parsing") {
   auto files = ListDirectory("jre8", true);
   double total_millis = 0;
 
-  char *shortest_error = NULL;
+  char *shortest_error = nullptr;
   int shortest_error_length = 1000000;
 
   int count = 0;
@@ -225,7 +227,6 @@ TEST_CASE("Test classfile parsing") {
     });
   };
 }
-#endif
 
 int preregister_all_classes(bjvm_vm *vm) {
   auto files = ListDirectory("jre8", true);
@@ -419,11 +420,11 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   options.write_stdout = capture_stdio ? [](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stdout_ += (char)ch;
-  } : NULL;
+  } : nullptr;
   options.write_stderr = capture_stdio ? [](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stderr_ += (char)ch;
-  } : NULL;
+  } : nullptr;
   options.write_byte_param = &result;
 
   bjvm_vm *vm = bjvm_create_vm(options);
@@ -438,7 +439,7 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   method = bjvm_easy_method_lookup(
       desc, "main", "([Ljava/lang/String;)V", false, false);
 
-  bjvm_thread_run(thr, method, args, NULL);
+  bjvm_thread_run(thr, method, args, nullptr);
 
   bjvm_free_thread(thr);
   bjvm_free_vm(vm);
@@ -529,11 +530,13 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
   auto result = run_test_case("test_files/big_decimal/");
   REQUIRE(result.stdout_ == expected);
 
-#ifndef EMSCRIPTEN
   BENCHMARK("Big decimal #2") {
     auto result = run_test_case("test_files/big_decimal/");
   };
-#endif
+}
+
+TEST_CASE("Signature polymorphism") {
+  auto result = run_test_case("test_files/signature_polymorphism/", false);
 }
 
 TEST_CASE("Playground") {

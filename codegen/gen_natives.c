@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
 	int class_count = 0;
 
 	while (!feof(f)) {
-		char *line = NULL;
+		char *line = nullptr;
 		size_t len = 0;
 		ssize_t read = getline(&line, &len, f);
 		if (read == -1) {
