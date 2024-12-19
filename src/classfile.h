@@ -20,6 +20,7 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
 
 char *parse_field_descriptor(const wchar_t **chars, size_t len,
                              bjvm_field_descriptor *result);
+bjvm_utf8 init_utf8_entry(int len);
 
 /**
  * Instruction code. Similar instructions like aload_0 are canonicalised to
@@ -195,31 +196,29 @@ typedef enum {
 } bjvm_insn_code_kind;
 
 typedef enum {
-  BJVM_TYPE_KIND_BOOLEAN = 4,
-  BJVM_TYPE_KIND_CHAR = 5,
-  BJVM_TYPE_KIND_FLOAT = 6,
-  BJVM_TYPE_KIND_DOUBLE = 7,
-  BJVM_TYPE_KIND_BYTE = 8,
-  BJVM_TYPE_KIND_SHORT = 9,
-  BJVM_TYPE_KIND_INT = 10,
-  BJVM_TYPE_KIND_LONG = 11,
-  BJVM_TYPE_KIND_VOID = 12,
+  BJVM_TYPE_KIND_BOOLEAN = 'Z',
+  BJVM_TYPE_KIND_CHAR = 'C',
+  BJVM_TYPE_KIND_FLOAT = 'F',
+  BJVM_TYPE_KIND_DOUBLE = 'D',
+  BJVM_TYPE_KIND_BYTE = 'B',
+  BJVM_TYPE_KIND_SHORT = 'S',
+  BJVM_TYPE_KIND_INT = 'I',
+  BJVM_TYPE_KIND_LONG = 'J',
+  BJVM_TYPE_KIND_VOID = 'V',
+  BJVM_TYPE_KIND_REFERENCE = 'L',
 
-  BJVM_TYPE_KIND_REFERENCE = 13,
-  BJVM_TYPE_KIND_RETURN_ADDRESS = 14 // used by jsr/jsr_w
+  // used by jsr/jsr_w (lol) but shouldn't appear outside of that
+  BJVM_TYPE_KIND_RETURN_ADDRESS
 } bjvm_type_kind;
 
 typedef enum {
-  BJVM_CD_KIND_ORDINARY_ARRAY = 0,
-  BJVM_CD_KIND_BYTE_ARRAY = 1,
-  BJVM_CD_KIND_CHAR_ARRAY = 2,
-  BJVM_CD_KIND_DOUBLE_ARRAY = 3,
-  BJVM_CD_KIND_FLOAT_ARRAY = 4,
-  BJVM_CD_KIND_INT_ARRAY = 5,
-  BJVM_CD_KIND_LONG_ARRAY = 6,
-  BJVM_CD_KIND_SHORT_ARRAY = 7,
-  BJVM_CD_KIND_BOOLEAN_ARRAY = 8,
-  BJVM_CD_KIND_ORDINARY = 10,
+  BJVM_CD_KIND_ORDINARY,
+  // e.g. classdesc corresponding to int.class. No objects mapping to this
+  // classdesc are actually constructed.
+  BJVM_CD_KIND_PRIMITIVE,
+  BJVM_CD_KIND_ORDINARY_ARRAY,
+  // e.g. [Z, [[[J  (i.e., multidimensional arrays are counted here)
+  BJVM_CD_KIND_PRIMITIVE_ARRAY,
 } bjvm_classdesc_kind;
 
 typedef enum {
@@ -598,12 +597,16 @@ typedef struct bjvm_classdesc {
 
   struct bjvm_native_Class *mirror;
 
-  // Non-array classes: which 4- or 8-byte aligned offsets correspond to references that need to be followed
+  // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets
+  // correspond to references that need to be followed
   bjvm_compressed_bitset static_references;
   bjvm_compressed_bitset instance_references;
 
-  bjvm_classdesc *one_fewer_dim;
+  bjvm_classdesc *one_fewer_dim;  // NULL for non-array types
   bjvm_classdesc *base_component;
+
+  int dimensions;  // array types only
+  bjvm_type_kind primitive_component;  // primitives and array types only
 } bjvm_classdesc;
 
 char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

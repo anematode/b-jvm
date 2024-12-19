@@ -120,15 +120,22 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
       thr->frames_count == 0 ? 0 : (uint8_t *)frame - thr->frame_buffer;
 }
 
-void free_array_classdesc(bjvm_array_classdesc *classdesc) {
-  if (classdesc->base.array_type) {
-    classdesc->base.array_type = nullptr;
-    free_array_classdesc((bjvm_array_classdesc *)classdesc->base.array_type);
-  }
+// Symmetry with make_array_classdesc
+void free_array_classdesc(bjvm_classdesc *classdesc) {
+  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
+         classdesc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY);
+  free_utf8(*classdesc->fields->name);
+  free_utf8(*classdesc->fields->descriptor);
+  free(classdesc->fields->name);
+  free(classdesc->fields->descriptor);
+  free(classdesc->fields);
   free(classdesc);
 }
 
-void free_primitive_arr_classdesc(bjvm_primitive_array_classdesc *classdesc);
+// Symmetry with make_primitive_classdesc
+void free_primitive_classdesc(bjvm_classdesc *classdesc) {
+  assert(classdesc->kind == BJVM_CD_KIND_PRIMITIVE);
+}
 
 void free_classdesc(void *classdesc_) {
   bjvm_classdesc *classdesc = classdesc_;
@@ -136,9 +143,9 @@ void free_classdesc(void *classdesc_) {
     bjvm_free_classfile(*classdesc);
     free(classdesc_);
   } else if (classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-    free_array_classdesc((bjvm_array_classdesc *)classdesc);
-  } else {
-    free_primitive_arr_classdesc((bjvm_primitive_array_classdesc *)classdesc);
+    free_array_classdesc(classdesc);
+  } else if (classdesc->kind == BJVM_CD_KIND_PRIMITIVE) {
+    free_primitive_classdesc(classdesc);
   }
 }
 
@@ -293,11 +300,56 @@ bjvm_stack_value bjvm_System_mapLibraryName(bjvm_thread *, bjvm_obj_header *,
 }
 
 void *array_data(bjvm_obj_header *array);
-bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *classdesc);
+bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 bool is_1d_primitive_array(bjvm_obj_header * src) {
-  return src->descriptor->kind != BJVM_CD_KIND_ORDINARY_ARRAY &&
-    ((bjvm_primitive_array_classdesc*) src->descriptor)->dimensions == 1;
+  return src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && src->descriptor->dimensions == 1;
+}
+
+int sizeof_type_kind(bjvm_type_kind kind) {
+  switch (kind) {
+  case BJVM_TYPE_KIND_BYTE:
+  case BJVM_TYPE_KIND_BOOLEAN:
+    return 1;
+  case BJVM_TYPE_KIND_CHAR:
+  case BJVM_TYPE_KIND_SHORT:
+    return 2;
+  case BJVM_TYPE_KIND_FLOAT:
+  case BJVM_TYPE_KIND_INT:
+    return 4;
+  case BJVM_TYPE_KIND_REFERENCE:
+    return sizeof(void*);
+  case BJVM_TYPE_KIND_DOUBLE:
+  case BJVM_TYPE_KIND_LONG:
+    return 8;
+  default:
+    UNREACHABLE();
+  }
+}
+
+int primitive_order(bjvm_type_kind kind) {
+  switch (kind) {
+  case BJVM_TYPE_KIND_BOOLEAN:
+    return 0;
+  case BJVM_TYPE_KIND_CHAR:
+    return 1;
+  case BJVM_TYPE_KIND_FLOAT:
+    return 2;
+  case BJVM_TYPE_KIND_DOUBLE:
+    return 3;
+  case BJVM_TYPE_KIND_BYTE:
+    return 4;
+  case BJVM_TYPE_KIND_SHORT:
+    return 5;
+  case BJVM_TYPE_KIND_INT:
+    return 6;
+  case BJVM_TYPE_KIND_LONG:
+    return 7;
+  case BJVM_TYPE_KIND_VOID:
+    return 8;
+  default:
+    UNREACHABLE();
+  }
 }
 
 bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
@@ -332,8 +384,11 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
     return value_null();
   }
 
+  // TODO translate these into a single memcpy routine instead of this
+  // TODO check that both primitive arrays are of the same type
+
 #define GEN_PRIMITIVE_IMPL(array_type, underlying)                                       \
-  if (src->descriptor->kind == BJVM_CD_KIND_##array_type) {                    \
+  if (src->descriptor->primitive_component == BJVM_TYPE_KIND_##array_type) {                    \
     underlying *src_data = array_data(src);                                    \
     underlying *dest_data = array_data(dest);                                  \
     for (int i = 0; i < length; ++i)                                           \
@@ -342,14 +397,15 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   }
 
   if (src_is_1d_primitive) {
-    GEN_PRIMITIVE_IMPL(BYTE_ARRAY, int8_t)
-    GEN_PRIMITIVE_IMPL(CHAR_ARRAY, uint16_t)
-    GEN_PRIMITIVE_IMPL(DOUBLE_ARRAY, double)
-    GEN_PRIMITIVE_IMPL(FLOAT_ARRAY, float)
-    GEN_PRIMITIVE_IMPL(INT_ARRAY, int32_t)
-    GEN_PRIMITIVE_IMPL(LONG_ARRAY, int64_t)
-    GEN_PRIMITIVE_IMPL(SHORT_ARRAY, int16_t)
-    GEN_PRIMITIVE_IMPL(BOOLEAN_ARRAY, uint8_t)
+    GEN_PRIMITIVE_IMPL(BYTE, int8_t)
+    GEN_PRIMITIVE_IMPL(CHAR, uint16_t)
+    GEN_PRIMITIVE_IMPL(DOUBLE, double)
+    GEN_PRIMITIVE_IMPL(FLOAT, float)
+    GEN_PRIMITIVE_IMPL(INT, int32_t)
+    GEN_PRIMITIVE_IMPL(LONG, int64_t)
+    GEN_PRIMITIVE_IMPL(SHORT, int16_t)
+    GEN_PRIMITIVE_IMPL(BOOLEAN, uint8_t)
+    UNREACHABLE();
   }
 
   // If the component type of the src class is an instanceof the destination class, then we don't
@@ -393,15 +449,14 @@ void primitive_type_kind_to_array_info(bjvm_type_kind kind,
                                        const wchar_t **type, int *size);
 
 size_t object_size_bytes(const bjvm_obj_header *obj) {
-  if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
-    return obj->descriptor->data_bytes;
+  const bjvm_classdesc *desc = obj->descriptor;
+  if (desc->kind == BJVM_CD_KIND_ORDINARY) {
+    return desc->data_bytes;
   }
   int element_size = sizeof(void*);
-  if (obj->descriptor->kind != BJVM_CD_KIND_ORDINARY_ARRAY) {
-    bjvm_primitive_array_classdesc *prim = (void*)obj->descriptor;
-    if (prim->dimensions == 1) {
-      const wchar_t* type;
-      primitive_type_kind_to_array_info(prim->element_type, &type, &element_size);
+  if (desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY) {
+    if (desc->dimensions == 1) {
+      element_size = sizeof_type_kind(desc->primitive_component);
     }
   }
   return 24 + element_size * *array_length((bjvm_obj_header*) obj);
@@ -411,24 +466,13 @@ bjvm_stack_value bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
                       bjvm_stack_value *, int) {
   switch (obj->descriptor->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
-    bjvm_array_classdesc *array_desc = (bjvm_array_classdesc *)obj->descriptor;
     bjvm_obj_header *new_array = create_object_array(
-        thread, array_desc->base.base_component, *array_length(obj));
+        thread, obj->descriptor->one_fewer_dim, *array_length(obj));
     if (new_array) {
       memcpy(array_data(new_array), array_data(obj),
              *array_length(obj) * sizeof(void *));
     }
     return (bjvm_stack_value){.obj = new_array};
-  }
-  case BJVM_CD_KIND_BYTE_ARRAY:
-  case BJVM_CD_KIND_CHAR_ARRAY:
-  case BJVM_CD_KIND_DOUBLE_ARRAY:
-  case BJVM_CD_KIND_FLOAT_ARRAY:
-  case BJVM_CD_KIND_INT_ARRAY:
-  case BJVM_CD_KIND_LONG_ARRAY:
-  case BJVM_CD_KIND_SHORT_ARRAY:
-  case BJVM_CD_KIND_BOOLEAN_ARRAY: {
-    UNREACHABLE();
   }
   case BJVM_CD_KIND_ORDINARY: {
     bjvm_obj_header *new_obj = new_object(thread, obj->descriptor);
@@ -489,13 +533,13 @@ bjvm_stack_value bjvm_Class_getPrimitiveClass(bjvm_thread * thread, bjvm_obj_hea
 bjvm_stack_value bjvm_Class_getComponentType(bjvm_thread *thread, bjvm_obj_header * obj,
                                              bjvm_stack_value*, int) {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj);
-  if (desc->kind == BJVM_CD_KIND_ORDINARY) {
+  if (desc->kind == BJVM_CD_KIND_ORDINARY || desc->kind == BJVM_CD_KIND_PRIMITIVE) {
+    // ints and ordinary objects have no components
     return value_null();
   }
   void* result = bjvm_get_class_mirror(thread, desc->one_fewer_dim);
-  wprintf(L"%d %d\n", desc->kind, ((bjvm_array_classdesc*)desc)->dimensions);
   assert(result);
-  return  (bjvm_stack_value) { .obj = result };
+  return (bjvm_stack_value) { .obj = result };
 }
 
 bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc,
@@ -733,7 +777,7 @@ bjvm_stack_value bjvm_Class_isAssignableFrom(bjvm_thread *, bjvm_obj_header *,
 bjvm_stack_value bjvm_Class_isArray(bjvm_thread *, bjvm_obj_header * obj,
                                 bjvm_stack_value *, int) {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj);
-  return  (bjvm_stack_value) { .i = desc->kind != BJVM_CD_KIND_ORDINARY };
+  return  (bjvm_stack_value) { .i = desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY || desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY };
 }
 
 bjvm_stack_value bjvm_MethodHandleNatives_getConstant(bjvm_thread *, bjvm_obj_header *,
@@ -823,16 +867,8 @@ bjvm_stack_value bjvm_Unsafe_arrayIndexScale(bjvm_thread *, bjvm_obj_header *,
   switch (desc->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY:
     return  (bjvm_stack_value) { .i = sizeof(void *) };
-  case BJVM_CD_KIND_BYTE_ARRAY:
-  case BJVM_CD_KIND_CHAR_ARRAY:
-  case BJVM_CD_KIND_FLOAT_ARRAY:
-  case BJVM_CD_KIND_SHORT_ARRAY:
-  case BJVM_CD_KIND_BOOLEAN_ARRAY:
-  case BJVM_CD_KIND_INT_ARRAY:
-    return  (bjvm_stack_value) { .i = 4 };
-  case BJVM_CD_KIND_DOUBLE_ARRAY:
-  case BJVM_CD_KIND_LONG_ARRAY:
-    return  (bjvm_stack_value) { .i = 8 };
+  case BJVM_CD_KIND_PRIMITIVE_ARRAY:
+    return  (bjvm_stack_value) { .i = sizeof_type_kind(desc->primitive_component) };
   case BJVM_CD_KIND_ORDINARY:
   default:  // invalid
     return  (bjvm_stack_value) { .i = 0 };
@@ -1001,20 +1037,31 @@ int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name,
   return 0;
 }
 
-struct bjvm_native_Class * bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind) {
+bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread, bjvm_type_kind prim_kind) {
   bjvm_vm *vm = thread->vm;
-  return vm->primitive_classes[prim_kind - BJVM_TYPE_KIND_BOOLEAN];
+  return vm->primitive_classes[primitive_order(prim_kind)];
 }
 
-bjvm_classdesc *bjvm_make_primitive_classdesc(const wchar_t* name, struct bjvm_native_Class* mirror) {
-  bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
+struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind) {
+  return bjvm_primitive_classdesc(thread, prim_kind)->mirror;
+}
 
-  desc->kind = BJVM_CD_KIND_ORDINARY;
+bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread, bjvm_type_kind kind, const wchar_t* name) {
+  bjvm_classdesc *mirror_desc = bootstrap_class_create(thread, L"java/lang/Class");
+  assert(mirror_desc->state == BJVM_CD_STATE_INITIALIZED);
+
+  bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
+  struct bjvm_native_Class *mirror = (void*)new_object(thread, mirror_desc);
+
+  mirror->reflected_class = desc;
+
+  desc->kind = BJVM_CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
   desc->name = bjvm_make_utf8(name);
   desc->access_flags = 0x411;  // result of int.class.getModifiers()
-  desc->array_type = nullptr;  // TODO
+  desc->array_type = nullptr;
   desc->mirror = mirror;
+  desc->primitive_component = kind;
 
   return desc;
 }
@@ -1023,30 +1070,15 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
   bjvm_vm *vm = thread->vm;
   if (vm->primitive_classes[0]) return; // already initialized
 
-  bjvm_classdesc *desc = bootstrap_class_create(thread, L"java/lang/Class");
-  assert(desc->state == BJVM_CD_STATE_INITIALIZED);
-
-  int offs = BJVM_TYPE_KIND_BOOLEAN;
-  struct bjvm_native_Class *Boolean, *Byte, *Char, *Short, *Int, *Long, *Float, *Double, *Void;
-  Boolean = vm->primitive_classes[BJVM_TYPE_KIND_BOOLEAN - offs] = (void*)new_object(thread, desc);
-  Byte = vm->primitive_classes[BJVM_TYPE_KIND_BYTE - offs] = (void*)new_object(thread, desc);
-  Char = vm->primitive_classes[BJVM_TYPE_KIND_CHAR - offs] = (void*)new_object(thread, desc);
-  Short = vm->primitive_classes[BJVM_TYPE_KIND_SHORT - offs] = (void*)new_object(thread, desc);
-  Int = vm->primitive_classes[BJVM_TYPE_KIND_INT - offs] = (void*)new_object(thread, desc);
-  Long = vm->primitive_classes[BJVM_TYPE_KIND_LONG - offs] = (void*)new_object(thread, desc);
-  Float = vm->primitive_classes[BJVM_TYPE_KIND_FLOAT - offs] = (void*)new_object(thread, desc);
-  Double = vm->primitive_classes[BJVM_TYPE_KIND_DOUBLE - offs] = (void*)new_object(thread, desc);
-  Void = vm->primitive_classes[BJVM_TYPE_KIND_VOID - offs] = (void*)new_object(thread, desc);
-
-  Boolean->reflected_class = bjvm_make_primitive_classdesc(L"boolean", Boolean);
-  Byte->reflected_class = bjvm_make_primitive_classdesc(L"byte", Byte);
-  Char->reflected_class = bjvm_make_primitive_classdesc(L"char", Char);
-  Short->reflected_class = bjvm_make_primitive_classdesc(L"short", Short);
-  Int->reflected_class = bjvm_make_primitive_classdesc(L"int", Int);
-  Long->reflected_class = bjvm_make_primitive_classdesc(L"long", Long);
-  Float->reflected_class = bjvm_make_primitive_classdesc(L"float", Float);
-  Double->reflected_class = bjvm_make_primitive_classdesc(L"double", Double);
-  Void->reflected_class = bjvm_make_primitive_classdesc(L"void", Void);
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BOOLEAN)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BOOLEAN, L"boolean");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BYTE)]= bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BYTE, L"byte");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_CHAR)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_CHAR, L"char");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_SHORT)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_SHORT, L"short");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_INT)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_INT, L"int");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_LONG)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_LONG, L"long");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_FLOAT)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_FLOAT, L"float");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_DOUBLE)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_DOUBLE, L"double");
+  vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_VOID)] = bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, L"void");
 }
 
 bjvm_stack_value bjvm_String_intern(bjvm_thread *thread, bjvm_obj_header *obj,
@@ -1073,7 +1105,6 @@ bjvm_stack_value bjvm_FileOutputStream_writeBytes(bjvm_thread *thread, bjvm_obj_
   bjvm_obj_header *bytes = args[0].obj;
   int offset = args[1].i;
   int length = args[2].i;
-  assert(bytes->descriptor->kind == BJVM_CD_KIND_BYTE_ARRAY);
   char *data = (char *)array_data(bytes);
   for (int i = 0; i < length; ++i) {
     if (thread->vm->write_stdout)
@@ -1495,7 +1526,6 @@ void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   bjvm_utf8 *java_lang_Object = malloc(sizeof(bjvm_utf8));
   *java_lang_Object = bjvm_make_utf8(L"java/lang/Object");
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
-
   info->classdesc = bootstrap_class_create(thread, java_lang_Object->chars);
   info->name = java_lang_Object;
   base->super_class = info;
@@ -1513,130 +1543,49 @@ void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   fields->descriptor = I;
 }
 
-void primitive_type_kind_to_array_info(bjvm_type_kind kind,
-                                       const wchar_t **type, int *size) {
-  switch (kind) {
-  case BJVM_TYPE_KIND_BOOLEAN:
-    *type = L"[Z";
-    *size = 1;
-    break;
-  case BJVM_TYPE_KIND_CHAR:
-    *type = L"[C";
-    *size = 2;
-    break;
-  case BJVM_TYPE_KIND_FLOAT:
-    *type = L"[F";
-    *size = 4;
-    break;
-  case BJVM_TYPE_KIND_DOUBLE:
-    *type = L"[D";
-    *size = 8;
-    break;
-  case BJVM_TYPE_KIND_BYTE:
-    *type = L"[B";
-    *size = 1;
-    break;
-  case BJVM_TYPE_KIND_SHORT:
-    *type = L"[S";
-    *size = 2;
-    break;
-  case BJVM_TYPE_KIND_INT:
-    *type = L"[I";
-    *size = 4;
-    break;
-  case BJVM_TYPE_KIND_LONG:
-    *type = L"[J";
-    *size = 8;
-    break;
-  default:
-    UNREACHABLE();
-  }
-}
-
-bjvm_classdesc *primitive_arr_classdesc(bjvm_thread *thread, int dimensions,
-                                        bjvm_classdesc_kind classdesc_kind,
-                                        bjvm_type_kind prim_kind) {
-  bjvm_primitive_array_classdesc *result =
-      calloc(1, sizeof(bjvm_primitive_array_classdesc));
-  bjvm_classdesc *base = &result->base;
-
-  base->state = BJVM_CD_STATE_INITIALIZED;
-  base->base_component = bjvm_primitive_class_mirror(thread, prim_kind)->reflected_class;
-
-  base->kind = classdesc_kind;
-  fill_array_classdesc(thread, base);
-
-  result->dimensions = dimensions;
-  result->element_type = prim_kind;
-
-  if (dimensions > 1) {
-    wchar_t one_fewer_name[MAX_CF_NAME_LENGTH] = { 0 };
-    int i = 0;
-    for (; i < dimensions - 1; ++i)
-      one_fewer_name[i] = '[';
-    const wchar_t* name;
-    int size;
-    primitive_type_kind_to_array_info(prim_kind, &name, &size);
-    one_fewer_name[i] = name[1];
-    result->base.one_fewer_dim = bootstrap_class_create(thread, one_fewer_name);
+bjvm_classdesc *primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
+  bjvm_classdesc *result = calloc(1, sizeof(bjvm_classdesc));
+  result->state = BJVM_CD_STATE_INITIALIZED;
+  result->kind = BJVM_CD_KIND_PRIMITIVE_ARRAY;
+  fill_array_classdesc(thread, result);
+  result->dimensions = component_type->dimensions + 1;
+  result->one_fewer_dim = component_type;
+  result->primitive_component = component_type->primitive_component;
+  if (component_type->kind == BJVM_CD_KIND_PRIMITIVE) {
+    result->name = init_utf8_entry(2);
+    swprintf(result->name.chars, 3, L"[%C", component_type->primitive_component);
   } else {
-    result->base.one_fewer_dim = base->base_component;
+    result->name = init_utf8_entry(component_type->name.len + 1);
+    wcpcpy(wcpcpy(result->name.chars, L"["), component_type->name.chars);
   }
-
-  return (bjvm_classdesc *)result;
+  return result;
 }
 
-void free_base_arr_classdesc(bjvm_classdesc *base) {
-  free_utf8(*base->fields->name);
-  free_utf8(*base->fields->descriptor);
-  free(base->fields->name);
-  free(base->fields->descriptor);
-  free(base->fields);
-}
+// Make a class descriptor corresponding to an array of components.
+bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component) {
+  bjvm_classdesc *result = calloc(1, sizeof(bjvm_classdesc));
+  // linkage state of array class is same as component class
+  result->state = component->state;
+  result->kind = BJVM_CD_KIND_ORDINARY_ARRAY;
+  fill_array_classdesc(thread, result);
+  result->dimensions = component->dimensions + 1;
+  result->one_fewer_dim = component;
 
-void free_primitive_arr_classdesc(bjvm_primitive_array_classdesc *desc) {
-  bjvm_classdesc *base = &desc->base;
-  free_base_arr_classdesc(base);
-  free(desc);
-}
-
-bjvm_classdesc *ordinary_arr_classdesc(bjvm_thread *thread,
-                                       bjvm_classdesc *base, int dimensions) {
-  bjvm_array_classdesc *result = calloc(1, sizeof(bjvm_array_classdesc));
-  result->base.kind = BJVM_CD_KIND_ORDINARY_ARRAY;
-  result->base.state = base->state;
-  fill_array_classdesc(thread, &result->base);
-
-  result->dimensions = dimensions;
-  if (base->kind == BJVM_CD_KIND_ORDINARY) {
-    result->base.base_component = result->base.one_fewer_dim = base;
+  if (component->kind == BJVM_CD_KIND_ORDINARY) {
+    result->base_component = component;
+    result->name = init_utf8_entry(component->name.len + 3);
+    wcpcpy(wcpcpy(wcpcpy(result->name.chars, L"[L"), component->name.chars), L";");
   } else {
-    bjvm_array_classdesc *array_base = (bjvm_array_classdesc *)base;
-    result->base.base_component = array_base->base.base_component;
-    result->base.one_fewer_dim = (bjvm_classdesc*) array_base;
-    assert(result->dimensions == array_base->dimensions + 1);
+    result->base_component = component->base_component;
+    result->name = init_utf8_entry(component->name.len + 1);
+    wcpcpy(wcpcpy(result->name.chars, L"["), component->name.chars);
+    assert(result->dimensions == component->dimensions + 1);
   }
 
-  return (bjvm_classdesc *)result;
+  return result;
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
-
-char primitive_type_kind_to_char(bjvm_type_kind kind) {
-  switch (kind) {
-  case BJVM_TYPE_KIND_BOOLEAN: return 'Z';
-  case BJVM_TYPE_KIND_CHAR: return 'C';
-  case BJVM_TYPE_KIND_FLOAT: return 'F';
-  case BJVM_TYPE_KIND_DOUBLE: return 'D';
-  case BJVM_TYPE_KIND_BYTE: return 'B';
-  case BJVM_TYPE_KIND_SHORT: return 'S';
-  case BJVM_TYPE_KIND_INT: return 'I';
-  case BJVM_TYPE_KIND_LONG: return 'J';
-  case BJVM_TYPE_KIND_VOID: return 'V';
-  case BJVM_TYPE_KIND_REFERENCE: return 'L';
-  default: UNREACHABLE();
-  }
-}
 
 bjvm_utf8 field_descriptor_to_name(bjvm_field_descriptor desc) {
   wchar_t* result = calloc(desc.dimensions + 4 + desc.kind == BJVM_TYPE_KIND_REFERENCE ? desc.class_name.len : 0, sizeof(wchar_t)), *write = result;
@@ -1649,7 +1598,7 @@ bjvm_utf8 field_descriptor_to_name(bjvm_field_descriptor desc) {
     wmemcpy(write, desc.class_name.chars, desc.class_name.len);
     write += desc.class_name.len;
   } else {
-    *write++ = primitive_type_kind_to_char(desc.kind);
+    *write++ = desc.kind;
   }
   return (bjvm_utf8) { .chars = result, .len = write - result };
 }
@@ -1667,12 +1616,12 @@ struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjv
   struct bjvm_native_Class *rtype;
 
   for (int i = 0; i < method->args_count; ++i) {
-    bjvm_utf8 name = field_descriptor_to_name(method->args[i]);
+    bjvm_utf8 name =
+      field_descriptor_to_name(method->args[i]);
     bjvm_classdesc* arg_desc = load_class_of_field_descriptor(thread, name.chars);
     free_utf8(name);
     if (!arg_desc) return nullptr;
     *((struct bjvm_native_Class**)array_data(ptypes) + i) = arg_desc->mirror;
-    printf("MT: %p", arg_desc->mirror);
   }
 
   abort();
@@ -1695,6 +1644,9 @@ int bjvm_resolve_method_handle(bjvm_thread *thread, bjvm_cp_method_handle_info *
   // for the kind of MH."
 }
 
+bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
+                                     bjvm_classdesc *classdesc);
+
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const wchar_t *name) {
@@ -1702,69 +1654,30 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 
   int dimensions = 0;
   const wchar_t *chars = name;
-  int len = wcslen(name), orig_len = len;
+  size_t len = wcslen(name);
   while (len > 0 && *chars == '[') // munch '[' at beginning
     dimensions++, len--, chars++;
 
   assert(dimensions < 255);
   assert(len > 0);
 
-  if (dimensions) { // array type
-    if (*chars != 'L') {
-      bjvm_classdesc *desc = bjvm_hash_table_lookup(&vm->classes, name, orig_len);
-      if (desc)
-        return desc;
-      switch (*chars) {
-      case 'J':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_LONG_ARRAY, BJVM_TYPE_KIND_LONG);
-        break;
-      case 'D':
-        desc = primitive_arr_classdesc(thread, dimensions,
-                                       BJVM_CD_KIND_DOUBLE_ARRAY,
-                                       BJVM_TYPE_KIND_DOUBLE);
-        break;
-      case 'F':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_FLOAT_ARRAY, BJVM_TYPE_KIND_FLOAT);
-        break;
-      case 'I':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_INT_ARRAY, BJVM_TYPE_KIND_INT);
-        break;
-      case 'S':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_SHORT_ARRAY, BJVM_TYPE_KIND_SHORT);
-        break;
-      case 'B':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_BYTE_ARRAY, BJVM_TYPE_KIND_BYTE);
-        break;
-      case 'C':
-        desc = primitive_arr_classdesc(
-            thread, dimensions, BJVM_CD_KIND_CHAR_ARRAY, BJVM_TYPE_KIND_CHAR);
-        break;
-      case 'Z':
-        desc = primitive_arr_classdesc(thread, dimensions,
-                                       BJVM_CD_KIND_BOOLEAN_ARRAY,
-                                       BJVM_TYPE_KIND_BOOLEAN);
-        break;
-      default:
-        UNREACHABLE();
-      }
-      (void)bjvm_hash_table_insert(&vm->classes, name, orig_len, desc);
-      return desc;
-    }
+  bjvm_classdesc *class;
 
-    chars++;
-    assert(len >= 3);
-    len -= 2;
+  if (dimensions && *chars != 'L') {
+    // Primitive array type
+    bjvm_type_kind kind = *chars;
+    class = bjvm_primitive_classdesc(thread, kind);
+  } else {
+    if (dimensions) {
+      // Strip L and ;
+      chars++;
+      assert(len >= 3);
+      len -= 2;
+    }
+    class = bjvm_hash_table_lookup(&vm->classes, chars, len);
   }
 
-  // Check whether the class is already loaded
-  bjvm_classdesc *base_class = bjvm_hash_table_lookup(&vm->classes, chars, len);
-
-  if (!base_class) {
+  if (!class) {
     // Add entry to inchoate_classes
     (void)bjvm_hash_table_insert(&vm->inchoate_classes, chars, len, (void *)1);
 
@@ -1789,10 +1702,10 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
       return nullptr;
     }
 
-    base_class = calloc(1, sizeof(bjvm_classdesc));
-    char *error = bjvm_parse_classfile(bytes, cf_len, base_class);
+    class = calloc(1, sizeof(bjvm_classdesc));
+    char *error = bjvm_parse_classfile(bytes, cf_len, class);
     if (error) {
-      free(base_class);
+      free(class);
       free(error);
       // TODO raise VerifyError
       UNREACHABLE();
@@ -1800,7 +1713,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 
     // 3. If C has a direct superclass, the symbolic reference from C to its
     // direct superclass is resolved using the algorithm of §5.4.3.1.
-    bjvm_cp_class_info *super = base_class->super_class;
+    bjvm_cp_class_info *super = class->super_class;
     if (super) {
       // If the superclass is currently being loaded -> circularity  error
       if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name->chars,
@@ -1809,7 +1722,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
         UNREACHABLE();
       }
 
-      int status = bjvm_resolve_class(thread, base_class->super_class);
+      int status = bjvm_resolve_class(thread, class->super_class);
       if (status) {
         // TODO raise NoClassDefFoundError
         UNREACHABLE();
@@ -1818,15 +1731,15 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 
     // 4. If C has any direct superinterfaces, the symbolic references from C to
     // its direct superinterfaces are resolved using the algorithm of §5.4.3.1.
-    for (int i = 0; i < base_class->interfaces_count; ++i) {
-      bjvm_cp_class_info *super = base_class->interfaces[i];
+    for (int i = 0; i < class->interfaces_count; ++i) {
+      bjvm_cp_class_info *super = class->interfaces[i];
       if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name->chars,
                                  -1)) {
         // TODO raise ClassCircularityError
         UNREACHABLE();
       }
 
-      int status = bjvm_resolve_class(thread, base_class->interfaces[i]);
+      int status = bjvm_resolve_class(thread, class->interfaces[i]);
       if (status) {
         // TODO raise NoClassDefFoundError
         UNREACHABLE();
@@ -1839,8 +1752,8 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
       for (int i = 0; i < entries->entries_count; i++) {
         native_entry *entry = entries->entries + i;
 
-        for (int j = 0; j < base_class->methods_count; ++j) {
-          bjvm_cp_method *method = base_class->methods + j;
+        for (int j = 0; j < class->methods_count; ++j) {
+          bjvm_cp_method *method = class->methods + j;
 
           if (utf8_equals_utf8(method->name, &entry->name) &&
               utf8_equals_utf8(method->descriptor, &entry->descriptor)) {
@@ -1853,15 +1766,15 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 
     // Remove from inchoate_classes
     (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars, len);
-    (void)bjvm_hash_table_insert(&vm->classes, chars, len, base_class);
+    (void)bjvm_hash_table_insert(&vm->classes, chars, len, class);
+
+    class->kind = BJVM_CD_KIND_ORDINARY;
   }
 
   // Derive nth dimension
-  bjvm_classdesc *result = base_class;
-  result->kind = BJVM_CD_KIND_ORDINARY;
+  bjvm_classdesc *result = class;
   for (int i = 1; i <= dimensions; ++i) {
-    if (!result->array_type)
-      result->array_type = ordinary_arr_classdesc(thread, result, i);
+    make_array_classdesc(thread, result);
     result = result->array_type;
   }
 
@@ -1869,13 +1782,13 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 }
 
 int bjvm_link_array_class(bjvm_thread *thread,
-                          bjvm_array_classdesc *classdesc) {
-  int status = bjvm_link_class(thread, classdesc->base.base_component);
+                          bjvm_classdesc *classdesc) {
+  int status = bjvm_link_class(thread, classdesc->base_component);
   if (status) {
     // TODO mark all arrays of this class as fucked up
     UNREACHABLE();
   }
-  classdesc->base.state = classdesc->base.base_component->state;
+  classdesc->state = classdesc->base_component->state;
   return status;
 }
 
@@ -1927,7 +1840,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 
   if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
     assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-    return bjvm_link_array_class(thread, (bjvm_array_classdesc *)classdesc);
+    return bjvm_link_array_class(thread, classdesc);
   }
 
   // Link superclasses
@@ -2183,21 +2096,18 @@ int bjvm_resolve_field(bjvm_thread *thread, bjvm_cp_field_info *info) {
   return field == nullptr;
 }
 
-void make_array_classdesc(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  if (classdesc->array_type)
-    return;
-  if (classdesc->kind == BJVM_CD_KIND_ORDINARY)
-    classdesc->array_type = ordinary_arr_classdesc(thread, classdesc, 1);
-  else if (classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-    bjvm_array_classdesc *arr = (bjvm_array_classdesc *)classdesc;
-    classdesc->array_type = ordinary_arr_classdesc(thread, arr->base.base_component,
-                                                   arr->dimensions + 1);
-  } else {
-    bjvm_primitive_array_classdesc *arr =
-        (bjvm_primitive_array_classdesc *)classdesc;
-    classdesc->array_type = primitive_arr_classdesc(
-        thread, arr->dimensions + 1, classdesc->kind, arr->element_type);
+// Fill in the array_type class descriptor, corresponding to an array of the
+// given component. For example, J -> [J, [[J -> [[[J, Object -> [Object
+bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
+                                     bjvm_classdesc *classdesc) {
+  if (!classdesc->array_type) {
+    if (classdesc->kind == BJVM_CD_KIND_ORDINARY || classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
+      classdesc->array_type = ordinary_array_classdesc(thread, classdesc);
+    } else {
+      classdesc->array_type = primitive_array_classdesc(thread, classdesc);
+    }
   }
+  return classdesc->array_type;
 }
 
 void store_stack_value(void *field_location, bjvm_stack_value value,
@@ -2283,24 +2193,19 @@ bjvm_obj_header *create_object_array(bjvm_thread *thread,
   return array;
 }
 
-bjvm_obj_header *create_primitive_array(bjvm_thread *thread,
+bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
                                         bjvm_type_kind array_type, int count) {
   const wchar_t *type;
-  int size;
-
+  int size = sizeof_type_kind(array_type);
   if (count < 0) {
     bjvm_negative_array_size_exception(thread, count);
     return nullptr;
   }
-
-  primitive_type_kind_to_array_info(array_type, &type, &size);
-  bjvm_classdesc *desc = bootstrap_class_create(thread, type);
+  bjvm_classdesc* desc = make_array_classdesc(thread, bjvm_primitive_classdesc(thread, array_type));
   assert(desc);
-
   bjvm_obj_header *array = calloc(1, 24 + count * size);
   array->descriptor = desc;
   *array_length(array) = count;
-
   return array;
 }
 
@@ -2359,7 +2264,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, const wchar_t *chars, int len)
   bjvm_initialize_class(thread, java_lang_String);
   struct bjvm_native_String *str = (void*)new_object(thread, java_lang_String);
   len = len < 0 ? wcslen(chars) : len;
-  str->value = create_primitive_array(thread, BJVM_TYPE_KIND_CHAR, len);
+  str->value = create_1d_primitive_array(thread, BJVM_TYPE_KIND_CHAR, len);
   for (int i = 0; i < len; ++i)
     *((uint16_t *)array_data(str->value) + i) = chars[i];
   return (void*)str;
@@ -2392,29 +2297,27 @@ bool bjvm_instanceof_interface(const bjvm_classdesc *o,
   return false;
 }
 
-bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *classdesc) {
+bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
   // Walk the superclasses/superinterfaces of bjvm_obj_header and see if any are
   // equal to classdesc
   // TODO compare class loaders too, superinterfaces
-  // TODO arrays
   if (o == nullptr) return true;
 
-  if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
-    if (classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-      const bjvm_array_classdesc *arr = (const bjvm_array_classdesc *)classdesc;
-      if (o->kind != BJVM_CD_KIND_ORDINARY_ARRAY)
-        return false;
-      const bjvm_array_classdesc *o_arr = (const bjvm_array_classdesc *)o;
-      return arr->dimensions == o_arr->dimensions &&
-             bjvm_instanceof(o_arr->base.base_component, arr->base.base_component);
+  if (target->kind != BJVM_CD_KIND_ORDINARY) {
+    if (o->kind == BJVM_CD_KIND_ORDINARY)
+      return false;
+    if (o->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
+      return target->dimensions == o->dimensions &&
+             bjvm_instanceof(o->base_component, target->base_component);
     }
-    return classdesc->kind == o->kind;
+    // o is primitive array, equality check suffices
+    return target->dimensions == o->dimensions && o->base_component == target->base_component;
   }
 
-  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
+  // o is normal object
   const bjvm_classdesc *desc = o;
   while (desc) {
-    if (bjvm_instanceof_interface(desc, classdesc))
+    if (bjvm_instanceof_interface(desc, target))
       return true;
     desc = desc->super_class ? desc->super_class->classdesc : nullptr;
   }
@@ -2586,7 +2489,7 @@ int bjvm_invokestatic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytec
 bjvm_obj_header *bjvm_multianewarray_impl(bjvm_thread *thread, bjvm_classdesc *desc, bjvm_stack_value *value, int dims) {
   int this_dim = (value + dims - 1)->i;
   if (dims == 1 && desc->kind != BJVM_CD_KIND_ORDINARY_ARRAY) {
-    return create_primitive_array(thread, ((bjvm_primitive_array_classdesc*) desc)->element_type, this_dim);
+    return create_1d_primitive_array(thread, desc->primitive_component, this_dim);
   }
   bjvm_obj_header* arr = create_object_array(thread, desc, this_dim);
   for (int i = 0; i < this_dim; ++i) {
@@ -2722,7 +2625,6 @@ start:
     bjvm_insn_baload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      assert(array->descriptor->kind == BJVM_CD_KIND_BYTE_ARRAY);
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         // ArrayIndexOutOfBoundsException
@@ -2737,7 +2639,6 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      assert(array->descriptor->kind == BJVM_CD_KIND_BYTE_ARRAY);
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -2749,7 +2650,6 @@ start:
     bjvm_insn_caload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      assert(array->descriptor->kind == BJVM_CD_KIND_CHAR_ARRAY);
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -2764,7 +2664,6 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      assert(array->descriptor->kind == BJVM_CD_KIND_CHAR_ARRAY);
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -3229,7 +3128,6 @@ start:
     bjvm_insn_saload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      assert(array->descriptor->kind == BJVM_CD_KIND_SHORT_ARRAY);
       int len = *array_length(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -3551,7 +3449,7 @@ start:
     bjvm_insn_newarray: {
       int count = checked_pop(frame).i;
       bjvm_obj_header *array =
-          create_primitive_array(thread, insn->array_type, count);
+          create_1d_primitive_array(thread, insn->array_type, count);
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
       } else {  // failed to create array

@@ -846,6 +846,24 @@ bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
                                                .targets_count = pairs_count}};
 }
 
+bjvm_type_kind parse_atype(uint8_t atype) {
+  switch (atype) {
+  case 4: return BJVM_TYPE_KIND_BOOLEAN;
+  case 5: return BJVM_TYPE_KIND_CHAR;
+    case 6: return BJVM_TYPE_KIND_FLOAT;
+        case 7: return BJVM_TYPE_KIND_DOUBLE;
+    case 8: return BJVM_TYPE_KIND_BYTE;
+        case 9: return BJVM_TYPE_KIND_SHORT;
+    case 10: return BJVM_TYPE_KIND_INT;
+        case 11: return BJVM_TYPE_KIND_LONG;
+  default: {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "invalid newarray type %d", atype);
+    format_error_dynamic(strdup(buf));
+  }
+  }
+}
+
 bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
                                    bjvm_classfile_parse_ctx *ctx) {
   /** Raw instruction codes (to be canonicalized). */
@@ -1546,13 +1564,9 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
 
   case newarray: {
     uint8_t atype = reader_next_u8(reader, "newarray type");
-    if (atype < BJVM_TYPE_KIND_BOOLEAN || atype > BJVM_TYPE_KIND_LONG) {
-      char buf[64];
-      snprintf(buf, sizeof(buf), "invalid newarray type %d", atype);
-      format_error_dynamic(strdup(buf));
-    }
+    bjvm_type_kind parsed = parse_atype(atype);
     return (bjvm_bytecode_insn){.kind = bjvm_insn_newarray,
-                                .array_type = atype};
+                                .array_type = parsed};
   }
 
   case anewarray: {

@@ -41,17 +41,6 @@ typedef uint64_t bjvm_mark_word_t;
 
 typedef struct bjvm_ordinary_class bjvm_ordinary_class;
 
-typedef struct bjvm_array_classdesc {
-  bjvm_classdesc base;
-  int dimensions;
-} bjvm_array_classdesc;
-
-typedef struct bjvm_primitive_array_classdesc {
-  bjvm_classdesc base;
-  int dimensions;
-  bjvm_type_kind element_type;
-} bjvm_primitive_array_classdesc;
-
 // Equivalent to HotSpot's InstanceKlass
 typedef struct bjvm_ordinary_class {
   bjvm_classdesc base;
@@ -101,7 +90,7 @@ typedef struct bjvm_vm {
   void *write_byte_param;
 
   // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8) )
-  struct bjvm_native_Class *primitive_classes[9];
+  bjvm_classdesc *primitive_classes[9];
 } bjvm_vm;
 
 typedef struct {
