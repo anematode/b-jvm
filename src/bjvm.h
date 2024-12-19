@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <wchar.h>
 
+#include "util.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -226,11 +228,6 @@ struct bjvm_bc_invokeinterface_data {
   uint16_t index;
   uint8_t count;
 };
-
-typedef struct {
-  wchar_t *chars;
-  int len;
-} bjvm_utf8;
 
 typedef struct bjvm_classdesc bjvm_classdesc;
 typedef struct bjvm_obj_header bjvm_obj_header;
