@@ -20,6 +20,7 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
 
 char *parse_field_descriptor(const wchar_t **chars, size_t len,
                              bjvm_field_descriptor *result);
+
 /**
  * Instruction code. Similar instructions like aload_0 are canonicalised to
  * aload with an argument of 0.
@@ -604,6 +605,8 @@ typedef struct bjvm_classdesc {
   bjvm_classdesc *one_fewer_dim;
   bjvm_classdesc *base_component;
 } bjvm_classdesc;
+
+char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
 
 #ifdef __cplusplus
 }

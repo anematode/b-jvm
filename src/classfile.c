@@ -207,7 +207,6 @@ void free_code_analysis(bjvm_code_analysis *code_analysis) {
   if (!code_analysis)
     return;
   if (code_analysis->insn_index_to_references) {
-    printf("%p\n", code_analysis->insn_index_to_references);
     fflush(stdout);
     for (int i = 0; i < code_analysis->insn_count; ++i)
       bjvm_free_compressed_bitset(code_analysis->insn_index_to_references[i]);

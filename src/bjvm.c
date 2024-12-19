@@ -3122,7 +3122,7 @@ start:
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .i = *((int64_t *)array_data(array) + index)});
+                              .l = *((int64_t *)array_data(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_land: {
@@ -3132,7 +3132,7 @@ start:
     }
     bjvm_insn_lastore:
     bjvm_insn_dastore: {
-      int value = checked_pop(frame).i;
+      int64_t value = checked_pop(frame).l;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
       int len = *array_length(array);
