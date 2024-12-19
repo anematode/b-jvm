@@ -356,12 +356,14 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   // need to perform any checks. Otherwise, we need to perform an instanceof check on each element
   // and raise an ArrayStoreException as appropriate.
   if (bjvm_instanceof(src->descriptor->one_fewer_dim, dest->descriptor->one_fewer_dim)) {
-    memcpy((bjvm_obj_header **)array_data(dest) + dest_pos,
+    // memmove because source and destination may alias
+    memmove((bjvm_obj_header **)array_data(dest) + dest_pos,
            (bjvm_obj_header **)array_data(src) + src_pos, length * sizeof(void *));
     return value_null();
   }
 
   for (int i = 0; i < length; ++i) {
+    // may-alias case handled above
     bjvm_obj_header *src_elem = ((bjvm_obj_header **)array_data(src))[src_pos + i];
     if (src_elem && !bjvm_instanceof(src_elem->descriptor, dest->descriptor->one_fewer_dim)) {
       bjvm_array_store_exception(thread);
