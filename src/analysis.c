@@ -7,7 +7,6 @@
 
 #include "analysis.h"
 #include "classfile.h"
-#include "bjvm.h"
 
 const char *insn_code_name(bjvm_insn_code_kind code) {
   switch (code) {
@@ -539,7 +538,7 @@ fail:;
   char *a_str = print_analy_stack_state(&a),
        *b_str = print_analy_stack_state(&b);
   char *buf = malloc(strlen(a_str) + strlen(b_str) + 128);
-  sprintf(buf, "Stack mismatch:\nPreviously inferred: %s\nFound: %s", a_str,
+  snprintf(buf, strlen(a_str) + strlen(b_str) + 128, "Stack mismatch:\nPreviously inferred: %s\nFound: %s", a_str,
           b_str);
   free(a_str);
   free(b_str);
@@ -1237,4 +1236,28 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   free(stack_before.entries);
 
   return error;
+}
+
+bjvm_analy_stack_state bjvm_init_analy_stack_state(int initial_size) {
+  return (bjvm_analy_stack_state){
+      .entries = calloc(initial_size, sizeof(bjvm_analy_stack_entry)),
+      .entries_count = initial_size,
+      .entries_cap = initial_size};
+}
+
+void bjvm_free_analy_stack_state(bjvm_analy_stack_state state) {
+  free(state.entries);
+}
+
+typedef struct {
+  bjvm_compressed_bitset
+      stack; // whenever a bit in here is true, that stack entry is a reference
+  bjvm_compressed_bitset locals; // whenever a bit in here is true, that local
+                                 // variable entry is a reference
+} bjvm_analy_reference_bitset_state;
+
+void bjvm_free_analy_reference_bitset_state(
+    bjvm_analy_reference_bitset_state state) {
+  bjvm_free_compressed_bitset(state.stack);
+  bjvm_free_compressed_bitset(state.locals);
 }

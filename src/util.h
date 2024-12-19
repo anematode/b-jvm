@@ -2,12 +2,15 @@
 #define UTIL_H
 
 #include <string.h>
+#include <stdio.h>
+#include <wchar.h>
+#include <assert.h>
 
 #if defined(__APPLE__)
 #include <libkern/OSByteOrder.h>
-#define __bswap_16(x) OSSwapInt16(x)
-#define __bswap_32(x) OSSwapInt32(x)
-#define __bswap_64(x) OSSwapInt64(x)
+#define __bswap_16(x) OSSwapInt16(x) // NOLINT(*-reserved-identifier)
+#define __bswap_32(x) OSSwapInt32(x) // NOLINT(*-reserved-identifier)
+#define __bswap_64(x) OSSwapInt64(x) // NOLINT(*-reserved-identifier)
 #else
 #include <byteswap.h>
 #endif
@@ -17,7 +20,6 @@
 /* -Wundef is avoided by using short circuiting in the condition */
 #define nullptr ((void*)0)
 #endif
-
 
 #define UNREACHABLE(optional_msg)                                              \
   do {                                                                         \
@@ -47,19 +49,10 @@ typedef struct {
   int len;
 } bjvm_utf8;
 
-static bool utf8_equals(const bjvm_utf8 *entry, const char *str) {
-  if (entry->len != (int)strlen(str))
-    return false;
-  for (int i = 0; i < entry->len; ++i)
-    if (entry->chars[i] != str[i])
-      return false;
-  return true;
-}
+bool utf8_equals(const bjvm_utf8 *entry, const char *str);
+bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right);
 
-static bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right) {
-  if (left->len != right->len)
-    return false;
-  return wmemcmp(left->chars, right->chars, left->len) == 0;
-}
+char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8);
+bjvm_utf8 bjvm_make_utf8(const wchar_t *c_literal);
 
 #endif

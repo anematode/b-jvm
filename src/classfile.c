@@ -15,8 +15,8 @@
 #include <wasm_simd128.h>
 #endif
 
+#include "analysis.h"
 #include "classfile.h"
-#include "bjvm.h"
 #include "util.h"
 
 static const char *cp_kind_to_string(bjvm_cp_kind kind) {
@@ -63,6 +63,7 @@ bjvm_utf8 init_utf8_entry(int len) {
 
 void free_utf8(bjvm_utf8 entry) { free(entry.chars); }
 
+void free_field_descriptor(bjvm_field_descriptor descriptor);
 void free_method_descriptor(void *descriptor_);
 
 void free_constant_pool_entry(bjvm_cp_entry *entry) {
@@ -178,6 +179,12 @@ void bjvm_free_classfile(bjvm_classdesc cf) {
 bjvm_cp_entry *get_constant_pool_entry(bjvm_constant_pool *pool, int index) {
   assert(index >= 0 && index < pool->entries_len);
   return &pool->entries[index];
+}
+
+void free_field_descriptor(bjvm_field_descriptor descriptor) {
+  if (descriptor.kind == BJVM_TYPE_KIND_REFERENCE) {
+    free_utf8(descriptor.class_name);
+  }
 }
 
 void free_field(bjvm_cp_field *field) {
@@ -451,6 +458,11 @@ bjvm_utf8 bjvm_wchar_slice_to_utf8(const wchar_t *chars, size_t len) {
   wmemcpy(init.chars, chars, len);
   return init;
 }
+
+char *parse_field_descriptor(const wchar_t **chars, size_t len,
+                             bjvm_field_descriptor *result);
+char *parse_method_descriptor(const bjvm_utf8 *descriptor,
+                              bjvm_method_descriptor *result);
 
 char *parse_complete_field_descriptor(const bjvm_utf8 *entry,
                                       bjvm_field_descriptor *result,
@@ -1684,20 +1696,6 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
   }
 }
 
-char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8) {
-  char *result = malloc(utf8->len + 1);
-  int i = 0;
-  for (; i < utf8->len; ++i) {
-    result[i] = (char)utf8->chars[i];
-  }
-  result[i] = '\0';
-  return result;
-}
-
-bjvm_utf8 bjvm_make_utf8(const wchar_t *c_literal) {
-  return (bjvm_utf8){.chars = wcsdup(c_literal), .len = wcslen(c_literal)};
-}
-
 /**
  * Parse an instruction at the given program counter and advance the reader.
  * @return The parsed instruction.
@@ -1970,139 +1968,6 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
     format_error_dynamic(error);
 
   return field;
-}
-
-bjvm_analy_stack_state bjvm_init_analy_stack_state(int initial_size) {
-  return (bjvm_analy_stack_state){
-      .entries = calloc(initial_size, sizeof(bjvm_analy_stack_entry)),
-      .entries_count = initial_size,
-      .entries_cap = initial_size};
-}
-
-void bjvm_free_analy_stack_state(bjvm_analy_stack_state state) {
-  free(state.entries);
-}
-
-typedef struct {
-  bjvm_compressed_bitset
-      stack; // whenever a bit in here is true, that stack entry is a reference
-  bjvm_compressed_bitset locals; // whenever a bit in here is true, that local
-                                 // variable entry is a reference
-} bjvm_analy_reference_bitset_state;
-
-void bjvm_free_analy_reference_bitset_state(
-    bjvm_analy_reference_bitset_state state) {
-  bjvm_free_compressed_bitset(state.stack);
-  bjvm_free_compressed_bitset(state.locals);
-}
-
-bjvm_compressed_bitset bjvm_empty_bitset() {
-  return (bjvm_compressed_bitset){.bits_inl = 1};
-}
-
-bool bjvm_is_bitset_compressed(bjvm_compressed_bitset bits) {
-  return (bits.bits_inl & 1) != 0; // pointer is aligned
-}
-
-void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
-  if (!bjvm_is_bitset_compressed(bits))
-    free(bits.ptr.bits);
-}
-
-/**
- * List all set bits, starting from 0, in the given bitset. Stores the list into
- * the given buffer, which must have the existing length in words (or
- * existing_buf = NULL, length = 0). Returns a (possibly reallocated) buffer.
- *
- * Used to follow references during garbage collection.
- */
-int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
-                                      int *existing_buf, int *length,
-                                      int *capacity) {
-  if (bjvm_is_bitset_compressed(bits)) {
-    for (int i = 1; i < 64; ++i)
-      if (bits.bits_inl & (1ULL << i))
-        *VECTOR_PUSH(existing_buf, (*length), (*capacity)) = i - 1;
-  } else {
-    for (uint32_t i = 0; i < bits.ptr.size_words; ++i)
-      for (int j = 0; j < 64; ++j)
-        if (bits.ptr.bits[i] & (1ULL << j))
-          *VECTOR_PUSH(existing_buf, (*length), (*capacity)) = i * 64 + j;
-  }
-  return existing_buf;
-}
-
-bjvm_compressed_bitset bjvm_init_compressed_bitset(int bits_capacity) {
-  if (bits_capacity > 63) {
-    uint32_t size_words = (bits_capacity + 63) / 64;
-    uint64_t *buffer = calloc(size_words, sizeof(uint64_t));
-    return (bjvm_compressed_bitset){.ptr.bits = buffer,
-                                    .ptr.size_words = size_words};
-  }
-  return (bjvm_compressed_bitset){
-      .bits_inl = 1 // lowest bit = 1
-  };
-}
-
-bjvm_compressed_bitset
-bjvm_copy_compressed_bitset(bjvm_compressed_bitset bits) {
-  if (bjvm_is_bitset_compressed(bits)) {
-    return bits;
-  }
-  const size_t buf_size = bits.ptr.size_words * sizeof(uint64_t);
-  uint64_t *buffer = malloc(buf_size);
-  memcpy(buffer, bits.ptr.bits, buf_size);
-  return (bjvm_compressed_bitset){.ptr.bits = buffer,
-                                  .ptr.size_words = bits.ptr.size_words};
-}
-
-void get_compressed_bitset_word_and_offset(bjvm_compressed_bitset *bits,
-                                           size_t bit_index, uint64_t **word,
-                                           uint8_t *offset) {
-  if (bjvm_is_bitset_compressed(*bits)) {
-    assert(bit_index < 63);
-    *word = &bits->bits_inl;
-    *offset = bit_index + 1;
-  } else {
-    assert(bit_index < 64 * bits->ptr.size_words);
-    *word = &bits->ptr.bits[bit_index >> 6];
-    *offset = bit_index & 0x3f;
-  }
-}
-
-bool bjvm_test_compressed_bitset(const bjvm_compressed_bitset bits,
-                                 size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
-  get_compressed_bitset_word_and_offset((bjvm_compressed_bitset *)&bits,
-                                        bit_index, &word, &offset);
-  return *word & (1ULL << offset);
-}
-
-bool bjvm_test_reset_compressed_bitset(bjvm_compressed_bitset *bits,
-                                       size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
-  get_compressed_bitset_word_and_offset(bits, bit_index, &word, &offset);
-  bool test = *word & (1ULL << offset);
-  *word &= ~(1ULL << offset);
-  return test;
-}
-
-bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
-                                     size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
-  get_compressed_bitset_word_and_offset(bits, bit_index, &word, &offset);
-  bool test = *word & (1ULL << offset);
-  *word |= 1ULL << offset;
-  return test;
-}
-
-void free_field_descriptor(bjvm_field_descriptor descriptor) {
-  if (descriptor.kind == BJVM_TYPE_KIND_REFERENCE) {
-    free_utf8(descriptor.class_name);
-  }
 }
 
 /**

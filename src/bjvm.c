@@ -53,210 +53,6 @@ int add_classfile_bytes(bjvm_vm *vm,
   return 0;
 }
 
-bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
-                                            double load_factor,
-                                            size_t initial_capacity) {
-  bjvm_string_hash_table table;
-  table.free_fn = free_fn;
-  table.entries = calloc(initial_capacity, sizeof(bjvm_hash_table_entry));
-  table.entries_count = 0;
-  table.entries_cap = initial_capacity;
-  table.load_factor = load_factor;
-  return table;
-}
-
-bjvm_hash_table_iterator
-bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
-  bjvm_hash_table_iterator iter;
-  iter.current_base = tbl->entries;
-  bjvm_hash_table_entry *end = tbl->entries + tbl->entries_cap;
-  // advance to first nonzero entry
-  while (iter.current_base < end && iter.current_base->key == NULL)
-    iter.current_base++;
-  iter.current = iter.current_base;
-  iter.end = end;
-  return iter;
-}
-
-bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       wchar_t **key, size_t *key_len,
-                                       void **value) {
-  if (iter.current != iter.end) {
-    *key = iter.current->key;
-    *key_len = iter.current->key_len;
-    *value = iter.current->data;
-    return true;
-  }
-  return false;
-}
-
-bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
-  if (iter->current_base == iter->end)
-    return false;
-  if (iter->current->next) {
-    iter->current = iter->current->next;
-    return true;
-  }
-  // advance base until a non-null key
-  while (++iter->current_base < iter->end && iter->current_base->key == NULL)
-    ;
-  iter->current = iter->current_base;
-  return iter->current_base != iter->end;
-}
-
-uint32_t bjvm_hash_string(const wchar_t *key, size_t len) {
-  uint64_t hash = 0;
-  for (size_t i = 0; i < len; ++i) {
-    hash = 31 * hash + key[i]; // yk what I mean ;)
-  }
-  return hash;
-}
-
-bjvm_hash_table_entry *
-bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const wchar_t *key,
-                           size_t len, bool *equal, bool *on_chain,
-                           bjvm_hash_table_entry **prev_entry) {
-  uint32_t hash = bjvm_hash_string(key, len);
-  size_t index = hash % tbl->entries_cap;
-  bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = NULL;
-  while (ent) {
-    *on_chain = prev != NULL;
-    if (ent->key && ent->key_len == len && wmemcmp(ent->key, key, len) == 0) {
-      *equal = true;
-      *prev_entry = prev;
-      return ent;
-    }
-    if (!ent->next) {
-      *equal = false;
-      *prev_entry = prev;
-      return ent;
-    }
-    prev = ent;
-    ent = ent->next;
-  }
-  *equal = false;
-  *on_chain = true;
-  if (prev_entry)
-    *prev_entry = prev;
-  return prev;
-}
-
-void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const wchar_t *key,
-                             int len) {
-  bool equal, on_chain;
-  len = len == -1 ? wcslen(key) : len;
-  bjvm_hash_table_entry *prev,
-      *ent =
-          bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &prev);
-  if (!equal)
-    return NULL;
-  tbl->entries_count--;
-  void *ret_val = ent->data;
-  free(ent->key);
-  ent->key = NULL;
-  if (prev) {
-    prev->next = ent->next;
-    free(ent);
-  } else if (ent->next) {
-    prev = ent->next;
-    *ent = *ent->next;
-    free(prev);
-  }
-  return ret_val;
-}
-
-void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
-                                  int len, void *value, bool copy_key) {
-  len = len == -1 ? wcslen(key) : len;
-  bool equal, on_chain;
-  if (tbl->entries_count + 1 >= tbl->load_factor * tbl->entries_cap) {
-    bjvm_hash_table_rehash(tbl, tbl->entries_cap * 2);
-  }
-
-  bjvm_hash_table_entry *_prev,
-      *ent =
-          bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
-  if (equal) {
-    void *ret_val = ent->data;
-    ent->data = value;
-    if (!copy_key)
-      free(key);
-    return ret_val;
-  }
-  if (on_chain || ent->key != NULL) {
-    ent->next = malloc(sizeof(bjvm_hash_table_entry));
-    ent = ent->next;
-  }
-  ent->next = NULL;
-  ent->data = value;
-  if (copy_key) {
-    wchar_t *new_key = malloc(len * sizeof(wchar_t));
-    wmemcpy(new_key, key, len);
-    ent->key = new_key;
-  } else {
-    ent->key = key;
-  }
-  ent->key_len = len;
-  tbl->entries_count++;
-  return NULL;
-}
-
-void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl, const wchar_t *key,
-                             int len, void *value) {
-  return bjvm_hash_table_insert_impl(tbl, (wchar_t *)key /* key copied */, len,
-                                     value, true);
-}
-
-void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
-  bjvm_string_hash_table new_table =
-      bjvm_make_hash_table(tbl->free_fn, tbl->load_factor, new_capacity);
-  bjvm_hash_table_iterator iter = bjvm_hash_table_get_iterator(tbl);
-  wchar_t *key;
-  size_t len;
-  void *value;
-  while (bjvm_hash_table_iterator_has_next(iter, &key, &len, &value)) {
-    bjvm_hash_table_insert_impl(&new_table, key, len, value,
-                                false /* don't copy key */);
-    bjvm_hash_table_entry *ent = iter.current;
-    bool entry_on_chain = iter.current != iter.current_base;
-    bjvm_hash_table_iterator_next(&iter);
-    if (entry_on_chain)
-      free(ent);
-  }
-  free(tbl->entries); // Don't need to free the linked lists, keys etc. as they
-                      // were moved over
-  *tbl = new_table;
-}
-
-void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
-                             int len) {
-  bool equal, on_chain;
-  len = len == -1 ? wcslen(key) : len;
-  bjvm_hash_table_entry *_prev,
-      *entry =
-          bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
-  return equal ? entry->data : NULL;
-}
-
-void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
-  bjvm_hash_table_iterator it = bjvm_hash_table_get_iterator(&tbl);
-  wchar_t *key;
-  size_t len;
-  void *value;
-  while (bjvm_hash_table_iterator_has_next(it, &key, &len, &value)) {
-    bjvm_hash_table_entry *ent = it.current;
-    bool needs_free = it.current != it.current_base;
-    free(key);
-    if (tbl.free_fn)
-      tbl.free_fn(value);
-    bjvm_hash_table_iterator_next(&it);
-    if (needs_free)
-      free(ent);
-  }
-  free(tbl.entries);
-  tbl.entries_cap = tbl.entries_count = 0; // good form
-}
-
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
   assert(method != NULL);
 
@@ -292,7 +88,7 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 
 char *stack_value_to_string(bjvm_stack_value value) {
   char buf[1000];
-  sprintf(buf, "[ ref = %p, int = %d ]", value.obj, value.i);
+  snprintf(buf, 1000, "[ ref = %p, int = %d ]", value.obj, value.i);
   return strdup(buf);
 }
 
@@ -2699,7 +2495,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_byte
       return -1;
     }
 
-    invoked_result = method->native_handle(thread, target,
+    invoked_result = ((bjvm_native_callback)method->native_handle)(thread, target,
                           frame->values + frame->stack_depth - args + 1,
                           args - 1);
     frame->stack_depth -= args;
@@ -2762,7 +2558,7 @@ int bjvm_invokestatic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytec
       return -1;
     }
 
-    invoked_result = method->native_handle(thread, NULL,
+    invoked_result = ((bjvm_native_callback)method->native_handle)(thread, NULL,
                           frame->values + frame->stack_depth - args, args);
     frame->stack_depth -= args;
     if (thread->current_exception)

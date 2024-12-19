@@ -43,7 +43,11 @@ add_library(bjvm OBJECT src/bjvm.h src/bjvm.c src/natives.h
         src/classfile.c
         src/classfile.h
         src/analysis.c
-        src/analysis.h)
+        src/analysis.h
+        src/adt.c
+        src/adt.h
+        src/util.c
+        src/util.h)
 
 add_executable(bjvm_main src/main.c)
 target_link_libraries(bjvm_main PRIVATE bjvm)
