@@ -27,7 +27,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
  *
  * Used to follow references during garbage collection.
  */
-int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
+[[nodiscard]] int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity) {
   if (bjvm_is_bitset_compressed(bits)) {
@@ -136,7 +136,7 @@ bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
 }
 
 bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       wchar_t **key, size_t *key_len,
+                                       const wchar_t **key, size_t *key_len,
                                        void **value) {
   if (iter.current != iter.end) {
     *key = iter.current->key;

@@ -28,7 +28,7 @@ bjvm_compressed_bitset bjvm_init_compressed_bitset(int bits_capacity);
 void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits);
 bool bjvm_is_bitset_compressed(bjvm_compressed_bitset bits);
 bjvm_compressed_bitset bjvm_empty_bitset();
-int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
+[[nodiscard]] int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity);
 bool bjvm_test_compressed_bitset(bjvm_compressed_bitset bits, size_t bit_index);

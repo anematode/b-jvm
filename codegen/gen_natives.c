@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 	}
 
 	char *jre_dir = argv[2];
-	bjvm_vm_options options = {};
+	bjvm_vm_options options = bjvm_default_vm_options();
 
 	options.load_classfile = load_classfile;
 	options.load_classfile_param = (void*)jre_dir;
