@@ -533,7 +533,7 @@ char *expect_analy_stack_states_equal(bjvm_analy_stack_state a,
     }
   }
 
-  return NULL;
+  return nullptr;
 fail:;
   char *a_str = print_analy_stack_state(&a),
        *b_str = print_analy_stack_state(&b);
@@ -585,9 +585,9 @@ bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
 char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   bjvm_attribute_code *code = method->code;
   if (!code)
-    return NULL; // method has no code
+    return nullptr; // method has no code
 
-  char *error = NULL;
+  char *error = nullptr;
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks =

@@ -231,7 +231,7 @@ typedef struct {
 
 // jmp_buf for format error
 _Thread_local jmp_buf format_error_jmp_buf;
-_Thread_local char *format_error_msg = NULL;
+_Thread_local char *format_error_msg = nullptr;
 _Thread_local bool format_error_needs_free = false;
 
 _Noreturn void format_error_static(const char *reason) {
@@ -311,7 +311,7 @@ typedef struct {
 } ctx_free_ticket;
 
 void free_ticket(ctx_free_ticket ticket) {
-  ticket.ctx->free_on_error[ticket.offset] = NULL;
+  ticket.ctx->free_on_error[ticket.offset] = nullptr;
 }
 
 #define PUSH_FREE                                                              \
@@ -478,7 +478,7 @@ char *parse_complete_field_descriptor(const bjvm_utf8 *entry,
     snprintf(buf, sizeof(buf), "trailing character(s): '%c'", *chars);
     return strdup(buf);
   }
-  return NULL;
+  return nullptr;
 }
 
 /**
@@ -517,7 +517,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
         .kind = BJVM_CP_KIND_CLASS,
         .class_info = {
             .name = skip_linking
-                        ? NULL
+                        ? nullptr
                         : checked_get_utf8(ctx->cp, index, "class info name")}};
   }
   case CONSTANT_Fieldref:
@@ -532,7 +532,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                                   ? BJVM_CP_KIND_METHOD_REF
                                   : BJVM_CP_KIND_INTERFACE_METHOD_REF;
     bjvm_cp_class_info *class_info =
-        skip_linking ? NULL
+        skip_linking ? nullptr
                      : &checked_cp_entry(
                             ctx->cp, class_index, BJVM_CP_KIND_CLASS,
                             "fieldref/methodref/interfacemethodref class info")
@@ -540,7 +540,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     bjvm_cp_name_and_type *name_and_type =
         skip_linking
-            ? NULL
+            ? nullptr
             : &checked_cp_entry(
                    ctx->cp, name_and_type_index, BJVM_CP_KIND_NAME_AND_TYPE,
                    "fieldref/methodref/interfacemethodref name and type")
@@ -550,7 +550,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
       return (bjvm_cp_entry){.kind = entry_kind,
                              .fieldref_info = {.class_info = class_info,
                                                .nat = name_and_type,
-                                               .field = NULL}};
+                                               .field = nullptr}};
     }
     return (bjvm_cp_entry){.kind = entry_kind,
                            .methodref = {.class_info = class_info,
@@ -560,7 +560,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t index = reader_next_u16(reader, "string index");
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_STRING,
-        .string = {.chars = skip_linking ? NULL
+        .string = {.chars = skip_linking ? nullptr
                                          : checked_get_utf8(ctx->cp, index,
                                                             "string value")}};
   }
@@ -588,7 +588,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t name_index = reader_next_u16(reader, "name index");
     uint16_t descriptor_index = reader_next_u16(reader, "descriptor index");
 
-    bjvm_utf8 *name = skip_linking ? NULL
+    bjvm_utf8 *name = skip_linking ? nullptr
                                    : checked_get_utf8(ctx->cp, name_index,
                                                       "name and type name");
 
@@ -597,7 +597,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
         .name_and_type = {
             .name = name,
             .descriptor = skip_linking
-                              ? NULL
+                              ? nullptr
                               : checked_get_utf8(ctx->cp, descriptor_index,
                                                  "name and type descriptor")}};
   }
@@ -617,7 +617,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
   case CONSTANT_MethodHandle: {
     uint8_t handle_kind = reader_next_u8(reader, "method handle kind");
     uint16_t reference_index = reader_next_u16(reader, "reference index");
-    bjvm_cp_entry *entry = skip_linking ? NULL : checked_cp_entry(
+    bjvm_cp_entry *entry = skip_linking ? nullptr : checked_cp_entry(
                                                      ctx->cp, reference_index,
                                                      -1,
                                                      "method handle reference");
@@ -634,7 +634,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
         .kind = BJVM_CP_KIND_METHOD_TYPE,
         .method_type_info = {
             .descriptor = skip_linking
-                              ? NULL
+                              ? nullptr
                               : checked_get_utf8(ctx->cp, desc_index,
                                                  "method type descriptor")}};
   }
@@ -644,7 +644,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t name_and_type_index =
         reader_next_u16(reader, "name and type index");
     bjvm_cp_name_and_type *name_and_type =
-        skip_linking ? NULL
+        skip_linking ? nullptr
                      : &checked_cp_entry(ctx->cp, name_and_type_index,
                                          BJVM_CP_KIND_NAME_AND_TYPE,
                                          "indy name and type")
@@ -653,7 +653,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
                            .indy_info = {.method = (void*)bootstrap_method_attr_index,  // will be fixed up later
                                          .name_and_type = name_and_type,
-                                         .method_descriptor = NULL}};
+                                         .method_descriptor = nullptr}};
   }
   default:
     format_error_static("Invalid constant pool entry kind");
@@ -671,7 +671,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
                                 bjvm_classfile_parse_ctx *ctx) {
   switch (entry->kind) {
   case BJVM_CP_KIND_FIELD_REF: {
-    bjvm_field_descriptor *parsed_descriptor = NULL;
+    bjvm_field_descriptor *parsed_descriptor = nullptr;
     bjvm_cp_name_and_type *name_and_type = entry->fieldref_info.nat;
 
     entry->fieldref_info.parsed_descriptor = parsed_descriptor =
@@ -1808,7 +1808,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
 
   uint16_t exception_table_length =
       reader_next_u16(&attr_reader, "exception table length");
-  bjvm_attribute_exception_table *table = NULL;
+  bjvm_attribute_exception_table *table = nullptr;
   if (exception_table_length) {
     table = calloc(1, sizeof(bjvm_attribute_exception_table));
     free_on_format_error(ctx, table);
@@ -1838,7 +1838,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
       ent->handler_pc = convert_pc_to_insn(handler_pc, pc_to_insn, code_length);
       ent->catch_type =
           catch_type == 0
-              ? NULL
+              ? nullptr
               : &checked_cp_entry(ctx->cp, catch_type, BJVM_CP_KIND_CLASS,
                                   "exception catch type")
                      ->class_info;
@@ -1893,9 +1893,9 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     uint16_t enclosing_method_index = reader_next_u16(&attr_reader, "enclosing method index");
     attr->enclosing_method = (bjvm_attribute_enclosing_method) {
         enclosing_class_index ? &checked_cp_entry(ctx->cp, enclosing_class_index,
-                                                  BJVM_CP_KIND_CLASS, "enclosing class")->class_info : NULL,
+                                                  BJVM_CP_KIND_CLASS, "enclosing class")->class_info : nullptr,
         enclosing_method_index ? &checked_cp_entry(ctx->cp, enclosing_method_index,
-                                                   BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")->name_and_type : NULL
+                                                   BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")->name_and_type : nullptr
     };
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
@@ -1988,33 +1988,33 @@ char *parse_field_descriptor(const wchar_t **chars, size_t len,
     switch (c) {
     case L'B':
       result->kind = BJVM_TYPE_KIND_BYTE;
-      return NULL;
+      return nullptr;
     case L'C':
       result->kind = BJVM_TYPE_KIND_CHAR;
-      return NULL;
+      return nullptr;
     case L'D':
       result->kind = BJVM_TYPE_KIND_DOUBLE;
-      return NULL;
+      return nullptr;
     case L'F':
       result->kind = BJVM_TYPE_KIND_FLOAT;
-      return NULL;
+      return nullptr;
     case L'I':
       result->kind = BJVM_TYPE_KIND_INT;
-      return NULL;
+      return nullptr;
     case L'J':
       result->kind = BJVM_TYPE_KIND_LONG;
-      return NULL;
+      return nullptr;
     case L'S':
       result->kind = BJVM_TYPE_KIND_SHORT;
-      return NULL;
+      return nullptr;
     case L'Z':
       result->kind = BJVM_TYPE_KIND_BOOLEAN;
-      return NULL;
+      return nullptr;
     case L'V': {
       result->kind = BJVM_TYPE_KIND_VOID;
       if (dimensions > 0)
         return strdup("void cannot have dimensions");
-      return NULL; // lol, check this later
+      return nullptr; // lol, check this later
     }
     case L'[':
       ++dimensions;
@@ -2032,7 +2032,7 @@ char *parse_field_descriptor(const wchar_t **chars, size_t len,
       ++*chars;
       result->kind = BJVM_TYPE_KIND_REFERENCE;
       result->class_name = bjvm_wchar_slice_to_utf8(start, class_name_len);
-      return NULL;
+      return nullptr;
     }
     default: {
       char buf[64];
@@ -2065,7 +2065,7 @@ char *parse_method_descriptor(const bjvm_utf8 *entry,
   const wchar_t *chars = entry->chars, *end = chars + len;
   if (len < 1 || *chars++ != '(')
     return strdup("Expected '('");
-  result->args = NULL;
+  result->args = nullptr;
   result->args_cap = result->args_count = 0;
   while (chars < end && *chars != ')') {
     bjvm_field_descriptor arg;
@@ -2083,7 +2083,7 @@ char *parse_method_descriptor(const bjvm_utf8 *entry,
   chars++; // skip ')'
   char *error =
       parse_field_descriptor(&chars, end - chars, &result->return_type);
-  return error ? err_while_parsing_md(result, error) : NULL;
+  return error ? err_while_parsing_md(result, error) : nullptr;
 }
 
 // Go through the InvokeDynamic entries and link their bootstrap method pointers
@@ -2104,10 +2104,10 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
 char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
-  bjvm_classfile_parse_ctx ctx = {.free_on_error = NULL,
+  bjvm_classfile_parse_ctx ctx = {.free_on_error = nullptr,
                                   .free_on_error_count = 0,
                                   .free_on_error_cap = 0,
-                                  .cp = NULL};
+                                  .cp = nullptr};
 
   if (setjmp(format_error_jmp_buf)) {
     for (int i = 0; i < ctx.free_on_error_count; i += 2) {
@@ -2149,7 +2149,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
 
   uint16_t super_class = reader_next_u16(&reader, "super class");
   cf->super_class = is_primordial_object
-                        ? NULL
+                        ? nullptr
                         : &checked_cp_entry(cf->pool, super_class,
                                             BJVM_CP_KIND_CLASS, "super class")
                                ->class_info;
@@ -2173,7 +2173,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
     cf->fields[i] = read_field(&reader, &ctx);
     cf->fields[i].my_class = result;
   }
-  cf->static_fields = NULL;
+  cf->static_fields = nullptr;
   cf->static_references = bjvm_empty_bitset();
   cf->instance_references = bjvm_empty_bitset();
 
@@ -2182,7 +2182,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf->methods = malloc(cf->methods_count * sizeof(bjvm_cp_method));
   free_on_format_error(&ctx, cf->methods);
 
-  cf->bootstrap_methods = NULL;
+  cf->bootstrap_methods = nullptr;
 
   bool in_MethodHandle =
       utf8_equals(&cf->name, "java/lang/invoke/MethodHandle");
@@ -2212,6 +2212,6 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
 
   result->state = BJVM_CD_STATE_LOADED;
   free(ctx.free_on_error); // we made it :)
-  return NULL;
+  return nullptr;
 }
 

@@ -155,7 +155,7 @@ TEST_CASE("Test classfile parsing") {
   auto files = ListDirectory("jre8", true);
   double total_millis = 0;
 
-  char *shortest_error = NULL;
+  char *shortest_error = nullptr;
   int shortest_error_length = 1000000;
 
   int count = 0;
@@ -418,11 +418,11 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   options.write_stdout = capture_stdio ? [](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stdout_ += (char)ch;
-  } : NULL;
+  } : nullptr;
   options.write_stderr = capture_stdio ? [](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stderr_ += (char)ch;
-  } : NULL;
+  } : nullptr;
   options.write_byte_param = &result;
 
   bjvm_vm *vm = bjvm_create_vm(options);
@@ -437,7 +437,7 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   method = bjvm_easy_method_lookup(
       desc, "main", "([Ljava/lang/String;)V", false, false);
 
-  bjvm_thread_run(thr, method, args, NULL);
+  bjvm_thread_run(thr, method, args, nullptr);
 
   bjvm_free_thread(thr);
   bjvm_free_vm(vm);

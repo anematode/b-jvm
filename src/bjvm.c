@@ -54,7 +54,7 @@ int add_classfile_bytes(bjvm_vm *vm,
 }
 
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
-  assert(method != NULL);
+  assert(method != nullptr);
 
   const bjvm_attribute_code *code = method->code;
   assert(code);
@@ -114,7 +114,7 @@ char *dump_frame(const bjvm_stack_frame *frame) {
 void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
   assert(thr->frames_count > 0);
   bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
-  assert(reference == NULL || reference == frame);
+  assert(reference == nullptr || reference == frame);
   thr->frames_count--;
   thr->frame_buffer_used =
       thr->frames_count == 0 ? 0 : (uint8_t *)frame - thr->frame_buffer;
@@ -122,7 +122,7 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
 
 void free_array_classdesc(bjvm_array_classdesc *classdesc) {
   if (classdesc->base.array_type) {
-    classdesc->base.array_type = NULL;
+    classdesc->base.array_type = nullptr;
     free_array_classdesc((bjvm_array_classdesc *)classdesc->base.array_type);
   }
   free(classdesc);
@@ -197,7 +197,7 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
 
 // Generally, use this to indicate that a native function is returning void or null
 bjvm_stack_value value_null() {
-  return (bjvm_stack_value) { .obj = NULL };
+  return (bjvm_stack_value) { .obj = nullptr };
 }
 
 bjvm_stack_value unimplemented_native(bjvm_thread *, bjvm_obj_header *, bjvm_stack_value *,
@@ -224,12 +224,12 @@ void bjvm_negative_array_size_exception(bjvm_thread *thread, int count) {
 
 // Raise a NullPointerException.
 void bjvm_null_pointer_exception(bjvm_thread *thread) {
-  bjvm_raise_exception(thread, L"java/lang/NullPointerException", NULL);
+  bjvm_raise_exception(thread, L"java/lang/NullPointerException", nullptr);
 }
 
 // Raise an ArrayStoreException.
 void bjvm_array_store_exception(bjvm_thread *thread) {
-  bjvm_raise_exception(thread, L"java/lang/ArrayStoreException", NULL);
+  bjvm_raise_exception(thread, L"java/lang/ArrayStoreException", nullptr);
 }
 
 // Raise an IncompatibleClassChangeError.
@@ -305,7 +305,7 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   assert(argc == 5);
   bjvm_obj_header *src = args[0].obj;
   bjvm_obj_header *dest = args[2].obj;
-  if (src == NULL || dest == NULL) {
+  if (src == nullptr || dest == nullptr) {
     bjvm_null_pointer_exception(thread);
     return value_null();
   }
@@ -328,7 +328,7 @@ bjvm_stack_value bjvm_System_arraycopy(bjvm_thread* thread, bjvm_obj_header*,
   // Verify that everything is in bounds
   // TODO add more descriptive error messages
   if (src_pos < 0 || dest_pos < 0 || length < 0 || (int64_t)src_pos + length > src_length || (int64_t)dest_pos + length > dest_length) {
-    bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException", NULL);
+    bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException", nullptr);
     return value_null();
   }
 
@@ -503,7 +503,7 @@ bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc,
       return desc->attributes + i;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 bjvm_stack_value bjvm_Class_getEnclosingMethod(bjvm_thread * thread, bjvm_obj_header * obj,
@@ -526,7 +526,7 @@ bjvm_stack_value bjvm_Class_getEnclosingMethod(bjvm_thread * thread, bjvm_obj_he
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
   assert(!error);
   data[0] = (void*) enclosing_method.class_info->classdesc->mirror;
-  if (enclosing_method.nat != NULL) {
+  if (enclosing_method.nat != nullptr) {
     data[1] = bjvm_intern_string(thread, enclosing_method.nat->name->chars, enclosing_method.nat->name->len);
     data[2] = bjvm_intern_string(thread, enclosing_method.nat->descriptor->chars, enclosing_method.nat->descriptor->len);
   }
@@ -944,7 +944,7 @@ bjvm_stack_value bjvm_AccessController_doPrivileged(bjvm_thread *thread, bjvm_ob
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
-      bjvm_easy_method_lookup(classdesc, "run", NULL, true, true);
+      bjvm_easy_method_lookup(classdesc, "run", nullptr, true, true);
   if (!method) {
     // TODO figure out what JVM normally does here
     UNREACHABLE();
@@ -985,11 +985,11 @@ int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name,
     bjvm_cp_method *method = bjvm_easy_method_lookup(
         classdesc, "<init>", "(Ljava/lang/String;)V", true, false);
     bjvm_thread_run(thread, method,
-                    (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, NULL);
+                    (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, nullptr);
   } else {
     bjvm_cp_method *method =
         bjvm_easy_method_lookup(classdesc, "<init>", "()V", true, false);
-    bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}}, NULL);
+    bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}}, nullptr);
   }
 
 #ifndef EMSCRIPTEN
@@ -1008,10 +1008,10 @@ bjvm_classdesc *bjvm_make_primitive_classdesc(const wchar_t* name, struct bjvm_n
   bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
 
   desc->kind = BJVM_CD_KIND_ORDINARY;
-  desc->super_class = NULL;
+  desc->super_class = nullptr;
   desc->name = bjvm_make_utf8(name);
   desc->access_flags = 0x411;  // result of int.class.getModifiers()
-  desc->array_type = NULL;  // TODO
+  desc->array_type = nullptr;  // TODO
   desc->mirror = mirror;
 
   return desc;
@@ -1049,8 +1049,8 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_stack_value bjvm_String_intern(bjvm_thread *thread, bjvm_obj_header *obj,
                        bjvm_stack_value *, int) {
-  if (obj == NULL) {
-    bjvm_raise_exception(thread, L"NullPointerException", NULL);
+  if (obj == nullptr) {
+    bjvm_raise_exception(thread, L"NullPointerException", nullptr);
     return value_null();
   }
   short *buf;
@@ -1110,11 +1110,11 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
 
   vm->classfiles = bjvm_make_hash_table(free_cf_entry, 0.75, 16);
   vm->classes = bjvm_make_hash_table(free_classdesc, 0.75, 16);
-  vm->inchoate_classes = bjvm_make_hash_table(NULL, 0.75, 16);
+  vm->inchoate_classes = bjvm_make_hash_table(nullptr, 0.75, 16);
   vm->natives = bjvm_make_hash_table(free_native_entries, 0.75, 16);
-  vm->interned_strings = bjvm_make_hash_table(NULL, 0.75, 16);
-  vm->class_padding = bjvm_make_hash_table(NULL, 0.75, 16);
-  vm->main_thread_group = NULL;
+  vm->interned_strings = bjvm_make_hash_table(nullptr, 0.75, 16);
+  vm->class_padding = bjvm_make_hash_table(nullptr, 0.75, 16);
+  vm->main_thread_group = nullptr;
 
   vm->write_stdout = options.write_stdout;
   vm->write_stderr = options.write_stderr;
@@ -1311,7 +1311,7 @@ bjvm_thread_options bjvm_default_thread_options() {
   bjvm_thread_options options = {};
   options.stack_space = 1 << 20;
   options.js_jit_enabled = true;
-  options.thread_group = NULL;
+  options.thread_group = nullptr;
   return options;
 }
 
@@ -1330,7 +1330,7 @@ bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc, bjvm_utf8 *name,
                              descriptor);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
@@ -1406,7 +1406,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
                   (bjvm_stack_value[]){{.obj = (void*)thread_obj},
                                        {.obj = main_thread_group},
                                        {.obj = name}},
-                  NULL);
+                  nullptr);
 
   // Call System.initializeSystemClass()
   desc = bootstrap_class_create(thr, L"java/lang/System");
@@ -1415,9 +1415,9 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_cp_method *method = bjvm_easy_method_lookup(
       desc, "initializeSystemClass", "()V", false, false);
   bjvm_stack_value ret;
-  bjvm_thread_run(thr, method, NULL, &ret);
+  bjvm_thread_run(thr, method, nullptr, &ret);
 
-  thr->current_exception = NULL;
+  thr->current_exception = nullptr;
 
   return thr;
 }
@@ -1447,7 +1447,7 @@ int bjvm_vm_read_classfile(bjvm_vm *vm, const wchar_t *filename,
 
   // Otherwise, try to read it from the vm->load_classfile implementation
   if (vm->load_classfile) {
-    uint8_t *loaded_bytes = NULL;
+    uint8_t *loaded_bytes = nullptr;
 
     size_t mbs_len = wcslen(filename) * 4 + 1;
     char *as_mbs = malloc(mbs_len);
@@ -1668,7 +1668,7 @@ struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjv
     bjvm_utf8 name = field_descriptor_to_name(method->args[i]);
     bjvm_classdesc* arg_desc = load_class_of_field_descriptor(thread, name.chars);
     free_utf8(name);
-    if (!arg_desc) return NULL;
+    if (!arg_desc) return nullptr;
     *((struct bjvm_native_Class**)array_data(ptypes) + i) = arg_desc->mirror;
     printf("MT: %p", arg_desc->mirror);
   }
@@ -1678,7 +1678,7 @@ struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjv
   bjvm_utf8 name = field_descriptor_to_name(method->return_type);
   bjvm_classdesc* ret_desc = load_class_of_field_descriptor(thread, name.chars);
   free_utf8(name);
-  if (!ret_desc) return NULL;
+  if (!ret_desc) return nullptr;
   rtype = ret_desc->mirror;
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
   bjvm_cp_method *init = bjvm_easy_method_lookup(MethodHandleNatives, "makeImpl", "(Ljava/lang/Class;[Ljava/lang/Class;)Ljava/lang/invoke/MethodType;", false, false);
@@ -1784,7 +1784,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
       // ClassNotFoundException: com.google.DontBeEvil
       bjvm_raise_exception(thread, L"java/lang/ClassNotFoundException",
                            filename);
-      return NULL;
+      return nullptr;
     }
 
     base_class = calloc(1, sizeof(bjvm_classdesc));
@@ -2015,7 +2015,7 @@ int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   int error = 0;
   if (clinit) {
     bjvm_stack_frame *frame = bjvm_push_frame(thread, clinit);
-    error = bjvm_bytecode_interpret(thread, frame, NULL);
+    error = bjvm_bytecode_interpret(thread, frame, nullptr);
     bjvm_pop_frame(thread, frame);
   }
   classdesc->state =
@@ -2093,7 +2093,7 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
     }
   }
   if (!search_superinterfaces)
-    return NULL;
+    return nullptr;
 
   for (int i = 0; i < descriptor->interfaces_count; ++i) {
     bjvm_cp_method *result =
@@ -2103,7 +2103,7 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
       return result;
   }
 
-  return NULL;
+  return nullptr;
 }
 
 bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
@@ -2111,13 +2111,13 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         const char *descriptor,
                                         bool superclasses,
                                         bool superinterfaces) {
-  if (!classdesc) return NULL;
+  if (!classdesc) return nullptr;
   bjvm_utf8 name_wide = bjvm_make_utf8_cstr(name),
             descriptor_wide;
   if (descriptor)
     descriptor_wide = bjvm_make_utf8_cstr(descriptor);
   bjvm_cp_method *result = bjvm_method_lookup(
-      classdesc, &name_wide, descriptor ? &descriptor_wide : NULL, superclasses, superinterfaces);
+      classdesc, &name_wide, descriptor ? &descriptor_wide : nullptr, superclasses, superinterfaces);
   free_utf8(name_wide);
   if (descriptor)
     free_utf8(descriptor_wide);
@@ -2178,7 +2178,7 @@ int bjvm_resolve_field(bjvm_thread *thread, bjvm_cp_field_info *info) {
   bjvm_cp_field *field = bjvm_field_lookup(class->classdesc, info->nat->name,
                                            info->nat->descriptor);
   info->field = field;
-  return field == NULL;
+  return field == nullptr;
 }
 
 void make_array_classdesc(bjvm_thread *thread, bjvm_classdesc *classdesc) {
@@ -2272,7 +2272,7 @@ bjvm_obj_header *create_object_array(bjvm_thread *thread,
   assert(classdesc);
   if (count < 0) {
     bjvm_negative_array_size_exception(thread, count);
-    return NULL;
+    return nullptr;
   }
   bjvm_obj_header *array = calloc(1, 24 + count * sizeof(void *));
   make_array_classdesc(thread, classdesc);
@@ -2288,7 +2288,7 @@ bjvm_obj_header *create_primitive_array(bjvm_thread *thread,
 
   if (count < 0) {
     bjvm_negative_array_size_exception(thread, count);
-    return NULL;
+    return nullptr;
   }
 
   primitive_type_kind_to_array_info(array_type, &type, &size);
@@ -2327,7 +2327,7 @@ bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror, const char* name) {
   return utf8_equals(&mirror->descriptor->name, name);
 }
 
-// NULLABLE because bjvm_unmirror_class on int.class etc. will return NULL! (For now...)
+// nullptrABLE because bjvm_unmirror_class on int.class etc. will return nullptr! (For now...)
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror) {
   assert(bjvm_is_instanceof_name(mirror, "java/lang/Class"));
   return ((struct bjvm_native_Class *)mirror)->reflected_class;
@@ -2366,7 +2366,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, const wchar_t *chars, int len)
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                        bjvm_classdesc *classdesc) {
   if (!classdesc)
-    return NULL;
+    return nullptr;
   if (classdesc->mirror)
     return classdesc->mirror;
 
@@ -2395,7 +2395,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *classdesc) {
   // equal to classdesc
   // TODO compare class loaders too, superinterfaces
   // TODO arrays
-  if (o == NULL) return true;
+  if (o == nullptr) return true;
 
   if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
     if (classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
@@ -2414,7 +2414,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *classdesc) {
   while (desc) {
     if (bjvm_instanceof_interface(desc, classdesc))
       return true;
-    desc = desc->super_class ? desc->super_class->classdesc : NULL;
+    desc = desc->super_class ? desc->super_class->classdesc : nullptr;
   }
   return false;
 }
@@ -2442,7 +2442,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_byte
     assert(args <= frame->stack_depth);
     target = frame->values[frame->stack_depth - args].obj;
 
-    if (target == NULL) {
+    if (target == nullptr) {
       bjvm_null_pointer_exception(thread);
       return -1;
     }
@@ -2558,7 +2558,7 @@ int bjvm_invokestatic(bjvm_thread * thread, bjvm_stack_frame * frame, bjvm_bytec
       return -1;
     }
 
-    invoked_result = ((bjvm_native_callback)method->native_handle)(thread, NULL,
+    invoked_result = ((bjvm_native_callback)method->native_handle)(thread, nullptr,
                           frame->values + frame->stack_depth - args, args);
     frame->stack_depth -= args;
     if (thread->current_exception)
@@ -2700,7 +2700,7 @@ start:
       NEXT_INSN;
     }
     bjvm_insn_aconst_null:
-      checked_push(frame, (bjvm_stack_value){.obj = NULL});
+      checked_push(frame, (bjvm_stack_value){.obj = nullptr});
       NEXT_INSN;
     bjvm_insn_arraylength: {
       bjvm_obj_header *obj = checked_pop(frame).obj;
@@ -3271,11 +3271,11 @@ start:
         if (bjvm_instanceof(obj->descriptor, info->classdesc)) {
           checked_push(frame, (bjvm_stack_value){.obj = obj});
         } else {
-          bjvm_raise_exception(thread, L"java/lang/ClassCastException", NULL);
+          bjvm_raise_exception(thread, L"java/lang/ClassCastException", nullptr);
           goto done;
         }
       } else {
-        checked_push(frame, (bjvm_stack_value){.obj = NULL});
+        checked_push(frame, (bjvm_stack_value){.obj = nullptr});
       }
       NEXT_INSN;
     }
@@ -3592,7 +3592,7 @@ start:
   }
 
 done:;
-  if (thread->current_exception != NULL) {
+  if (thread->current_exception != nullptr) {
     bjvm_attribute_exception_table *table = method->code->exception_table;
     if (table) {
       int pc = frame->program_counter;
@@ -3610,7 +3610,7 @@ done:;
             frame->stack_depth = 1;
             frame->values[0] =
                 (bjvm_stack_value){.obj = thread->current_exception};
-            thread->current_exception = NULL;
+            thread->current_exception = nullptr;
 
             goto start;
           }
@@ -3640,7 +3640,7 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
     bjvm_obj_header *thread_group = new_object(thread, ThreadGroup);
     vm->main_thread_group = thread_group;
     bjvm_stack_value args[1] = {(bjvm_stack_value){.obj = thread_group}};
-    bjvm_thread_run(thread, init, args, NULL);
+    bjvm_thread_run(thread, init, args, nullptr);
   }
   return vm->main_thread_group;
 }

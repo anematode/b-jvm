@@ -92,7 +92,7 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
 /**
  * Delete the key from the hash table and return the old value, if any. If len =
  * -1, the key is treated as a null- terminated string literal. Pass the result
- * of this function to the free function, as long as it accepts NULL pointers.
+ * of this function to the free function, as long as it accepts nullptr pointers.
  */
 [[nodiscard]] void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl,
                                            const wchar_t *key, int len);

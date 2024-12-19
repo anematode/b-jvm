@@ -23,7 +23,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
 /**
  * List all set bits, starting from 0, in the given bitset. Stores the list into
  * the given buffer, which must have the existing length in words (or
- * existing_buf = NULL, length = 0). Returns a (possibly reallocated) buffer.
+ * existing_buf = nullptr, length = 0). Returns a (possibly reallocated) buffer.
  *
  * Used to follow references during garbage collection.
  */
@@ -129,7 +129,7 @@ bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
   iter.current_base = tbl->entries;
   bjvm_hash_table_entry *end = tbl->entries + tbl->entries_cap;
   // advance to first nonzero entry
-  while (iter.current_base < end && iter.current_base->key == NULL)
+  while (iter.current_base < end && iter.current_base->key == nullptr)
     iter.current_base++;
   iter.current = iter.current_base;
   iter.end = end;
@@ -156,7 +156,7 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
     return true;
   }
   // advance base until a non-null key
-  while (++iter->current_base < iter->end && iter->current_base->key == NULL)
+  while (++iter->current_base < iter->end && iter->current_base->key == nullptr)
     ;
   iter->current = iter->current_base;
   return iter->current_base != iter->end;
@@ -176,9 +176,9 @@ bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const wchar_t *key,
                            bjvm_hash_table_entry **prev_entry) {
   uint32_t hash = bjvm_hash_string(key, len);
   size_t index = hash % tbl->entries_cap;
-  bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = NULL;
+  bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = nullptr;
   while (ent) {
-    *on_chain = prev != NULL;
+    *on_chain = prev != nullptr;
     if (ent->key && ent->key_len == len && wmemcmp(ent->key, key, len) == 0) {
       *equal = true;
       *prev_entry = prev;
@@ -207,11 +207,11 @@ void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const wchar_t *key,
       *ent =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &prev);
   if (!equal)
-    return NULL;
+    return nullptr;
   tbl->entries_count--;
   void *ret_val = ent->data;
   free(ent->key);
-  ent->key = NULL;
+  ent->key = nullptr;
   if (prev) {
     prev->next = ent->next;
     free(ent);
@@ -241,11 +241,11 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
       free(key);
     return ret_val;
   }
-  if (on_chain || ent->key != NULL) {
+  if (on_chain || ent->key != nullptr) {
     ent->next = malloc(sizeof(bjvm_hash_table_entry));
     ent = ent->next;
   }
-  ent->next = NULL;
+  ent->next = nullptr;
   ent->data = value;
   if (copy_key) {
     wchar_t *new_key = malloc(len * sizeof(wchar_t));
@@ -256,7 +256,7 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
   }
   ent->key_len = len;
   tbl->entries_count++;
-  return NULL;
+  return nullptr;
 }
 
 void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl, const wchar_t *key,
@@ -293,7 +293,7 @@ void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
   bjvm_hash_table_entry *_prev,
       *entry =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
-  return equal ? entry->data : NULL;
+  return equal ? entry->data : nullptr;
 }
 
 void bjvm_free_hash_table(bjvm_string_hash_table tbl) {

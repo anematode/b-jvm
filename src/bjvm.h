@@ -93,7 +93,7 @@ typedef struct bjvm_vm {
   // Classes with implementation-required padding before other fields (map class name -> padding bytes)
   bjvm_string_hash_table class_padding;
 
-  // Write byte of stdout/stderr (if NULL, uses the default implementation)
+  // Write byte of stdout/stderr (if nullptr, uses the default implementation)
   bjvm_write_byte write_stdout;
   bjvm_write_byte write_stderr;
 
@@ -113,7 +113,7 @@ typedef struct {
                         size_t *len);
   void *load_classfile_param;
 
-  // Write byte of stdout/stderr (if NULL, uses the default implementation)
+  // Write byte of stdout/stderr (if nullptr, uses the default implementation)
   bjvm_write_byte write_stdout;
   bjvm_write_byte write_stderr;
   // Passed to write_stdout/write_stderr
@@ -180,9 +180,9 @@ typedef struct {
   uint32_t stack_space;
   // Whether to enable JavaScript JIT compilation
   bool js_jit_enabled;
-  // What thread group to construct the thread in (NULL = default thread group)
+  // What thread group to construct the thread in (nullptr = default thread group)
   bjvm_obj_header *thread_group;
-  // Write byte of stdout/stderr (if NULL, prints directly to stdout/stderr)
+  // Write byte of stdout/stderr (if nullptr, prints directly to stdout/stderr)
   bjvm_write_byte write_stdout;
   bjvm_write_byte write_stderr;
 } bjvm_thread_options;
@@ -217,7 +217,7 @@ void bjvm_vm_list_classfiles(bjvm_vm *vm, wchar_t **strings, size_t *count);
  * @param bytes Start byte of the classfile.
  * @param len Length of the classfile in bytes.
  * @param result Where to write the result.
- * @return NULL on success, otherwise an error message (which is the caller's
+ * @return nullptr on success, otherwise an error message (which is the caller's
  * responsibility to free).
  */
 char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result);
