@@ -26,7 +26,8 @@
   } while (0)
 
 extern size_t bjvm_native_count;
-extern bjvm_native_t bjvm_natives[1000];
+extern size_t bjvm_native_capacity;
+extern bjvm_native_t *bjvm_natives;
 
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_)                     \
   static bjvm_stack_value bjvm_native_##class_name_##_##method_name_##_cb(     \
@@ -37,6 +38,12 @@ extern bjvm_native_t bjvm_natives[1000];
                            method_descriptor_)                                 \
   __attribute__((constructor)) static void                                     \
       bjvm_native_##class_name_##_##method_name_##_init() {                    \
+    if (bjvm_native_count == bjvm_native_capacity) {                           \
+      bjvm_native_capacity =                                                   \
+          bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;                \
+      bjvm_natives =                                                           \
+          realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t)); \
+    }                                                                          \
     bjvm_natives[bjvm_native_count++] = (bjvm_native_t){                       \
         .class_path = package_path "/" #class_name_,                           \
         .method_name = #method_name_,                                          \

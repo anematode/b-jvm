@@ -178,7 +178,8 @@ void free_native_entries(void *entries_) {
 }
 
 size_t bjvm_native_count = 0;
-bjvm_native_t bjvm_natives[1000];
+size_t bjvm_native_capacity = 0;
+bjvm_native_t *bjvm_natives = nullptr;
 
 size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
   *natives = bjvm_natives;
