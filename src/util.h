@@ -92,6 +92,13 @@ inline heap_string make_heap_str(int len) {
   return (heap_string) { .chars = (char *)calloc(len, 1), .len = len };
 }
 
+/// Creates a heap string from the given slice.
+inline heap_string make_heap_str_from(bjvm_utf8 slice) {
+  heap_string str = make_heap_str(slice.len);
+  memcpy(str.chars, slice.chars, slice.len);
+  return str;
+}
+
 /// Truncates the given heap string to the given length.
 inline void heap_str_truncate(heap_string str, int len) {
   assert(len <= str.len);
@@ -106,13 +113,13 @@ inline void free_heap_str(heap_string str) {
 
 /// Creates a slice of the given heap string.
 inline bjvm_utf8 hslc(heap_string str) {
-  return str.__inner;
+  return (bjvm_utf8) { .chars = str.chars, .len = str.len };
 }
 
 #define str(literal) ((bjvm_utf8) { .chars = (literal), .len = sizeof(literal) - 1 })
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str);
-bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right);
+bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8);
 bjvm_utf8 bjvm_make_utf8(const char *c_literal);

@@ -2,7 +2,7 @@
 
 DECLARE_NATIVE("java/lang", String, intern, "()Ljava/lang/String;") {
   if (obj == nullptr) {
-    bjvm_raise_exception(thread, "NullPointerException", nullptr);
+    ThrowLangException(NullPointerException);
     return value_null();
   }
   short *buf;
@@ -13,7 +13,7 @@ DECLARE_NATIVE("java/lang", String, intern, "()Ljava/lang/String;") {
     data[i] = buf[i];
   data[len] = 0;
   bjvm_stack_value result;
-  result.obj = bjvm_intern_string(thread, data, len);
+  result.obj = bjvm_intern_string(thread, data);
   free(data);
   return result;
 }

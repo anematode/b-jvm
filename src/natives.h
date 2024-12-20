@@ -9,11 +9,11 @@
 #include "bjvm.h"
 
 #define ThrowLangException(exception_name)                                     \
-  bjvm_raise_exception(thread, "java/lang/" #exception_name, nullptr)
+  bjvm_raise_exception(thread, str("java/lang/" #exception_name), null_str())
 
 #define ThrowLangExceptionM(exception_name, fmt, ...)                          \
   do {                                                                         \
-    char msg[1024];                                                         \
+    char msg[1024];                                                            \
     snprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
     bjvm_raise_exception(thread, L"java/lang/" exception_name, msg);           \
   } while (0)
@@ -38,9 +38,9 @@ extern bjvm_native_t *bjvm_natives;
           realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t)); \
     }                                                                          \
     bjvm_natives[bjvm_native_count++] = (bjvm_native_t){                       \
-        .class_path = package_path "/" #class_name_,                           \
-        .method_name = #method_name_,                                          \
-        .method_descriptor = method_descriptor_,                               \
+        .class_path = str(package_path "/" #class_name_),                      \
+        .method_name = str(#method_name_),                                     \
+        .method_descriptor = str(method_descriptor_),                          \
         .callback = &bjvm_native_##class_name_##_##method_name_##_cb};         \
   }
 

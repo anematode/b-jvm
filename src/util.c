@@ -3,18 +3,18 @@
 #include <stdlib.h>
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str) {
-  if (entry->len != (int)strlen(str))
+  if (entry.len != (int)strlen(str))
     return false;
-  for (int i = 0; i < entry->len; ++i)
-    if (entry->chars[i] != str[i])
+  for (int i = 0; i < entry.len; ++i)
+    if (entry.chars[i] != str[i])
       return false;
   return true;
 }
 
-bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right) {
-  if (left->len != right->len)
+bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right) {
+  if (left.len != right.len)
     return false;
-  return memcmp(left->chars, right->chars, left->len) == 0;
+  return memcmp(left.chars, right.chars, left.len) == 0;
 }
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8) {

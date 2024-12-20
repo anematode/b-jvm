@@ -7,19 +7,19 @@
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
   bjvm_obj_header *props_obj = args[0].obj;
-  const char *const props[][2] = {
-      {"file.encoding", "UTF-8"},   {"stdout.encoding", "UTF-8"},
-      {"native.encoding", "UTF-8"}, {"stderr.encoding", "UTF-8"},
-      {"line.separator", "\n"},     {"path.separator", ":"},
-      {"file.separator", "/"}};
+  const bjvm_utf8 props[][2] = {
+      {str("file.encoding"), str("UTF-8")},   {str("stdout.encoding"), str("UTF-8")},
+      {str("native.encoding"), str("UTF-8")}, {str("stderr.encoding"), str("UTF-8")},
+      {str("line.separator"), str("\n")},     {str("path.separator"), str(":")},
+      {str("file.separator"), str("/")}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
-      props_obj->descriptor, "put",
-      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", true, false);
+      props_obj->descriptor, str("put"),
+      str("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true, false);
   for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
     bjvm_stack_value put_args[3] = {
         {.obj = props_obj},
-        {.obj = bjvm_intern_string(thread, props[i][0], strlen(props[i][0]))},
-        {.obj = bjvm_intern_string(thread, props[i][1], strlen(props[i][1]))}};
+        {.obj = bjvm_intern_string(thread, props[i][0])},
+        {.obj = bjvm_intern_string(thread, props[i][1])}};
     bjvm_stack_value result;
     // call put() with String key and value
     bjvm_thread_run(thread, put, put_args, &result);
@@ -124,9 +124,9 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
 DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   // Look up the field System.out
   bjvm_classdesc *system_class =
-      bootstrap_class_create(thread, "java/lang/System");
+      bootstrap_class_create(thread, str("java/lang/System"));
   bjvm_cp_field *out_field =
-      bjvm_easy_field_lookup(system_class, "out", "Ljava/io/PrintStream;");
+      bjvm_easy_field_lookup(system_class, str("out"), str("Ljava/io/PrintStream;"));
 
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;

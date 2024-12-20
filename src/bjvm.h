@@ -47,9 +47,9 @@ typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
 
 // represents a native method somewhere in this binary
 typedef struct {
-  char const *class_path;
-  char const *method_name;
-  char const *method_descriptor;
+  bjvm_utf8 class_path;
+  bjvm_utf8 method_name;
+  bjvm_utf8 method_descriptor;
   bjvm_native_callback callback;
 } bjvm_native_t;
 

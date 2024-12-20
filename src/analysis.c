@@ -577,17 +577,13 @@ bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->kind);
 }
 
-/**
- * Analyze the method's code segment if it exists, rewriting instructions in
- * place to make longs/doubles one stack value wide, writing the analysis into
- * analysis, and returning an error string upon some sort of error.
- */
-char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
+int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error) {
   bjvm_attribute_code *code = method->code;
-  if (!code)
-    return nullptr; // method has no code
+  if (!code) {
+    return 0;
+  }
 
-  char *error = nullptr;
+  int result = 0;
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks =
@@ -1199,11 +1195,12 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   stack_type_mismatch: {
     error_str = "Stack type mismatch:";
   error:;
-    error = calloc(50000, 1);
+    result = -1;
+    *error = make_heap_str(50000);
     char *insn_str = insn_to_string(insn, i);
     char *stack_str = print_analy_stack_state(&stack_before);
     char *context = code_attribute_to_string(method->code);
-    snprintf(error, 50000,
+    bprintf(hslc(*error),
              "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
              error_str, insn_str, stack_str, context);
     free(insn_str);
@@ -1235,7 +1232,7 @@ char *bjvm_analyze_method_code_segment(bjvm_cp_method *method) {
   free(stack.entries);
   free(stack_before.entries);
 
-  return error;
+  return result;
 }
 
 bjvm_analy_stack_state bjvm_init_analy_stack_state(int initial_size) {

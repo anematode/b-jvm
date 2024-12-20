@@ -203,8 +203,8 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class,
 }
 
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
-                                   const bjvm_utf8 *name,
-                                   const bjvm_utf8 *method_descriptor,
+                                   const bjvm_utf8 name,
+                                   const bjvm_utf8 method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);
 
@@ -524,13 +524,12 @@ bjvm_stack_value bjvm_Class_getClassLoader(bjvm_thread *, bjvm_obj_header *,
   return value_null(); // TODO
 }
 
-bjvm_obj_header *make_string(bjvm_thread *thread, const bjvm_utf8 chars,
-                             int len);
+bjvm_obj_header *make_string(bjvm_thread *thread, const bjvm_utf8 chars);
 
 bjvm_stack_value bjvm_Class_getName(bjvm_thread *thread, bjvm_obj_header *obj,
                                     bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  return (bjvm_stack_value){.obj = bjvm_intern_string(thread, classdesc->name)};
+  return (bjvm_stack_value){.obj = bjvm_intern_string(thread, hslc(classdesc->name))};
 }
 
 // Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class; static
@@ -558,17 +557,16 @@ bjvm_stack_value bjvm_Class_desiredAssertionStatus(bjvm_thread *,
   return (bjvm_stack_value){.i = 1}; // TODO add thread option
 }
 
-bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
-                                               const bjvm_utf8 name) {
+bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread, bjvm_utf8 name) {
   const char *chars = name.chars;
 
   if (chars[0] == 'L') {
-    bjvm_utf8 cow = strdup(chars);
-    cow[strlen(chars) - 1] = '\0';
-    return bootstrap_class_create(thread, cow + 1);
+    name = slice_to(name, 1, name.len - 1);
+    return bootstrap_class_create(thread, name);
   }
+
   if (chars[0] == '[')
-    return bootstrap_class_create(thread, chars);
+    return bootstrap_class_create(thread, name);
   switch (chars[0]) {
   case 'Z':
     return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_BOOLEAN)
@@ -663,7 +661,7 @@ bjvm_stack_value bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
 
   int count = 0;
   for (int i = 0; i < classdesc->methods_count; ++i) {
-    if (utf8_equals(classdesc->methods[i].name, "<init>")) {
+    if (utf8_equals(*classdesc->methods[i].name, "<init>")) {
       bjvm_reflect_initialize_constructor(thread, classdesc,
                                           classdesc->methods + i);
       ++count;
@@ -676,7 +674,7 @@ bjvm_stack_value bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
       bootstrap_class_create(thread, str("java/lang/reflect/Constructor")),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
-    if (utf8_equals(classdesc->methods[i].name, "<init>")) {
+    if (utf8_equals(*classdesc->methods[i].name, "<init>")) {
       *((struct bjvm_native_Constructor **)array_data(ret.obj) + j++) =
           classdesc->methods[i].reflection_ctor;
     }
@@ -776,7 +774,7 @@ bjvm_stack_value bjvm_Unsafe_compareAndSwapLong(bjvm_thread *,
   assert(argc == 4);
   bjvm_obj_header *obj = args[0].obj;
   int64_t offset = args[1].l;
-  int expected = args[2].l, update = args[3].l;
+  int64_t expected = args[2].l, update = args[3].l;
   int ret = __sync_bool_compare_and_swap((int64_t *)((void *)obj + offset),
                                          expected, update);
   return (bjvm_stack_value){.l = ret};
@@ -908,7 +906,7 @@ bjvm_stack_value bjvm_AccessController_doPrivileged(bjvm_thread *thread,
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
-      bjvm_easy_method_lookup(classdesc, str("run"), nullptr, true, true);
+      bjvm_easy_method_lookup(classdesc, str("run"), null_str(), true, true);
   if (!method) {
     // TODO figure out what JVM normally does here
     UNREACHABLE();
@@ -926,7 +924,7 @@ bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
                                                 chars.chars, chars.len);
   if (str)
     return str;
-  bjvm_obj_header *new_str = make_string(thread, chars, chars.len);
+  bjvm_obj_header *new_str = make_string(thread, chars);
   (void)bjvm_hash_table_insert(&thread->vm->interned_strings, chars.chars,
                                chars.len, new_str);
   return new_str;
@@ -944,15 +942,15 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
 
   // Create the exception object
   bjvm_obj_header *obj = new_object(thread, classdesc);
-  if (exception_string) {
-    bjvm_obj_header *str = make_string(thread, exception_string, -1);
+  if (exception_string.chars) {
+    bjvm_obj_header *str = make_string(thread, exception_string);
     bjvm_cp_method *method = bjvm_easy_method_lookup(
         classdesc, str("<init>"), str("(Ljava/lang/String;)V"), true, false);
     bjvm_thread_run(thread, method,
                     (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, nullptr);
   } else {
     bjvm_cp_method *method =
-        bjvm_easy_method_lookup(classdesc, str("<init>"), "()V", true, false);
+        bjvm_easy_method_lookup(classdesc, str("<init>"), str("()V"), true, false);
     bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}},
                     nullptr);
   }
@@ -989,7 +987,7 @@ bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread,
 
   desc->kind = BJVM_CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
-  desc->name = bjvm_make_utf8(name);
+  desc->name = make_heap_str_from(name);
   desc->access_flags = 0x411; // result of int.class.getModifiers()
   desc->array_type = nullptr;
   desc->mirror = mirror;
@@ -1258,12 +1256,12 @@ bjvm_thread_options bjvm_default_thread_options() {
 }
 
 bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc,
-                                 bjvm_utf8 const *name,
-                                 bjvm_utf8 const *descriptor) {
+                                 bjvm_utf8 const name,
+                                 bjvm_utf8 const descriptor) {
   for (int i = 0; i < classdesc->fields_count; ++i) {
     bjvm_cp_field *field = classdesc->fields + i;
-    if (utf8_equals_utf8(field->name, name) &&
-        utf8_equals_utf8(field->descriptor, descriptor)) {
+    if (utf8_equals_utf8(*field->name, name) &&
+        utf8_equals_utf8(*field->descriptor, descriptor)) {
       return field;
     }
   }
@@ -1279,7 +1277,7 @@ bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc,
 bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
                                       const bjvm_utf8 name,
                                       const bjvm_utf8 descriptor) {
-  bjvm_cp_field *result = bjvm_field_lookup(classdesc, &name, &descriptor);
+  bjvm_cp_field *result = bjvm_field_lookup(classdesc, name, descriptor);
   return result;
 }
 
@@ -1658,7 +1656,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
     }
 
     // Look up in the native methods list and add native handles as appropriate
-    native_entries *entries = bjvm_hash_table_lookup(&vm->natives, chars, len);
+    native_entries *entries = bjvm_hash_table_lookup(&vm->natives, chars.chars, chars.len);
     if (entries) {
       for (int i = 0; i < entries->entries_count; i++) {
         native_entry *entry = entries->entries + i;
@@ -1666,8 +1664,8 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
         for (int j = 0; j < class->methods_count; ++j) {
           bjvm_cp_method *method = class->methods + j;
 
-          if (utf8_equals_utf8(method->name, &entry->name) &&
-              utf8_equals_utf8(method->descriptor, &entry->descriptor)) {
+          if (utf8_equals_utf8(*method->name, entry->name) &&
+              utf8_equals_utf8(*method->descriptor, entry->descriptor)) {
             method->native_handle = entry->callback;
             break;
           }
@@ -1779,11 +1777,12 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   for (int method_i = 0; method_i < classdesc->methods_count; ++method_i) {
     bjvm_cp_method *method = classdesc->methods + method_i;
     if (method->code) {
-      bjvm_utf8 error = bjvm_analyze_method_code_segment(method);
-      if (error) {
+      heap_string error_str;
+      int result = bjvm_analyze_method_code_segment(method, &error_str);
+      if (result != 0) {
         // TODO raise VerifyError
         classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
-        printf("Error analyzing method %s: %s\n", method->name->chars, error);
+        printf("Error analyzing method %.*s: %.*s\n", method->name->len, method->name->chars, error_str.len, error_str.chars);
         UNREACHABLE();
       }
     }
@@ -1887,16 +1886,16 @@ int64_t java_lrem(int64_t a, int64_t b) {
 }
 
 bool method_candidate_matches(const bjvm_cp_method *candidate,
-                              const bjvm_utf8 *name,
-                              const bjvm_utf8 *method_descriptor) {
-  return utf8_equals_utf8(candidate->name, name) &&
-         (candidate->is_signature_polymorphic || !method_descriptor ||
-          utf8_equals_utf8(candidate->descriptor, method_descriptor));
+                              const bjvm_utf8 name,
+                              const bjvm_utf8 method_descriptor) {
+  return utf8_equals_utf8(*candidate->name, name) &&
+         (candidate->is_signature_polymorphic || !method_descriptor.chars ||
+          utf8_equals_utf8(*candidate->descriptor, method_descriptor));
 }
 
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
-                                   const bjvm_utf8 *name,
-                                   const bjvm_utf8 *method_descriptor,
+                                   const bjvm_utf8 name,
+                                   const bjvm_utf8 method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces) {
   assert(descriptor->state >= BJVM_CD_STATE_LINKED);
@@ -1937,15 +1936,11 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         bool superinterfaces) {
   if (!classdesc)
     return nullptr;
-  bjvm_utf8 name_wide = bjvm_make_utf8_cstr(name), descriptor_wide;
-  if (descriptor)
-    descriptor_wide = bjvm_make_utf8_cstr(descriptor);
+
   bjvm_cp_method *result = bjvm_method_lookup(
-      classdesc, &name_wide, descriptor ? &descriptor_wide : nullptr,
+      classdesc, name, descriptor,
       superclasses, superinterfaces);
-  free_utf8(name_wide);
-  if (descriptor)
-    free_utf8(descriptor_wide);
+
   return result;
 }
 
@@ -2001,8 +1996,8 @@ int bjvm_resolve_field(bjvm_thread *thread, bjvm_cp_field_info *info) {
 
   // Get offset of field
   assert(class->classdesc->state >= BJVM_CD_STATE_LINKED);
-  bjvm_cp_field *field = bjvm_field_lookup(class->classdesc, info->nat->name,
-                                           info->nat->descriptor);
+  bjvm_cp_field *field = bjvm_field_lookup(class->classdesc, *info->nat->name,
+                                           *info->nat->descriptor);
   info->field = field;
   return field == nullptr;
 }
@@ -2139,14 +2134,14 @@ bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 }
 
 int *array_length(bjvm_obj_header *array) {
-  return (int *)((bjvm_utf8)array + 16);
+  return (int *)((void *)array + 16);
 }
 
-void *array_data(bjvm_obj_header *array) { return (bjvm_utf8)array + 24; }
+void *array_data(bjvm_obj_header *array) { return (void *)array + 24; }
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
                              const bjvm_utf8 name) {
-  return utf8_equals_utf8(mirror->descriptor->name, &name);
+  return utf8_equals_utf8(hslc(mirror->descriptor->name), name);
 }
 
 // nullptrABLE because bjvm_unmirror_class on int.class etc. will return
@@ -2280,7 +2275,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
         return -1;
     }
     method = insn->ic = bjvm_method_lookup(
-        lookup_on, info->name_and_type->name, info->name_and_type->descriptor,
+        lookup_on, *info->name_and_type->name, *info->name_and_type->descriptor,
         true, insn->kind == bjvm_insn_invokeinterface);
     insn->ic2 = lookup_on;
     if (!method) {
@@ -2359,8 +2354,8 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       return -1;
 
     method = insn->ic =
-        bjvm_method_lookup(class->classdesc, info->name_and_type->name,
-                           info->name_and_type->descriptor, false, false);
+        bjvm_method_lookup(class->classdesc, *info->name_and_type->name,
+                           *info->name_and_type->descriptor, false, false);
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
       bprintf(complaint, "Could not find method %s with descriptor %s on class %s",
@@ -3333,8 +3328,8 @@ start:
 
         bjvm_initialize_class(thread, class->classdesc);
         bjvm_cp_field *field =
-            bjvm_field_lookup(class->classdesc, field_info->nat->name,
-                              field_info->nat->descriptor);
+            bjvm_field_lookup(class->classdesc, *field_info->nat->name,
+                              *field_info->nat->descriptor);
         field_info->field = field;
         if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
           INIT_STACK_STRING(complaint, 1000);
