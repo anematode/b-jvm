@@ -25,18 +25,8 @@
     bjvm_raise_exception(thread, L"java/lang/" exception_name, msg);           \
   } while (0)
 
-#ifdef __APPLE__
-#define NATIVE_SECTION_NAME "__DATA,__native"
-#else
-#define NATIVE_SECTION_NAME ".native"
-#endif
-
-#if defined(__has_feature) && __has_feature(address_sanitizer)
-#define BJVM_NATIVECALL                                                        \
-  __attribute__((section(NATIVE_SECTION_NAME), no_sanitize_address))
-#else
-#define BJVM_NATIVECALL __attribute__((section(NATIVE_SECTION_NAME)))
-#endif
+extern size_t bjvm_native_count;
+extern bjvm_native_t bjvm_natives[1000];
 
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_)                     \
   static bjvm_stack_value bjvm_native_##class_name_##_##method_name_##_cb(     \
@@ -45,12 +35,14 @@
 
 #define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,            \
                            method_descriptor_)                                 \
-  BJVM_NATIVECALL const bjvm_native_t                                          \
-      bjvm_native_##class_name_##_##method_name_##_info = {                    \
-          .class_path = package_path "/" #class_name_,                         \
-          .method_name = #method_name_,                                        \
-          .method_descriptor = method_descriptor_,                             \
-          .callback = &bjvm_native_##class_name_##_##method_name_##_cb}
+  __attribute__((constructor)) static void                                     \
+      bjvm_native_##class_name_##_##method_name_##_init() {                    \
+    bjvm_natives[bjvm_native_count++] = (bjvm_native_t){                       \
+        .class_path = package_path "/" #class_name_,                           \
+        .method_name = #method_name_,                                          \
+        .method_descriptor = method_descriptor_,                               \
+        .callback = &bjvm_native_##class_name_##_##method_name_##_cb};         \
+  }
 
 #define DECLARE_NATIVE(package_path, class_name_, method_name_,                \
                        method_descriptor_)                                     \

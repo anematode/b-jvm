@@ -34,7 +34,9 @@ typedef union {
 
 // Generally, use this to indicate that a native function is returning void or
 // null
-static inline bjvm_stack_value value_null() { return (bjvm_stack_value){.obj = nullptr}; }
+static inline bjvm_stack_value value_null() {
+  return (bjvm_stack_value){.obj = nullptr};
+}
 
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
