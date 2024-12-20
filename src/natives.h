@@ -8,13 +8,17 @@
 
 #include "bjvm.h"
 
-#define ThrowLangException(exception_name)                             \
+#define ThrowLangException(exception_name)                                     \
   bjvm_raise_exception(thread, L"java/lang/" #exception_name, nullptr)
 
-#define Is1DPrimitiveArray(src) ({ bjvm_obj_header *__obj = src; \
-	src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && src->descriptor->dimensions == 1; })
+#define Is1DPrimitiveArray(src)                                                \
+  ({                                                                           \
+    bjvm_obj_header *__obj = src;                                              \
+    src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&                   \
+        src->descriptor->dimensions == 1;                                      \
+  })
 
-#define ThrowLangExceptionM(exception_name, fmt, ...)                   \
+#define ThrowLangExceptionM(exception_name, fmt, ...)                          \
   do {                                                                         \
     wchar_t msg[1024];                                                         \
     swprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
@@ -43,7 +47,7 @@
                            method_descriptor_)                                 \
   BJVM_NATIVECALL const bjvm_native_t                                          \
       bjvm_native_##class_name_##_##method_name_##_info = {                    \
-          .class_path = package_path "/" #class_name_,                        \
+          .class_path = package_path "/" #class_name_,                         \
           .method_name = #method_name_,                                        \
           .method_descriptor = method_descriptor_,                             \
           .callback = &bjvm_native_##class_name_##_##method_name_##_cb}
