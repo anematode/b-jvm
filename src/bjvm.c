@@ -123,8 +123,6 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
 void free_array_classdesc(bjvm_classdesc *classdesc) {
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
          classdesc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY);
-  free_utf8(classdesc->fields->name);
-  free_utf8(classdesc->fields->descriptor);
   free(classdesc->fields);
   free(classdesc);
 }
@@ -163,12 +161,7 @@ void free_native_entries(void *entries_) {
   if (!entries_)
     return;
 
-  native_entries *entries = entries_;
-  for (int i = 0; i < entries->entries_count; i++) {
-    free_utf8(entries->entries[i].name);
-    free_utf8(entries->entries[i].descriptor);
-  }
-  free(entries);
+  free(entries_);
 }
 
 size_t bjvm_native_count = 0;
@@ -191,7 +184,6 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class,
     (void)bjvm_hash_table_insert(&vm->natives, class.chars, class.len,
                                  existing);
   }
-  free_utf8(class);
 
   native_entry *ent = VECTOR_PUSH(existing->entries, existing->entries_count,
                                   existing->entries_cap);
@@ -1402,8 +1394,8 @@ void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   fields->access_flags =
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_STATIC | BJVM_ACCESS_FINAL;
 
-  fields->name = bjvm_make_utf8("length");
-  fields->descriptor = bjvm_make_utf8("I");
+  fields->name = str("length");
+  fields->descriptor = str("I");
 }
 
 bjvm_classdesc *primitive_array_classdesc(bjvm_thread *thread,

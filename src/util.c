@@ -26,7 +26,3 @@ char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8) {
   result[i] = '\0';
   return result;
 }
-
-bjvm_utf8 bjvm_make_utf8(const char *c_literal) {
-  return (bjvm_utf8){.chars = strdup(c_literal), .len = strlen(c_literal)};
-}

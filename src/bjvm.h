@@ -230,7 +230,6 @@ void bjvm_free_vm(bjvm_vm *vm);
 /**
  * Implementation details, but exposed for testing...
  */
-void free_utf8(bjvm_utf8 entry);
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name);

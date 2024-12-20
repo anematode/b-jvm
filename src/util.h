@@ -124,7 +124,6 @@ bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8);
-bjvm_utf8 bjvm_make_utf8(const char *c_literal);
 
 #ifdef __cplusplus
 }

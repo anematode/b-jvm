@@ -56,8 +56,6 @@ static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   }
 }
 
-void free_utf8(bjvm_utf8 entry) { free(entry.chars); }
-
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 void free_method_descriptor(void *descriptor_);
 
@@ -340,10 +338,6 @@ ctx_free_ticket complex_free_on_format_error(bjvm_classfile_parse_ctx *ctx,
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
 heap_string parse_modified_utf8(const uint8_t *bytes, int len) {
   return make_heap_str_from((bjvm_utf8){.chars = (char *)bytes, .len = len});
-}
-
-heap_string bjvm_make_utf8_cstr(const char *c_literal) {
-  return parse_modified_utf8((const uint8_t *)c_literal, strlen(c_literal));
 }
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
