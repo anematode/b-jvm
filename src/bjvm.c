@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -18,7 +19,6 @@
 
 #include "analysis.h"
 #include "bjvm.h"
-#include <math.h>
 
 struct classfile_entry {
   size_t len;
@@ -175,6 +175,20 @@ void free_native_entries(void *entries_) {
   free(entries);
 }
 
+size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
+#ifdef __APPLE__
+  extern const bjvm_native_t natives_start __asm(
+      "section$start$__DATA$__native");
+  extern const bjvm_native_t natives_end __asm("section$end$__DATA$__native");
+#else
+  extern const bjvm_native_t natives_start __asm("__start_natives");
+  extern const bjvm_native_t natives_end __asm("__stop_natives");
+#endif
+
+  *natives = &natives_start;
+  return &natives_end - &natives_start;
+}
+
 void bjvm_register_native(bjvm_vm *vm, const char *class_name,
                           const char *method_name,
                           const char *method_descriptor,
@@ -202,10 +216,6 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
                                    const bjvm_utf8 *method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);
-
-// Generally, use this to indicate that a native function is returning void or
-// null
-bjvm_stack_value value_null() { return (bjvm_stack_value){.obj = nullptr}; }
 
 bjvm_stack_value unimplemented_native(bjvm_thread *, bjvm_obj_header *,
                                       bjvm_stack_value *, int) {
@@ -277,43 +287,8 @@ void read_string(bjvm_obj_header *obj, short **buf, size_t *len) {
   *len = *array_length(array);
 }
 
-// TODO read the properties from the VM instead of hardcoding them
-bjvm_stack_value bjvm_System_initProperties(bjvm_thread *thread,
-                                            bjvm_obj_header *,
-                                            bjvm_stack_value *args, int) {
-  bjvm_obj_header *props_obj = args[0].obj;
-  const wchar_t *const props[][2] = {
-      {L"file.encoding", L"UTF-8"},   {L"stdout.encoding", L"UTF-8"},
-      {L"native.encoding", L"UTF-8"}, {L"stderr.encoding", L"UTF-8"},
-      {L"line.separator", L"\n"},     {L"path.separator", L":"},
-      {L"file.separator", L"/"}};
-  bjvm_cp_method *put = bjvm_easy_method_lookup(
-      props_obj->descriptor, "put",
-      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", true, false);
-  for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
-    bjvm_stack_value put_args[3] = {
-        {.obj = props_obj},
-        {.obj = bjvm_intern_string(thread, props[i][0], wcslen(props[i][0]))},
-        {.obj = bjvm_intern_string(thread, props[i][1], wcslen(props[i][1]))}};
-    bjvm_stack_value result;
-    // call put() with String key and value
-    bjvm_thread_run(thread, put, put_args, &result);
-  }
-  return value_null();
-}
-
-bjvm_stack_value bjvm_System_mapLibraryName(bjvm_thread *, bjvm_obj_header *,
-                                            bjvm_stack_value *args, int) {
-  return args[0];
-}
-
 void *array_data(bjvm_obj_header *array);
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
-
-bool is_1d_primitive_array(bjvm_obj_header *src) {
-  return src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
-         src->descriptor->dimensions == 1;
-}
 
 int sizeof_type_kind(bjvm_type_kind kind) {
   switch (kind) {
@@ -359,97 +334,6 @@ int primitive_order(bjvm_type_kind kind) {
   default:
     UNREACHABLE();
   }
-}
-
-bjvm_stack_value bjvm_System_arraycopy(bjvm_thread *thread, bjvm_obj_header *,
-                                       bjvm_stack_value *args, int argc) {
-  assert(argc == 5);
-  bjvm_obj_header *src = args[0].obj;
-  bjvm_obj_header *dest = args[2].obj;
-  if (src == nullptr || dest == nullptr) {
-    bjvm_null_pointer_exception(thread);
-    return value_null();
-  }
-  bool src_not_array = src->descriptor->kind == BJVM_CD_KIND_ORDINARY;
-  if (src_not_array || dest->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
-    // Can't copy non-array objects to each other
-    bjvm_array_store_exception(thread);
-    return value_null();
-  }
-  bool src_is_1d_primitive = is_1d_primitive_array(src),
-       dst_is_1d_primitive = is_1d_primitive_array(dest);
-  if (src_is_1d_primitive != dst_is_1d_primitive ||
-      (src_is_1d_primitive && src->descriptor->primitive_component !=
-                                  dest->descriptor->primitive_component)) {
-    bjvm_array_store_exception(thread);
-    return value_null();
-  }
-
-  int src_pos = args[1].i;
-  int dest_pos = args[3].i;
-  int length = args[4].i;
-  int src_length = *array_length(src);
-  int dest_length = *array_length(dest);
-  // Verify that everything is in bounds
-  // TODO add more descriptive error messages
-  if (src_pos < 0 || dest_pos < 0 || length < 0 ||
-      (int64_t)src_pos + length > src_length ||
-      (int64_t)dest_pos + length > dest_length) {
-    bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException",
-                         nullptr);
-    return value_null();
-  }
-
-  // TODO translate these into a single memcpy routine instead of this
-  // TODO check that both primitive arrays are of the same type
-
-#define GEN_PRIMITIVE_IMPL(array_type, underlying)                             \
-  if (src->descriptor->primitive_component == BJVM_TYPE_KIND_##array_type) {   \
-    underlying *src_data = array_data(src);                                    \
-    underlying *dest_data = array_data(dest);                                  \
-    for (int i = 0; i < length; ++i)                                           \
-      dest_data[dest_pos + i] = src_data[src_pos + i];                         \
-    return value_null();                                                       \
-  }
-
-  if (src_is_1d_primitive) {
-    GEN_PRIMITIVE_IMPL(BYTE, int8_t)
-    GEN_PRIMITIVE_IMPL(CHAR, uint16_t)
-    GEN_PRIMITIVE_IMPL(DOUBLE, double)
-    GEN_PRIMITIVE_IMPL(FLOAT, float)
-    GEN_PRIMITIVE_IMPL(INT, int32_t)
-    GEN_PRIMITIVE_IMPL(LONG, int64_t)
-    GEN_PRIMITIVE_IMPL(SHORT, int16_t)
-    GEN_PRIMITIVE_IMPL(BOOLEAN, uint8_t)
-    UNREACHABLE();
-  }
-
-  // If the component type of the src class is an instanceof the destination
-  // class, then we don't need to perform any checks. Otherwise, we need to
-  // perform an instanceof check on each element and raise an
-  // ArrayStoreException as appropriate.
-  if (bjvm_instanceof(src->descriptor->one_fewer_dim,
-                      dest->descriptor->one_fewer_dim)) {
-    // memmove because source and destination may alias
-    memmove((bjvm_obj_header **)array_data(dest) + dest_pos,
-            (bjvm_obj_header **)array_data(src) + src_pos,
-            length * sizeof(void *));
-    return value_null();
-  }
-
-  for (int i = 0; i < length; ++i) {
-    // may-alias case handled above
-    bjvm_obj_header *src_elem =
-        ((bjvm_obj_header **)array_data(src))[src_pos + i];
-    if (src_elem && !bjvm_instanceof(src_elem->descriptor,
-                                     dest->descriptor->one_fewer_dim)) {
-      bjvm_array_store_exception(thread);
-      return value_null();
-    }
-    ((bjvm_obj_header **)array_data(dest))[dest_pos + i] = src_elem;
-  }
-
-  return value_null();
 }
 
 bjvm_stack_value bjvm_System_setOut(bjvm_thread *thread, bjvm_obj_header *,
@@ -1202,18 +1086,6 @@ bjvm_stack_value bjvm_FileOutputStream_writeBytes(bjvm_thread *thread,
 
 /** Begin StrictMath natives */
 
-bjvm_stack_value bjvm_StrictMath_log(bjvm_thread *, bjvm_obj_header *,
-                                     bjvm_stack_value *args, int argc) {
-  assert(argc == 1);
-  return (bjvm_stack_value){.d = log(args[0].d)};
-}
-
-// Natives for the java.lang.StrictMath class.
-void bjvm_register_natives_StrictMath(bjvm_vm *vm) {
-  bjvm_register_native(vm, "java/lang/StrictMath", "log", "(D)D",
-                       bjvm_StrictMath_log);
-}
-
 /** End StrictMath natives, begin Class natives */
 
 // Natives for the java.lang.Class class.
@@ -1237,21 +1109,17 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   vm->write_stderr = options.write_stderr;
   vm->write_byte_param = options.write_byte_param;
 
-  bjvm_register_native_padding(vm);
+  bjvm_native_t const *natives;
+  size_t natives_reg_count = bjvm_get_natives_list(&natives);
+  for (size_t i = 0; i < natives_reg_count; ++i) {
+    bjvm_register_native(vm, natives[i].class_path, natives[i].method_name,
+                         natives[i].method_descriptor, natives[i].callback);
+  }
 
-  bjvm_register_natives_StrictMath(vm);
+  bjvm_register_native_padding(vm);
 
   bjvm_register_native(vm, "java/lang/System", "registerNatives", "()V",
                        unimplemented_native);
-  bjvm_register_native(vm, "java/lang/System", "mapLibraryName",
-                       "(Ljava/lang/String;)Ljava/lang/String;",
-                       bjvm_System_mapLibraryName);
-  bjvm_register_native(vm, "java/lang/System", "initProperties",
-                       "(Ljava/util/Properties;)Ljava/util/Properties;",
-                       bjvm_System_initProperties);
-  bjvm_register_native(vm, "java/lang/System", "arraycopy",
-                       "(Ljava/lang/Object;ILjava/lang/Object;II)V",
-                       bjvm_System_arraycopy);
   bjvm_register_native(vm, "java/lang/System", "setIn0",
                        "(Ljava/io/InputStream;)V", unimplemented_native);
   bjvm_register_native(vm, "java/lang/System", "setOut0",

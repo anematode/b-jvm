@@ -32,10 +32,24 @@ typedef union {
   bjvm_obj_header *obj; // reference type
 } bjvm_stack_value;
 
+// Generally, use this to indicate that a native function is returning void or
+// null
+static inline bjvm_stack_value value_null() { return (bjvm_stack_value){.obj = nullptr}; }
+
+bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
+
 typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
                                                  bjvm_obj_header *obj,
                                                  bjvm_stack_value *args,
                                                  int argc);
+
+// represents a native method somewhere in this binary
+typedef struct {
+  char const *class_path;
+  char const *method_name;
+  char const *method_descriptor;
+  bjvm_native_callback callback;
+} bjvm_native_t;
 
 typedef struct bjvm_array_classdesc bjvm_array_classdesc;
 

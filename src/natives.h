@@ -1,5 +1,6 @@
 //
 // Created by alec on 12/19/24.
+// This file contains definitions useful for implementing native methods.
 //
 
 #ifndef BJVM_NATIVES_H
@@ -7,41 +8,51 @@
 
 #include "bjvm.h"
 
-typedef struct {
-  char const* class_path;
-  char const* method_name;
-  char const* method_descriptor;
-  bjvm_native_callback callback;
-} bjvm_native_t;
+#define ThrowLangException(exception_name)                             \
+  bjvm_raise_exception(thread, L"java/lang/" #exception_name, nullptr)
 
-size_t bjvm_get_natives_list(bjvm_native_t const* const (*natives[]));
+#define Is1DPrimitiveArray(src) ({ bjvm_obj_header *__obj = src; \
+	src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && src->descriptor->dimensions == 1; })
+
+#define ThrowLangExceptionM(exception_name, fmt, ...)                   \
+  do {                                                                         \
+    wchar_t msg[1024];                                                         \
+    swprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
+    bjvm_raise_exception(thread, L"java/lang/" exception_name, msg);           \
+  } while (0)
 
 #ifdef __APPLE__
-#define BJVM_NATIVE_SECTION __attribute__((section("__DATA,__native")))
+#define NATIVE_SECTION_NAME "__DATA,__native"
 #else
-#define BJVM_NATIVE_SECTION __attribute__((section(".native")))
+#define NATIVE_SECTION_NAME ".native"
 #endif
 
-#define DECLARE_NATIVE_CALLBACK(class_name_, method_name_) \
-    static bjvm_stack_value bjvm_native_##class_name_##_##method_name_##_cb( \
-        bjvm_thread *vm, bjvm_obj_header *obj, bjvm_stack_value *args, int argc)
+#if defined(__has_feature) && __has_feature(address_sanitizer)
+#define BJVM_NATIVECALL                                                        \
+  __attribute__((section(NATIVE_SECTION_NAME), no_sanitize_address))
+#else
+#define BJVM_NATIVECALL __attribute__((section(NATIVE_SECTION_NAME)))
+#endif
 
-#define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_, method_descriptor_) \
-    static const bjvm_native_t bjvm_native_##class_name_##_##method_name_info = { \
-        .class_path = #package_path "/" #class_name_,                             \
-        .method_name = #method_name_,                                            \
-        .method_descriptor = method_descriptor_,                                 \
-        .callback = &bjvm_native_##class_name_##_##method_name_##_cb             \
-    }
+#define DECLARE_NATIVE_CALLBACK(class_name_, method_name_)                     \
+  static bjvm_stack_value bjvm_native_##class_name_##_##method_name_##_cb(     \
+      bjvm_thread *thread, bjvm_obj_header *obj, bjvm_stack_value *args,       \
+      int argc)
 
-#define PLACE_NATIVE_IN_SECTION(class_name_, method_name_) \
-    const bjvm_native_t * const BJVM_NATIVE_SECTION \
-        bjvm_native_##class_name_##_##method_name_info_p = &bjvm_native_##class_name_##_##method_name_info
+#define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,            \
+                           method_descriptor_)                                 \
+  BJVM_NATIVECALL const bjvm_native_t                                          \
+      bjvm_native_##class_name_##_##method_name_##_info = {                    \
+          .class_path = package_path "/" #class_name_,                        \
+          .method_name = #method_name_,                                        \
+          .method_descriptor = method_descriptor_,                             \
+          .callback = &bjvm_native_##class_name_##_##method_name_##_cb}
 
-#define DECLARE_NATIVE(package_path, class_name_, method_name_, method_descriptor_) \
-    DECLARE_NATIVE_CALLBACK(class_name_, method_name_);                             \
-    DEFINE_NATIVE_INFO(package_path, class_name_, method_name_, method_descriptor_); \
-    PLACE_NATIVE_IN_SECTION(class_name_, method_name_);                             \
-    DECLARE_NATIVE_CALLBACK(class_name_, method_name_)
+#define DECLARE_NATIVE(package_path, class_name_, method_name_,                \
+                       method_descriptor_)                                     \
+  DECLARE_NATIVE_CALLBACK(class_name_, method_name_);                          \
+  DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,                  \
+                     method_descriptor_);                                      \
+  DECLARE_NATIVE_CALLBACK(class_name_, method_name_)
 
 #endif // BJVM_NATIVES_H
