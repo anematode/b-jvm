@@ -7,13 +7,17 @@ DECLARE_NATIVE("java/lang", String, intern, "()Ljava/lang/String;") {
   }
   short *buf;
   size_t len;
-  read_string(obj, &buf, &len);
-  char *data = malloc((len + 1) * sizeof(char));
+  read_string(thread, obj, &buf, &len);
+
+  heap_string utf8_str = make_heap_str(len);
+
   for (size_t i = 0; i < len; ++i)
-    data[i] = buf[i];
-  data[len] = 0;
+    utf8_str.chars[i] = buf[i];
+
   bjvm_stack_value result;
-  result.obj = bjvm_intern_string(thread, data);
-  free(data);
+  result.obj = bjvm_intern_string(thread, hslc(utf8_str));
+
+  free_heap_str(utf8_str);
+
   return result;
 }

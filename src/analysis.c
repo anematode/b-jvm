@@ -336,15 +336,15 @@ const char *bjvm_type_kind_to_string(bjvm_type_kind kind) {
 
 char *class_info_entry_to_string(const bjvm_cp_class_info *ent) {
   char result[1000];
-  snprintf(result, sizeof(result), "Class: %S", ent->name->chars);
+  snprintf(result, sizeof(result), "Class: %.*s", ent->name.len, ent->name.chars);
   return strdup(result);
 }
 
 char *
 name_and_type_entry_to_string(const bjvm_cp_name_and_type *name_and_type) {
   char result[1000];
-  snprintf(result, sizeof(result), "NameAndType: %S:%S",
-           name_and_type->name->chars, name_and_type->descriptor->chars);
+  snprintf(result, sizeof(result), "NameAndType: %.*s:%.*s",
+           name_and_type->name.len, name_and_type->name.chars, name_and_type->descriptor.len, name_and_type->descriptor.chars);
   return strdup(result);
 }
 
@@ -363,7 +363,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_INVALID:
     return strdup("<invalid>");
   case BJVM_CP_KIND_UTF8:
-    return lossy_utf8_entry_to_chars(&ent->utf8);
+    return lossy_utf8_entry_to_chars(hslc(ent->utf8));
   case BJVM_CP_KIND_INTEGER:
     snprintf(result, sizeof(result), "%d", (int)ent->integral.value);
     break;
@@ -379,7 +379,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_CLASS:
     return class_info_entry_to_string(&ent->class_info);
   case BJVM_CP_KIND_STRING: {
-    snprintf(result, sizeof(result), "String: '%S'", ent->string.chars->chars);
+    snprintf(result, sizeof(result), "String: '%.*s'", ent->string.chars.len, ent->string.chars.chars);
     break;
   }
   case BJVM_CP_KIND_FIELD_REF: {

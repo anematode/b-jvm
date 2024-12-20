@@ -71,7 +71,7 @@ typedef struct bjvm_obj_header {
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
 
-void read_string(bjvm_obj_header *obj, short **buf, size_t *len); // todo: get rid of
+void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf, size_t *len); // todo: get rid of
 
 struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;
@@ -218,21 +218,7 @@ int bjvm_vm_preregister_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
 int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
                            const uint8_t **bytes, size_t *len);
 
-void bjvm_vm_list_classfiles(bjvm_vm *vm, bjvm_utf8 *strings, size_t *count);
-
-/**
- * Parse a Java class file.
- *
- * The error message corresponds to a ClassFormatError in Java land.
- * (UnsupportedClassVersionErrors and VerifyErrors should be raised elsewhere.)
- *
- * @param bytes Start byte of the classfile.
- * @param len Length of the classfile in bytes.
- * @param result Where to write the result.
- * @return nullptr on success, otherwise an error message (which is the caller's
- * responsibility to free).
- */
-bjvm_utf8 bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result);
+void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count);
 
 /**
  * Free the classfile.

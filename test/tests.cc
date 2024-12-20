@@ -176,14 +176,9 @@ TEST_CASE("Test classfile parsing") {
 
     // std::cout << "Reading " << file << "\n";
     bjvm_classdesc cf = {};
-    char *error = bjvm_parse_classfile(read.data(), read.size(), &cf);
-    if (error != nullptr) {
+    parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf);
+    if (error != PARSE_SUCCESS) {
       std::cerr << "Error parsing classfile: " << error << '\n';
-      if ((int)strlen(error) < shortest_error_length) {
-        shortest_error = strdup(error);
-        shortest_error_length = strlen(error);
-      }
-      free(error);
       // abort();
     } else {
       bjvm_free_classfile(cf);
@@ -199,9 +194,9 @@ TEST_CASE("Test classfile parsing") {
         auto copy = read;
         for (int j = 0; j < 256; ++j) {
           copy[i] += 1;
-          char *error = bjvm_parse_classfile(copy.data(), copy.size(), &cf);
-          if (error) {
-            free(error);
+          parse_result_t error = bjvm_parse_classfile(copy.data(), copy.size(), &cf);
+          if (error != PARSE_SUCCESS) {
+
           } else {
             bjvm_free_classfile(cf);
           }
@@ -221,8 +216,8 @@ TEST_CASE("Test classfile parsing") {
     bjvm_classdesc cf;
 
     meter.measure([&] {
-      char *error = bjvm_parse_classfile(read.data(), read.size(), &cf);
-      if (error)
+      parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf);
+      if (error != PARSE_SUCCESS)
         abort();
       bjvm_free_classfile(cf);
     });
@@ -237,9 +232,7 @@ int preregister_all_classes(bjvm_vm *vm) {
       continue;
     }
     auto read = ReadFile(file);
-    wchar_t filename[1000] = {};
-    file = file.substr(5); // remove "jre8/"
-    mbstowcs(filename, file.c_str(), file.size());
+    bjvm_utf8 filename = {.chars = (char *)file.c_str(), .len = (int)file.size()};
     bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
     file_count++;
   }
@@ -253,22 +246,22 @@ TEST_CASE("Class file management") {
   int file_count = preregister_all_classes(vm);
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm, L"java/lang/Object.class", &bytes, &len) ==
+  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes, &len) ==
           0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm, L"java/lang/Object.clas", nullptr, &len) !=
+  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.clas"), nullptr, &len) !=
           0);
-  REQUIRE(bjvm_vm_read_classfile(vm, L"java/lang/Object.classe", nullptr,
+  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.classe"), nullptr,
                                  &len) != 0);
   bjvm_vm_list_classfiles(vm, nullptr, &len);
   REQUIRE((int)len == file_count);
-  std::vector<wchar_t *> strings(len);
+  std::vector<heap_string> strings(len);
+
   bjvm_vm_list_classfiles(vm, strings.data(), &len);
   bool found = false;
   for (size_t i = 0; i < len; ++i) {
-    found = found || wcscmp(strings[i], L"java/lang/ClassLoader.class") == 0;
-    free(strings[i]);
+    found = found || utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
   }
   REQUIRE(found);
   bjvm_free_vm(vm);
@@ -321,22 +314,22 @@ TEST_CASE("Compressed bitset") {
 }
 
 TEST_CASE("parse_field_descriptor valid cases") {
-  const wchar_t *fields =
-      L"Lcom/example/Example;[I[[[JLjava/lang/String;[[Ljava/lang/Object;BVCZ";
+  const char *fields =
+      "Lcom/example/Example;[I[[[JLjava/lang/String;[[Ljava/lang/Object;BVCZ";
   bjvm_field_descriptor com_example_Example, Iaaa, Jaa, java_lang_String,
       java_lang_Object, B, V, C, Z;
   REQUIRE(
-      !parse_field_descriptor(&fields, wcslen(fields), &com_example_Example));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &Iaaa));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &Jaa));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &java_lang_String));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &java_lang_Object));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &B));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &V));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &C));
-  REQUIRE(!parse_field_descriptor(&fields, wcslen(fields), &Z));
+      !parse_field_descriptor(&fields, strlen(fields), &com_example_Example));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Iaaa));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Jaa));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_String));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_Object));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &B));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &V));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &C));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Z));
 
-  REQUIRE(utf8_equals(&com_example_Example.class_name, "com/example/Example"));
+  REQUIRE(utf8_equals(hslc(com_example_Example.class_name), "com/example/Example"));
   REQUIRE(com_example_Example.dimensions == 0);
   REQUIRE(com_example_Example.kind == BJVM_TYPE_KIND_REFERENCE);
 
@@ -346,10 +339,10 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(Jaa.kind == BJVM_TYPE_KIND_LONG);
   REQUIRE(Jaa.dimensions == 3);
 
-  REQUIRE(utf8_equals(&java_lang_String.class_name, "java/lang/String"));
+  REQUIRE(utf8_equals(hslc(java_lang_String.class_name), "java/lang/String"));
   REQUIRE(java_lang_String.dimensions == 0);
 
-  REQUIRE(utf8_equals(&java_lang_Object.class_name, "java/lang/Object"));
+  REQUIRE(utf8_equals(hslc(java_lang_Object.class_name), "java/lang/Object"));
   REQUIRE(java_lang_Object.dimensions == 2);
 
   REQUIRE(B.kind == BJVM_TYPE_KIND_BYTE);
@@ -362,7 +355,7 @@ TEST_CASE("parse_field_descriptor valid cases") {
   free_field_descriptor(java_lang_String);
 }
 
-int load_classfile(const char *filename, void *param, uint8_t **bytes,
+int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
                    size_t *len) {
   const char **classpath = (const char **)param;
   std::vector<std::string> paths{"jre8/"};
@@ -370,7 +363,7 @@ int load_classfile(const char *filename, void *param, uint8_t **bytes,
     paths.emplace_back(classpath[i]);
   }
   for (const auto &path : paths) {
-    std::string file = path + std::string(filename);
+    std::string file = path + std::string(filename.chars, filename.len);
     try {
       auto file_data = ReadFile(file);
       if (file_data.size() > 0) {
@@ -431,13 +424,13 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_classdesc *desc = bootstrap_class_create(thr, L"Main");
+  bjvm_classdesc *desc = bootstrap_class_create(thr, str("Main"));
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(desc, "main", "([Ljava/lang/String;)V",
+  method = bjvm_easy_method_lookup(desc, str("main"), str("([Ljava/lang/String;)V"),
                                    false, false);
 
   bjvm_thread_run(thr, method, args, nullptr);
@@ -453,21 +446,21 @@ TEST_CASE("String hash table") {
   REQUIRE(tbl.load_factor == 0.75);
   REQUIRE(tbl.entries_cap == 48);
 
-  std::unordered_map<std::wstring, std::string> reference;
+  std::unordered_map<std::string, std::string> reference;
   for (int i = 0; i < 5000; ++i) {
-    std::wstring key = std::to_wstring(i * 5201);
+    std::string key = std::to_string(i * 5201);
     std::string value = std::to_string(i);
     reference[key] = value;
-    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, strdup(value.c_str())));
-    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, strdup(value.c_str())));
+    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, (void *)strdup(value.c_str())));
+    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, (void *)strdup(value.c_str())));
   }
   for (int i = 1; i <= 4999; i += 2) {
-    std::wstring key = std::to_wstring(i * 5201);
+    std::string key = std::to_string(i * 5201);
     free(bjvm_hash_table_delete(&tbl, key.c_str(), -1));
   }
   REQUIRE(tbl.entries_count == 2500);
   for (int i = 1; i <= 4999; i += 2) {
-    std::wstring key = std::to_wstring(i * 5201);
+    std::string key = std::to_string(i * 5201);
     void *lookup = bjvm_hash_table_lookup(&tbl, key.c_str(), -1);
     REQUIRE(lookup == nullptr);
     std::string value = std::to_string(i);
@@ -475,7 +468,7 @@ TEST_CASE("String hash table") {
   }
 
   for (int i = 0; i < 5000; i += 2) {
-    std::wstring key = std::to_wstring(i * 5201);
+    std::string key = std::to_string(i * 5201);
     void *value = bjvm_hash_table_lookup(&tbl, key.c_str(), -1);
     REQUIRE(value != nullptr);
     REQUIRE(reference[key] == (const char *)value);

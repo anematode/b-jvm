@@ -17,11 +17,11 @@ bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right) {
   return memcmp(left.chars, right.chars, left.len) == 0;
 }
 
-char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8) {
-  char *result = malloc(utf8->len + 1);
+char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8) {
+  char *result = malloc(utf8.len + 1);
   int i = 0;
-  for (; i < utf8->len; ++i) {
-    result[i] = (char)utf8->chars[i];
+  for (; i < utf8.len; ++i) {
+    result[i] = (char)utf8.chars[i];
   }
   result[i] = '\0';
   return result;

@@ -68,18 +68,18 @@ typedef struct {
 #define null_str() ((bjvm_utf8) { .chars = nullptr, .len = 0 })
 
 /// Slices the given string from the given start index to the end.
-inline bjvm_utf8 slice(bjvm_utf8 str, int start) {
+static inline bjvm_utf8 slice(bjvm_utf8 str, int start) {
   return (bjvm_utf8) { .chars = str.chars + start, .len = str.len - start };
 }
 
 /// Slices the given string from the given start index to the given end index.
-inline bjvm_utf8 slice_to(bjvm_utf8 str, int start, int end) {
+static inline bjvm_utf8 slice_to(bjvm_utf8 str, int start, int end) {
   return (bjvm_utf8) { .chars = str.chars + start, .len = end - start };
 }
 
 /// Uses the given format string and arguments to print a string into the given buffer;
 /// returns a slice of the buffer containing the string.
-inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
+static inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
   va_list args;
   va_start(args, format);
   int len = vsnprintf(buffer.chars, buffer.len, format, args);
@@ -88,40 +88,42 @@ inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
 }
 
 /// Mallocates a new heap string with the given length.
-inline heap_string make_heap_str(int len) {
+static inline heap_string make_heap_str(int len) {
   return (heap_string) { .chars = (char *)calloc(len, 1), .len = len };
 }
 
 /// Creates a heap string from the given slice.
-inline heap_string make_heap_str_from(bjvm_utf8 slice) {
+static inline heap_string make_heap_str_from(bjvm_utf8 slice) {
   heap_string str = make_heap_str(slice.len);
   memcpy(str.chars, slice.chars, slice.len);
   return str;
 }
 
 /// Truncates the given heap string to the given length.
-inline void heap_str_truncate(heap_string str, int len) {
+static inline void heap_str_truncate(heap_string str, int len) {
   assert(len <= str.len);
   str.len = len;
 }
 
 /// Frees the given heap string.
-inline void free_heap_str(heap_string str) {
+static inline void free_heap_str(heap_string str) {
   free(str.chars);
   str.chars = nullptr;
 }
 
 /// Creates a slice of the given heap string.
-inline bjvm_utf8 hslc(heap_string str) {
+static inline bjvm_utf8 hslc(heap_string str) {
   return (bjvm_utf8) { .chars = str.chars, .len = str.len };
 }
+
+#define fmt_slice(slice) (int)(slice).len, (slice).chars
 
 #define str(literal) ((bjvm_utf8) { .chars = (literal), .len = sizeof(literal) - 1 })
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
 
-char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8);
+char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8);
 bjvm_utf8 bjvm_make_utf8(const char *c_literal);
 
 #ifdef __cplusplus
