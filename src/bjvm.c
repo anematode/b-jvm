@@ -136,6 +136,10 @@ void free_array_classdesc(bjvm_classdesc *classdesc) {
          classdesc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY);
   free_utf8(*classdesc->fields->name);
   free_utf8(*classdesc->fields->descriptor);
+  free_utf8(classdesc->name);
+  free_utf8(*classdesc->super_class->name);
+  free(classdesc->super_class->name);
+  free(classdesc->super_class);
   free(classdesc->fields->name);
   free(classdesc->fields->descriptor);
   free(classdesc->fields);
@@ -145,17 +149,21 @@ void free_array_classdesc(bjvm_classdesc *classdesc) {
 // Symmetry with make_primitive_classdesc
 void free_primitive_classdesc(bjvm_classdesc *classdesc) {
   assert(classdesc->kind == BJVM_CD_KIND_PRIMITIVE);
+  free_utf8(classdesc->name);
+  free(classdesc);
 }
 
 void free_classdesc(void *classdesc_) {
   bjvm_classdesc *classdesc = classdesc_;
+  if (classdesc->array_type)
+    free_classdesc(classdesc->array_type);
   if (classdesc->kind == BJVM_CD_KIND_ORDINARY) {
     bjvm_free_classfile(*classdesc);
     free(classdesc_);
-  } else if (classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-    free_array_classdesc(classdesc);
   } else if (classdesc->kind == BJVM_CD_KIND_PRIMITIVE) {
     free_primitive_classdesc(classdesc);
+  } else {
+    free_array_classdesc(classdesc);
   }
 }
 
@@ -175,12 +183,12 @@ typedef struct {
 void free_native_entries(void *entries_) {
   if (!entries_)
     return;
-
   native_entries *entries = entries_;
   for (int i = 0; i < entries->entries_count; i++) {
     free_utf8(entries->entries[i].name);
     free_utf8(entries->entries[i].descriptor);
   }
+  free(entries->entries);
   free(entries);
 }
 
@@ -189,7 +197,6 @@ void bjvm_register_native(bjvm_vm *vm, const char *class_name,
                           const char *method_descriptor,
                           bjvm_native_callback callback) {
   bjvm_utf8 class = bjvm_make_utf8_cstr(class_name);
-
   native_entries *existing =
       bjvm_hash_table_lookup(&vm->natives, class.chars, class.len);
   if (!existing) {
@@ -695,6 +702,7 @@ bjvm_stack_value bjvm_Class_forName(bjvm_thread *thread, bjvm_obj_header *,
     name_wchar[i] = name[i] == '.' ? '/' : name[i];
   }
   bjvm_classdesc *c = bootstrap_class_create(thread, name_wchar);
+  free(name_wchar);
   if (c) {
     return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, c)};
   }
@@ -712,7 +720,9 @@ bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
   if (chars[0] == 'L') {
     wchar_t *cow = wcsdup(chars);
     cow[wcslen(chars) - 1] = L'\0';
-    return bootstrap_class_create(thread, cow + 1);
+    bjvm_classdesc *result = bootstrap_class_create(thread, cow + 1);
+    free(cow);
+    return result;
   }
   if (chars[0] == '[')
     return bootstrap_class_create(thread, chars);
@@ -1230,7 +1240,7 @@ void bjvm_register_natives_Class(bjvm_vm *vm) {}
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 19;
+  options.heap_size = 1 << 20;
   return options;
 }
 
@@ -1437,8 +1447,15 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
 void bjvm_free_vm(bjvm_vm *vm) {
   bjvm_free_hash_table(vm->classfiles);
   bjvm_free_hash_table(vm->classes);
+  bjvm_free_hash_table(vm->natives);
   bjvm_free_hash_table(vm->inchoate_classes);
   bjvm_free_hash_table(vm->interned_strings);
+  bjvm_free_hash_table(vm->class_padding);
+
+  for (int i = 0; i < 9; ++i) {
+    free_classdesc(vm->primitive_classes[i]);
+  }
+
   free(vm->active_threads);
   free(vm->heap);
   free(vm);
@@ -1566,6 +1583,7 @@ void bjvm_free_thread(bjvm_thread *thread) {
 
   // TODO what happens to ->current_exception etc.?
   free(thread->frame_buffer);
+  free(thread->frames);
   free(thread);
 }
 
@@ -2356,10 +2374,12 @@ void* bump_allocate(bjvm_thread *thread, size_t bytes) {
 #endif
 
   if (vm->heap_used + bytes > vm->heap_capacity) {
+    printf("Begin GC\n");
     bjvm_major_gc(thread->vm); // LOL
+    printf("New heap used: %d/%d\n", vm->heap_used, vm->heap_capacity);
     if (vm->heap_used + bytes > vm->heap_capacity) {
       // Out of memory
-      UNREACHABLE();
+      UNREACHABLE("Out of memory");
     }
   }
 
@@ -3988,6 +4008,8 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     }
   }
 
+  free(bitset_list);
+
   // Interned strings (TODO remove)
   it = bjvm_hash_table_get_iterator(&vm->interned_strings);
   bjvm_obj_header *str;
@@ -4117,7 +4139,8 @@ void bjvm_major_gc(bjvm_vm* vm) {
   int original_roots = ctx.roots_count;
   for (int i = 0; i < original_roots; ++i) {
     bjvm_obj_header *root = ctx.roots[i];
-    bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
+    if (!(root->mark_word & REACHABLE_BIT))
+      bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
   }
   for (int i = 0; i < 1000; ++i) {
     free(bitset_list[i]);
@@ -4128,14 +4151,19 @@ void bjvm_major_gc(bjvm_vm* vm) {
   bjvm_obj_header** new_location = ctx.new_location = malloc(ctx.roots_count * sizeof(bjvm_obj_header*));
 
   // For now, create a new heap of the same size
-  uint8_t *new_heap = aligned_alloc(4096, vm->heap_capacity);
+  uint8_t *new_heap = aligned_alloc(4096, vm->heap_capacity), *end = new_heap + vm->heap_capacity;
   uint8_t *write_ptr = new_heap;
 
   // Copy object by object
   for (int i = 0; i < ctx.roots_count; ++i) {
+    // Align to 8 bytes
+    write_ptr = (uint8_t*)(((uintptr_t)write_ptr + 7) & ~7);
+    if (write_ptr + size_of_object(ctx.roots[i]) > end) {
+      UNREACHABLE("Out of memory");
+    }
+
     bjvm_obj_header *obj = ctx.roots[i];
     size_t sz = size_of_object(obj);
-    write_ptr = (uint8_t*)(((uintptr_t)write_ptr + 7) & ~7);
     obj->mark_word &= ~REACHABLE_BIT;
     memcpy(write_ptr, obj, sz);
     new_location[i] = (bjvm_obj_header*)write_ptr;
