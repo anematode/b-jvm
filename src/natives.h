@@ -9,19 +9,12 @@
 #include "bjvm.h"
 
 #define ThrowLangException(exception_name)                                     \
-  bjvm_raise_exception(thread, L"java/lang/" #exception_name, nullptr)
-
-#define Is1DPrimitiveArray(src)                                                \
-  ({                                                                           \
-    bjvm_obj_header *__obj = src;                                              \
-    src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&                   \
-        src->descriptor->dimensions == 1;                                      \
-  })
+  bjvm_raise_exception(thread, "java/lang/" #exception_name, nullptr)
 
 #define ThrowLangExceptionM(exception_name, fmt, ...)                          \
   do {                                                                         \
-    wchar_t msg[1024];                                                         \
-    swprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
+    char msg[1024];                                                         \
+    snprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
     bjvm_raise_exception(thread, L"java/lang/" exception_name, msg);           \
   } while (0)
 

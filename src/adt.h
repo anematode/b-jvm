@@ -39,7 +39,7 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
 
 typedef struct bjvm_hash_table_entry {
   struct bjvm_hash_table_entry *next;
-  wchar_t *key;
+  char *key;
   uint32_t key_len;
   void *data;
 } bjvm_hash_table_entry;
@@ -50,7 +50,7 @@ typedef struct bjvm_string_hash_table_iterator {
   bjvm_hash_table_entry *end;
 } bjvm_hash_table_iterator;
 
-// Separate chaining hash map from (wchar_t) strings to void* (arbitrary)
+// Separate chaining hash map from (char) strings to void* (arbitrary)
 // entries. Sigh.
 typedef struct bjvm_string_hash_table {
   void (*free_fn)(void *entry);
@@ -70,12 +70,12 @@ bjvm_hash_table_iterator
 bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl);
 
 bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       wchar_t **key, size_t *key_len,
+                                       char **key, size_t *key_len,
                                        void **value);
 
 bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter);
 
-uint32_t bjvm_hash_string(const wchar_t *key, size_t len);
+uint32_t bjvm_hash_string(const char *key, size_t len);
 
 void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity);
 
@@ -83,7 +83,7 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity);
  * Insert the key/value pair into the hash table and return the old value, if
  * any. Ownership of the key is passed into the function.
  */
-void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
+void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len, void *value, bool copy_key);
 
 /**
@@ -91,7 +91,7 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
  * any. If len = -1, the key is treated as a null-terminated string literal.
  */
 [[nodiscard]] void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl,
-                                           const wchar_t *key, int len,
+                                           const char *key, int len,
                                            void *value);
 
 /**
@@ -101,12 +101,12 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
  * pointers.
  */
 [[nodiscard]] void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl,
-                                           const wchar_t *key, int len);
+                                           const char *key, int len);
 
 /**
  * Look up the value in the hash table.
  */
-void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
+void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const char *key,
                              int len);
 
 void bjvm_free_hash_table(bjvm_string_hash_table tbl);

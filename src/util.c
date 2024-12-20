@@ -14,7 +14,7 @@ bool utf8_equals(const bjvm_utf8 *entry, const char *str) {
 bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right) {
   if (left->len != right->len)
     return false;
-  return wmemcmp(left->chars, right->chars, left->len) == 0;
+  return memcmp(left->chars, right->chars, left->len) == 0;
 }
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8) {
@@ -27,6 +27,6 @@ char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8) {
   return result;
 }
 
-bjvm_utf8 bjvm_make_utf8(const wchar_t *c_literal) {
-  return (bjvm_utf8){.chars = wcsdup(c_literal), .len = wcslen(c_literal)};
+bjvm_utf8 bjvm_make_utf8(const char *c_literal) {
+  return (bjvm_utf8){.chars = strdup(c_literal), .len = strlen(c_literal)};
 }

@@ -58,7 +58,7 @@ static const char *cp_kind_to_string(bjvm_cp_kind kind) {
 
 // Create a null-terminated UTF-8 entry of the given length
 bjvm_utf8 init_utf8_entry(int len) {
-  return (bjvm_utf8){.chars = calloc(len + 1, sizeof(wchar_t)), .len = len};
+  return (bjvm_utf8){.chars = calloc(len + 1, sizeof(char)), .len = len};
 }
 
 void free_utf8(bjvm_utf8 entry) { free(entry.chars); }
@@ -453,13 +453,13 @@ bjvm_utf8 *checked_get_utf8(bjvm_constant_pool *pool, int index,
   return &checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8;
 }
 
-bjvm_utf8 bjvm_wchar_slice_to_utf8(const wchar_t *chars, size_t len) {
+bjvm_utf8 bjvm_wchar_slice_to_utf8(const char *chars, size_t len) {
   bjvm_utf8 init = init_utf8_entry(len);
-  wmemcpy(init.chars, chars, len);
+  memcpy(init.chars, chars, len);
   return init;
 }
 
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result);
 char *parse_method_descriptor(const bjvm_utf8 *descriptor,
                               bjvm_method_descriptor *result);
@@ -467,7 +467,7 @@ char *parse_method_descriptor(const bjvm_utf8 *descriptor,
 char *parse_complete_field_descriptor(const bjvm_utf8 *entry,
                                       bjvm_field_descriptor *result,
                                       bjvm_classfile_parse_ctx *ctx) {
-  const wchar_t *chars = entry->chars;
+  const char *chars = entry->chars;
   char *error = parse_field_descriptor(&chars, entry->len, result);
   if (error)
     return error;
@@ -2015,15 +2015,15 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
  * length len, writing the result to result and returning an owned error message
  * if there was an error.
  */
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result) {
-  const wchar_t *end = *chars + len;
+  const char *end = *chars + len;
   int dimensions = 0;
   while (*chars < end) {
     result->dimensions = dimensions;
     if (dimensions > 255)
       return strdup("too many dimensions (max 255)");
-    wchar_t c = **chars;
+    char c = **chars;
     (*chars)++;
     switch (c) {
     case L'B':
@@ -2060,7 +2060,7 @@ char *parse_field_descriptor(const wchar_t **chars, size_t len,
       ++dimensions;
       break;
     case L'L': {
-      const wchar_t *start = *chars;
+      const char *start = *chars;
       while (*chars < end && **chars != ';')
         ++*chars;
       if (*chars == end)
@@ -2102,7 +2102,7 @@ char *parse_method_descriptor(const bjvm_utf8 *entry,
   // ParameterDescriptor:
   // FieldType
   const size_t len = entry->len;
-  const wchar_t *chars = entry->chars, *end = chars + len;
+  const char *chars = entry->chars, *end = chars + len;
   if (len < 1 || *chars++ != '(')
     return strdup("Expected '('");
   result->args = nullptr;

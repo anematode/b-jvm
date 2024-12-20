@@ -18,7 +18,7 @@ typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
                                    const char *reason);
 
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result);
 bjvm_utf8 init_utf8_entry(int len);
 
@@ -195,7 +195,7 @@ typedef enum {
   bjvm_insn_ret
 } bjvm_insn_code_kind;
 
-typedef enum {
+typedef enum : char {
   BJVM_TYPE_KIND_BOOLEAN = 'Z',
   BJVM_TYPE_KIND_CHAR = 'C',
   BJVM_TYPE_KIND_FLOAT = 'F',

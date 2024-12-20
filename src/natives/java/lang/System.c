@@ -1,24 +1,25 @@
 #include <math.h>
 #include <natives.h>
 #include <util.h>
+#include <objects.h>
 
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
   bjvm_obj_header *props_obj = args[0].obj;
-  const wchar_t *const props[][2] = {
-      {L"file.encoding", L"UTF-8"},   {L"stdout.encoding", L"UTF-8"},
-      {L"native.encoding", L"UTF-8"}, {L"stderr.encoding", L"UTF-8"},
-      {L"line.separator", L"\n"},     {L"path.separator", L":"},
-      {L"file.separator", L"/"}};
+  const char *const props[][2] = {
+      {"file.encoding", "UTF-8"},   {"stdout.encoding", "UTF-8"},
+      {"native.encoding", "UTF-8"}, {"stderr.encoding", "UTF-8"},
+      {"line.separator", "\n"},     {"path.separator", ":"},
+      {"file.separator", "/"}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
       props_obj->descriptor, "put",
       "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", true, false);
   for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
     bjvm_stack_value put_args[3] = {
         {.obj = props_obj},
-        {.obj = bjvm_intern_string(thread, props[i][0], wcslen(props[i][0]))},
-        {.obj = bjvm_intern_string(thread, props[i][1], wcslen(props[i][1]))}};
+        {.obj = bjvm_intern_string(thread, props[i][0], strlen(props[i][0]))},
+        {.obj = bjvm_intern_string(thread, props[i][1], strlen(props[i][1]))}};
     bjvm_stack_value result;
     // call put() with String key and value
     bjvm_thread_run(thread, put, put_args, &result);
@@ -119,3 +120,20 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
 
   return value_null();
 }
+
+DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
+  // Look up the field System.out
+  bjvm_classdesc *system_class =
+      bootstrap_class_create(thread, "java/lang/System");
+  bjvm_cp_field *out_field =
+      bjvm_easy_field_lookup(system_class, "out", "Ljava/io/PrintStream;");
+
+  void *field = &system_class->static_fields[out_field->byte_offset];
+  *(bjvm_obj_header **)field = args[0].obj;
+
+  return value_null();
+}
+
+DECLARE_NATIVE("java/lang", System, registerNatives, "()V") { return value_null(); }
+DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") { return value_null(); }
+DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") { return value_null(); }

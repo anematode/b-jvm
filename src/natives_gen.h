@@ -167,22 +167,22 @@ struct bjvm_native_MethodType {
   bjvm_obj_header *methodDescriptor; // Ljava/lang/String;
 };
 static inline void bjvm_register_native_padding(bjvm_vm *vm) {
-  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/Class", -1,
+  (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/Class", -1,
                                (void *)(1 * sizeof(void *)));
-  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/reflect/Field",
+  (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/reflect/Field",
                                -1, (void *)(1 * sizeof(void *)));
-  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/reflect/Method",
+  (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/reflect/Method",
                                -1, (void *)(1 * sizeof(void *)));
   (void)bjvm_hash_table_insert(&vm->class_padding,
-                               L"java/lang/reflect/Constructor", -1,
+                               "java/lang/reflect/Constructor", -1,
                                (void *)(1 * sizeof(void *)));
-  (void)bjvm_hash_table_insert(&vm->class_padding, L"java/lang/Thread", -1,
-                               (void *)(1 * sizeof(void *)));
-  (void)bjvm_hash_table_insert(&vm->class_padding,
-                               L"java/lang/invoke/MethodHandle", -1,
+  (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/Thread", -1,
                                (void *)(1 * sizeof(void *)));
   (void)bjvm_hash_table_insert(&vm->class_padding,
-                               L"java/lang/invoke/MethodType", -1,
+                               "java/lang/invoke/MethodHandle", -1,
+                               (void *)(1 * sizeof(void *)));
+  (void)bjvm_hash_table_insert(&vm->class_padding,
+                               "java/lang/invoke/MethodType", -1,
                                (void *)(1 * sizeof(void *)));
 }
 /** END CODEGEN SECTION (gen_natives.c) */
