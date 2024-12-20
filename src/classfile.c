@@ -228,12 +228,14 @@ _Thread_local char *format_error_msg = nullptr;
 _Thread_local bool format_error_needs_free = false;
 
 _Noreturn void format_error_static(const char *reason) {
+  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = (char *)reason;
   format_error_needs_free = false;
   longjmp(format_error_jmp_buf, 1);
 }
 
 _Noreturn void format_error_dynamic(char *reason) {
+  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = reason;
   format_error_needs_free = true;
   longjmp(format_error_jmp_buf, 1);
@@ -372,7 +374,7 @@ bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
 }
 
 bjvm_utf8 checked_get_utf8(bjvm_constant_pool *pool, int index,
-                            const char *reason) {
+                           const char *reason) {
   return hslc(checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8);
 }
 
@@ -506,8 +508,8 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t descriptor_index = reader_next_u16(reader, "descriptor index");
 
     bjvm_utf8 name = skip_linking ? null_str()
-                                   : checked_get_utf8(ctx->cp, name_index,
-                                                      "name and type name");
+                                  : checked_get_utf8(ctx->cp, name_index,
+                                                     "name and type name");
 
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_NAME_AND_TYPE,
@@ -603,6 +605,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_INVOKE_DYNAMIC: {
+    puts("indy");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     char *error = parse_method_descriptor(
@@ -614,6 +617,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
+    puts("method ref");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
@@ -629,6 +633,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
+    puts("method type");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     char *error = parse_method_descriptor(entry->method_type_info.descriptor,
@@ -989,8 +994,7 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
     arraylength = 0xbe,
     athrow = 0xbf,
     checkcast = 0xc0,
-    instanceof
-    = 0xc1,
+    instanceof = 0xc1,
     monitorenter = 0xc2,
     monitorexit = 0xc3,
     wide = 0xc4,
@@ -1988,7 +1992,8 @@ char *parse_field_descriptor(const char **chars, size_t len,
       }
       ++*chars;
       result->kind = BJVM_TYPE_KIND_REFERENCE;
-      result->class_name = make_heap_str_from((bjvm_utf8){.chars = (char*)start, .len = class_name_len});
+      result->class_name = make_heap_str_from(
+          (bjvm_utf8){.chars = (char *)start, .len = class_name_len});
       return nullptr;
     }
     default: {
@@ -2058,7 +2063,8 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
   }
 }
 
-parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
+parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
+                                    bjvm_classdesc *result) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
   bjvm_classfile_parse_ctx ctx = {.free_on_error = nullptr,
@@ -2076,7 +2082,8 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *
     }
 
     free(ctx.free_on_error);
-    if (format_error_needs_free) free(format_error_msg);
+    if (format_error_needs_free)
+      free(format_error_msg);
     assert(format_error_msg);
     result->state = BJVM_CD_STATE_LINKAGE_ERROR;
     // todo: get rid of format_error

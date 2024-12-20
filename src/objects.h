@@ -10,11 +10,11 @@ static int constexpr kArrayDataOffset = sizeof(bjvm_obj_header) + sizeof(int);
         src->descriptor->dimensions == 1;                                      \
   })
 
-inline int *ArrayLength(bjvm_obj_header *obj) {
+static inline int *ArrayLength(bjvm_obj_header *obj) {
   return (int *)((char *)obj + kArrayLengthOffset);
 }
 
-inline void *ArrayData(bjvm_obj_header *obj) {
+static inline void *ArrayData(bjvm_obj_header *obj) {
   return (char *)obj + kArrayDataOffset;
 }
 

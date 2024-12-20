@@ -151,6 +151,14 @@ std::vector<std::string> ListDirectory(const std::string &path,
 #endif
 }
 
+TEST_CASE("ATest str() macro") {
+  bjvm_utf8 utf = str("abc");
+  REQUIRE(utf.chars[0] == 'a');
+  REQUIRE(utf.chars[1] == 'b');
+  REQUIRE(utf.chars[2] == 'c');
+  REQUIRE(utf.len == 3);
+}
+
 TEST_CASE("Test classfile parsing") {
   bool fuzz = false;
 
@@ -194,7 +202,8 @@ TEST_CASE("Test classfile parsing") {
         auto copy = read;
         for (int j = 0; j < 256; ++j) {
           copy[i] += 1;
-          parse_result_t error = bjvm_parse_classfile(copy.data(), copy.size(), &cf);
+          parse_result_t error =
+              bjvm_parse_classfile(copy.data(), copy.size(), &cf);
           if (error != PARSE_SUCCESS) {
 
           } else {
@@ -216,7 +225,8 @@ TEST_CASE("Test classfile parsing") {
     bjvm_classdesc cf;
 
     meter.measure([&] {
-      parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf);
+      parse_result_t error =
+          bjvm_parse_classfile(read.data(), read.size(), &cf);
       if (error != PARSE_SUCCESS)
         abort();
       bjvm_free_classfile(cf);
@@ -232,7 +242,8 @@ int preregister_all_classes(bjvm_vm *vm) {
       continue;
     }
     auto read = ReadFile(file);
-    bjvm_utf8 filename = {.chars = (char *)file.c_str(), .len = (int)file.size()};
+    bjvm_utf8 filename = {.chars = (char *)file.c_str(),
+                          .len = (int)file.size()};
     bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
     file_count++;
   }
@@ -246,12 +257,12 @@ TEST_CASE("Class file management") {
   int file_count = preregister_all_classes(vm);
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes, &len) ==
-          0);
+  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes,
+                                 &len) == 0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.clas"), nullptr, &len) !=
-          0);
+  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.clas"), nullptr,
+                                 &len) != 0);
   REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.classe"), nullptr,
                                  &len) != 0);
   bjvm_vm_list_classfiles(vm, nullptr, &len);
@@ -261,7 +272,8 @@ TEST_CASE("Class file management") {
   bjvm_vm_list_classfiles(vm, strings.data(), &len);
   bool found = false;
   for (size_t i = 0; i < len; ++i) {
-    found = found || utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
+    found = found ||
+            utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
   }
   REQUIRE(found);
   bjvm_free_vm(vm);
@@ -329,7 +341,8 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &C));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Z));
 
-  REQUIRE(utf8_equals(hslc(com_example_Example.class_name), "com/example/Example"));
+  REQUIRE(
+      utf8_equals(hslc(com_example_Example.class_name), "com/example/Example"));
   REQUIRE(com_example_Example.dimensions == 0);
   REQUIRE(com_example_Example.kind == BJVM_TYPE_KIND_REFERENCE);
 
@@ -430,8 +443,8 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(desc, str("main"), str("([Ljava/lang/String;)V"),
-                                   false, false);
+  method = bjvm_easy_method_lookup(desc, str("main"),
+                                   str("([Ljava/lang/String;)V"), false, false);
 
   bjvm_thread_run(thr, method, args, nullptr);
 
@@ -451,8 +464,10 @@ TEST_CASE("String hash table") {
     std::string key = std::to_string(i * 5201);
     std::string value = std::to_string(i);
     reference[key] = value;
-    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, (void *)strdup(value.c_str())));
-    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1, (void *)strdup(value.c_str())));
+    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1,
+                                (void *)strdup(value.c_str())));
+    free(bjvm_hash_table_insert(&tbl, key.c_str(), -1,
+                                (void *)strdup(value.c_str())));
   }
   for (int i = 1; i <= 4999; i += 2) {
     std::string key = std::to_string(i * 5201);

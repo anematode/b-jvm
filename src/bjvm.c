@@ -216,7 +216,7 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
 // Raise a NegativeArraySizeException with the given count value.
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count) {
   INIT_STACK_STRING(err, 12);
-  snprintf(err.chars, err.len, "%d", count);
+  bprintf(err, "%d", count);
   bjvm_raise_exception(thread, str("java/lang/NegativeArraySizeException"),
                        err);
 }
@@ -1286,6 +1286,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_classdesc *desc;
 
   // Link (but don't initialize) java.lang.Class immediately
+  auto thing = str("java/lang/Class");
+  assert(thing.len != 0);
   desc = bootstrap_class_create(thr, str("java/lang/Class"));
   bjvm_initialize_class(thr, desc);
 
@@ -1591,6 +1593,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
     INIT_STACK_STRING(filename, MAX_CF_NAME_LENGTH + 6);
     memcpy(filename.chars, chars.chars, chars.len);
     memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
+    filename.len = chars.len + cf_ending.len;
 
     uint8_t *bytes;
     size_t cf_len;
