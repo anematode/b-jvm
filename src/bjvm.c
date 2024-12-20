@@ -1240,7 +1240,7 @@ void bjvm_register_natives_Class(bjvm_vm *vm) {}
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 20;
+  options.heap_size = 1 << 18;
   return options;
 }
 
@@ -3960,7 +3960,6 @@ typedef struct bjvm_gc_ctx {
   __typeof(x) v = (x); \
   if (*v) {\
 *VECTOR_PUSH(ctx->noninstance_roots, ctx->noninstance_roots_count, ctx->noninstance_roots_cap) = (bjvm_obj_header**) v; \
-*VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = (bjvm_obj_header*) *v; \
  }\
 }
 
@@ -4023,6 +4022,7 @@ uint64_t REACHABLE_BIT = 1ULL << 33;
 
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, int* capacities, int depth) {
   obj->mark_word |= REACHABLE_BIT;
+  *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = obj;
   // Visit all instance fields
   bjvm_classdesc *desc = obj->descriptor;
   int len = 0;
@@ -4034,7 +4034,6 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, 
       bjvm_obj_header *field = *((bjvm_obj_header**) obj + (*bitset)[i]);
       if (field && !(field->mark_word & REACHABLE_BIT)) {
         // Visiting instance field at offset on class
-        *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = field;
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
     }
@@ -4044,7 +4043,6 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, 
     for (int i = 0; i < len; ++i) {
       bjvm_obj_header *field = *((bjvm_obj_header**) array_data(obj) + i);
       if (field && !(field->mark_word & REACHABLE_BIT)) {
-          *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = field;
           bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
     }
@@ -4136,9 +4134,8 @@ void bjvm_major_gc(bjvm_vm* vm) {
 
   // Mark phase
   int* bitset_list[1000] = { nullptr }, capacity[1000] = { 0 };
-  int original_roots = ctx.roots_count;
-  for (int i = 0; i < original_roots; ++i) {
-    bjvm_obj_header *root = ctx.roots[i];
+  for (int i = 0; i < ctx.noninstance_roots_count; ++i) {
+    bjvm_obj_header *root = *ctx.noninstance_roots[i];
     if (!(root->mark_word & REACHABLE_BIT))
       bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
   }
@@ -4158,9 +4155,7 @@ void bjvm_major_gc(bjvm_vm* vm) {
   for (int i = 0; i < ctx.roots_count; ++i) {
     // Align to 8 bytes
     write_ptr = (uint8_t*)(((uintptr_t)write_ptr + 7) & ~7);
-    if (write_ptr + size_of_object(ctx.roots[i]) > end) {
-      UNREACHABLE("Out of memory");
-    }
+    assert(write_ptr + size_of_object(ctx.roots[i]) <= end);
 
     bjvm_obj_header *obj = ctx.roots[i];
     size_t sz = size_of_object(obj);
