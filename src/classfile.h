@@ -564,7 +564,7 @@ typedef struct bjvm_classdesc {
   bjvm_constant_pool *pool;
 
   bjvm_access_flags access_flags;
-  bjvm_utf8 name;
+  heap_string name;
   bjvm_cp_class_info *super_class;
 
   int interfaces_count;

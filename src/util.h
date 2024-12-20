@@ -54,6 +54,11 @@ typedef struct {
   int len;
 } bjvm_utf8;
 
+typedef struct {
+  char *chars;
+  int len;
+} heap_string;
+
 #define INIT_STACK_STRING(name, buffer_size)   \
     char name##_chars[buffer_size] = {0};  \
     bjvm_utf8 name = {                     \
@@ -82,13 +87,31 @@ inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
   return (bjvm_utf8) { .chars = buffer.chars, .len = len };
 }
 
-typedef struct {
-  bjvm_utf8 __inner;
-} heap_string;
+/// Mallocates a new heap string with the given length.
+inline heap_string make_heap_str(int len) {
+  return (heap_string) { .chars = (char *)calloc(len, 1), .len = len };
+}
+
+/// Truncates the given heap string to the given length.
+inline void heap_str_truncate(heap_string str, int len) {
+  assert(len <= str.len);
+  str.len = len;
+}
+
+/// Frees the given heap string.
+inline void free_heap_str(heap_string str) {
+  free(str.chars);
+  str.chars = nullptr;
+}
+
+/// Creates a slice of the given heap string.
+inline bjvm_utf8 hslc(heap_string str) {
+  return str.__inner;
+}
 
 #define str(literal) ((bjvm_utf8) { .chars = (literal), .len = sizeof(literal) - 1 })
 
-bool utf8_equals(const bjvm_utf8 *entry, const char *str);
+bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 *left, const bjvm_utf8 *right);
 
 char *lossy_utf8_entry_to_chars(const bjvm_utf8 *utf8);
