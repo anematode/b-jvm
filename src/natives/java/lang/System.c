@@ -65,45 +65,43 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   if (src_pos < 0 || dest_pos < 0 || length < 0 ||
       (int64_t)src_pos + length > src_length ||
       (int64_t)dest_pos + length > dest_length) {
-    bjvm_raise_exception(thread, L"java/lang/ArrayIndexOutOfBoundsException",
-                         nullptr);
+    ThrowLangException(ArrayIndexOutOfBoundsException);
     return value_null();
   }
 
-  // TODO translate these into a single memcpy routine instead of this
-  // TODO check that both primitive arrays are of the same type
+  // We can copy primitive arrays directly.
+  // For reference arrays, if the component type of the src class is an
+  // instanceof the destination class, then we don't need to perform any checks.
+  // Otherwise, we need to perform an instanceof check on each element and raise
+  // an ArrayStoreException as appropriate.
+  if (src_is_1d_primitive || bjvm_instanceof(src->descriptor->one_fewer_dim,
+                                             dest->descriptor->one_fewer_dim)) {
+    size_t element_size;
 
-#define GEN_PRIMITIVE_IMPL(array_type, underlying)                             \
-  if (src->descriptor->primitive_component == BJVM_TYPE_KIND_##array_type) {   \
-    underlying *src_data = array_data(src);                                    \
-    underlying *dest_data = array_data(dest);                                  \
-    for (int i = 0; i < length; ++i)                                           \
-      dest_data[dest_pos + i] = src_data[src_pos + i];                         \
-    return value_null();                                                       \
-  }
+    switch (src->descriptor->primitive_component) {
+#define CASE(type, underlying)                                                 \
+  case BJVM_TYPE_KIND_##type:                                                  \
+    element_size = sizeof(underlying);                                         \
+    break;
+      CASE(BYTE, int8_t)
+      CASE(CHAR, uint16_t)
+      CASE(DOUBLE, double)
+      CASE(FLOAT, float)
+      CASE(INT, int32_t)
+      CASE(LONG, int64_t)
+      CASE(SHORT, int16_t)
+      CASE(BOOLEAN, uint8_t)
+      CASE(REFERENCE, bjvm_obj_header *)
+#undef CASE
 
-  if (src_is_1d_primitive) {
-    GEN_PRIMITIVE_IMPL(BYTE, int8_t)
-    GEN_PRIMITIVE_IMPL(CHAR, uint16_t)
-    GEN_PRIMITIVE_IMPL(DOUBLE, double)
-    GEN_PRIMITIVE_IMPL(FLOAT, float)
-    GEN_PRIMITIVE_IMPL(INT, int32_t)
-    GEN_PRIMITIVE_IMPL(LONG, int64_t)
-    GEN_PRIMITIVE_IMPL(SHORT, int16_t)
-    GEN_PRIMITIVE_IMPL(BOOLEAN, uint8_t)
-    UNREACHABLE();
-  }
+    default:
+      UNREACHABLE();
+    }
 
-  // If the component type of the src class is an instanceof the destination
-  // class, then we don't need to perform any checks. Otherwise, we need to
-  // perform an instanceof check on each element and raise an
-  // ArrayStoreException as appropriate.
-  if (bjvm_instanceof(src->descriptor->one_fewer_dim,
-                      dest->descriptor->one_fewer_dim)) {
-    // memmove because source and destination may alias
-    memmove((bjvm_obj_header **)array_data(dest) + dest_pos,
-            (bjvm_obj_header **)array_data(src) + src_pos,
-            length * sizeof(void *));
+    memmove((char *)array_data(dest) + dest_pos * element_size,
+            (char *)array_data(src) + src_pos * element_size,
+            length * element_size);
+
     return value_null();
   }
 
