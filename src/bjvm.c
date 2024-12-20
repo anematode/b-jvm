@@ -3894,7 +3894,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 
   // Static fields of bootstrap-loaded classes
   bjvm_hash_table_iterator it = bjvm_hash_table_get_iterator(&vm->classes);
-  const wchar_t *key;
+  wchar_t *key;
   size_t key_len;
   bjvm_classdesc *desc;
   int* bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
@@ -3907,7 +3907,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
     while (array) {
-      PUSH_ROOT(array->mirror);
+      PUSH_ROOT((void*)array->mirror);
       array = array->array_type;
     }
     bjvm_hash_table_iterator_next(&it);

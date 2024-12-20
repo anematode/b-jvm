@@ -136,7 +136,7 @@ bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
 }
 
 bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       const wchar_t **key, size_t *key_len,
+                                       wchar_t **key, size_t *key_len,
                                        void **value) {
   if (iter.current != iter.end) {
     *key = iter.current->key;
