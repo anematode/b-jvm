@@ -506,7 +506,7 @@ TEST_CASE("NegativeArraySizeException") {
 
 TEST_CASE("System.arraycopy") {
   auto result = run_test_case("test_files/arraycopy/");
-  std::string expected = "abcdefgh";
+  std::string expected = "abcdefghijkljklm";
   REQUIRE(result.stdout_ == expected);
 }
 
