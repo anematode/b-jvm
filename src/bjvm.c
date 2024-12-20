@@ -1258,6 +1258,7 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   vm->class_padding = bjvm_make_hash_table(nullptr, 0.75, 16);
   vm->main_thread_group = nullptr;
 
+  vm->card_table = calloc(options.heap_size / BJVM_CARD_BYTES / CHAR_BIT, 1);
   vm->heap = aligned_alloc(4096, options.heap_size);
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
@@ -1457,6 +1458,7 @@ void bjvm_free_vm(bjvm_vm *vm) {
   }
 
   free(vm->active_threads);
+  free(vm->card_table);
   free(vm->heap);
   free(vm);
 }
@@ -2771,6 +2773,18 @@ bool bjvm_invokedynamic(bjvm_thread *thread, bjvm_stack_frame *frame,
   (void)insn;
 }
 
+// Returns whether an object belongs to the main heap
+bool is_object_in_main_heap(bjvm_vm *vm, bjvm_obj_header *bjvm_obj_header) {
+  return bjvm_obj_header && (uintptr_t)bjvm_obj_header - (uintptr_t)vm->heap < vm->heap_capacity;
+}
+
+void update_card_table(bjvm_vm *vm, bjvm_obj_header *bjvm_obj_header) {
+  size_t card = ((uintptr_t)bjvm_obj_header - (uintptr_t)vm->heap) / BJVM_CARD_BYTES;
+  printf("Updating card %zu\n", card);
+  // Atomic or
+  __atomic_fetch_or(&vm->card_table[card / CHAR_BIT], 1 << (card % CHAR_BIT), __ATOMIC_RELAXED);
+}
+
 int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
                             bjvm_stack_value *result) {
   bjvm_cp_method *method = frame->method;
@@ -3616,15 +3630,17 @@ start:
       if (insn->kind == bjvm_insn_putfield)
         val = checked_pop(frame);
       bjvm_obj_header *obj = checked_pop(frame).obj;
-
       void *addr = (char *)obj + field_info->field->byte_offset;
-
       bjvm_type_kind kind =
           field_to_representable_kind(field_info->parsed_descriptor);
       if (insn->kind == bjvm_insn_getfield) {
         checked_push(frame, load_stack_value(addr, kind));
       } else {
         store_stack_value(addr, val, kind);
+        if (kind == BJVM_TYPE_KIND_REFERENCE && val.obj && !is_object_in_main_heap(thread->vm, val.obj) &&
+          is_object_in_main_heap(thread->vm, obj)) {
+          update_card_table(thread->vm, obj);
+        }
       }
 
       NEXT_INSN;

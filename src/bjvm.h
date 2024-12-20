@@ -103,11 +103,21 @@ typedef struct bjvm_vm {
   int active_thread_count;
   int active_thread_cap;
 
+
   uint8_t *heap;
   // Next object should be allocated here. Should always be 8-byte aligned
   // which is the alignment of BJVM objects.
   size_t heap_used;
   size_t heap_capacity;
+
+  uint8_t* card_table;  // size in bytes: sizeof(heap) / CARD_SIZE / CHAR_BIT
+
+  // Except for large objects, which are placed directly into the main heap,
+  // objects are first created here and then copied into the heap during
+  // minor GCs.
+  uint8_t *eden_space;
+  size_t eden_used;
+  size_t eden_capacity;
 } bjvm_vm;
 
 typedef struct {
@@ -162,8 +172,6 @@ typedef struct bjvm_thread {
 
   // Instance of java.lang.Thread
   struct bjvm_native_Thread *thread_obj;
-
-  // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
 bjvm_array_classdesc *
