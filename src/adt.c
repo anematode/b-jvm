@@ -30,6 +30,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
 [[nodiscard]] int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity) {
+  *length = 0;
   if (bjvm_is_bitset_compressed(bits)) {
     for (int i = 1; i < 64; ++i)
       if (bits.bits_inl & (1ULL << i))
@@ -136,7 +137,7 @@ bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
 }
 
 bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       const wchar_t **key, size_t *key_len,
+                                       wchar_t **key, size_t *key_len,
                                        void **value) {
   if (iter.current != iter.end) {
     *key = iter.current->key;

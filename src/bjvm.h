@@ -261,6 +261,7 @@ void bjvm_register_native(bjvm_vm *vm, const char *class_name,
                           const char *method_name,
                           const char *method_descriptor,
                           bjvm_native_callback callback);
+void bjvm_major_gc(bjvm_vm* vm);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 

@@ -2208,14 +2208,14 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   // Parse fields
   cf->fields_count = reader_next_u16(&reader, "fields count");
   cf->fields = malloc(cf->fields_count * sizeof(bjvm_cp_field));
+  cf->static_references = bjvm_empty_bitset();
+  cf->instance_references = bjvm_empty_bitset();
   free_on_format_error(&ctx, cf->fields);
   for (int i = 0; i < cf->fields_count; i++) {
     cf->fields[i] = read_field(&reader, &ctx);
     cf->fields[i].my_class = result;
   }
   cf->static_fields = nullptr;
-  cf->static_references = bjvm_empty_bitset();
-  cf->instance_references = bjvm_empty_bitset();
 
   // Parse methods
   cf->methods_count = reader_next_u16(&reader, "methods count");
