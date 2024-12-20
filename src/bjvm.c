@@ -530,9 +530,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, const bjvm_utf8 chars,
 bjvm_stack_value bjvm_Class_getName(bjvm_thread *thread, bjvm_obj_header *obj,
                                     bjvm_stack_value *, int) {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  return (bjvm_stack_value){.obj = bjvm_intern_string(thread,
-                                                      classdesc->name.chars,
-                                                      classdesc->name.len)};
+  return (bjvm_stack_value){.obj = bjvm_intern_string(thread, classdesc->name)};
 }
 
 // Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class; static
@@ -607,17 +605,16 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_classdesc *classdesc,
                                    bjvm_cp_field *field) {
   bjvm_classdesc *reflect_Field =
-      bootstrap_class_create(thread, "java/lang/reflect/Field");
+      bootstrap_class_create(thread, str("java/lang/reflect/Field"));
   bjvm_initialize_class(thread, reflect_Field);
   struct bjvm_native_Field *result = field->reflection_field =
       (void *)new_object(thread, reflect_Field);
 
   result->reflected_field = field;
-  result->name =
-      bjvm_intern_string(thread, field->name->chars, field->name->len);
+  result->name = bjvm_intern_string(thread, *field->name);
   result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   result->type = (void *)bjvm_get_class_mirror(
-      thread, load_class_of_field_descriptor(thread, field->descriptor->chars));
+      thread, load_class_of_field_descriptor(thread, *field->descriptor));
   result->modifiers = field->access_flags;
 }
 
@@ -627,7 +624,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   assert(utf8_equals(method->name, "<init>"));
 
   bjvm_classdesc *reflect_Constructor =
-      bootstrap_class_create(thread, "java/lang/reflect/Constructor");
+      bootstrap_class_create(thread, str("java/lang/reflect/Constructor"));
   bjvm_initialize_class(thread, reflect_Constructor);
 
   struct bjvm_native_Constructor *result = method->reflection_ctor =
@@ -638,7 +635,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 
   // TODO fill these in
   result->parameterTypes = create_object_array(
-      thread, bootstrap_class_create(thread, "java/lang/Class"),
+      thread, bootstrap_class_create(thread, str("java/lang/Class")),
       method->parsed_descriptor->args_count);
 }
 
@@ -648,7 +645,7 @@ bjvm_stack_value bjvm_Class_getDeclaredFields(bjvm_thread *thread,
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
   bjvm_stack_value ret;
   ret.obj = create_object_array(
-      thread, bootstrap_class_create(thread, "java/lang/reflect/Field"),
+      thread, bootstrap_class_create(thread, str("java/lang/reflect/Field")),
       classdesc->fields_count);
 
   for (int i = 0; i < classdesc->fields_count; ++i) {
@@ -675,7 +672,8 @@ bjvm_stack_value bjvm_Class_getDeclaredConstructors(bjvm_thread *thread,
 
   bjvm_stack_value ret;
   ret.obj = create_object_array(
-      thread, bootstrap_class_create(thread, "java/lang/reflect/Constructor"),
+      thread,
+      bootstrap_class_create(thread, str("java/lang/reflect/Constructor")),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
     if (utf8_equals(classdesc->methods[i].name, "<init>")) {
@@ -949,12 +947,12 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   if (exception_string) {
     bjvm_obj_header *str = make_string(thread, exception_string, -1);
     bjvm_cp_method *method = bjvm_easy_method_lookup(
-        classdesc, "<init>", "(Ljava/lang/String;)V", true, false);
+        classdesc, str("<init>"), str("(Ljava/lang/String;)V"), true, false);
     bjvm_thread_run(thread, method,
                     (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, nullptr);
   } else {
     bjvm_cp_method *method =
-        bjvm_easy_method_lookup(classdesc, "<init>", "()V", true, false);
+        bjvm_easy_method_lookup(classdesc, str("<init>"), "()V", true, false);
     bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}},
                     nullptr);
   }
@@ -981,7 +979,7 @@ bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread,
                                               bjvm_type_kind kind,
                                               const bjvm_utf8 name) {
   bjvm_classdesc *mirror_desc =
-      bootstrap_class_create(thread, "java/lang/Class");
+      bootstrap_class_create(thread, str("java/lang/Class"));
   assert(mirror_desc->state == BJVM_CD_STATE_INITIALIZED);
 
   bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
@@ -1006,23 +1004,25 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
     return; // already initialized
 
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BOOLEAN)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BOOLEAN, "boolean");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BOOLEAN,
+                                    str("boolean"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BYTE)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BYTE, "byte");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BYTE, str("byte"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_CHAR)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_CHAR, "char");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_CHAR, str("char"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_SHORT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_SHORT, "short");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_SHORT, str("short"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_INT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_INT, "int");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_INT, str("int"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_LONG)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_LONG, "long");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_LONG, str("long"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_FLOAT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_FLOAT, "float");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_FLOAT, str("float"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_DOUBLE)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_DOUBLE, "double");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_DOUBLE,
+                                    str("double"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_VOID)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, "void");
+      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, str("void"));
 }
 
 bjvm_stack_value bjvm_FileOutputStream_writeBytes(bjvm_thread *thread,
@@ -1075,154 +1075,167 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
 
   bjvm_register_native_padding(vm);
 
-  bjvm_register_native(vm, "java/lang/Object", "registerNatives", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Object", "clone", "()Ljava/lang/Object;",
-                       bjvm_Object_clone);
-  bjvm_register_native(vm, "java/lang/Class", "registerNatives", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Class", "getPrimitiveClass",
-                       "(Ljava/lang/String;)Ljava/lang/Class;",
+  bjvm_register_native(vm, str("java/lang/Object"), str("registerNatives"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Object"), str("clone"),
+                       str("()Ljava/lang/Object;"), bjvm_Object_clone);
+  bjvm_register_native(vm, str("java/lang/Class"), str("registerNatives"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getPrimitiveClass"),
+                       str("(Ljava/lang/String;)Ljava/lang/Class;"),
                        bjvm_Class_getPrimitiveClass);
-  bjvm_register_native(vm, "java/lang/Class", "getEnclosingMethod0",
-                       "()[Ljava/lang/Object;", bjvm_Class_getEnclosingMethod);
-  bjvm_register_native(vm, "java/lang/Class", "getDeclaringClass0",
-                       "()Ljava/lang/Class;", bjvm_Class_getDeclaringClass);
-  bjvm_register_native(vm, "java/lang/Class", "getComponentType",
-                       "()Ljava/lang/Class;", bjvm_Class_getComponentType);
-  bjvm_register_native(vm, "java/lang/Class", "getModifiers", "()I",
-                       bjvm_Class_getModifiers);
-  bjvm_register_native(vm, "java/lang/Object", "getClass",
-                       "()Ljava/lang/Class;", bjvm_Object_getClass);
-  bjvm_register_native(vm, "java/lang/Class", "getSuperclass",
-                       "()Ljava/lang/Class;", bjvm_Class_getSuperclass);
-  bjvm_register_native(vm, "java/lang/Class", "getClassLoader",
-                       "()Ljava/lang/ClassLoader;", bjvm_Class_getClassLoader);
-  bjvm_register_native(vm, "java/lang/Class", "getName0",
-                       "()Ljava/lang/String;", bjvm_Class_getName);
-  bjvm_register_native(vm, "java/lang/Class", "forName0",
-                       "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/"
-                       "Class;)Ljava/lang/Class;",
+  bjvm_register_native(vm, str("java/lang/Class"), str("getEnclosingMethod0"),
+                       str("()[Ljava/lang/Object;"),
+                       bjvm_Class_getEnclosingMethod);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getDeclaringClass0"),
+                       str("()Ljava/lang/Class;"),
+                       bjvm_Class_getDeclaringClass);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getComponentType"),
+                       str("()Ljava/lang/Class;"), bjvm_Class_getComponentType);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getModifiers"),
+                       str("()I"), bjvm_Class_getModifiers);
+  bjvm_register_native(vm, str("java/lang/Object"), str("getClass"),
+                       str("()Ljava/lang/Class;"), bjvm_Object_getClass);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getSuperclass"),
+                       str("()Ljava/lang/Class;"), bjvm_Class_getSuperclass);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getClassLoader"),
+                       str("()Ljava/lang/ClassLoader;"),
+                       bjvm_Class_getClassLoader);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getName0"),
+                       str("()Ljava/lang/String;"), bjvm_Class_getName);
+  bjvm_register_native(vm, str("java/lang/Class"), str("forName0"),
+                       str("(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/"
+                           "lang/Class;)Ljava/lang/Class;"),
                        bjvm_Class_forName);
-  bjvm_register_native(vm, "java/lang/Class", "desiredAssertionStatus0",
-                       "(Ljava/lang/Class;)Z",
-                       bjvm_Class_desiredAssertionStatus);
-  bjvm_register_native(vm, "java/lang/Class", "getDeclaredFields0",
-                       "(Z)[Ljava/lang/reflect/Field;",
+  bjvm_register_native(
+      vm, str("java/lang/Class"), str("desiredAssertionStatus0"),
+      str("(Ljava/lang/Class;)Z"), bjvm_Class_desiredAssertionStatus);
+  bjvm_register_native(vm, str("java/lang/Class"), str("getDeclaredFields0"),
+                       str("(Z)[Ljava/lang/reflect/Field;"),
                        bjvm_Class_getDeclaredFields);
-  bjvm_register_native(vm, "java/lang/Class", "getDeclaredConstructors0",
-                       "(Z)[Ljava/lang/reflect/Constructor;",
+  bjvm_register_native(vm, str("java/lang/Class"),
+                       str("getDeclaredConstructors0"),
+                       str("(Z)[Ljava/lang/reflect/Constructor;"),
                        bjvm_Class_getDeclaredConstructors);
-  bjvm_register_native(vm, "java/lang/invoke/MethodHandleNatives",
-                       "registerNatives", "()V", unimplemented_native);
-  bjvm_register_native(vm, "java/lang/invoke/MethodHandleNatives",
-                       "getConstant", "(I)I",
+  bjvm_register_native(vm, str("java/lang/invoke/MethodHandleNatives"),
+                       str("registerNatives"), str("()V"),
+                       unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/invoke/MethodHandleNatives"),
+                       str("getConstant"), str("(I)I"),
                        bjvm_MethodHandleNatives_getConstant);
-  bjvm_register_native(vm, "java/lang/invoke/MethodHandleNatives",
-                       "getNamedCon", "(I[Ljava/lang/Object;)I",
+  bjvm_register_native(vm, str("java/lang/invoke/MethodHandleNatives"),
+                       str("getNamedCon"), str("(I[Ljava/lang/Object;)I"),
                        bjvm_MethodHandleNatives_getNamedCon);
-  bjvm_register_native(vm, "java/lang/Class", "isPrimitive", "()Z",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Class", "isInterface", "()Z",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Class", "isAssignableFrom",
-                       "(Ljava/lang/Class;)Z", bjvm_Class_isAssignableFrom);
-  bjvm_register_native(vm, "java/lang/Class", "isArray", "()Z",
+  bjvm_register_native(vm, str("java/lang/Class"), str("isPrimitive"),
+                       str("()Z"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Class"), str("isInterface"),
+                       str("()Z"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Class"), str("isAssignableFrom"),
+                       str("(Ljava/lang/Class;)Z"),
+                       bjvm_Class_isAssignableFrom);
+  bjvm_register_native(vm, str("java/lang/Class"), str("isArray"), str("()Z"),
                        bjvm_Class_isArray);
-  bjvm_register_native(vm, "java/lang/ClassLoader", "registerNatives", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Float", "floatToRawIntBits", "(F)I",
-                       bjvm_Float_floatToRawIntBits);
-  bjvm_register_native(vm, "java/lang/Double", "doubleToRawLongBits", "(D)J",
-                       bjvm_Double_doubleToRawLongBits);
-  bjvm_register_native(vm, "java/lang/Double", "longBitsToDouble", "(J)D",
-                       bjvm_Double_doubleToRawLongBits);
-  bjvm_register_native(vm, "java/io/FileInputStream", "initIDs", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/io/WinNTFileSystem", "initIDs", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/io/FileOutputStream", "initIDs", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/io/FileOutputStream", "writeBytes", "([BIIZ)V",
-                       bjvm_FileOutputStream_writeBytes);
-  bjvm_register_native(vm, "java/io/FileDescriptor", "initIDs", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/io/FileDescriptor", "set", "(I)J",
-                       bjvm_FileDescriptor_set);
-  bjvm_register_native(vm, "java/lang/Runtime", "availableProcessors", "()I",
-                       bjvm_Runtime_availableProcessors);
+  bjvm_register_native(vm, str("java/lang/ClassLoader"), str("registerNatives"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Float"), str("floatToRawIntBits"),
+                       str("(F)I"), bjvm_Float_floatToRawIntBits);
+  bjvm_register_native(vm, str("java/lang/Double"), str("doubleToRawLongBits"),
+                       str("(D)J"), bjvm_Double_doubleToRawLongBits);
+  bjvm_register_native(vm, str("java/lang/Double"), str("longBitsToDouble"),
+                       str("(J)D"), bjvm_Double_doubleToRawLongBits);
+  bjvm_register_native(vm, str("java/io/FileInputStream"), str("initIDs"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/io/WinNTFileSystem"), str("initIDs"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/io/FileOutputStream"), str("initIDs"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/io/FileOutputStream"), str("writeBytes"),
+                       str("([BIIZ)V"), bjvm_FileOutputStream_writeBytes);
+  bjvm_register_native(vm, str("java/io/FileDescriptor"), str("initIDs"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/io/FileDescriptor"), str("set"),
+                       str("(I)J"), bjvm_FileDescriptor_set);
+  bjvm_register_native(vm, str("java/lang/Runtime"), str("availableProcessors"),
+                       str("()I"), bjvm_Runtime_availableProcessors);
 
   bjvm_register_native(
-      vm, "java/security/AccessController", "doPrivileged",
-      "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
+      vm, str("java/security/AccessController"), str("doPrivileged"),
+      str("(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;"),
       bjvm_AccessController_doPrivileged);
+  bjvm_register_native(vm, str("java/security/AccessController"),
+                       str("getStackAccessControlContext"),
+                       str("()Ljava/security/AccessControlContext;"),
+                       unimplemented_native);
   bjvm_register_native(
-      vm, "java/security/AccessController", "getStackAccessControlContext",
-      "()Ljava/security/AccessControlContext;", unimplemented_native);
-  bjvm_register_native(vm, "java/security/AccessController", "doPrivileged",
-                       "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
-                       bjvm_AccessController_doPrivileged);
+      vm, str("java/security/AccessController"), str("doPrivileged"),
+      str("(Ljava/security/PrivilegedAction;)Ljava/lang/Object;"),
+      bjvm_AccessController_doPrivileged);
 
-  bjvm_register_native(vm, "sun/misc/VM", "initialize", "()V",
+  bjvm_register_native(vm, str("sun/misc/VM"), str("initialize"), str("()V"),
                        unimplemented_native);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "registerNatives", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "arrayBaseOffset",
-                       "(Ljava/lang/Class;)I", bjvm_Unsafe_arrayBaseOffset);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("registerNatives"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("arrayBaseOffset"),
+                       str("(Ljava/lang/Class;)I"),
+                       bjvm_Unsafe_arrayBaseOffset);
   bjvm_register_native(
-      vm, "sun/misc/Unsafe", "compareAndSwapObject",
-      "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z",
+      vm, str("sun/misc/Unsafe"), str("compareAndSwapObject"),
+      str("(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z"),
       bjvm_Unsafe_compareAndSwapObject);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "objectFieldOffset",
-                       "(Ljava/lang/reflect/Field;)J",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("objectFieldOffset"),
+                       str("(Ljava/lang/reflect/Field;)J"),
                        bjvm_Unsafe_objectFieldOffset);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "arrayIndexScale",
-                       "(Ljava/lang/Class;)I", bjvm_Unsafe_arrayIndexScale);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "getIntVolatile",
-                       "(Ljava/lang/Object;J)I", bjvm_Unsafe_getIntVolatile);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "compareAndSwapInt",
-                       "(Ljava/lang/Object;JII)Z",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("arrayIndexScale"),
+                       str("(Ljava/lang/Class;)I"),
+                       bjvm_Unsafe_arrayIndexScale);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("getIntVolatile"),
+                       str("(Ljava/lang/Object;J)I"),
+                       bjvm_Unsafe_getIntVolatile);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("compareAndSwapInt"),
+                       str("(Ljava/lang/Object;JII)Z"),
                        bjvm_Unsafe_compareAndSwapInt);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "compareAndSwapLong",
-                       "(Ljava/lang/Object;JJJ)Z",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("compareAndSwapLong"),
+                       str("(Ljava/lang/Object;JJJ)Z"),
                        bjvm_Unsafe_compareAndSwapLong);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "addressSize", "()I",
-                       bjvm_Unsafe_addressSize);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "allocateMemory", "(J)J",
-                       bjvm_Unsafe_allocateMemory);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "freeMemory", "(J)V",
-                       bjvm_Unsafe_freeMemory);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "putLong", "(JJ)V",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("addressSize"),
+                       str("()I"), bjvm_Unsafe_addressSize);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("allocateMemory"),
+                       str("(J)J"), bjvm_Unsafe_allocateMemory);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("freeMemory"),
+                       str("(J)V"), bjvm_Unsafe_freeMemory);
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("putLong"), str("(JJ)V"),
                        bjvm_Unsafe_putLong);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "getByte", "(J)B",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("getByte"), str("(J)B"),
                        bjvm_Unsafe_getByte);
-  bjvm_register_native(vm, "sun/misc/Unsafe", "getObjectVolatile",
-                       "(Ljava/lang/Object;J)Ljava/lang/Object;",
+  bjvm_register_native(vm, str("sun/misc/Unsafe"), str("getObjectVolatile"),
+                       str("(Ljava/lang/Object;J)Ljava/lang/Object;"),
                        bjvm_Unsafe_getObjectVolatile);
-  bjvm_register_native(vm, "sun/reflect/Reflection", "getCallerClass",
-                       "()Ljava/lang/Class;", bjvm_Reflection_getCallerClass);
-  bjvm_register_native(vm, "sun/reflect/Reflection", "getClassAccessFlags",
-                       "(Ljava/lang/Class;)I",
+  bjvm_register_native(vm, str("sun/reflect/Reflection"), str("getCallerClass"),
+                       str("()Ljava/lang/Class;"),
+                       bjvm_Reflection_getCallerClass);
+  bjvm_register_native(vm, str("sun/reflect/Reflection"),
+                       str("getClassAccessFlags"), str("(Ljava/lang/Class;)I"),
                        bjvm_Reflection_getClassAccessFlags);
-  bjvm_register_native(
-      vm, "sun/reflect/NativeConstructorAccessorImp", "newInstance0",
-      "(Ljava/lang/reflect/Constructor;[Ljava/lang/Object;)Ljava/lang/Object;",
-      bjvm_NativeConstructorAccessImpl_newInstance);
-  bjvm_register_native(vm, "java/lang/Object", "hashCode", "()I",
+  bjvm_register_native(vm, str("sun/reflect/NativeConstructorAccessorImp"),
+                       str("newInstance0"),
+                       str("(Ljava/lang/reflect/Constructor;[Ljava/lang/"
+                           "Object;)Ljava/lang/Object;"),
+                       bjvm_NativeConstructorAccessImpl_newInstance);
+  bjvm_register_native(vm, str("java/lang/Object"), str("hashCode"), str("()I"),
                        bjvm_Object_hashCode);
 
-  bjvm_register_native(vm, "java/lang/Thread", "registerNatives", "()V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Thread", "currentThread",
-                       "()Ljava/lang/Thread;", bjvm_Thread_currentThread);
-  bjvm_register_native(vm, "java/lang/Thread", "setPriority0", "(I)V",
-                       unimplemented_native);
-  bjvm_register_native(vm, "java/lang/Thread", "isAlive", "()Z",
+  bjvm_register_native(vm, str("java/lang/Thread"), str("registerNatives"),
+                       str("()V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Thread"), str("currentThread"),
+                       str("()Ljava/lang/Thread;"), bjvm_Thread_currentThread);
+  bjvm_register_native(vm, str("java/lang/Thread"), str("setPriority0"),
+                       str("(I)V"), unimplemented_native);
+  bjvm_register_native(vm, str("java/lang/Thread"), str("isAlive"), str("()Z"),
                        bjvm_Thread_isAlive);
-  bjvm_register_native(vm, "java/lang/Thread", "start0", "()V",
+  bjvm_register_native(vm, str("java/lang/Thread"), str("start0"), str("()V"),
                        bjvm_Thread_start);
-  bjvm_register_native(vm, "java/lang/Throwable", "fillInStackTrace",
-                       "(I)Ljava/lang/Throwable;",
+  bjvm_register_native(vm, str("java/lang/Throwable"), str("fillInStackTrace"),
+                       str("(I)Ljava/lang/Throwable;"),
                        bjvm_Throwable_fillInStackTrace);
 
   return vm;
@@ -1244,8 +1257,9 @@ bjvm_thread_options bjvm_default_thread_options() {
   return options;
 }
 
-bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc, bjvm_utf8 *name,
-                                 bjvm_utf8 *descriptor) {
+bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc,
+                                 bjvm_utf8 const *name,
+                                 bjvm_utf8 const *descriptor) {
   for (int i = 0; i < classdesc->fields_count; ++i) {
     bjvm_cp_field *field = classdesc->fields + i;
     if (utf8_equals_utf8(field->name, name) &&
@@ -1265,12 +1279,7 @@ bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc, bjvm_utf8 *name,
 bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
                                       const bjvm_utf8 name,
                                       const bjvm_utf8 descriptor) {
-  bjvm_utf8 name_utf8 = bjvm_make_utf8(name),
-            descriptor_utf8 = bjvm_make_utf8(descriptor);
-  bjvm_cp_field *result =
-      bjvm_field_lookup(classdesc, &name_utf8, &descriptor_utf8);
-  free_utf8(name_utf8);
-  free_utf8(descriptor_utf8);
+  bjvm_cp_field *result = bjvm_field_lookup(classdesc, &name, &descriptor);
   return result;
 }
 
@@ -1302,16 +1311,16 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_classdesc *desc;
 
   // Link (but don't initialize) java.lang.Class immediately
-  desc = bootstrap_class_create(thr, "java/lang/Class");
+  desc = bootstrap_class_create(thr, str("java/lang/Class"));
   bjvm_initialize_class(thr, desc);
 
   bjvm_vm_init_primitive_classes(thr);
 
-  desc = bootstrap_class_create(thr, "java/lang/reflect/Field");
-  desc = bootstrap_class_create(thr, "java/lang/reflect/Constructor");
+  desc = bootstrap_class_create(thr, str("java/lang/reflect/Field"));
+  desc = bootstrap_class_create(thr, str("java/lang/reflect/Constructor"));
 
   // Initialize java.lang.Thread mirror
-  desc = bootstrap_class_create(thr, "java/lang/Thread");
+  desc = bootstrap_class_create(thr, str("java/lang/Thread"));
   bjvm_initialize_class(thr, desc);
 
   struct bjvm_native_Thread *thread_obj = (void *)new_object(thr, desc);
@@ -1319,7 +1328,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
   thread_obj->vm_thread = thr;
   thread_obj->priority = 5;
-  thread_obj->name = bjvm_intern_string(thr, "main", -1);
+  thread_obj->name = bjvm_intern_string(thr, str("main"));
 
   bjvm_obj_header *main_thread_group = options.thread_group;
   if (!main_thread_group) {
@@ -1328,9 +1337,9 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
   bjvm_cp_method *make_thread = bjvm_easy_method_lookup(
-      desc, "<init>", "(Ljava/lang/ThreadGroup;Ljava/lang/String;)V", false,
-      false);
-  bjvm_obj_header *name = make_string(thr, "main", -1);
+      desc, str("<init>"), str("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"),
+      false, false);
+  bjvm_obj_header *name = make_string(thr, str("main"));
   bjvm_thread_run(thr, make_thread,
                   (bjvm_stack_value[]){{.obj = (void *)thread_obj},
                                        {.obj = main_thread_group},
@@ -1338,11 +1347,11 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
                   nullptr);
 
   // Call System.initializeSystemClass()
-  desc = bootstrap_class_create(thr, "java/lang/System");
+  desc = bootstrap_class_create(thr, str("java/lang/System"));
   bjvm_initialize_class(thr, desc);
 
   bjvm_cp_method *method = bjvm_easy_method_lookup(
-      desc, "initializeSystemClass", "()V", false, false);
+      desc, str("initializeSystemClass"), str("()V"), false, false);
   bjvm_stack_value ret;
   bjvm_thread_run(thr, method, nullptr, &ret);
 
@@ -1400,7 +1409,7 @@ void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   bjvm_utf8 *java_lang_Object = malloc(sizeof(bjvm_utf8));
   *java_lang_Object = bjvm_make_utf8("java/lang/Object");
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
-  info->classdesc = bootstrap_class_create(thread, java_lang_Object->chars);
+  info->classdesc = bootstrap_class_create(thread, *java_lang_Object);
   info->name = java_lang_Object;
   base->super_class = info;
   base->fields_count = 1;
@@ -1490,8 +1499,9 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   // exists
   assert(method);
   bjvm_classdesc *MethodHandleNatives = bootstrap_class_create(
-                     thread, "java/lang/invoke/MethodHandleNatives"),
-                 *Class = bootstrap_class_create(thread, "java/lang/Class");
+                     thread, str("java/lang/invoke/MethodHandleNatives")),
+                 *Class =
+                     bootstrap_class_create(thread, str("java/lang/Class"));
 
   assert(MethodHandleNatives);
   bjvm_initialize_class(thread, MethodHandleNatives);
@@ -1502,8 +1512,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
 
   for (int i = 0; i < method->args_count; ++i) {
     bjvm_utf8 name = field_descriptor_to_name(method->args[i]);
-    bjvm_classdesc *arg_desc =
-        load_class_of_field_descriptor(thread, name.chars);
+    bjvm_classdesc *arg_desc = load_class_of_field_descriptor(thread, name);
     free_utf8(name);
     if (!arg_desc)
       return nullptr;
@@ -1513,15 +1522,15 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   abort();
 
   bjvm_utf8 name = field_descriptor_to_name(method->return_type);
-  bjvm_classdesc *ret_desc = load_class_of_field_descriptor(thread, name.chars);
+  bjvm_classdesc *ret_desc = load_class_of_field_descriptor(thread, name);
   free_utf8(name);
   if (!ret_desc)
     return nullptr;
   rtype = ret_desc->mirror;
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
   bjvm_cp_method *init = bjvm_easy_method_lookup(
-      MethodHandleNatives, "makeImp",
-      "(Ljava/lang/Class;[Ljava/lang/Class;)Ljava/lang/invoke/MethodType;",
+      MethodHandleNatives, str("makeImp"),
+      str("(Ljava/lang/Class;[Ljava/lang/Class;)Ljava/lang/invoke/MethodType;"),
       false, false);
   bjvm_stack_value result;
   bjvm_thread_run(thread, init,
@@ -1574,7 +1583,8 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 
   if (!class) {
     // Add entry to inchoate_classes
-    (void)bjvm_hash_table_insert(&vm->inchoate_classes, chars.chars, chars.len, (void *)1);
+    (void)bjvm_hash_table_insert(&vm->inchoate_classes, chars.chars, chars.len,
+                                 (void *)1);
 
     // e.g. "java/lang/Object.class"
     const bjvm_utf8 cf_ending = str(".class");
@@ -1592,7 +1602,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
         filename[i] = filename[i] == '/' ? '.' : filename[i];
       filename[i] = L'\0';
       // ClassNotFoundException: com.google.DontBeEvil
-      bjvm_raise_exception(thread, "java/lang/ClassNotFoundException",
+      bjvm_raise_exception(thread, str("java/lang/ClassNotFoundException"),
                            filename);
       return nullptr;
     }
@@ -1660,8 +1670,8 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
     }
 
     // Remove from inchoate_classes
-    (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars, len);
-    (void)bjvm_hash_table_insert(&vm->classes, chars, len, class);
+    (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars.chars, chars.len);
+    (void)bjvm_hash_table_insert(&vm->classes, chars.chars, chars.len, class);
 
     class->kind = BJVM_CD_KIND_ORDINARY;
   }
@@ -1818,8 +1828,8 @@ int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 
   classdesc->state = BJVM_CD_STATE_INITIALIZED;
 
-  bjvm_cp_method *clinit =
-      bjvm_easy_method_lookup(classdesc, "<clinit>", "()V", false, false);
+  bjvm_cp_method *clinit = bjvm_easy_method_lookup(classdesc, str("<clinit>"),
+                                                   str("()V"), false, false);
   int error = 0;
   if (clinit) {
     bjvm_stack_frame *frame = bjvm_push_frame(thread, clinit);
@@ -1963,7 +1973,7 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
                                 info->resolution_error); // already failed
     return -1;
   }
-  info->classdesc = bootstrap_class_create(thread, info->name->chars);
+  info->classdesc = bootstrap_class_create(thread, *info->name);
   if (!info->classdesc) {
     info->resolution_error = thread->current_exception;
     return -1;
@@ -2130,18 +2140,18 @@ void *array_data(bjvm_obj_header *array) { return (bjvm_utf8)array + 24; }
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
                              const bjvm_utf8 name) {
-  return utf8_equals(&mirror->descriptor->name, name);
+  return utf8_equals_utf8(&mirror->descriptor->name, &name);
 }
 
 // nullptrABLE because bjvm_unmirror_class on int.class etc. will return
 // nullptr! (For now...)
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, "java/lang/Class"));
+  assert(bjvm_is_instanceof_name(mirror, str("java/lang/Class")));
   return ((struct bjvm_native_Class *)mirror)->reflected_class;
 }
 
 bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, "java/lang/reflect/Field"));
+  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Field")));
   // Fields get copied around, but all reference the "root" created by the VM
   bjvm_obj_header *root = ((struct bjvm_native_Field *)mirror)->root;
   if (root)
@@ -2150,7 +2160,7 @@ bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror) {
 }
 
 bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, "java/lang/reflect/Constructor"));
+  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Constructor")));
   // Constructors get copied around, but all reference the "root" created by the
   // VM
   bjvm_obj_header *root = ((struct bjvm_native_Constructor *)mirror)->root;
@@ -2167,7 +2177,7 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
     return classdesc->mirror;
 
   bjvm_classdesc *java_lang_Class =
-      bootstrap_class_create(thread, "java/lang/Class");
+      bootstrap_class_create(thread, str("java/lang/Class"));
   struct bjvm_native_Class *class_mirror = classdesc->mirror =
       (void *)new_object(thread, java_lang_Class);
   class_mirror->reflected_class = classdesc;
@@ -2268,20 +2278,19 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
         true, insn->kind == bjvm_insn_invokeinterface);
     insn->ic2 = lookup_on;
     if (!method) {
-      char complaint[1000];
-      snprintf(complaint, 1000,
-               "Could not find method %s with descriptor %s on %s %s",
-               info->name_and_type->name->chars,
-               info->name_and_type->descriptor->chars,
-               lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
-                                                               : "class",
-               lookup_on->name.chars);
+      INIT_STACK_STRING(complaint, 1000);
+      bprintf(complaint, "Could not find method %s with descriptor %s on %s %s",
+              info->name_and_type->name->chars,
+              info->name_and_type->descriptor->chars,
+              lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
+                                                              : "class",
+              lookup_on->name.chars);
       bjvm_incompatible_class_change_error(thread, complaint);
       return -1;
     }
     if (method->access_flags & BJVM_ACCESS_STATIC) {
-      char complaint[1000];
-      snprintf(complaint, 1000, "Method %s is static", method->name->chars);
+      INIT_STACK_STRING(complaint, 1000);
+      bprintf(complaint, "Method %s is static", method->name->chars);
       bjvm_incompatible_class_change_error(thread, complaint);
       return -1;
     }
@@ -2347,11 +2356,10 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
         bjvm_method_lookup(class->classdesc, info->name_and_type->name,
                            info->name_and_type->descriptor, false, false);
     if (!method) {
-      char complaint[1000];
-      snprintf(complaint, 1000,
-               "Could not find method %s with descriptor %s on class %s",
-               info->name_and_type->name->chars,
-               info->name_and_type->descriptor->chars, class->name->chars);
+      INIT_STACK_STRING(complaint, 1000);
+      bprintf(complaint, "Could not find method %s with descriptor %s on class %s",
+              info->name_and_type->name->chars,
+              info->name_and_type->descriptor->chars, class->name->chars);
       bjvm_incompatible_class_change_error(thread, complaint);
       return -1;
     }
@@ -2997,7 +3005,7 @@ start:
     bjvm_insn_idiv: {
       int b = checked_pop(frame).i, a = checked_pop(frame).i;
       if (b == 0) {
-        bjvm_arithmetic_exception(thread, "/ by zero");
+        bjvm_arithmetic_exception(thread, str("/ by zero"));
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){.i = java_idiv(a, b)});
@@ -3121,7 +3129,7 @@ start:
     bjvm_insn_ldiv: {
       int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
       if (b == 0) {
-        bjvm_arithmetic_exception(thread, "/ by zero");
+        bjvm_arithmetic_exception(thread, str("/ by zero"));
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){.l = java_ldiv(a, b)});
@@ -3145,7 +3153,7 @@ start:
     bjvm_insn_lrem: {
       int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
       if (b == 0) {
-        bjvm_arithmetic_exception(thread, "/ by zero");
+        bjvm_arithmetic_exception(thread, str("/ by zero"));
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){.l = java_lrem(a, b)});
@@ -3239,7 +3247,7 @@ start:
         if (bjvm_instanceof(obj->descriptor, info->classdesc)) {
           checked_push(frame, (bjvm_stack_value){.obj = obj});
         } else {
-          bjvm_raise_exception(thread, "java/lang/ClassCastException", nullptr);
+          bjvm_raise_exception(thread, str("java/lang/ClassCastException"), null_str());
           goto done;
         }
       } else {
@@ -3283,9 +3291,10 @@ start:
       bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
       int error = bjvm_resolve_field(thread, field_info);
       if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
-        char complaint[1000];
-        snprintf(complaint, 1000, "Expected nonstatic field %s on class %s",
+        INIT_STACK_STRING(complaint, 1000);
+        bprintf(complaint, "Expected nonstatic field %s on class %s",
                  field_info->nat->name, field_info->class_info->name->chars);
+
         bjvm_incompatible_class_change_error(thread, complaint);
         goto done;
       }
@@ -3294,7 +3303,7 @@ start:
         val = checked_pop(frame);
       bjvm_obj_header *obj = checked_pop(frame).obj;
 
-      void *addr = (bjvm_utf8)obj + field_info->field->byte_offset;
+      void *addr = (void *)obj + field_info->field->byte_offset;
 
       bjvm_type_kind kind =
           field_to_representable_kind(field_info->parsed_descriptor);
@@ -3322,8 +3331,8 @@ start:
                               field_info->nat->descriptor);
         field_info->field = field;
         if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
-          char complaint[1000];
-          snprintf(complaint, 1000, "Expected static field %s on class %s",
+          INIT_STACK_STRING(complaint, 1000);
+          bprintf(complaint, "Expected static field %s on class %s",
                    field_info->nat->name, field_info->class_info->name->chars);
           bjvm_incompatible_class_change_error(thread, complaint);
           goto done;
@@ -3379,7 +3388,7 @@ start:
       }
       case BJVM_CP_KIND_STRING: {
         bjvm_utf8 *s = ent->string.chars;
-        bjvm_obj_header *obj = bjvm_intern_string(thread, s->chars, s->len);
+        bjvm_obj_header *obj = bjvm_intern_string(thread, *s);
         checked_push(frame, (bjvm_stack_value){.obj = obj});
         break;
       }
@@ -3601,12 +3610,12 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
   bjvm_vm *vm = thread->vm;
   if (!vm->main_thread_group) {
     bjvm_classdesc *ThreadGroup =
-        bootstrap_class_create(thread, "java/lang/ThreadGroup");
+        bootstrap_class_create(thread, str("java/lang/ThreadGroup"));
     int error = bjvm_initialize_class(thread, ThreadGroup);
     assert(!error);
 
     bjvm_cp_method *init =
-        bjvm_easy_method_lookup(ThreadGroup, "<init>", "()V", false, false);
+        bjvm_easy_method_lookup(ThreadGroup, str("<init>"), str("()V"), false, false);
 
     assert(init);
 
