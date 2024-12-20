@@ -278,7 +278,7 @@ bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
                                     size_t len);
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
-#include "natives.h"
+#include "natives_gen.h"
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
