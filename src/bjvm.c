@@ -20,6 +20,8 @@
 #include "analysis.h"
 #include "bjvm.h"
 
+#include "natives.h"
+
 struct classfile_entry {
   size_t len;
   uint8_t *data;
@@ -175,18 +177,13 @@ void free_native_entries(void *entries_) {
   free(entries);
 }
 
-size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
-#ifdef __APPLE__
-  extern const bjvm_native_t natives_start __asm(
-      "section$start$__DATA$__native");
-  extern const bjvm_native_t natives_end __asm("section$end$__DATA$__native");
-#else
-  extern const bjvm_native_t natives_start __asm("__start_natives");
-  extern const bjvm_native_t natives_end __asm("__stop_natives");
-#endif
+size_t bjvm_native_count = 0;
+size_t bjvm_native_capacity = 0;
+bjvm_native_t *bjvm_natives = nullptr;
 
-  *natives = &natives_start;
-  return &natives_end - &natives_start;
+size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
+  *natives = bjvm_natives;
+  return bjvm_native_count;
 }
 
 void bjvm_register_native(bjvm_vm *vm, const char *class_name,
