@@ -3,12 +3,10 @@
 static int constexpr kArrayLengthOffset = sizeof(bjvm_obj_header);
 static int constexpr kArrayDataOffset = sizeof(bjvm_obj_header) + sizeof(int);
 
-#define Is1DPrimitiveArray(src)                                                \
-  ({                                                                           \
-    bjvm_obj_header *__obj = (src);                                            \
-    src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&                   \
-        src->descriptor->dimensions == 1;                                      \
-  })
+static inline bool Is1DPrimitiveArray(bjvm_obj_header *src) {
+  return src->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
+         src->descriptor->dimensions == 1;
+}
 
 static inline int *ArrayLength(bjvm_obj_header *obj) {
   return (int *)((char *)obj + kArrayLengthOffset);

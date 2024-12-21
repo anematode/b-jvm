@@ -279,8 +279,8 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
                  size_t *len) {
   assert(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
   bjvm_obj_header *array = ((struct bjvm_native_String *)obj)->value;
-  *buf = array_data(array);
-  *len = *array_length(array);
+  *buf = ArrayData(array);
+  *len = *ArrayLength(array);
 }
 
 heap_string read_string_to_utf8(bjvm_obj_header *obj) {
@@ -311,7 +311,7 @@ void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
 }
 #endif
 
-void *array_data(bjvm_obj_header *array);
+void *ArrayData(bjvm_obj_header *array);
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 int primitive_order(bjvm_type_kind kind) {
@@ -353,7 +353,7 @@ size_t object_size_bytes(const bjvm_obj_header *obj) {
       element_size = sizeof_type_kind(desc->primitive_component);
     }
   }
-  return 24 + element_size * *array_length((bjvm_obj_header *)obj);
+  return 24 + element_size * *ArrayLength((bjvm_obj_header *)obj);
 }
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
@@ -393,7 +393,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
   str->value = create_1d_primitive_array(thread, BJVM_TYPE_KIND_CHAR, len);
-  memcpy(array_data(str->value), chars, len * sizeof(short));
+  memcpy(ArrayData(str->value), chars, len * sizeof(short));
   free(chars);
   return (void *)str;
 }
@@ -1002,7 +1002,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
 
     if (!arg_desc)
       return nullptr;
-    *((struct bjvm_native_Class **)array_data(ptypes) + i) = arg_desc->mirror;
+    *((struct bjvm_native_Class **)ArrayData(ptypes) + i) = arg_desc->mirror;
   }
 
   abort();
@@ -1587,7 +1587,7 @@ bjvm_obj_header *create_object_array(bjvm_thread *thread,
   make_array_classdesc(thread, classdesc);
   array->mark_word = next_hash_code();
   array->descriptor = classdesc->array_type;
-  *array_length(array) = count;
+  *ArrayLength(array) = count;
   return array;
 }
 
@@ -1605,7 +1605,7 @@ bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
   bjvm_obj_header *array = calloc(1, 24 + count * size);
   array->mark_word = next_hash_code();
   array->descriptor = desc;
-  *array_length(array) = count;
+  *ArrayLength(array) = count;
   return array;
 }
 
@@ -1617,12 +1617,6 @@ bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   obj->mark_word = next_hash_code();
   return obj;
 }
-
-int *array_length(bjvm_obj_header *array) {
-  return (int *)((void *)array + 16);
-}
-
-void *array_data(bjvm_obj_header *array) { return (void *)array + 24; }
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
                              const bjvm_utf8 name) {
@@ -1910,7 +1904,7 @@ bjvm_obj_header *bjvm_multianewarray_impl(bjvm_thread *thread,
     for (int i = 0; i < this_dim; ++i) {
       bjvm_obj_header *next =
           bjvm_multianewarray_impl(thread, desc->array_type, value, dims - 1);
-      *((bjvm_obj_header **)array_data(arr) + i) = next;
+      *((bjvm_obj_header **)ArrayData(arr) + i) = next;
     }
   }
   return arr;
@@ -2157,13 +2151,13 @@ start:
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
       assert(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         // ArrayIndexOutOfBoundsException
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      bjvm_obj_header *obj = *((bjvm_obj_header **)array_data(array) + index);
+      bjvm_obj_header *obj = *((bjvm_obj_header **)ArrayData(array) + index);
       checked_push(frame, (bjvm_stack_value){.obj = obj});
       NEXT_INSN;
     }
@@ -2171,12 +2165,12 @@ start:
       bjvm_obj_header *value = checked_pop(frame).obj;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      bjvm_obj_header **obj = (bjvm_obj_header **)array_data(array) + index;
+      bjvm_obj_header **obj = (bjvm_obj_header **)ArrayData(array) + index;
       *obj = value;
       NEXT_INSN;
     }
@@ -2191,7 +2185,7 @@ start:
         goto done;
       }
       assert(obj->descriptor->kind != BJVM_CD_KIND_ORDINARY);
-      checked_push(frame, (bjvm_stack_value){.i = *array_length(obj)});
+      checked_push(frame, (bjvm_stack_value){.i = *ArrayLength(obj)});
       NEXT_INSN;
     }
     bjvm_insn_athrow: {
@@ -2201,38 +2195,38 @@ start:
     bjvm_insn_baload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         // ArrayIndexOutOfBoundsException
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .i = *((int8_t *)array_data(array) + index)});
+                              .i = *((int8_t *)ArrayData(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_bastore: {
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      *((int8_t *)array_data(array) + index) = value;
+      *((int8_t *)ArrayData(array) + index) = value;
       NEXT_INSN;
     }
     bjvm_insn_caload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .i = *((uint16_t *)array_data(array) + index)});
+                              .i = *((uint16_t *)ArrayData(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_sastore:
@@ -2240,12 +2234,12 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      *((uint16_t *)array_data(array) + index) = value;
+      *((uint16_t *)ArrayData(array) + index) = value;
       NEXT_INSN;
     }
     bjvm_insn_d2f: {
@@ -2478,13 +2472,13 @@ start:
     bjvm_insn_iaload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .i = *((int32_t *)array_data(array) + index)});
+                              .i = *((int32_t *)ArrayData(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_iand: {
@@ -2497,12 +2491,12 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      *((int32_t *)array_data(array) + index) = value;
+      *((int32_t *)ArrayData(array) + index) = value;
       NEXT_INSN;
     }
     bjvm_insn_idiv: {
@@ -2596,13 +2590,13 @@ start:
     bjvm_insn_daload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .l = *((int64_t *)array_data(array) + index)});
+                              .l = *((int64_t *)ArrayData(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_land: {
@@ -2615,12 +2609,12 @@ start:
       int64_t value = checked_pop(frame).l;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      *((int64_t *)array_data(array) + index) = value;
+      *((int64_t *)ArrayData(array) + index) = value;
       NEXT_INSN;
     }
     bjvm_insn_lcmp: {
@@ -2707,13 +2701,13 @@ start:
     bjvm_insn_saload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
-      int len = *array_length(array);
+      int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
       checked_push(frame, (bjvm_stack_value){
-                              .i = *((int16_t *)array_data(array) + index)});
+                              .i = *((int16_t *)ArrayData(array) + index)});
       NEXT_INSN;
     }
     bjvm_insn_swap: {
