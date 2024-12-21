@@ -3,9 +3,9 @@ A JVM for the web.
 
 ## Style guide
 
-Prefix all non-`static` functions with `bjvm_`.
-
 Always use `int64_t` instead of `long` because Emscripten has `sizeof(long) == 4`. `int` can be assumed to be 32 bits.
+
+Place all native functions in the corresponding folder in `src/natives`, and use the `DECLARE_NATIVE` macro to link them.
 
 Common abbreviations:
 
