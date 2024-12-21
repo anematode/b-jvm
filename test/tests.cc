@@ -424,11 +424,11 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
   options.load_classfile = load_classfile;
   options.load_classfile_param = classpath;
-  options.write_stdout = capture_stdio ? [](int ch, void *param) {
+  options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stdout_ += (char)ch;
   } : nullptr;
-  options.write_stderr = capture_stdio ? [](int ch, void *param) {
+  options.write_stderr = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stderr_ += (char)ch;
   } : nullptr;
