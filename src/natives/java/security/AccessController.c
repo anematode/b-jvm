@@ -1,6 +1,8 @@
 #include <natives.h>
 
-DECLARE_NATIVE("java/security", AccessController, doPrivileged, "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;") {
+DECLARE_NATIVE(
+    "java/security", AccessController, doPrivileged,
+    "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;") {
   // Look up method "run" on obj
   assert(argc == 1);
 
@@ -21,11 +23,13 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged, "(Ljava/security
   return ret;
 }
 
-DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext, "()Ljava/security/AccessControlContext;") {
+DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
+               "()Ljava/security/AccessControlContext;") {
   return value_null();
 }
 
-DECLARE_NATIVE("java/security", AccessController, doPrivileged, "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;") {
+DECLARE_NATIVE("java/security", AccessController, doPrivileged,
+               "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;") {
   // Look up method "run" on obj
   assert(argc == 1);
 
@@ -45,4 +49,3 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged, "(Ljava/security
   bjvm_thread_run(thread, method, method_args, &ret);
   return ret;
 }
-

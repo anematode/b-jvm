@@ -8,19 +8,23 @@ DECLARE_NATIVE("sun/misc", Unsafe, arrayBaseOffset, "(Ljava/lang/Class;)I") {
   return (bjvm_stack_value){.i = 24};
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized, "(Ljava/lang/Class;)Z") {
+DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized,
+               "(Ljava/lang/Class;)Z") {
   return (bjvm_stack_value){.i = 1}; // TODO
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized, "(Ljava/lang/Class;)V") {
+DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized,
+               "(Ljava/lang/Class;)V") {
   return value_null();
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapObject, "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
+DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapObject,
+               "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
   return (bjvm_stack_value){.i = 1}; // TODO
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, objectFieldOffset, "(Ljava/lang/reflect/Field;)J") {
+DECLARE_NATIVE("sun/misc", Unsafe, objectFieldOffset,
+               "(Ljava/lang/reflect/Field;)J") {
   assert(argc == 1);
   bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].obj);
   return (bjvm_stack_value){.l = reflect_field->byte_offset};
@@ -45,7 +49,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, getIntVolatile, "(Ljava/lang/Object;J)I") {
   return (bjvm_stack_value){.i = *(int *)((void *)args[0].obj + args[1].l)};
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapInt, "(Ljava/lang/Object;JII)Z") {
+DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapInt,
+               "(Ljava/lang/Object;JII)Z") {
   assert(argc == 4);
   bjvm_obj_header *target = args[0].obj;
   int64_t offset = args[1].l;
@@ -55,7 +60,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapInt, "(Ljava/lang/Object;JII)Z"
   return (bjvm_stack_value){.i = ret};
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapLong, "(Ljava/lang/Object;JJJ)Z") {
+DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapLong,
+               "(Ljava/lang/Object;JJJ)Z") {
   assert(argc == 4);
   bjvm_obj_header *target = args[0].obj;
   int64_t offset = args[1].l;
@@ -91,8 +97,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, getByte, "(J)B") {
   return (bjvm_stack_value){.i = *(int8_t *)args[0].l};
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, getObjectVolatile, "(Ljava/lang/Object;J)Ljava/lang/Object;") {
+DECLARE_NATIVE("sun/misc", Unsafe, getObjectVolatile,
+               "(Ljava/lang/Object;J)Ljava/lang/Object;") {
   assert(argc == 2);
   return (bjvm_stack_value){.obj = *(void **)((void *)args[0].obj + args[1].l)};
 }
-

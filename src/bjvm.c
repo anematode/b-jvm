@@ -477,7 +477,8 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
       method->parsed_descriptor->args_count);
 }
 
-bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str, const bjvm_field_descriptor *desc) {
+bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
+                                   const bjvm_field_descriptor *desc) {
   bjvm_utf8 write = str;
   // Print '[' repeatedly
   int dims = desc->dimensions;
@@ -498,7 +499,8 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str, const bjvm_field_descriptor *d
     write = slice(write, bprintf(write, "%c", desc->kind).len);
     break;
   case BJVM_TYPE_KIND_REFERENCE:
-    write = slice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
+    write =
+        slice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
     break;
   default:
     UNREACHABLE();
@@ -525,15 +527,17 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   result->parameterTypes = create_object_array(
       thread, bootstrap_class_create(thread, str("java/lang/Class")),
       method->parsed_descriptor->args_count);
-  struct bjvm_native_Class **types = (void*)array_data(result->parameterTypes);
+  struct bjvm_native_Class **types = (void *)array_data(result->parameterTypes);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
-    bjvm_utf8 desc = unparse_field_descriptor(str, &method->parsed_descriptor->args[i]);
+    bjvm_utf8 desc =
+        unparse_field_descriptor(str, &method->parsed_descriptor->args[i]);
     types[i] = (void *)bjvm_get_class_mirror(
-            thread, load_class_of_field_descriptor(thread, desc));
+        thread, load_class_of_field_descriptor(thread, desc));
   }
 
-  bjvm_utf8 ret_desc = unparse_field_descriptor(str, &method->parsed_descriptor->return_type);
+  bjvm_utf8 ret_desc =
+      unparse_field_descriptor(str, &method->parsed_descriptor->return_type);
   result->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
 

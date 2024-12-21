@@ -1,20 +1,21 @@
 #include <natives.h>
 
 static bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc,
-									   bjvm_attribute_kind kind) {
-	for (int i = 0; i < desc->attributes_count; ++i) {
-		if (desc->attributes[i].kind == kind) {
-			return desc->attributes + i;
-		}
-	}
-	return nullptr;
+                                              bjvm_attribute_kind kind) {
+  for (int i = 0; i < desc->attributes_count; ++i) {
+    if (desc->attributes[i].kind == kind) {
+      return desc->attributes + i;
+    }
+  }
+  return nullptr;
 }
 
 DECLARE_NATIVE("java/lang", Class, registerNatives, "()V") {
   return value_null();
 }
 
-DECLARE_NATIVE("java/lang", Class, getPrimitiveClass, "(Ljava/lang/String;)Ljava/lang/Class;") {
+DECLARE_NATIVE("java/lang", Class, getPrimitiveClass,
+               "(Ljava/lang/String;)Ljava/lang/Class;") {
   assert(argc == 1);
   short *chars;
   size_t len;
@@ -53,7 +54,8 @@ DECLARE_NATIVE("java/lang", Class, getPrimitiveClass, "(Ljava/lang/String;)Ljava
       .obj = (void *)bjvm_primitive_class_mirror(thread, kind)};
 }
 
-DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;") {
+DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0,
+               "()[Ljava/lang/Object;") {
   // "The array is expected to have three elements: the immediately enclosing
   // class, the immediately enclosing method or constructor's name (can be
   // null). the immediately enclosing method or constructor's descriptor (null
@@ -121,7 +123,8 @@ DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
   return value_null(); // TODO
 }
 
-DECLARE_NATIVE("java/lang", Class, getClassLoader, "()Ljava/lang/ClassLoader;") {
+DECLARE_NATIVE("java/lang", Class, getClassLoader,
+               "()Ljava/lang/ClassLoader;") {
   return value_null(); // TODO
 }
 
@@ -131,7 +134,9 @@ DECLARE_NATIVE("java/lang", Class, getName0, "()Ljava/lang/String;") {
       .obj = bjvm_intern_string(thread, hslc(classdesc->name))};
 }
 
-DECLARE_NATIVE("java/lang", Class, forName0, "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/Class;") {
+DECLARE_NATIVE("java/lang", Class, forName0,
+               "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/"
+               "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
   bjvm_obj_header *name_obj = args[0].obj;
   short *name;
@@ -150,11 +155,13 @@ DECLARE_NATIVE("java/lang", Class, forName0, "(Ljava/lang/String;ZLjava/lang/Cla
   return value_null();
 }
 
-DECLARE_NATIVE("java/lang", Class, desiredAssertionStatus0, "(Ljava/lang/Class;)Z") {
+DECLARE_NATIVE("java/lang", Class, desiredAssertionStatus0,
+               "(Ljava/lang/Class;)Z") {
   return (bjvm_stack_value){.i = 1}; // TODO add thread option
 }
 
-DECLARE_NATIVE("java/lang", Class, getDeclaredFields0, "(Z)[Ljava/lang/reflect/Field;") {
+DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
+               "(Z)[Ljava/lang/reflect/Field;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
   bjvm_stack_value ret;
   ret.obj = create_object_array(
@@ -169,7 +176,8 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0, "(Z)[Ljava/lang/reflect/F
   return ret;
 }
 
-DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0, "(Z)[Ljava/lang/reflect/Constructor;") {
+DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
+               "(Z)[Ljava/lang/reflect/Constructor;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
 
   int count = 0;
@@ -195,22 +203,21 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0, "(Z)[Ljava/lang/ref
   return ret;
 }
 
-DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/Method;") {
+DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
+               "(Z)[Ljava/lang/reflect/Method;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
 
   int count = 0;
   for (int i = 0; i < classdesc->methods_count; ++i) {
     if (!utf8_equals(classdesc->methods[i].name, "<init>")) {
-      bjvm_reflect_initialize_method(thread, classdesc,
-                                          classdesc->methods + i);
+      bjvm_reflect_initialize_method(thread, classdesc, classdesc->methods + i);
       ++count;
     }
   }
 
   bjvm_stack_value ret;
   ret.obj = create_object_array(
-      thread,
-      bootstrap_class_create(thread, str("java/lang/reflect/Method")),
+      thread, bootstrap_class_create(thread, str("java/lang/reflect/Method")),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
     if (!utf8_equals(classdesc->methods[i].name, "<init>")) {
@@ -222,19 +229,21 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/
 }
 
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
-  return (bjvm_stack_value) { .i = bjvm_unmirror_class(obj)->kind == BJVM_CD_KIND_PRIMITIVE };
+  return (bjvm_stack_value){.i = bjvm_unmirror_class(obj)->kind ==
+                                 BJVM_CD_KIND_PRIMITIVE};
 }
 
 DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
-  return (bjvm_stack_value) { .i = bjvm_unmirror_class(obj)->access_flags & BJVM_ACCESS_INTERFACE };
+  return (bjvm_stack_value){.i = bjvm_unmirror_class(obj)->access_flags &
+                                 BJVM_ACCESS_INTERFACE};
 }
 
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
   if (!args[0].obj)
-    UNREACHABLE();   // TODO check reference for what to do here
+    UNREACHABLE(); // TODO check reference for what to do here
   bjvm_classdesc *other_desc = bjvm_unmirror_class(args[0].obj);
-  return (bjvm_stack_value) { .i = bjvm_instanceof(other_desc, this_desc) };
+  return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
 }
 
 DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
@@ -242,4 +251,3 @@ DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
   return (bjvm_stack_value){.i = desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
                                  desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY};
 }
-

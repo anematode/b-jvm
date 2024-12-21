@@ -17,4 +17,3 @@ DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
   }
   return (bjvm_stack_value){.i = 0};
 }
-

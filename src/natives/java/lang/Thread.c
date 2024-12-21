@@ -19,4 +19,3 @@ DECLARE_NATIVE("java/lang", Thread, isAlive, "()Z") {
 DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
   return value_null(); // TODO
 }
-

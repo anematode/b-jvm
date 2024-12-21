@@ -1,20 +1,23 @@
 #include <math.h>
 #include <natives.h>
-#include <util.h>
 #include <objects.h>
+#include <util.h>
 
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
   bjvm_obj_header *props_obj = args[0].obj;
-  const bjvm_utf8 props[][2] = {
-      {str("file.encoding"), str("UTF-8")},   {str("stdout.encoding"), str("UTF-8")},
-      {str("native.encoding"), str("UTF-8")}, {str("stderr.encoding"), str("UTF-8")},
-      {str("line.separator"), str("\n")},     {str("path.separator"), str(":")},
-      {str("file.separator"), str("/")}};
+  const bjvm_utf8 props[][2] = {{str("file.encoding"), str("UTF-8")},
+                                {str("stdout.encoding"), str("UTF-8")},
+                                {str("native.encoding"), str("UTF-8")},
+                                {str("stderr.encoding"), str("UTF-8")},
+                                {str("line.separator"), str("\n")},
+                                {str("path.separator"), str(":")},
+                                {str("file.separator"), str("/")}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
       props_obj->descriptor, str("put"),
-      str("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true, false);
+      str("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,
+      false);
   for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
     bjvm_stack_value put_args[3] = {
         {.obj = props_obj},
@@ -77,14 +80,14 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   // an ArrayStoreException as appropriate.
   if (src_is_1d_primitive || bjvm_instanceof(src->descriptor->one_fewer_dim,
                                              dest->descriptor->one_fewer_dim)) {
-    size_t element_size = sizeof(void*);
+    size_t element_size = sizeof(void *);
 
     if (src_is_1d_primitive) {
       switch (src->descriptor->primitive_component) {
 #define CASE(type, underlying)                                                 \
-case BJVM_TYPE_KIND_##type:                                                  \
-element_size = sizeof(underlying);                                         \
-break;
+  case BJVM_TYPE_KIND_##type:                                                  \
+    element_size = sizeof(underlying);                                         \
+    break;
         CASE(BYTE, int8_t)
         CASE(CHAR, uint16_t)
         CASE(DOUBLE, double)
@@ -93,7 +96,7 @@ break;
         CASE(LONG, int64_t)
         CASE(SHORT, int16_t)
         CASE(BOOLEAN, uint8_t)
-  #undef CASE
+#undef CASE
 
       default:
         UNREACHABLE();
@@ -126,20 +129,24 @@ DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   // Look up the field System.out
   bjvm_classdesc *system_class =
       bootstrap_class_create(thread, str("java/lang/System"));
-  bjvm_cp_field *out_field =
-      bjvm_easy_field_lookup(system_class, str("out"), str("Ljava/io/PrintStream;"));
+  bjvm_cp_field *out_field = bjvm_easy_field_lookup(
+      system_class, str("out"), str("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
   return value_null();
 }
 
-DECLARE_NATIVE("java/lang", System, registerNatives, "()V") { return value_null(); }
-DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") { return value_null(); }
+DECLARE_NATIVE("java/lang", System, registerNatives, "()V") {
+  return value_null();
+}
+DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") {
+  return value_null();
+}
 DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
   bjvm_classdesc *system_class =
       bootstrap_class_create(thread, str("java/lang/System"));
-  bjvm_cp_field *out_field =
-      bjvm_easy_field_lookup(system_class, str("err"), str("Ljava/io/PrintStream;"));
+  bjvm_cp_field *out_field = bjvm_easy_field_lookup(
+      system_class, str("err"), str("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
   return value_null();
