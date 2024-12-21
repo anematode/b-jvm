@@ -3734,11 +3734,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
     while (array) {
-<<<<<<< HEAD
       PUSH_ROOT((void*)array->mirror);
-=======
-      PUSH_ROOT((void *)array->mirror);
->>>>>>> main
       array = array->array_type;
     }
     bjvm_hash_table_iterator_next(&it);
