@@ -73,6 +73,7 @@ typedef struct bjvm_obj_header {
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len); // todo: get rid of
+heap_string read_string_to_utf8(bjvm_obj_header *obj);
 
 struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;

@@ -283,6 +283,18 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
   *len = *array_length(array);
 }
 
+heap_string read_string_to_utf8(bjvm_obj_header *obj) {
+  short* buf;
+  size_t len;
+  read_string(nullptr, obj, &buf, &len);
+  char* cbuf = malloc(len + 1);
+  for (size_t i = 0; i < len; ++i) {
+    cbuf[i] = buf[i];
+  }
+  cbuf[len] = 0;
+  return (heap_string){.chars = cbuf, .len = len};
+}
+
 #if 0
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len) {

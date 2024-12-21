@@ -14,3 +14,6 @@ java/lang/invoke/MethodHandle
   bjvm_cp_method_handle_info *reflected_mh;
 java/lang/invoke/MethodType
   bjvm_cp_method_type_info *reflected_mt;
+java/lang/invoke/MemberName
+  bjvm_obj_header *vmtarget;
+  int64_t vmindex;
