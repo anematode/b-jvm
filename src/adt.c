@@ -202,7 +202,7 @@ bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,
 void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const char *key,
                              int len) {
   bool equal, on_chain;
-  len = len == -1 ? strlen(key) : len;
+  len = len == -1 ? (int)strlen(key) : len;
   bjvm_hash_table_entry *prev,
       *ent =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &prev);
@@ -225,7 +225,7 @@ void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const char *key,
 
 void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len, void *value, bool copy_key) {
-  len = len == -1 ? strlen(key) : len;
+  len = len == -1 ? (int)strlen(key) : len;
   bool equal, on_chain;
   if (tbl->entries_count + 1 >= tbl->load_factor * tbl->entries_cap) {
     bjvm_hash_table_rehash(tbl, tbl->entries_cap * 2);
@@ -289,7 +289,7 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
 void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const char *key,
                              int len) {
   bool equal, on_chain;
-  len = len == -1 ? strlen(key) : len;
+  len = len == -1 ? (int)strlen(key) : len;
   bjvm_hash_table_entry *_prev,
       *entry =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);

@@ -8,6 +8,8 @@
 #include "analysis.h"
 #include "classfile.h"
 
+#include <inttypes.h>
+
 const char *insn_code_name(bjvm_insn_code_kind code) {
   switch (code) {
   case bjvm_insn_aaload:
@@ -367,7 +369,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_UTF8:
     return lossy_utf8_entry_to_chars(hslc(ent->utf8));
   case BJVM_CP_KIND_INTEGER:
-    snprintf(result, sizeof(result), "%d", (int)ent->integral.value);
+    snprintf(result, sizeof(result), "%" PRId64, ent->integral.value);
     break;
   case BJVM_CP_KIND_FLOAT:
     snprintf(result, sizeof(result), "%.9gf", (float)ent->floating.value);
@@ -445,7 +447,7 @@ char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
     // indexes into the instruction array
     write += snprintf(write, end - write, "-> inst %d", insn->index);
   } else if (insn->kind == bjvm_insn_lconst || insn->kind == bjvm_insn_iconst) {
-    write += snprintf(write, end - write, "%lld", insn->integer_imm);
+    write += snprintf(write, end - write, "%" PRId64, insn->integer_imm);
   } else if (insn->kind == bjvm_insn_dconst || insn->kind == bjvm_insn_fconst) {
     write += snprintf(write, end - write, "%.15g", insn->f_imm);
   } else if (insn->kind == bjvm_insn_tableswitch) {
