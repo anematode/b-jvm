@@ -8,6 +8,14 @@ DECLARE_NATIVE("sun/misc", Unsafe, arrayBaseOffset, "(Ljava/lang/Class;)I") {
   return (bjvm_stack_value){.i = 24};
 }
 
+DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized, "(Ljava/lang/Class;)Z") {
+  return (bjvm_stack_value){.i = 1}; // TODO
+}
+
+DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized, "(Ljava/lang/Class;)V") {
+  return value_null();
+}
+
 DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapObject, "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
   return (bjvm_stack_value){.i = 1}; // TODO
 }

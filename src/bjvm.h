@@ -277,6 +277,8 @@ bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
 
 bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror);
 
+bjvm_cp_method **bjvm_unmirror_method(bjvm_obj_header *mirror);
+
 bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror);
 
 bjvm_obj_header *create_object_array(bjvm_thread *thread,

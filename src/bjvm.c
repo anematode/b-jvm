@@ -477,6 +477,36 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
       method->parsed_descriptor->args_count);
 }
 
+bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str, const bjvm_field_descriptor *desc) {
+  bjvm_utf8 write = str;
+  // Print '[' repeatedly
+  int dims = desc->dimensions;
+  while (dims--) {
+    write.chars[0] = '[';
+    write = slice(write, 1);
+  }
+  switch (desc->kind) {
+  case BJVM_TYPE_KIND_BOOLEAN:
+  case BJVM_TYPE_KIND_CHAR:
+  case BJVM_TYPE_KIND_FLOAT:
+  case BJVM_TYPE_KIND_DOUBLE:
+  case BJVM_TYPE_KIND_BYTE:
+  case BJVM_TYPE_KIND_SHORT:
+  case BJVM_TYPE_KIND_INT:
+  case BJVM_TYPE_KIND_LONG:
+  case BJVM_TYPE_KIND_VOID:
+    write = slice(write, bprintf(write, "%c", desc->kind).len);
+    break;
+  case BJVM_TYPE_KIND_REFERENCE:
+    write = slice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
+    break;
+  default:
+    UNREACHABLE();
+  }
+  str.len = write.chars - str.chars;
+  return str;
+}
+
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method) {
@@ -489,8 +519,27 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   result->reflected_method = method;
   result->name = bjvm_intern_string(thread, method->name);
   result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+  result->modifiers = method->access_flags;
+  result->signature = make_string(thread, method->descriptor);
 
-  // TODO fill the rest in
+  result->parameterTypes = create_object_array(
+      thread, bootstrap_class_create(thread, str("java/lang/Class")),
+      method->parsed_descriptor->args_count);
+  struct bjvm_native_Class **types = (void*)array_data(result->parameterTypes);
+  INIT_STACK_STRING(str, 1000);
+  for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
+    bjvm_utf8 desc = unparse_field_descriptor(str, &method->parsed_descriptor->args[i]);
+    types[i] = (void *)bjvm_get_class_mirror(
+            thread, load_class_of_field_descriptor(thread, desc));
+  }
+
+  bjvm_utf8 ret_desc = unparse_field_descriptor(str, &method->parsed_descriptor->return_type);
+  result->returnType = (void *)bjvm_get_class_mirror(
+      thread, load_class_of_field_descriptor(thread, ret_desc));
+
+  // TODO parse and fill these in
+  result->exceptionTypes = create_object_array(
+      thread, bootstrap_class_create(thread, str("java/lang/Class")), 0);
 }
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
@@ -1607,6 +1656,15 @@ bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror) {
   if (root)
     mirror = root;
   return &((struct bjvm_native_Constructor *)mirror)->reflected_ctor;
+}
+
+bjvm_cp_method **bjvm_unmirror_method(bjvm_obj_header *mirror) {
+  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Method")));
+  // Methods get copied around, but all reference the "root" created by the VM
+  bjvm_obj_header *root = ((struct bjvm_native_Method *)mirror)->root;
+  if (root)
+    mirror = root;
+  return &((struct bjvm_native_Method *)mirror)->reflected_method;
 }
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,

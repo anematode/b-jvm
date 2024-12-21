@@ -26,7 +26,7 @@ bjvm_method_handle_kind unpack_mn_kind(struct bjvm_native_MemberName *mn) {
   return mn->flags >> 24 & 0xf;
 }
 
-bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str, const bjvm_classdesc *desc) {
+bjvm_utf8 unparse_classdesc_to_field_descriptor(bjvm_utf8 str, const bjvm_classdesc *desc) {
   switch (desc->kind) {
   case BJVM_CD_KIND_ORDINARY:
     return bprintf(str, "L%.*s;", fmt_slice(desc->name));
@@ -55,26 +55,52 @@ heap_string unparse_method_type(const struct bjvm_native_MethodType *mt) {
   write = slice(write, bprintf(write, "(").len);
   for (int i = 0; i < *array_length(mt->ptypes); ++i) {
     struct bjvm_native_Class *class = *((struct bjvm_native_Class**)array_data(mt->ptypes) + i);
-    write = slice(write, unparse_field_descriptor(write, class->reflected_class).len);
+    write = slice(write, unparse_classdesc_to_field_descriptor(write, class->reflected_class).len);
   }
   write = slice(write, bprintf(write, ")").len);
   struct bjvm_native_Class *rtype = (void*)mt->rtype;
-  write = slice(write, unparse_field_descriptor(write, rtype->reflected_class).len);
+  write = slice(write, unparse_classdesc_to_field_descriptor(write, rtype->reflected_class).len);
   desc.len = write.chars - desc.chars;
   return make_heap_str_from(desc);
 }
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;") {
-  assert(argc == 2);
+void fill_mn_with_field(bjvm_thread * thread, struct bjvm_native_MemberName * mn, bjvm_cp_field * field) {
+  bjvm_classdesc *search_on = field->my_class;
+  bjvm_reflect_initialize_field(thread, search_on, field);
+  mn->vmtarget = (void*)mn;
+  mn->resolution = (void*)field->reflection_field;
+  mn->vmindex = 1; // field offset
+  mn->flags |= field->access_flags;
+  mn->flags |= MN_IS_FIELD;
+  bjvm_classdesc *field_cd = load_class_of_field_descriptor(thread, field->descriptor);
+  mn->type = (void*)bjvm_get_class_mirror(thread, field_cd);
+  mn->clazz = (void*)bjvm_get_class_mirror(thread, search_on);
+}
 
-  struct bjvm_native_MemberName *mn = (void*)args[0].obj;
-  struct bjvm_native_Class *caller = (void*)args[1].obj;
+void fill_mn_with_method(bjvm_thread * thread, struct bjvm_native_MemberName * mn,
+                        bjvm_cp_method * method, bool is_static, bool dynamic_dispatch) {
+  assert(method);
+  bjvm_classdesc *search_on = method->my_class;
+  if (utf8_equals(method->name, "<init>")) {
+    bjvm_reflect_initialize_constructor(thread, search_on, method);
+    mn->resolution = (void*)method->reflection_ctor;
+    mn->flags |= MN_IS_CONSTRUCTOR;
+  } else {
+    bjvm_reflect_initialize_method(thread, search_on, method);
+    mn->resolution = (void*)method->reflection_method;
+    mn->flags |= MN_IS_METHOD;
+  }
 
+  mn->vmtarget = (void*)mn;
+  mn->vmindex = dynamic_dispatch ? 1 : -1;  // ultimately, itable or vtable entry index
+  mn->flags |= method->access_flags;
+  mn->type = bjvm_intern_string(thread, method->descriptor);
+  mn->clazz = (void*)bjvm_get_class_mirror(thread, search_on);
+}
+
+bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
   heap_string search_for = mn->name ? read_string_to_utf8(mn->name) : make_heap_str(0);
   bjvm_classdesc *search_on = ((struct bjvm_native_Class *)mn->clazz)->reflected_class;
-  printf("SEARCHING FOR: %.*s\n", fmt_slice(search_for));
-  printf("Searching on: %.*s\n", fmt_slice(search_on->name));
-  printf("Search type: %.*s\n", fmt_slice(mn->type->descriptor->name));
 
   bjvm_method_handle_kind kind = unpack_mn_kind(mn); // TODO validate
   mn->flags &= (int)0xFF000000U;
@@ -91,14 +117,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
     if (!field) {
       break;
     }
-    bjvm_reflect_initialize_field(thread, search_on, field);
-    mn->vmtarget = (void*)mn;
-    mn->resolution = (void*)field->reflection_field;
-    mn->vmindex = 1; // field offset
-    mn->flags |= field->access_flags;
-    mn->flags |= MN_IS_FIELD;
-    bjvm_classdesc *field_cd = load_class_of_field_descriptor(thread, field->descriptor);
-    mn->type = (void*)bjvm_get_class_mirror(thread, field_cd);
+    fill_mn_with_field(thread, mn, field);
     break;
   case BJVM_MH_KIND_INVOKE_STATIC:
     is_static = true;
@@ -119,26 +138,24 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
     }
 
     found = true;
-    if (utf8_equals(method->name, "<init>")) {
-      bjvm_reflect_initialize_constructor(thread, search_on, method);
-      mn->resolution = (void*)method->reflection_ctor;
-      mn->flags |= MN_IS_CONSTRUCTOR;
-    } else {
-      bjvm_reflect_initialize_method(thread, search_on, method);
-      mn->resolution = (void*)method->reflection_method;
-      mn->flags |= MN_IS_METHOD;
-    }
-
-    mn->vmtarget = (void*)mn;
-    mn->vmindex = dynamic_dispatch ? 1 : -1;  // ultimately, itable or vtable entry index
-    mn->flags |= method->access_flags;
-    mn->type = bjvm_intern_string(thread, method->descriptor);
+    fill_mn_with_method(thread, mn, method, is_static, dynamic_dispatch);
     break;
   default:
     UNREACHABLE();
   }
 
   free_heap_str(search_for);
+  return found;
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/invoke/MemberName;") {
+  assert(argc == 2);
+
+  struct bjvm_native_Class *caller = (void*)args[1].obj;
+  struct bjvm_native_MemberName *mn = (void*)args[0].obj;
+
+  bool found = resolve_mn(thread, mn);
+
   return found ? (bjvm_stack_value) { .obj = (void*)mn } : value_null();
 }
 
@@ -162,4 +179,22 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo, "(Ljava
   data[1] = mn->vmtarget;
 
   return (bjvm_stack_value) { .obj = array };
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init, "(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V") {
+  struct bjvm_native_MemberName *mn = (void*)args[0].obj;
+  bjvm_obj_header *target = args[1].obj;
+
+  bjvm_utf8 s = hslc(target->descriptor->name);
+  if (utf8_equals(s, "java/lang/reflect/Method")) {
+    // TODO we're not given the method handle type. Huh?
+    fill_mn_with_method(thread, mn, *bjvm_unmirror_method(target), false, true);
+  } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
+    fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), false, true);
+  } else if (utf8_equals(s, "java/lang/reflect/Field")) {
+    fill_mn_with_field(thread, mn, *bjvm_unmirror_field(target));
+  } else {
+    UNREACHABLE();
+  }
+  return value_null();
 }
