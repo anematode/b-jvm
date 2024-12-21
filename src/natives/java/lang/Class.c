@@ -130,8 +130,14 @@ DECLARE_NATIVE("java/lang", Class, getClassLoader,
 
 DECLARE_NATIVE("java/lang", Class, getName0, "()Ljava/lang/String;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
+  INIT_STACK_STRING(name, 1000);
+  bprintf(name, "%.*s", fmt_slice(classdesc->name));
+  for (int i = 0; i < classdesc->name.len; ++i) {
+    name.chars[i] = name.chars[i] == '/' ? '.' : name.chars[i];
+  }
+  name.len = classdesc->name.len;
   return (bjvm_stack_value){
-      .obj = bjvm_intern_string(thread, hslc(classdesc->name))};
+      .obj = bjvm_intern_string(thread, name)};
 }
 
 DECLARE_NATIVE("java/lang", Class, forName0,

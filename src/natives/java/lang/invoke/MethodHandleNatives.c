@@ -212,13 +212,19 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
   bjvm_utf8 s = hslc(target->descriptor->name);
   if (utf8_equals(s, "java/lang/reflect/Method")) {
     // TODO we're not given the method handle type. Huh?
-    fill_mn_with_method(thread, mn, *bjvm_unmirror_method(target), false, true);
+    bjvm_cp_method *m = *bjvm_unmirror_method(target);
+    fill_mn_with_method(thread, mn, m, false, true);
+    mn->flags |= (m->access_flags & BJVM_ACCESS_STATIC) ? BJVM_MH_KIND_INVOKE_STATIC << 24 : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
     fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), false, true);
+    mn->flags |= BJVM_MH_KIND_NEW_INVOKE_SPECIAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Field")) {
-    fill_mn_with_field(thread, mn, *bjvm_unmirror_field(target));
+    bjvm_cp_field *field =  *bjvm_unmirror_field(target);
+    fill_mn_with_field(thread, mn, field);
+    mn->flags |= (field->access_flags & BJVM_ACCESS_STATIC) ? BJVM_MH_KIND_GET_STATIC << 24 : BJVM_MH_KIND_GET_FIELD << 24;
   } else {
     UNREACHABLE();
   }
+  mn->resolution = nullptr;  // ??
   return value_null();
 }
