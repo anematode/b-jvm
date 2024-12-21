@@ -284,10 +284,10 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
 }
 
 heap_string read_string_to_utf8(bjvm_obj_header *obj) {
-  short* buf;
+  short *buf;
   size_t len;
   read_string(nullptr, obj, &buf, &len);
-  char* cbuf = malloc(len + 1);
+  char *cbuf = malloc(len + 1);
   for (size_t i = 0; i < len; ++i) {
     cbuf[i] = buf[i];
   }
@@ -708,14 +708,14 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 }
 
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
-  bjvm_classdesc* classdesc,
-  bjvm_cp_method *method) {
+                                    bjvm_classdesc *classdesc,
+                                    bjvm_cp_method *method) {
   bjvm_classdesc *reflect_Method =
-    bootstrap_class_create(thread, str("java/lang/reflect/Method"));
+      bootstrap_class_create(thread, str("java/lang/reflect/Method"));
   bjvm_initialize_class(thread, reflect_Method);
 
   struct bjvm_native_Method *result = method->reflection_method =
-    (void *)new_object(thread, reflect_Method);
+      (void *)new_object(thread, reflect_Method);
   result->reflected_method = method;
   result->name = bjvm_intern_string(thread, method->name);
   result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
@@ -3757,7 +3757,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
     while (array) {
-      PUSH_ROOT((void*)array->mirror);
+      PUSH_ROOT((void *)array->mirror);
       array = array->array_type;
     }
     bjvm_hash_table_iterator_next(&it);

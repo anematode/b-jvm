@@ -305,14 +305,14 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
 
 void bjvm_reflect_initialize_field(bjvm_thread *thread,
-                               bjvm_classdesc *classdesc,
-                               bjvm_cp_field *field);
+                                   bjvm_classdesc *classdesc,
+                                   bjvm_cp_field *field);
 void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
                                          bjvm_classdesc *classdesc,
                                          bjvm_cp_method *method);
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
-                                          bjvm_classdesc *classdesc,
-                                          bjvm_cp_method *method);
+                                    bjvm_classdesc *classdesc,
+                                    bjvm_cp_method *method);
 
 #ifdef __cplusplus
 }
