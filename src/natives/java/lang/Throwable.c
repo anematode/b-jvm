@@ -37,7 +37,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
     bjvm_obj_header *class_name = bjvm_intern_string(thread, hslc(frame->method->my_class->name));
     bjvm_obj_header *method_name = bjvm_intern_string(thread, frame->method->name);
     bjvm_obj_header *file_name = bjvm_intern_string(thread, frame->method->my_class->source_file->name);
-    int line = bjvm_get_line_number(frame->method, frame->program_counter);
+    int line = bjvm_get_line_number(frame->method->code, frame->program_counter);
 
     struct bjvm_native_StackTraceElement *e = (void*)new_object(thread, StackTraceElement);
     e->declaringClass = class_name;
