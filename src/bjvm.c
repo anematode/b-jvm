@@ -1,4 +1,4 @@
-#define AGGRESSIVE_DEBUG 1
+#define AGGRESSIVE_DEBUG 0
 
 #define CACHE_INVOKESTATIC 1
 #define CACHE_INVOKENONSTATIC 1
@@ -401,12 +401,10 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
 bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
                                                bjvm_utf8 name) {
   const char *chars = name.chars;
-
   if (chars[0] == 'L') {
     name = slice_to(name, 1, name.len - 1);
     return bootstrap_class_create(thread, name);
   }
-
   if (chars[0] == '[')
     return bootstrap_class_create(thread, name);
   switch (chars[0]) {
@@ -1922,8 +1920,10 @@ start:
 #if AGGRESSIVE_DEBUG
     char *insn_dump = insn_to_string(insn, frame->program_counter);
     printf("Insn: %s\n", insn_to_string(insn, frame->program_counter));
-    printf("Method: %.*s in class %.*s\n", fmt_slice(method->name),
-           fmt_slice(method->my_class->name));
+    printf("Method: %.*s in class %.*s (%.*s:%d)\n", fmt_slice(method->name),
+           fmt_slice(method->my_class->name),
+           fmt_slice(method->my_class->source_file->name),
+           bjvm_get_line_number(method->code, frame->program_counter));
     printf("FRAME:\n");
     dump_frame(stdout, frame);
 

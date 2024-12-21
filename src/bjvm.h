@@ -313,6 +313,8 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method);
+bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
+                                               bjvm_utf8 name);
 int bjvm_get_line_number(const bjvm_attribute_code *method, uint16_t pc);
 void store_stack_value(void *field_location, bjvm_stack_value value,
                        bjvm_type_kind kind);

@@ -85,6 +85,9 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
     mn->vmtarget = (void*)mn;
     mn->resolution = (void*)field->reflection_field;
     mn->vmindex = 1; // field offset
+    mn->flags = field->access_flags;
+    bjvm_classdesc *field_cd = load_class_of_field_descriptor(thread, field->descriptor);
+    mn->type = (void*)bjvm_get_class_mirror(thread, field_cd);
     break;
   case BJVM_MH_KIND_INVOKE_STATIC:
     is_static = true;
@@ -115,6 +118,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
 
     mn->vmtarget = (void*)mn;
     mn->vmindex = dynamic_dispatch ? 1 : -1;  // ultimately, itable or vtable entry index
+    mn->flags = method->access_flags;
+    mn->type = bjvm_intern_string(thread, method->descriptor);
     break;
   default:
     UNREACHABLE();
