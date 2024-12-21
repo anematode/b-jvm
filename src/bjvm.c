@@ -3057,20 +3057,14 @@ done:;
   return 0;
 }
 
-int cmp_line_number_table_entry(const void *p, const void *arg) {
-  return *(int *)p - ((bjvm_line_number_table_entry *)arg)->start_pc;
-}
-
-int bjvm_get_line_number(const bjvm_cp_method *method, uint16_t pc) {
-  bjvm_attribute_line_number_table *table = method->code->line_number_table;
-  if (!table)
+int bjvm_get_line_number(const bjvm_attribute_code *code, uint16_t pc) {
+  bjvm_attribute_line_number_table *table = code->line_number_table;
+  if (!table || pc >= code->insn_count)
     return -1;
-  // Look up original PC in method code attribute
-  if (pc >= method->code->insn_count)
-    return -1;
-  int original_pc = method->code->code[pc].original_pc;
+  // Look up original PC (the instruction is tagged with it)
+  int original_pc = code->code[pc].original_pc;
   int low = 0, high = table->entry_count - 1;
-  while (low <= high) {
+  while (low <= high) { // binary search for first entry with start_pc <= pc
     int mid = (low + high) / 2;
     bjvm_line_number_table_entry *entry = &table->entries[mid];
     if (entry->start_pc <= original_pc &&
