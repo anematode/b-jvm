@@ -578,14 +578,17 @@ bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->kind);
 }
 
-void write_references_to_bitset(const bjvm_analy_stack_state *inferred_stack, int offset, bjvm_compressed_bitset *bjvm_compressed_bitset) {
+void write_references_to_bitset(
+    const bjvm_analy_stack_state *inferred_stack, int offset,
+    bjvm_compressed_bitset *bjvm_compressed_bitset) {
   for (int i = 0; i < inferred_stack->entries_count; ++i) {
     if (inferred_stack->entries[i] == BJVM_TYPE_KIND_REFERENCE)
       bjvm_test_set_compressed_bitset(bjvm_compressed_bitset, offset + i);
   }
 }
 
-int bjvm_locals_on_method_entry(const bjvm_cp_method *method, bjvm_analy_stack_state *locals) {
+int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
+                                bjvm_analy_stack_state *locals) {
   const bjvm_attribute_code *code = method->code;
   const bjvm_method_descriptor *desc = method->parsed_descriptor;
   assert(code);
@@ -622,7 +625,8 @@ fail:
  * place to make longs/doubles one stack value wide, writing the analysis into
  * analysis, and returning an error string upon some sort of error.
  */
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error) {
+int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+                                     heap_string *error) {
   bjvm_attribute_code *code = method->code;
   if (!code) {
     return 0;
@@ -632,13 +636,13 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error)
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks =
-    calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
+      calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_analy_stack_state *inferred_locals =
-    calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
+      calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_compressed_bitset *insn_index_to_references =
-    calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
+      calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
   uint16_t *insn_index_to_stack_depth =
-    calloc(code->insn_count, sizeof(uint16_t));
+      calloc(code->insn_count, sizeof(uint16_t));
 
   bjvm_analy_stack_state stack, locals;
 
@@ -702,7 +706,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error)
   {                                                                            \
     if (index >= code->max_locals)                                             \
       goto local_overflow;                                                     \
-    locals.entries[index] = BJVM_TYPE_KIND_ ## kind;                           \
+    locals.entries[index] = BJVM_TYPE_KIND_##kind;                             \
   }
 
 #define PUSH_BRANCH_TARGET(target)                                             \
@@ -736,7 +740,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error)
         // At exception handlers, use the local variable table of the start of
         // the exception block. Later we'll properly validate this by taking
         // the intersection of all types.
-        copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start], &locals);
+        copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start],
+                               &locals);
         copy_analy_stack_state(locals, this_locals);
       }
 

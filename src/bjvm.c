@@ -93,23 +93,25 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   char buf[2000] = {0}, *write = buf, *end = buf + sizeof(buf);
 
-  bjvm_compressed_bitset refs = ((bjvm_code_analysis*)frame->method->code_analysis)
-    ->insn_index_to_references[frame->program_counter];
+  bjvm_compressed_bitset refs =
+      ((bjvm_code_analysis *)frame->method->code_analysis)
+          ->insn_index_to_references[frame->program_counter];
 
   for (int i = 0; i < frame->stack_depth; ++i) {
     bjvm_stack_value value = frame->values[i];
-    const char* is_ref = bjvm_test_compressed_bitset(refs, i) ? "<ref>" : "";
+    const char *is_ref = bjvm_test_compressed_bitset(refs, i) ? "<ref>" : "";
     write +=
-        snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n", i,
-                 value.obj, value.i, is_ref);
+        snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n",
+                 i, value.obj, value.i, is_ref);
   }
 
   for (int i = 0; i < frame->max_locals; ++i) {
     bjvm_stack_value value = frame->values[i];
-    const char* is_ref = bjvm_test_compressed_bitset(refs, i + frame->max_stack) ? "<ref>" : "";
+    const char *is_ref =
+        bjvm_test_compressed_bitset(refs, i + frame->max_stack) ? "<ref>" : "";
     write +=
-        snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n", i,
-                 value.obj, value.i, is_ref);
+        snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n",
+                 i, value.obj, value.i, is_ref);
   }
 
   fprintf(stream, "%s", buf);
@@ -1330,7 +1332,8 @@ bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field) {
 
 bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_thread *thr = calloc(1, sizeof(bjvm_thread));
-  *VECTOR_PUSH(vm->active_threads, vm->active_thread_count, vm->active_thread_cap) = thr;
+  *VECTOR_PUSH(vm->active_threads, vm->active_thread_count,
+               vm->active_thread_cap) = thr;
 
   thr->vm = vm;
   thr->frame_buffer =
@@ -3702,16 +3705,17 @@ typedef struct bjvm_gc_ctx {
 } bjvm_gc_ctx;
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
-#define PUSH_ROOT(x) { \
-  __typeof(x) v = x; \
-  if (v) \
-  *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = v; \
-}
+#define PUSH_ROOT(x)                                                           \
+  {                                                                            \
+    __typeof(x) v = x;                                                         \
+    if (v)                                                                     \
+      *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = v;          \
+  }
 
 void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
-    PUSH_ROOT((void*)vm->primitive_classes[i]);
+    PUSH_ROOT((void *)vm->primitive_classes[i]);
   }
 
   // Static fields of bootstrap-loaded classes
@@ -3719,17 +3723,18 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   char *key;
   size_t key_len;
   bjvm_classdesc *desc;
-  int* bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
-  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void**) &desc)) {
-    bitset_list = bjvm_list_compressed_bitset_bits(desc->static_references,
-      bitset_list, &bs_list_len, &bs_list_cap);
+  int *bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
+  while (
+      bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void **)&desc)) {
+    bitset_list = bjvm_list_compressed_bitset_bits(
+        desc->static_references, bitset_list, &bs_list_len, &bs_list_cap);
     for (int i = 0; i < bs_list_len; ++i) {
-      PUSH_ROOT(((void*) desc->static_fields) + bitset_list[i]);
+      PUSH_ROOT(((void *)desc->static_fields) + bitset_list[i]);
     }
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
     while (array) {
-      PUSH_ROOT((void*)array->mirror);
+      PUSH_ROOT((void *)array->mirror);
       array = array->array_type;
     }
     bjvm_hash_table_iterator_next(&it);
@@ -3741,8 +3746,10 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     for (int frame_i = 0; frame_i < thr->frames_count; ++frame_i) {
       bjvm_stack_frame *frame = thr->frames[frame_i];
       bjvm_code_analysis *analy = frame->method->code_analysis;
-      bjvm_compressed_bitset refs = analy->insn_index_to_references[frame->program_counter];
-      bitset_list = bjvm_list_compressed_bitset_bits(refs, bitset_list, &bs_list_len, &bs_list_cap);
+      bjvm_compressed_bitset refs =
+          analy->insn_index_to_references[frame->program_counter];
+      bitset_list = bjvm_list_compressed_bitset_bits(
+          refs, bitset_list, &bs_list_len, &bs_list_cap);
       for (int i = 0; i < bs_list_len; ++i) {
         PUSH_ROOT(frame->values[bitset_list[i]].obj);
       }
@@ -3750,13 +3757,13 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   }
 }
 
-void bjvm_for_each_heap_object(bjvm_vm* vm, void* data, int (*callback)(bjvm_obj_header *obj, void *data)) {
+void bjvm_for_each_heap_object(bjvm_vm *vm, void *data,
+                               int (*callback)(bjvm_obj_header *obj,
+                                               void *data)) {}
 
-}
-
-void bjvm_major_gc(bjvm_vm* vm) {
+void bjvm_major_gc(bjvm_vm *vm) {
   // TODO wait for all threads to get ready (for now we'll just call this from
   // an already-running thread)
-  bjvm_gc_ctx ctx = { .vm = vm };
+  bjvm_gc_ctx ctx = {.vm = vm};
   bjvm_major_gc_enumerate_gc_roots(&ctx);
 }

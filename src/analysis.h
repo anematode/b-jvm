@@ -36,7 +36,7 @@ typedef struct {
 } bjvm_analy_stack_state;
 
 int bjvm_locals_on_method_entry(const bjvm_cp_method *descriptor,
-                                    bjvm_analy_stack_state *locals);
+                                bjvm_analy_stack_state *locals);
 
 /**
  * Analyze the method's code segment if it exists, rewriting instructions in
