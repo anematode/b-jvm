@@ -1,8 +1,8 @@
 #define AGGRESSIVE_DEBUG 0
 
-#define CACHE_INVOKESTATIC 0
-#define CACHE_INVOKENONSTATIC 0
-#define ONE_GOTO_PER_INSN 0
+#define CACHE_INVOKESTATIC 1
+#define CACHE_INVOKENONSTATIC 1
+#define ONE_GOTO_PER_INSN 1
 
 #include <assert.h>
 #include <limits.h>
@@ -93,18 +93,23 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   char buf[2000] = {0}, *write = buf, *end = buf + sizeof(buf);
 
+  bjvm_compressed_bitset refs = ((bjvm_code_analysis*)frame->method->code_analysis)
+    ->insn_index_to_references[frame->program_counter];
+
   for (int i = 0; i < frame->stack_depth; ++i) {
     bjvm_stack_value value = frame->values[i];
+    const char* is_ref = bjvm_test_compressed_bitset(refs, i) ? "<ref>" : "";
     write +=
-        snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ]\n", i,
-                 value.obj, value.i);
+        snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n", i,
+                 value.obj, value.i, is_ref);
   }
 
   for (int i = 0; i < frame->max_locals; ++i) {
-    bjvm_stack_value value = frame->values[i + frame->max_stack];
+    bjvm_stack_value value = frame->values[i];
+    const char* is_ref = bjvm_test_compressed_bitset(refs, i + frame->max_stack) ? "<ref>" : "";
     write +=
-        snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ]\n", i,
-                 value.obj, value.i);
+        snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n", i,
+                 value.obj, value.i, is_ref);
   }
 
   fprintf(stream, "%s", buf);
@@ -1103,6 +1108,12 @@ bjvm_stack_value bjvm_FileOutputStream_writeBytes(bjvm_thread *thread,
 // Natives for the java.lang.Class class.
 void bjvm_register_natives_Class(bjvm_vm *vm) {}
 
+bjvm_vm_options bjvm_default_vm_options() {
+  bjvm_vm_options options = {0};
+  options.heap_size = 1 << 24;
+  return options;
+}
+
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   bjvm_vm *vm = calloc(1, sizeof(bjvm_vm));
 
@@ -1116,6 +1127,10 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   vm->interned_strings = bjvm_make_hash_table(nullptr, 0.75, 16);
   vm->class_padding = bjvm_make_hash_table(nullptr, 0.75, 16);
   vm->main_thread_group = nullptr;
+
+  vm->heap = aligned_alloc(4096, options.heap_size);
+  vm->heap_used = 0;
+  vm->heap_capacity = options.heap_size;
 
   vm->write_stdout = options.write_stdout;
   vm->write_stderr = options.write_stderr;
@@ -1256,6 +1271,8 @@ void bjvm_free_vm(bjvm_vm *vm) {
   bjvm_free_hash_table(vm->classes);
   bjvm_free_hash_table(vm->inchoate_classes);
   bjvm_free_hash_table(vm->interned_strings);
+  free(vm->active_threads);
+  free(vm->heap);
   free(vm);
 }
 
@@ -1313,6 +1330,8 @@ bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field) {
 
 bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_thread *thr = calloc(1, sizeof(bjvm_thread));
+  *VECTOR_PUSH(vm->active_threads, vm->active_thread_count, vm->active_thread_cap) = thr;
+
   thr->vm = vm;
   thr->frame_buffer =
       calloc(1, thr->frame_buffer_capacity = options.stack_space);
@@ -1373,6 +1392,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 }
 
 void bjvm_free_thread(bjvm_thread *thread) {
+  // TODO remove from the VM
+
   // TODO what happens to ->current_exception etc.?
   free(thread->frame_buffer);
   free(thread);
@@ -2121,6 +2142,12 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
   return result;
 }
 
+uint64_t hash_code_rng = 0;
+uint64_t next_hash_code() {
+  hash_code_rng = hash_code_rng * 0x5DEECE66D + 0xB;
+  return hash_code_rng >> 32;
+}
+
 bjvm_obj_header *create_object_array(bjvm_thread *thread,
                                      bjvm_classdesc *classdesc, int count) {
   assert(classdesc);
@@ -2130,6 +2157,7 @@ bjvm_obj_header *create_object_array(bjvm_thread *thread,
   }
   bjvm_obj_header *array = calloc(1, 24 + count * sizeof(void *));
   make_array_classdesc(thread, classdesc);
+  array->mark_word = next_hash_code();
   array->descriptor = classdesc->array_type;
   *array_length(array) = count;
   return array;
@@ -2148,15 +2176,10 @@ bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
       thread, bjvm_primitive_classdesc(thread, array_type));
   assert(desc);
   bjvm_obj_header *array = calloc(1, 24 + count * size);
+  array->mark_word = next_hash_code();
   array->descriptor = desc;
   *array_length(array) = count;
   return array;
-}
-
-uint64_t hash_code_rng = 0;
-uint64_t next_hash_code() {
-  hash_code_rng = hash_code_rng * 0x5DEECE66D + 0xB;
-  return hash_code_rng >> 16;
 }
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
@@ -3668,4 +3691,72 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
     bjvm_thread_run(thread, init, args, nullptr);
   }
   return vm->main_thread_group;
+}
+
+typedef struct bjvm_gc_ctx {
+  bjvm_vm *vm;
+
+  bjvm_obj_header **roots;
+  int roots_count;
+  int roots_cap;
+} bjvm_gc_ctx;
+
+#define lengthof(x) (sizeof(x) / sizeof(x[0]))
+#define PUSH_ROOT(x) { \
+  __typeof(x) v = x; \
+  if (v) \
+  *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = v; \
+}
+
+void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
+  bjvm_vm *vm = ctx->vm;
+  for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
+    PUSH_ROOT((void*)vm->primitive_classes[i]);
+  }
+
+  // Static fields of bootstrap-loaded classes
+  bjvm_hash_table_iterator it = bjvm_hash_table_get_iterator(&vm->classes);
+  char *key;
+  size_t key_len;
+  bjvm_classdesc *desc;
+  int* bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
+  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void**) &desc)) {
+    bitset_list = bjvm_list_compressed_bitset_bits(desc->static_references,
+      bitset_list, &bs_list_len, &bs_list_cap);
+    for (int i = 0; i < bs_list_len; ++i) {
+      PUSH_ROOT(((void*) desc->static_fields) + bitset_list[i]);
+    }
+    // Push the mirrors of this base class and all of its array types
+    bjvm_classdesc *array = desc;
+    while (array) {
+      PUSH_ROOT((void*)array->mirror);
+      array = array->array_type;
+    }
+    bjvm_hash_table_iterator_next(&it);
+  }
+
+  // Stack and local variables on active threads
+  for (int thread_i = 0; thread_i < vm->active_thread_count; ++thread_i) {
+    bjvm_thread *thr = vm->active_threads[thread_i];
+    for (int frame_i = 0; frame_i < thr->frames_count; ++frame_i) {
+      bjvm_stack_frame *frame = thr->frames[frame_i];
+      bjvm_code_analysis *analy = frame->method->code_analysis;
+      bjvm_compressed_bitset refs = analy->insn_index_to_references[frame->program_counter];
+      bitset_list = bjvm_list_compressed_bitset_bits(refs, bitset_list, &bs_list_len, &bs_list_cap);
+      for (int i = 0; i < bs_list_len; ++i) {
+        PUSH_ROOT(frame->values[bitset_list[i]].obj);
+      }
+    }
+  }
+}
+
+void bjvm_for_each_heap_object(bjvm_vm* vm, void* data, int (*callback)(bjvm_obj_header *obj, void *data)) {
+
+}
+
+void bjvm_major_gc(bjvm_vm* vm) {
+  // TODO wait for all threads to get ready (for now we'll just call this from
+  // an already-running thread)
+  bjvm_gc_ctx ctx = { .vm = vm };
+  bjvm_major_gc_enumerate_gc_roots(&ctx);
 }

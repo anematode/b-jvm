@@ -119,7 +119,7 @@ static inline bjvm_utf8 hslc(heap_string str) {
 #define fmt_slice(slice) (int)(slice).len, (slice).chars
 
 #define str(literal)                                                           \
-  ((bjvm_utf8){.chars = (literal), .len = sizeof(literal) - 1})
+  ((bjvm_utf8){.chars = (char*)(literal), .len = sizeof(literal) - 1})
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);

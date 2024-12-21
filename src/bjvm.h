@@ -79,6 +79,8 @@ typedef struct bjvm_vm bjvm_vm;
 
 typedef void (*bjvm_write_byte)(int ch, void *param);
 
+#define BJVM_CARD_BYTES 4096
+
 typedef struct bjvm_vm {
   // Map class file name -> cf bytes
   bjvm_string_hash_table classfiles;
@@ -114,11 +116,20 @@ typedef struct bjvm_vm {
   // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8)
   // )
   bjvm_classdesc *primitive_classes[9];
+
+  // Active threads (unused for now)
+  bjvm_thread **active_threads;
+  int active_thread_count;
+  int active_thread_cap;
+
+  uint8_t *heap;
+  // Next object should be allocated here. Should always be 8-byte aligned
+  // which is the alignment of BJVM objects.
+  size_t heap_used;
+  size_t heap_capacity;
 } bjvm_vm;
 
 typedef struct {
-  bool unused;
-
   // Callback to load a classfile from the classpath. Returns 0 on success,
   // nonzero on failure. Pointer passed to bytes will be free()-d by the VM.
   int (*load_classfile)(const bjvm_utf8 filename, void *param, uint8_t **bytes,
@@ -130,6 +141,9 @@ typedef struct {
   bjvm_write_byte write_stderr;
   // Passed to write_stdout/write_stderr
   void *write_byte_param;
+
+  // Heap size (static for now)
+  size_t heap_size;
 } bjvm_vm_options;
 
 typedef struct {
@@ -167,6 +181,8 @@ typedef struct bjvm_thread {
 
   // Instance of java.lang.Thread
   struct bjvm_native_Thread *thread_obj;
+
+  // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
 bjvm_array_classdesc *
@@ -186,6 +202,7 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method);
  */
 void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference);
 
+bjvm_vm_options bjvm_default_vm_options();
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
 
 typedef struct {

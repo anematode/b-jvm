@@ -1,8 +1,3 @@
-//
-// Created by alec on 12/19/24.
-// This file contains definitions useful for implementing native methods.
-//
-
 #ifndef BJVM_NATIVES_H
 #define BJVM_NATIVES_H
 

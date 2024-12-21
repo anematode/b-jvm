@@ -167,7 +167,6 @@ TEST_CASE("Test classfile parsing") {
   double total_millis = 0;
 
   char *shortest_error = nullptr;
-  int shortest_error_length = 1000000;
 
   int count = 0;
   int FILE_COUNT = fuzz ? 64 : INT_MAX;
