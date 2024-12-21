@@ -40,9 +40,7 @@ endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
-add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
-        src/natives/java/lang/reflect/Array.c
-        src/natives/java/lang/Object.c)
+add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
 
 add_executable(bjvm_main src/bin/main.c)

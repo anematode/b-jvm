@@ -149,6 +149,7 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
+  case BJVM_ATTRIBUTE_KIND_SOURCE_FILE:
     break;
   }
 }
@@ -722,7 +723,7 @@ bjvm_bytecode_insn parse_tableswitch_insn(cf_byteslice *reader, int pc,
   }
   free_on_format_error(ctx, targets);
   return (bjvm_bytecode_insn){.kind = bjvm_insn_tableswitch,
-                              .program_counter = original_pc,
+                              .original_pc = original_pc,
                               .tableswitch = {.default_target = default_target,
                                               .low = low,
                                               .high = high,
@@ -758,7 +759,7 @@ bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
   }
 
   return (bjvm_bytecode_insn){.kind = bjvm_insn_lookupswitch,
-                              .program_counter = original_pc,
+                              .original_pc = original_pc,
                               .lookupswitch = {.default_target = default_target,
                                                .keys = keys,
                                                .keys_count = pairs_count,
@@ -1644,7 +1645,7 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
 bjvm_bytecode_insn parse_insn(cf_byteslice *reader, uint32_t pc,
                               bjvm_classfile_parse_ctx *ctx) {
   bjvm_bytecode_insn insn = parse_insn_impl(reader, pc, ctx);
-  insn.program_counter = pc;
+  insn.original_pc = pc;
   return insn;
 }
 
@@ -1801,9 +1802,14 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
       reader_next_u16(&attr_reader, "code attributes count");
   bjvm_attribute *attributes =
       malloc(attributes_count * sizeof(bjvm_attribute));
+
+  bjvm_attribute_line_number_table *lnt = NULL;
   for (int i = 0; i < attributes_count; ++i) {
     bjvm_attribute *attr = attributes + i;
     parse_attribute(&attr_reader, ctx, attr);
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE) {
+      lnt = &attr->lnt;
+    }
   }
 
   return (bjvm_attribute_code){.max_stack = max_stack,
@@ -1813,6 +1819,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
                                .code = code,
                                .attributes = attributes,
                                .exception_table = table,
+                               .line_number_table = lnt,
                                .attributes_count = attributes_count};
 }
 
@@ -1853,6 +1860,26 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
                                 BJVM_CP_KIND_NAME_AND_TYPE, "enclosing method")
                    ->name_and_type
             : nullptr};
+  } else if (utf8_equals(attr->name, "SourceFile")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_SOURCE_FILE;
+    attr->source_file.name =
+        hslc(checked_cp_entry(
+                 ctx->cp, reader_next_u16(&attr_reader, "source file index"),
+                 BJVM_CP_KIND_UTF8, "source file")
+                 ->utf8);
+  } else if (utf8_equals(attr->name, "LineNumberTable")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE;
+    uint16_t count = attr->lnt.entry_count =
+        reader_next_u16(&attr_reader, "line number table count");
+
+    attr->lnt.entries = calloc(count, sizeof(bjvm_line_number_table_entry));
+    free_on_format_error(ctx, attr->lnt.entries);
+
+    for (int i = 0; i < count; ++i) {
+      bjvm_line_number_table_entry *entry = attr->lnt.entries + i;
+      entry->start_pc = reader_next_u16(&attr_reader, "line number start pc");
+      entry->line = reader_next_u16(&attr_reader, "line number");
+    }
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
@@ -2163,8 +2190,11 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   for (int i = 0; i < cf->attributes_count; i++) {
     bjvm_attribute *attr = cf->attributes + i;
     parse_attribute(&reader, &ctx, attr);
+
     if (attr->kind == BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS) {
       cf->bootstrap_methods = &attr->bootstrap_methods;
+    } else if (attr->kind == BJVM_ATTRIBUTE_KIND_SOURCE_FILE) {
+      cf->source_file = &attr->source_file;
     }
   }
 

@@ -428,7 +428,7 @@ char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
   char *write = buf, *end = write + sizeof(buf);
 
   write += snprintf(write, sizeof(buf), "%04d = pc %04d: ", insn_index,
-                    insn->program_counter);
+                    insn->original_pc);
   write += snprintf(write, end - write, "%s ", insn_code_name(insn->kind));
 
   if (insn->kind <= bjvm_insn_swap) {

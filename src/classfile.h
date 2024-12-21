@@ -391,6 +391,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_UNKNOWN = 2,
   BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS = 3,
   BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
+  BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
+  BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -413,6 +415,16 @@ typedef struct {
 } bjvm_attribute_exception_table;
 
 typedef struct bjvm_attribute bjvm_attribute;
+
+typedef struct {
+  int start_pc;
+  int line;
+} bjvm_line_number_table_entry;
+
+typedef struct {
+  bjvm_line_number_table_entry *entries;
+  int entry_count;
+} bjvm_attribute_line_number_table;
 
 struct bjvm_bc_tableswitch_data {
   int default_target;
@@ -443,7 +455,7 @@ struct bjvm_bc_invokeinterface_data {
 
 typedef struct {
   bjvm_insn_code_kind kind;
-  int program_counter;
+  int original_pc;
 
   union {
     // for newarray
@@ -484,6 +496,7 @@ typedef struct {
 
   bjvm_bytecode_insn *code;
   bjvm_attribute_exception_table *exception_table;
+  bjvm_attribute_line_number_table *line_number_table;
 
   bjvm_attribute *attributes;
   int attributes_count;
@@ -505,6 +518,10 @@ typedef struct {
   bjvm_cp_name_and_type *nat;
 } bjvm_attribute_enclosing_method;
 
+typedef struct {
+  bjvm_utf8 name;
+} bjvm_attribute_source_file;
+
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
   bjvm_utf8 name;
@@ -515,6 +532,8 @@ typedef struct bjvm_attribute {
     bjvm_cp_entry *constant_value;
     bjvm_attribute_bootstrap_methods bootstrap_methods;
     bjvm_attribute_enclosing_method enclosing_method;
+    bjvm_attribute_source_file source_file;
+    bjvm_attribute_line_number_table lnt;
   };
 } bjvm_attribute;
 
@@ -580,6 +599,8 @@ typedef struct bjvm_classdesc {
 
   int bootstrap_methods_count;
   bjvm_attribute_bootstrap_methods *bootstrap_methods;
+
+  bjvm_attribute_source_file *source_file;
 
   int attributes_count;
   bjvm_attribute *attributes;

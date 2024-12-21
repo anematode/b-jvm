@@ -973,12 +973,6 @@ bjvm_stack_value bjvm_Thread_start(bjvm_thread *, bjvm_obj_header *,
   return value_null(); // TODO
 }
 
-bjvm_stack_value bjvm_Throwable_fillInStackTrace(bjvm_thread *,
-                                                 bjvm_obj_header *,
-                                                 bjvm_stack_value *args, int) {
-  return args[0]; // TODO
-}
-
 bjvm_stack_value bjvm_AccessController_doPrivileged(bjvm_thread *thread,
                                                     bjvm_obj_header *,
                                                     bjvm_stack_value *args,
@@ -1016,6 +1010,10 @@ bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
 }
 
 void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj) {
+#if AGGRESSIVE_DEBUG
+  printf("Raising exception of type %s\n", obj->descriptor->name);
+#endif
+
   thread->current_exception = obj;
 }
 
@@ -1282,8 +1280,6 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
   REGISTER("java/lang/Thread", "setPriority0", "(I)V", unimplemented_native);
   REGISTER("java/lang/Thread", "isAlive", "()Z", bjvm_Thread_isAlive);
   REGISTER("java/lang/Thread", "start0", "()V", bjvm_Thread_start);
-  REGISTER("java/lang/Throwable", "fillInStackTrace",
-           "(I)Ljava/lang/Throwable;", bjvm_Throwable_fillInStackTrace);
 #undef REGISTER
 
   return vm;
@@ -1334,10 +1330,6 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
 }
 
 bjvm_obj_header *get_main_thread_group(bjvm_thread *thread);
-
-void store_stack_value(void *field_location, bjvm_stack_value value,
-                       bjvm_type_kind kind);
-bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind);
 
 void bjvm_set_field(bjvm_obj_header *obj, bjvm_cp_field *field,
                     bjvm_stack_value bjvm_stack_value) {
@@ -2363,12 +2355,12 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
       bprintf(complaint,
-              "Could not find method %.*s with descriptor %.*s on %.*s %.*s",
+              "Could not find method %.*s with descriptor %.*s on %s %.*s",
               fmt_slice(info->name_and_type->name),
               fmt_slice(info->name_and_type->descriptor),
               lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
                                                               : "class",
-              lookup_on->name.chars);
+              fmt_slice(lookup_on->name));
       bjvm_incompatible_class_change_error(thread, complaint);
       return -1;
     }
@@ -3696,6 +3688,36 @@ done:;
   }
 
   return 0;
+}
+
+int cmp_line_number_table_entry(const void *p, const void *arg) {
+  return *(int *)p - ((bjvm_line_number_table_entry *)arg)->start_pc;
+}
+
+int bjvm_get_line_number(const bjvm_cp_method *method, uint16_t pc) {
+  bjvm_attribute_line_number_table *table = method->code->line_number_table;
+  if (!table)
+    return -1;
+  // Look up original PC in method code attribute
+  if (pc >= method->code->insn_count)
+    return -1;
+  int original_pc = method->code->code[pc].original_pc;
+  int low = 0, high = table->entry_count - 1;
+  while (low <= high) {
+    int mid = (low + high) / 2;
+    bjvm_line_number_table_entry *entry = &table->entries[mid];
+    if (entry->start_pc <= original_pc &&
+        (mid == table->entry_count - 1 ||
+         table->entries[mid + 1].start_pc > original_pc)) {
+      return entry->line;
+    }
+    if (entry->start_pc < original_pc) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return -1;
 }
 
 bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {

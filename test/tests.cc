@@ -449,16 +449,21 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_thread_run(thr, method, args, nullptr);
 
   if (thr->current_exception) {
-    auto *message = (bjvm_obj_header *)*((void **)thr->current_exception + 3);
-    std::string msg = "(no message)";
-    if (message) {
-      heap_string msg_object = read_string_to_utf8(message);
-      msg = std::string(msg_object.chars, msg_object.chars + msg_object.len);
-      free_heap_str(msg_object);
-    }
-    std::cout << "Exception thrown!\n"
-              << thr->current_exception->descriptor->name.chars << ": " << msg
-              << '\n';
+    method = bjvm_easy_method_lookup(thr->current_exception->descriptor,
+                                     str("toString"),
+                                     str("()Ljava/lang/String;"), true, false);
+    bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
+    thr->current_exception = nullptr;
+    bjvm_thread_run(thr, method, args, &result);
+    heap_string read = read_string_to_utf8(result.obj);
+    std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
+    free_heap_str(read);
+
+    // Then call printStackTrace ()V
+    method =
+        bjvm_easy_method_lookup(args[0].obj->descriptor, str("printStackTrace"),
+                                str("()V"), true, false);
+    bjvm_thread_run(thr, method, args, nullptr);
   }
 
   bjvm_free_thread(thr);
