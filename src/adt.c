@@ -27,7 +27,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
  *
  * Used to follow references during garbage collection.
  */
-[[nodiscard]] int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
+int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity) {
   if (bjvm_is_bitset_compressed(bits)) {
@@ -136,7 +136,7 @@ bjvm_hash_table_get_iterator(bjvm_string_hash_table *tbl) {
 }
 
 bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
-                                       const wchar_t **key, size_t *key_len,
+                                       char **key, size_t *key_len,
                                        void **value) {
   if (iter.current != iter.end) {
     *key = iter.current->key;
@@ -161,7 +161,7 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
-uint32_t bjvm_hash_string(const wchar_t *key, size_t len) {
+uint32_t bjvm_hash_string(const char *key, size_t len) {
   uint64_t hash = 0;
   for (size_t i = 0; i < len; ++i) {
     hash = 31 * hash + key[i]; // yk what I mean ;)
@@ -170,7 +170,7 @@ uint32_t bjvm_hash_string(const wchar_t *key, size_t len) {
 }
 
 bjvm_hash_table_entry *
-bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const wchar_t *key,
+bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,
                            size_t len, bool *equal, bool *on_chain,
                            bjvm_hash_table_entry **prev_entry) {
   uint32_t hash = bjvm_hash_string(key, len);
@@ -178,7 +178,7 @@ bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const wchar_t *key,
   bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = nullptr;
   while (ent) {
     *on_chain = prev != nullptr;
-    if (ent->key && ent->key_len == len && wmemcmp(ent->key, key, len) == 0) {
+    if (ent->key && ent->key_len == len && memcmp(ent->key, key, len) == 0) {
       *equal = true;
       *prev_entry = prev;
       return ent;
@@ -198,10 +198,10 @@ bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const wchar_t *key,
   return prev;
 }
 
-void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const wchar_t *key,
+void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const char *key,
                              int len) {
   bool equal, on_chain;
-  len = len == -1 ? wcslen(key) : len;
+  len = len == -1 ? strlen(key) : len;
   bjvm_hash_table_entry *prev,
       *ent =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &prev);
@@ -222,9 +222,9 @@ void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const wchar_t *key,
   return ret_val;
 }
 
-void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
+void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len, void *value, bool copy_key) {
-  len = len == -1 ? wcslen(key) : len;
+  len = len == -1 ? strlen(key) : len;
   bool equal, on_chain;
   if (tbl->entries_count + 1 >= tbl->load_factor * tbl->entries_cap) {
     bjvm_hash_table_rehash(tbl, tbl->entries_cap * 2);
@@ -247,8 +247,8 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
   ent->next = nullptr;
   ent->data = value;
   if (copy_key) {
-    wchar_t *new_key = malloc(len * sizeof(wchar_t));
-    wmemcpy(new_key, key, len);
+    char *new_key = malloc(len * sizeof(char));
+    memcpy(new_key, key, len);
     ent->key = new_key;
   } else {
     ent->key = key;
@@ -258,9 +258,9 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, wchar_t *key,
   return nullptr;
 }
 
-void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl, const wchar_t *key,
+void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl, const char *key,
                              int len, void *value) {
-  return bjvm_hash_table_insert_impl(tbl, (wchar_t *)key /* key copied */, len,
+  return bjvm_hash_table_insert_impl(tbl, (char *)key /* key copied */, len,
                                      value, true);
 }
 
@@ -268,7 +268,7 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
   bjvm_string_hash_table new_table =
       bjvm_make_hash_table(tbl->free_fn, tbl->load_factor, new_capacity);
   bjvm_hash_table_iterator iter = bjvm_hash_table_get_iterator(tbl);
-  wchar_t *key;
+  char *key;
   size_t len;
   void *value;
   while (bjvm_hash_table_iterator_has_next(iter, &key, &len, &value)) {
@@ -285,10 +285,10 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
   *tbl = new_table;
 }
 
-void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
+void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const char *key,
                              int len) {
   bool equal, on_chain;
-  len = len == -1 ? wcslen(key) : len;
+  len = len == -1 ? strlen(key) : len;
   bjvm_hash_table_entry *_prev,
       *entry =
           bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
@@ -297,7 +297,7 @@ void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const wchar_t *key,
 
 void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
   bjvm_hash_table_iterator it = bjvm_hash_table_get_iterator(&tbl);
-  wchar_t *key;
+  char *key;
   size_t len;
   void *value;
   while (bjvm_hash_table_iterator_has_next(it, &key, &len, &value)) {

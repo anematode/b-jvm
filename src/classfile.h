@@ -18,9 +18,8 @@ typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
                                    const char *reason);
 
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result);
-bjvm_utf8 init_utf8_entry(int len);
 
 /**
  * Instruction code. Similar instructions like aload_0 are canonicalised to
@@ -195,7 +194,7 @@ typedef enum {
   bjvm_insn_ret
 } bjvm_insn_code_kind;
 
-typedef enum {
+typedef enum : char {
   BJVM_TYPE_KIND_BOOLEAN = 'Z',
   BJVM_TYPE_KIND_CHAR = 'C',
   BJVM_TYPE_KIND_FLOAT = 'F',
@@ -233,21 +232,21 @@ typedef struct bjvm_bootstrap_method bjvm_bootstrap_method;
 
 typedef struct {
   bjvm_classdesc *classdesc;
-  bjvm_utf8 *name;
+  bjvm_utf8 name;
 
   void *resolution_error; // bjvm_obj_header
 } bjvm_cp_class_info;
 
 typedef struct bjvm_cp_name_and_type {
-  bjvm_utf8 *name;
-  bjvm_utf8 *descriptor;
+  bjvm_utf8 name;
+  bjvm_utf8 descriptor;
 } bjvm_cp_name_and_type;
 
 struct bjvm_field_descriptor {
   bjvm_type_kind kind;
   // Can be nonzero for any kind
   int dimensions;
-  bjvm_utf8 class_name; // For reference and array types only
+  heap_string class_name; // For reference and array types only
 };
 
 bool bjvm_is_field_wide(bjvm_field_descriptor desc);
@@ -272,7 +271,7 @@ typedef struct {
 } bjvm_cp_method_info;
 
 typedef struct {
-  bjvm_utf8 *chars;
+  bjvm_utf8 chars;
 } bjvm_cp_string_info;
 
 typedef struct {
@@ -305,7 +304,7 @@ typedef struct {
 } bjvm_cp_method_handle_info;
 
 typedef struct {
-  bjvm_utf8 *descriptor;
+  bjvm_utf8 descriptor;
   bjvm_method_descriptor *parsed_descriptor;
 
   struct bjvm_native_MethodType *resolved_mt;
@@ -341,7 +340,7 @@ typedef struct bjvm_cp_entry {
   int my_index;
 
   union {
-    bjvm_utf8 utf8;
+    heap_string utf8;
     bjvm_cp_string_info string;
 
     bjvm_cp_floating_info floating;
@@ -508,7 +507,7 @@ typedef struct {
 
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
-  bjvm_utf8 *name;
+  bjvm_utf8 name;
   uint32_t length;
 
   union {
@@ -522,8 +521,8 @@ typedef struct bjvm_attribute {
 typedef struct bjvm_cp_method {
   bjvm_access_flags access_flags;
 
-  bjvm_utf8 *name;
-  bjvm_utf8 *descriptor;
+  bjvm_utf8 name;
+  bjvm_utf8 descriptor;
 
   bjvm_method_descriptor *parsed_descriptor;
   void *code_analysis; // bjvm_code_analysis*
@@ -543,8 +542,8 @@ typedef struct bjvm_cp_method {
 
 typedef struct bjvm_cp_field {
   bjvm_access_flags access_flags;
-  bjvm_utf8 *name;
-  bjvm_utf8 *descriptor;
+  bjvm_utf8 name;
+  bjvm_utf8 descriptor;
 
   int attributes_count;
   bjvm_attribute *attributes;
@@ -557,6 +556,8 @@ typedef struct bjvm_cp_field {
   bjvm_classdesc *my_class;
 } bjvm_cp_field;
 
+typedef bjvm_utf8 cp_string;
+
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
   bjvm_classdesc_state state;
@@ -564,7 +565,7 @@ typedef struct bjvm_classdesc {
   bjvm_constant_pool *pool;
 
   bjvm_access_flags access_flags;
-  bjvm_utf8 name;
+  heap_string name;
   bjvm_cp_class_info *super_class;
 
   int interfaces_count;
@@ -610,6 +611,23 @@ typedef struct bjvm_classdesc {
 } bjvm_classdesc;
 
 char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
+
+typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
+
+/**
+ * Parse a Java class file.
+ *
+ * The error message corresponds to a ClassFormatError in Java land.
+ * (UnsupportedClassVersionErrors and VerifyErrors should be raised elsewhere.)
+ *
+ * @param bytes Start byte of the classfile.
+ * @param len Length of the classfile in bytes.
+ * @param result Where to write the result.
+ * @return nullptr on success, otherwise an error message (which is the caller's
+ * responsibility to free).
+ */
+parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
+                                    bjvm_classdesc *result);
 
 #ifdef __cplusplus
 }

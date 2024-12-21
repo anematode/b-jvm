@@ -56,20 +56,13 @@ static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   }
 }
 
-// Create a null-terminated UTF-8 entry of the given length
-bjvm_utf8 init_utf8_entry(int len) {
-  return (bjvm_utf8){.chars = calloc(len + 1, sizeof(wchar_t)), .len = len};
-}
-
-void free_utf8(bjvm_utf8 entry) { free(entry.chars); }
-
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 void free_method_descriptor(void *descriptor_);
 
 void free_constant_pool_entry(bjvm_cp_entry *entry) {
   switch (entry->kind) {
   case BJVM_CP_KIND_UTF8:
-    free_utf8(entry->utf8);
+    free_heap_str(entry->utf8);
     break;
   case BJVM_CP_KIND_FIELD_REF: {
     bjvm_field_descriptor *desc = entry->fieldref_info.parsed_descriptor;
@@ -184,7 +177,7 @@ bjvm_cp_entry *get_constant_pool_entry(bjvm_constant_pool *pool, int index) {
 
 void free_field_descriptor(bjvm_field_descriptor descriptor) {
   if (descriptor.kind == BJVM_TYPE_KIND_REFERENCE) {
-    free_utf8(descriptor.class_name);
+    free_heap_str(descriptor.class_name);
   }
 }
 
@@ -235,12 +228,14 @@ _Thread_local char *format_error_msg = nullptr;
 _Thread_local bool format_error_needs_free = false;
 
 _Noreturn void format_error_static(const char *reason) {
+  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = (char *)reason;
   format_error_needs_free = false;
   longjmp(format_error_jmp_buf, 1);
 }
 
 _Noreturn void format_error_dynamic(char *reason) {
+  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = reason;
   format_error_needs_free = true;
   longjmp(format_error_jmp_buf, 1);
@@ -343,78 +338,8 @@ ctx_free_ticket complex_free_on_format_error(bjvm_classfile_parse_ctx *ctx,
 #undef PUSH_FREE
 
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
-bjvm_utf8 parse_modified_utf8(const uint8_t *bytes, int len) {
-  bjvm_utf8 result = init_utf8_entry(len); // conservatively large
-  int i = 0, j = 0;
-
-  uint32_t idxs[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  for (int i = 0; i < 16; ++i)
-    idxs[i] -= 256;
-
-  for (; i + 15 < len; i += 16, j += 16) {
-    // fuck maintainability!!! (measured perf improvement: 12% for cf parsing on
-    // my M1 laptop. There are a shit ton of strings.)
-#ifdef __ARM_NEON__
-    uint8x16_t v = vld1q_u8(bytes + i);
-    uint8x16_t ascii = vcgtq_s8(v, vdupq_n_s8(0));
-    if (vminvq_u8(ascii) == 0)
-      break;
-#pragma clang loop unroll(enable)
-    for (int k = 0; k < 4; ++k) {
-      uint8x16_t idx = vld1q_u8((uint8_t *)idxs + 16 * k);
-      vst1q_u8((uint8_t *)&result.chars[j + 4 * k], vqtbl1q_u8(v, idx));
-    }
-#elif defined(__SSSE3__)
-    __m128i v = _mm_loadu_si128((const __m128i *)(bytes + i));
-    int ascii = _mm_movemask_epi8(_mm_cmpgt_epi8(v, _mm_set1_epi8(0)));
-    if (ascii != 0xffff)
-      break;
-#pragma GCC unroll 4
-    for (int k = 0; k < 4; ++k) {
-      __m128i idx = _mm_loadu_si128((const __m128i *)idxs + k);
-      _mm_storeu_si128((__m128i *)&result.chars[j + 4 * k],
-                       _mm_shuffle_epi8(v, idx));
-    }
-#else
-    break;
-#endif
-  }
-
-  for (; i < len; ++i) {
-    // "Code points in the range '\u0001' to '\u007F' are represented by a
-    // single byte"
-    if (bytes[i] >= 0x01 && bytes[i] <= 0x7F) {
-      result.chars[j++] = bytes[i];
-    } else if ((bytes[i] & 0xE0) == 0xC0) {
-      // "Code points in the range '\u0080' to '\u07FF' are represented by two
-      // bytes"
-      if (i >= len - 1)
-        goto inval;
-      result.chars[j++] = ((bytes[i] & 0x1F) << 6) | (bytes[i + 1] & 0x3F);
-      i++;
-    } else if ((bytes[i] & 0xF0) == 0xE0) {
-      // "Code points in the range '\u0800' to '\uFFFF' are represented by three
-      // bytes"
-      if (i >= len - 2)
-        goto inval;
-      result.chars[j++] = ((bytes[i] & 0x0F) << 12) |
-                          ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F);
-      i += 2;
-    } else {
-      // "No byte may have the value (byte)0 or lie in the range (byte)0xf0 -
-      // (byte)0xff."
-      goto inval;
-    }
-  }
-  result.len = j;
-  return result;
-inval:
-  free_utf8(result);
-  format_error_static("Invalid UTF-8 sequence");
-}
-
-bjvm_utf8 bjvm_make_utf8_cstr(const char *c_literal) {
-  return parse_modified_utf8((const uint8_t *)c_literal, strlen(c_literal));
+heap_string parse_modified_utf8(const uint8_t *bytes, int len) {
+  return make_heap_str_from((bjvm_utf8){.chars = (char *)bytes, .len = len});
 }
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
@@ -448,32 +373,26 @@ bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
   return bjvm_check_cp_entry(&pool->entries[index], expected_kinds, reason);
 }
 
-bjvm_utf8 *checked_get_utf8(bjvm_constant_pool *pool, int index,
-                            const char *reason) {
-  return &checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8;
+bjvm_utf8 checked_get_utf8(bjvm_constant_pool *pool, int index,
+                           const char *reason) {
+  return hslc(checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8);
 }
 
-bjvm_utf8 bjvm_wchar_slice_to_utf8(const wchar_t *chars, size_t len) {
-  bjvm_utf8 init = init_utf8_entry(len);
-  wmemcpy(init.chars, chars, len);
-  return init;
-}
-
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result);
-char *parse_method_descriptor(const bjvm_utf8 *descriptor,
+char *parse_method_descriptor(const bjvm_utf8 descriptor,
                               bjvm_method_descriptor *result);
 
-char *parse_complete_field_descriptor(const bjvm_utf8 *entry,
+char *parse_complete_field_descriptor(const bjvm_utf8 entry,
                                       bjvm_field_descriptor *result,
                                       bjvm_classfile_parse_ctx *ctx) {
-  const wchar_t *chars = entry->chars;
-  char *error = parse_field_descriptor(&chars, entry->len, result);
+  const char *chars = entry.chars;
+  char *error = parse_field_descriptor(&chars, entry.len, result);
   if (error)
     return error;
   if (result->kind == BJVM_TYPE_KIND_REFERENCE)
     free_on_format_error(ctx, result->class_name.chars);
-  if (chars != entry->chars + entry->len) {
+  if (chars != entry.chars + entry.len) {
     char buf[64];
     snprintf(buf, sizeof(buf), "trailing character(s): '%c'", *chars);
     return strdup(buf);
@@ -517,7 +436,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
         .kind = BJVM_CP_KIND_CLASS,
         .class_info = {
             .name = skip_linking
-                        ? nullptr
+                        ? null_str()
                         : checked_get_utf8(ctx->cp, index, "class info name")}};
   }
   case CONSTANT_Fieldref:
@@ -560,7 +479,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t index = reader_next_u16(reader, "string index");
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_STRING,
-        .string = {.chars = skip_linking ? nullptr
+        .string = {.chars = skip_linking ? null_str()
                                          : checked_get_utf8(ctx->cp, index,
                                                             "string value")}};
   }
@@ -588,16 +507,16 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t name_index = reader_next_u16(reader, "name index");
     uint16_t descriptor_index = reader_next_u16(reader, "descriptor index");
 
-    bjvm_utf8 *name = skip_linking ? nullptr
-                                   : checked_get_utf8(ctx->cp, name_index,
-                                                      "name and type name");
+    bjvm_utf8 name = skip_linking ? null_str()
+                                  : checked_get_utf8(ctx->cp, name_index,
+                                                     "name and type name");
 
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_NAME_AND_TYPE,
         .name_and_type = {
             .name = name,
             .descriptor = skip_linking
-                              ? nullptr
+                              ? null_str()
                               : checked_get_utf8(ctx->cp, descriptor_index,
                                                  "name and type descriptor")}};
   }
@@ -605,12 +524,10 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t length = reader_next_u16(reader, "utf8 length");
     cf_byteslice bytes_reader = reader_get_slice(reader, length, "utf8 data");
 
-    bjvm_utf8 utf8 = {0};
+    heap_string utf8 = {0};
 
-    if (!skip_linking) {
-      utf8 = parse_modified_utf8(bytes_reader.bytes, length);
-      free_on_format_error(ctx, utf8.chars);
-    }
+    utf8 = parse_modified_utf8(bytes_reader.bytes, length);
+    free_on_format_error(ctx, utf8.chars);
 
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_UTF8, .utf8 = utf8};
   }
@@ -632,7 +549,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
         .kind = BJVM_CP_KIND_METHOD_TYPE,
         .method_type_info = {
             .descriptor = skip_linking
-                              ? nullptr
+                              ? null_str()
                               : checked_get_utf8(ctx->cp, desc_index,
                                                  "method type descriptor")}};
   }
@@ -704,8 +621,8 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
                                           desc); // TODO free on FormatError
     if (error) {
       char *buf = malloc(1000);
-      snprintf(buf, 1000, "Method '%S' has invalid descriptor '%S': %s",
-               nat->name->chars, nat->descriptor->chars, error);
+      snprintf(buf, 1000, "Method '%.*s' has invalid descriptor '%.*s': %s",
+               fmt_slice(nat->name), fmt_slice(nat->descriptor), error);
       format_error_dynamic(buf);
     }
     entry->methodref.method_descriptor = desc;
@@ -1072,8 +989,7 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
     arraylength = 0xbe,
     athrow = 0xbf,
     checkcast = 0xc0,
-    instanceof
-    = 0xc1,
+    instanceof = 0xc1,
     monitorenter = 0xc2,
     monitorexit = 0xc3,
     wide = 0xc4,
@@ -2015,15 +1931,15 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
  * length len, writing the result to result and returning an owned error message
  * if there was an error.
  */
-char *parse_field_descriptor(const wchar_t **chars, size_t len,
+char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result) {
-  const wchar_t *end = *chars + len;
+  const char *end = *chars + len;
   int dimensions = 0;
   while (*chars < end) {
     result->dimensions = dimensions;
     if (dimensions > 255)
       return strdup("too many dimensions (max 255)");
-    wchar_t c = **chars;
+    char c = **chars;
     (*chars)++;
     switch (c) {
     case L'B':
@@ -2060,7 +1976,7 @@ char *parse_field_descriptor(const wchar_t **chars, size_t len,
       ++dimensions;
       break;
     case L'L': {
-      const wchar_t *start = *chars;
+      const char *start = *chars;
       while (*chars < end && **chars != ';')
         ++*chars;
       if (*chars == end)
@@ -2071,7 +1987,8 @@ char *parse_field_descriptor(const wchar_t **chars, size_t len,
       }
       ++*chars;
       result->kind = BJVM_TYPE_KIND_REFERENCE;
-      result->class_name = bjvm_wchar_slice_to_utf8(start, class_name_len);
+      result->class_name = make_heap_str_from(
+          (bjvm_utf8){.chars = (char *)start, .len = class_name_len});
       return nullptr;
     }
     default: {
@@ -2095,14 +2012,14 @@ char *err_while_parsing_md(bjvm_method_descriptor *result, char *error) {
   return error;
 }
 
-char *parse_method_descriptor(const bjvm_utf8 *entry,
+char *parse_method_descriptor(const bjvm_utf8 entry,
                               bjvm_method_descriptor *result) {
   // MethodDescriptor:
   // ( { ParameterDescriptor } )
   // ParameterDescriptor:
   // FieldType
-  const size_t len = entry->len;
-  const wchar_t *chars = entry->chars, *end = chars + len;
+  const size_t len = entry.len;
+  const char *chars = entry.chars, *end = chars + len;
   if (len < 1 || *chars++ != '(')
     return strdup("Expected '('");
   result->args = nullptr;
@@ -2141,7 +2058,8 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
   }
 }
 
-char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
+parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
+                                    bjvm_classdesc *result) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
   bjvm_classfile_parse_ctx ctx = {.free_on_error = nullptr,
@@ -2159,10 +2077,12 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
     }
 
     free(ctx.free_on_error);
+    if (format_error_needs_free)
+      free(format_error_msg);
     assert(format_error_msg);
     result->state = BJVM_CD_STATE_LINKAGE_ERROR;
-    return format_error_needs_free ? format_error_msg
-                                   : strdup(format_error_msg);
+    // todo: get rid of format_error
+    return PARSE_ERR;
   }
 
   const uint32_t magic = reader_next_u32(&reader, "magic");
@@ -2182,10 +2102,10 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),
                         BJVM_CP_KIND_CLASS, "this class")
            ->class_info;
-  cf->name = *this_class->name;
+  cf->name = make_heap_str_from(this_class->name);
 
   bool is_primordial_object = cf->is_primordial_object =
-      utf8_equals(&cf->name, "java/lang/Object");
+      utf8_equals(hslc(cf->name), "java/lang/Object");
 
   uint16_t super_class = reader_next_u16(&reader, "super class");
   cf->super_class = is_primordial_object
@@ -2225,7 +2145,7 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
   cf->bootstrap_methods = nullptr;
 
   bool in_MethodHandle =
-      utf8_equals(&cf->name, "java/lang/invoke/MethodHandle");
+      utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle");
   for (int i = 0; i < cf->methods_count; ++i) {
     cf->methods[i] = parse_method(&reader, &ctx);
     cf->methods[i].my_class = result;
@@ -2252,5 +2172,5 @@ char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result) {
 
   result->state = BJVM_CD_STATE_LOADED;
   free(ctx.free_on_error); // we made it :)
-  return nullptr;
+  return PARSE_SUCCESS;
 }

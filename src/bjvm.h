@@ -32,10 +32,26 @@ typedef union {
   bjvm_obj_header *obj; // reference type
 } bjvm_stack_value;
 
+// Generally, use this to indicate that a native function is returning void or
+// null
+static inline bjvm_stack_value value_null() {
+  return (bjvm_stack_value){.obj = nullptr};
+}
+
+bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
+
 typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
                                                  bjvm_obj_header *obj,
                                                  bjvm_stack_value *args,
                                                  int argc);
+
+// represents a native method somewhere in this binary
+typedef struct {
+  bjvm_utf8 class_path;
+  bjvm_utf8 method_name;
+  bjvm_utf8 method_descriptor;
+  bjvm_native_callback callback;
+} bjvm_native_t;
 
 typedef struct bjvm_array_classdesc bjvm_array_classdesc;
 
@@ -55,6 +71,9 @@ typedef struct bjvm_obj_header {
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
 
+void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
+                 size_t *len); // todo: get rid of
+
 struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;
 
@@ -73,7 +92,7 @@ typedef struct bjvm_vm {
   // Native methods in javah form
   bjvm_string_hash_table natives;
 
-  int (*load_classfile)(const char *filename, void *param, uint8_t **bytes,
+  int (*load_classfile)(const bjvm_utf8 filename, void *param, uint8_t **bytes,
                         size_t *len);
   void *load_classfile_param;
 
@@ -113,7 +132,7 @@ typedef struct bjvm_vm {
 typedef struct {
   // Callback to load a classfile from the classpath. Returns 0 on success,
   // nonzero on failure. Pointer passed to bytes will be free()-d by the VM.
-  int (*load_classfile)(const char *filename, void *param, uint8_t **bytes,
+  int (*load_classfile)(const bjvm_utf8 filename, void *param, uint8_t **bytes,
                         size_t *len);
   void *load_classfile_param;
 
@@ -206,7 +225,7 @@ void bjvm_free_thread(bjvm_thread *thread);
  * Directly add the given classfile as accessible to the VM, bypassing the
  * callback to load_classfile.
  */
-int bjvm_vm_preregister_classfile(bjvm_vm *vm, const wchar_t *filename,
+int bjvm_vm_preregister_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
                                   const uint8_t *bytes, size_t len);
 
 /**
@@ -214,24 +233,10 @@ int bjvm_vm_preregister_classfile(bjvm_vm *vm, const wchar_t *filename,
  * classfile. Writes a pointer to the classfile bytes and the length of the
  * classfile to the given pointers.
  */
-int bjvm_vm_read_classfile(bjvm_vm *vm, const wchar_t *filename,
+int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
                            const uint8_t **bytes, size_t *len);
 
-void bjvm_vm_list_classfiles(bjvm_vm *vm, wchar_t **strings, size_t *count);
-
-/**
- * Parse a Java class file.
- *
- * The error message corresponds to a ClassFormatError in Java land.
- * (UnsupportedClassVersionErrors and VerifyErrors should be raised elsewhere.)
- *
- * @param bytes Start byte of the classfile.
- * @param len Length of the classfile in bytes.
- * @param result Where to write the result.
- * @return nullptr on success, otherwise an error message (which is the caller's
- * responsibility to free).
- */
-char *bjvm_parse_classfile(uint8_t *bytes, size_t len, bjvm_classdesc *result);
+void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count);
 
 /**
  * Free the classfile.
@@ -243,23 +248,22 @@ void bjvm_free_vm(bjvm_vm *vm);
 /**
  * Implementation details, but exposed for testing...
  */
-void free_utf8(bjvm_utf8 entry);
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
-                                       const wchar_t *name);
+                                       const bjvm_utf8 name);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
-                                        const char *name,
-                                        const char *descriptor,
+                                        const bjvm_utf8 name,
+                                        const bjvm_utf8 descriptor,
                                         bool superclasses,
                                         bool superinterfaces);
-bjvm_utf8 bjvm_make_utf8_cstr(const char *c_literal);
+bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
 int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
-void bjvm_register_native(bjvm_vm *vm, const char *class_name,
-                          const char *method_name,
-                          const char *method_descriptor,
+void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
+                          const bjvm_utf8 method_name,
+                          const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
@@ -281,18 +285,17 @@ void bjvm_set_field(bjvm_obj_header *obj, bjvm_cp_field *field,
                     bjvm_stack_value bjvm_stack_value);
 bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field);
 bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
-                                      const wchar_t *name,
-                                      const wchar_t *descriptor);
+                                      const bjvm_utf8 name,
+                                      const bjvm_utf8 descriptor);
 bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field);
-int bjvm_raise_exception(bjvm_thread *thread, const wchar_t *exception_name,
-                         const wchar_t *exception_string);
+int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
+                         const bjvm_utf8 exception_string);
 
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,
                                                       bjvm_type_kind prim_kind);
 
-bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const wchar_t *chars,
-                                    size_t len);
+bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const bjvm_utf8 chars);
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
 #include "natives_gen.h"

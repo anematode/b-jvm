@@ -10,7 +10,7 @@ public class Main {
             int[] intArray = new int[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("a");
             }
         }
 
@@ -18,7 +18,7 @@ public class Main {
             double[] doubleArray = new double[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("b");
             }
         }
 
@@ -26,18 +26,17 @@ public class Main {
             boolean[] booleanArray = new boolean[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("c");
             }
         }
     }
 
     private static void testANewArray() {
-        System.out.print("k");
         try {
             String[] stringArray = new String[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("d");
             }
         }
 
@@ -45,7 +44,7 @@ public class Main {
             Object[] objectArray = new Object[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("e");
             }
         }
 
@@ -53,18 +52,17 @@ public class Main {
             Integer[] integerArray = new Integer[-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("f");
             }
         }
     }
 
     private static void testMultiANewArray() {
-        System.out.print("k");
         try {
             int[][] multiIntArray = new int[-1][5];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("g");
             }
         }
 
@@ -72,7 +70,7 @@ public class Main {
             int[][] multiIntArray = new int[5][-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("h");
             }
         }
 
@@ -80,7 +78,7 @@ public class Main {
             String[][] multiStringArray = new String[-1][5];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("i");
             }
         }
 
@@ -88,7 +86,7 @@ public class Main {
             String[][] multiStringArray = new String[5][-1];
         } catch (NegativeArraySizeException e) {
             if (e.getMessage().contains("-1")) {
-                System.out.print("k");
+                System.out.print("j");
             }
         }
     }
