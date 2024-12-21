@@ -4196,8 +4196,9 @@ void bjvm_major_gc(bjvm_vm* vm) {
 
   free(ctx.objs);
   free(ctx.new_location);
-  free(vm->heap);
   free(ctx.roots);
+
+  free(vm->heap);
 
   vm->heap = new_heap;
   vm->heap_used = write_ptr - new_heap;
