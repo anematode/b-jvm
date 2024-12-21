@@ -105,7 +105,6 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
 										   int count) {
 	assert(count >= 0);
 
-	const bjvm_utf8 type;
 	int size = sizeof_type_kind(array_type);
 	bjvm_classdesc *desc = make_array_classdesc(
 			thread, bjvm_primitive_classdesc(thread, array_type));

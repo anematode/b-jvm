@@ -2574,6 +2574,11 @@ start:
         goto done;
       assert(info->classdesc);
 
+      if (count < 0) {
+        bjvm_negative_array_size_exception(thread, count);
+        goto done;
+      }
+
       bjvm_obj_header *array =
           CreateObjectArray1D(thread, info->classdesc, count);
       if (array) {
@@ -2878,11 +2883,18 @@ start:
     }
     bjvm_insn_newarray: {
       int count = checked_pop(frame).i;
+
+      if (count < 0) {
+        bjvm_negative_array_size_exception(thread, count);
+        goto done;
+      }
+
       bjvm_obj_header *array =
           CreatePrimitiveArray1D(thread, insn->array_type, count);
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
       } else { // failed to create array
+        /// TODO: throw OOM
         goto done;
       }
       NEXT_INSN;

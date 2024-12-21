@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
+#include <optional>
 
 #include "../src/adt.h"
 #include "../src/bjvm.h"
@@ -37,7 +38,7 @@ double get_time() {
 #endif
 }
 
-std::vector<uint8_t> ReadFile(const std::string &file) {
+std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
 #ifdef EMSCRIPTEN
   bool exists = EM_ASM_INT(
       {
@@ -78,7 +79,7 @@ std::vector<uint8_t> ReadFile(const std::string &file) {
     ifs.seekg(0, std::ios::beg);
     ifs.read(reinterpret_cast<char *>(result.data()), pos);
   } else {
-    throw std::runtime_error("Classpath file not found: " + file);
+    return {};
   }
   return result;
 #endif
@@ -176,7 +177,7 @@ TEST_CASE("Test classfile parsing") {
       continue;
     }
 
-    auto read = ReadFile(file);
+    auto read = ReadFile(file).value();
     double start = get_time();
 
     // std::cout << "Reading " << file << "\n";
@@ -216,7 +217,8 @@ TEST_CASE("Test classfile parsing") {
   std::cout << "Total time: " << total_millis << "ms\n";
 
   BENCHMARK_ADVANCED("Parse classfile")(Catch::Benchmark::Chronometer meter) {
-    auto read = ReadFile("./jre8/sun/security/tools/keytool/Main.class");
+    auto read =
+        ReadFile("./jre8/sun/security/tools/keytool/Main.class").value();
     bjvm_classdesc cf;
 
     meter.measure([&] {
@@ -236,7 +238,7 @@ int preregister_all_classes(bjvm_vm *vm) {
     if (!EndsWith(file, ".class")) {
       continue;
     }
-    auto read = ReadFile(file);
+    auto read = ReadFile(file).value();
     file = file.substr(5); // remove "jre8/"
     bjvm_utf8 filename = {.chars = (char *)file.c_str(),
                           .len = (int)file.size()};
@@ -374,8 +376,10 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   for (const auto &path : paths) {
     std::string file = path + std::string(filename.chars, filename.len);
     try {
-      auto file_data = ReadFile(file);
-      if (file_data.size() > 0) {
+      auto file_data_ = ReadFile(file);
+      if (file_data_.has_value()) {
+        auto file_data = file_data_.value();
+
         auto *data = (uint8_t *)malloc(file_data.size());
         memcpy(data, file_data.data(), file_data.size());
         *bytes = data;
@@ -422,7 +426,7 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   options.load_classfile_param = classpath;
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
-    result->stdout_ += (char)ch;
+  result->stdout_ += (char)ch;
   } : nullptr;
   options.write_stderr = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
