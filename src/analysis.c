@@ -605,7 +605,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   locals->entries_cap = locals->entries_count = code->max_locals;
   for (; i < desc->args_count && j < code->max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
-    locals->entries[j] = arg.kind;
+    locals->entries[j] = field_to_representable_kind(&arg);
     if (bjvm_is_field_wide(arg)) {
       if (++j >= code->max_locals)
         goto fail;
