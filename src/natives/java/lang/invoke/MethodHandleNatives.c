@@ -40,6 +40,15 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str, const bjvm_classdesc *desc) {
   }
 }
 
+// Copied from MethodHandleNatives.java
+enum {
+  MN_IS_METHOD           = 0x00010000, // method (not constructor)
+  MN_IS_CONSTRUCTOR      = 0x00020000, // constructor
+  MN_IS_FIELD            = 0x00040000, // field
+  MN_IS_TYPE             = 0x00080000, // nested type
+  MN_CALLER_SENSITIVE    = 0x00100000, // @CallerSensitive annotation detected
+};
+
 heap_string unparse_method_type(const struct bjvm_native_MethodType *mt) {
   INIT_STACK_STRING(desc, 10000);
   bjvm_utf8 write = desc;
@@ -68,6 +77,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
   printf("Search type: %.*s\n", fmt_slice(mn->type->descriptor->name));
 
   bjvm_method_handle_kind kind = unpack_mn_kind(mn); // TODO validate
+  mn->flags &= (int)0xFF000000U;
   bool is_static = false, dynamic_dispatch = true, found = false;
 
   switch (kind) {
@@ -85,7 +95,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
     mn->vmtarget = (void*)mn;
     mn->resolution = (void*)field->reflection_field;
     mn->vmindex = 1; // field offset
-    mn->flags = field->access_flags;
+    mn->flags |= field->access_flags;
+    mn->flags |= MN_IS_FIELD;
     bjvm_classdesc *field_cd = load_class_of_field_descriptor(thread, field->descriptor);
     mn->type = (void*)bjvm_get_class_mirror(thread, field_cd);
     break;
@@ -111,14 +122,16 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve, "(Ljava/lang/in
     if (utf8_equals(method->name, "<init>")) {
       bjvm_reflect_initialize_constructor(thread, search_on, method);
       mn->resolution = (void*)method->reflection_ctor;
+      mn->flags |= MN_IS_CONSTRUCTOR;
     } else {
       bjvm_reflect_initialize_method(thread, search_on, method);
       mn->resolution = (void*)method->reflection_method;
+      mn->flags |= MN_IS_METHOD;
     }
 
     mn->vmtarget = (void*)mn;
     mn->vmindex = dynamic_dispatch ? 1 : -1;  // ultimately, itable or vtable entry index
-    mn->flags = method->access_flags;
+    mn->flags |= method->access_flags;
     mn->type = bjvm_intern_string(thread, method->descriptor);
     break;
   default:
