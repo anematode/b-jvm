@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str) {
   if (entry.len != (int)strlen(str))
