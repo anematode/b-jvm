@@ -33,14 +33,16 @@ if (TRUE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (FALSE)
+if (TRUE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
-add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
+add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
+        src/natives/java/lang/reflect/Array.c
+        src/natives/java/lang/Object.c)
 target_include_directories(bjvm PRIVATE src)
 
 add_executable(bjvm_main src/bin/main.c)

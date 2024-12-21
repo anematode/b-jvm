@@ -128,13 +128,16 @@ DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
       bootstrap_class_create(thread, str("java/lang/System"));
   bjvm_cp_field *out_field =
       bjvm_easy_field_lookup(system_class, str("out"), str("Ljava/io/PrintStream;"));
-
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
-
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", System, registerNatives, "()V") { return value_null(); }
 DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") { return value_null(); }
 DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") { return value_null(); }
+
+DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
+  assert(argc == 1);
+  return (bjvm_stack_value){.i = (int)args[0].obj->mark_word};
+}

@@ -73,6 +73,7 @@ typedef struct bjvm_obj_header {
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len); // todo: get rid of
+heap_string read_string_to_utf8(bjvm_obj_header *obj);
 
 struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;
@@ -302,6 +303,16 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
+
+void bjvm_reflect_initialize_field(bjvm_thread *thread,
+                                   bjvm_classdesc *classdesc,
+                                   bjvm_cp_field *field);
+void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
+                                         bjvm_classdesc *classdesc,
+                                         bjvm_cp_method *method);
+void bjvm_reflect_initialize_method(bjvm_thread *thread,
+                                    bjvm_classdesc *classdesc,
+                                    bjvm_cp_method *method);
 
 #ifdef __cplusplus
 }

@@ -448,6 +448,19 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
   bjvm_thread_run(thr, method, args, nullptr);
 
+  if (thr->current_exception) {
+    auto *message = (bjvm_obj_header *)*((void **)thr->current_exception + 3);
+    std::string msg = "(no message)";
+    if (message) {
+      heap_string msg_object = read_string_to_utf8(message);
+      msg = std::string(msg_object.chars, msg_object.chars + msg_object.len);
+      free_heap_str(msg_object);
+    }
+    std::cout << "Exception thrown!\n"
+              << thr->current_exception->descriptor->name.chars << ": " << msg
+              << '\n';
+  }
+
   bjvm_free_thread(thr);
   bjvm_free_vm(vm);
 
@@ -553,8 +566,6 @@ TEST_CASE("Math natives") {
 TEST_CASE("Signature polymorphism") {
   auto result = run_test_case("test_files/signature_polymorphism/", false);
 }
-
-
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
