@@ -62,8 +62,8 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   int src_pos = args[1].i;
   int dest_pos = args[3].i;
   int length = args[4].i;
-  int src_length = *array_length(src);
-  int dest_length = *array_length(dest);
+  int src_length = *ArrayLength(src);
+  int dest_length = *ArrayLength(dest);
   // Verify that everything is in bounds
   // TODO add more descriptive error messages
   if (src_pos < 0 || dest_pos < 0 || length < 0 ||
@@ -103,8 +103,8 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
       }
     }
 
-    memmove((char *)array_data(dest) + dest_pos * element_size,
-            (char *)array_data(src) + src_pos * element_size,
+    memmove((char *)ArrayData(dest) + dest_pos * element_size,
+            (char *)ArrayData(src) + src_pos * element_size,
             length * element_size);
 
     return value_null();
@@ -113,13 +113,13 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   for (int i = 0; i < length; ++i) {
     // may-alias case handled above
     bjvm_obj_header *src_elem =
-        ((bjvm_obj_header **)array_data(src))[src_pos + i];
+        ((bjvm_obj_header **)ArrayData(src))[src_pos + i];
     if (src_elem && !bjvm_instanceof(src_elem->descriptor,
                                      dest->descriptor->one_fewer_dim)) {
       ThrowLangException(ArrayStoreException);
       return value_null();
     }
-    ((bjvm_obj_header **)array_data(dest))[dest_pos + i] = src_elem;
+    ((bjvm_obj_header **)ArrayData(dest))[dest_pos + i] = src_elem;
   }
 
   return value_null();

@@ -71,9 +71,9 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0,
   if (!enclosing_method.class_info) {
     return value_null();
   }
-  bjvm_obj_header *array = create_object_array(
+  bjvm_obj_header *array = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, str("java/lang/Object")), 3);
-  bjvm_obj_header **data = array_data(array);
+  bjvm_obj_header **data = ArrayData(array);
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
   assert(!error);
   data[0] = (void *)enclosing_method.class_info->classdesc->mirror;
@@ -169,13 +169,13 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
                "(Z)[Ljava/lang/reflect/Field;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
   bjvm_stack_value ret;
-  ret.obj = create_object_array(
+  ret.obj = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, str("java/lang/reflect/Field")),
       classdesc->fields_count);
 
   for (int i = 0; i < classdesc->fields_count; ++i) {
     bjvm_reflect_initialize_field(thread, classdesc, classdesc->fields + i);
-    *((struct bjvm_native_Field **)array_data(ret.obj) + i) =
+    *((struct bjvm_native_Field **)ArrayData(ret.obj) + i) =
         classdesc->fields[i].reflection_field;
   }
   return ret;
@@ -195,13 +195,13 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
   }
 
   bjvm_stack_value ret;
-  ret.obj = create_object_array(
+  ret.obj = CreateObjectArray1D(
       thread,
       bootstrap_class_create(thread, str("java/lang/reflect/Constructor")),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
     if (utf8_equals(classdesc->methods[i].name, "<init>")) {
-      *((struct bjvm_native_Constructor **)array_data(ret.obj) + j++) =
+      *((struct bjvm_native_Constructor **)ArrayData(ret.obj) + j++) =
           classdesc->methods[i].reflection_ctor;
     }
   }
@@ -221,12 +221,12 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
   }
 
   bjvm_stack_value ret;
-  ret.obj = create_object_array(
+  ret.obj = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, str("java/lang/reflect/Method")),
       count);
   for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
     if (!utf8_equals(classdesc->methods[i].name, "<init>")) {
-      *((struct bjvm_native_Method **)array_data(ret.obj) + j++) =
+      *((struct bjvm_native_Method **)ArrayData(ret.obj) + j++) =
           classdesc->methods[i].reflection_method;
     }
   }

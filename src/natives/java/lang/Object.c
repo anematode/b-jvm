@@ -1,4 +1,3 @@
-
 #include <natives.h>
 
 DECLARE_NATIVE("java/lang", Object, hashCode, "()I") {
@@ -12,11 +11,11 @@ DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") {
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   switch (obj->descriptor->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
-    bjvm_obj_header *new_array = create_object_array(
-        thread, obj->descriptor->one_fewer_dim, *array_length(obj));
+    bjvm_obj_header *new_array = CreateObjectArray1D(
+        thread, obj->descriptor->one_fewer_dim, *ArrayLength(obj));
     if (new_array) {
-      memcpy(array_data(new_array), array_data(obj),
-             *array_length(obj) * sizeof(void *));
+      memcpy(ArrayData(new_array), ArrayData(obj),
+             *ArrayLength(obj) * sizeof(void *));
     }
     return (bjvm_stack_value){.obj = new_array};
   }
