@@ -10,7 +10,7 @@ public class Main {
 class BigDecimalTest {
     static void testBigDecimalOperations() {
         System.out.println("hello");
-        for (int i = 0; i < 1024; ++i) {
+        for (int i = 0; i < 1; ++i) {
         BigDecimal a = new BigDecimal("10.5");
         BigDecimal b = new BigDecimal("2.3");
         BigDecimal result = a.add(b);

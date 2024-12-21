@@ -18,7 +18,6 @@ bool frame_mentions_object(bjvm_stack_frame *frame, bjvm_obj_header *obj) {
 
 // Implementation-dependent field where we can store the stack trace
 bjvm_obj_header **backtrace_object(bjvm_obj_header *throwable) {
-  assert(utf8_equals(throwable->descriptor->name, "java/lang/Throwable"));
   return &((struct bjvm_native_Throwable *)throwable)->backtrace;
 }
 

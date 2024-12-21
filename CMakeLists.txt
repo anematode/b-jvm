@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(bjvm)
 
+enable_testing()
+
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 17)
 Include(FetchContent)
@@ -19,8 +21,8 @@ if (EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
     set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=100000000 -fsanitize=undefined -s ALLOW_MEMORY_GROWTH=1")
 elseif (APPLE)
-    set(CMAKE_C_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing")
-    set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
+    set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing")
+    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
     set(EmscriptenFlags "")
 else ()
     set(CMAKE_C_FLAGS "-O3 -Wall -Wextra -g -fsanitize=address,undefined -march=native -fno-strict-aliasing")
@@ -28,7 +30,7 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (TRUE)
+if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
@@ -59,3 +61,8 @@ add_executable(tests test/tests.cc)
 target_link_libraries(tests PRIVATE bjvm)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
+
+add_test(NAME tests
+        COMMAND tests --skip-benchmarks
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
+set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_container_overflow=0")
