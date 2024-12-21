@@ -5,8 +5,8 @@
 #include "adt.h"
 #include "util.h"
 
-#include <stdlib.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 bjvm_compressed_bitset bjvm_empty_bitset() {
   return (bjvm_compressed_bitset){.bits_inl = 1};

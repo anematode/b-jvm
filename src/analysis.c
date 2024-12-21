@@ -375,7 +375,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
     snprintf(result, sizeof(result), "%.9gf", (float)ent->floating.value);
     break;
   case BJVM_CP_KIND_LONG:
-    snprintf(result, sizeof(result), "%lldL", ent->integral.value);
+    snprintf(result, sizeof(result), "%" PRId64 "L", ent->integral.value);
     break;
   case BJVM_CP_KIND_DOUBLE:
     snprintf(result, sizeof(result), "%.15gd", (float)ent->floating.value);

@@ -166,8 +166,6 @@ TEST_CASE("Test classfile parsing") {
   auto files = ListDirectory("jre8", true);
   double total_millis = 0;
 
-  char *shortest_error = nullptr;
-
   int count = 0;
   int FILE_COUNT = fuzz ? 64 : INT_MAX;
   for (const auto &file : files) {
@@ -214,8 +212,6 @@ TEST_CASE("Test classfile parsing") {
 
     total_millis += get_time() - start;
   }
-
-  printf("Shortest error: %s\n", shortest_error);
 
   std::cout << "Total time: " << total_millis << "ms\n";
 

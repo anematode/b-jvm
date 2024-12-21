@@ -656,13 +656,6 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
       bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, str("void"));
 }
 
-/** Begin StrictMath natives */
-
-/** End StrictMath natives, begin Class natives */
-
-// Natives for the java.lang.Class class.
-void bjvm_register_natives_Class(bjvm_vm *vm) {}
-
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
   options.heap_size = 1 << 24;
@@ -940,7 +933,7 @@ void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count) {
   if (strings) {
     bjvm_hash_table_iterator iter =
         bjvm_hash_table_get_iterator(&vm->classfiles);
-    size_t key_len, i = 0;
+    size_t i = 0;
     void *value;
 
     bjvm_utf8 key;
@@ -1041,6 +1034,7 @@ int bjvm_resolve_method_handle(bjvm_thread *thread,
   // obtained as if by resolution of an unresolved symbolic reference to a
   // method type that contains the method descriptor specified in
   // Table 5.4.3.5-B for the kind of MH."
+  return 0;
 }
 
 bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
@@ -1600,7 +1594,6 @@ bjvm_obj_header *create_object_array(bjvm_thread *thread,
 bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
                                            bjvm_type_kind array_type,
                                            int count) {
-  const bjvm_utf8 type;
   int size = sizeof_type_kind(array_type);
   if (count < 0) {
     bjvm_negative_array_size_exception(thread, count);
