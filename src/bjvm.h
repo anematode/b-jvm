@@ -319,24 +319,24 @@ void store_stack_value(void *field_location, bjvm_stack_value value,
 bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind);
 
 static inline int sizeof_type_kind(bjvm_type_kind kind) {
-	switch (kind) {
-		case BJVM_TYPE_KIND_BYTE:
-		case BJVM_TYPE_KIND_BOOLEAN:
-			return 1;
-		case BJVM_TYPE_KIND_CHAR:
-		case BJVM_TYPE_KIND_SHORT:
-			return 2;
-		case BJVM_TYPE_KIND_FLOAT:
-		case BJVM_TYPE_KIND_INT:
-			return 4;
-		case BJVM_TYPE_KIND_REFERENCE:
-			return sizeof(void *);
-		case BJVM_TYPE_KIND_DOUBLE:
-		case BJVM_TYPE_KIND_LONG:
-			return 8;
-		default:
-			UNREACHABLE();
-	}
+  switch (kind) {
+  case BJVM_TYPE_KIND_BYTE:
+  case BJVM_TYPE_KIND_BOOLEAN:
+    return 1;
+  case BJVM_TYPE_KIND_CHAR:
+  case BJVM_TYPE_KIND_SHORT:
+    return 2;
+  case BJVM_TYPE_KIND_FLOAT:
+  case BJVM_TYPE_KIND_INT:
+    return 4;
+  case BJVM_TYPE_KIND_REFERENCE:
+    return sizeof(void *);
+  case BJVM_TYPE_KIND_DOUBLE:
+  case BJVM_TYPE_KIND_LONG:
+    return 8;
+  default:
+    UNREACHABLE();
+  }
 }
 
 #ifdef __cplusplus
