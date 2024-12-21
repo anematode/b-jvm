@@ -2,7 +2,7 @@
 
 #define CACHE_INVOKESTATIC 1
 #define CACHE_INVOKENONSTATIC 1
-#define ONE_GOTO_PER_INSN 1
+#define ONE_GOTO_PER_INSN 0
 
 #include <assert.h>
 #include <limits.h>
@@ -106,7 +106,7 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   }
 
   for (int i = 0; i < frame->max_locals; ++i) {
-    bjvm_stack_value value = frame->values[i];
+    bjvm_stack_value value = frame->values[i + frame->max_stack];
     const char *is_ref =
         bjvm_test_compressed_bitset(refs, i + frame->max_stack) ? "<ref>" : "";
     write +=
@@ -398,12 +398,6 @@ bjvm_stack_value bjvm_Object_clone(bjvm_thread *thread, bjvm_obj_header *obj,
   default:
     UNREACHABLE();
   }
-}
-
-// Get the default hash code of an Object, which is stored in its mark word
-bjvm_stack_value bjvm_Object_hashCode(bjvm_thread *, bjvm_obj_header *obj,
-                                      bjvm_stack_value *, int) {
-  return (bjvm_stack_value){.i = (int)obj->mark_word};
 }
 
 bjvm_stack_value bjvm_Class_getPrimitiveClass(bjvm_thread *thread,
@@ -711,6 +705,22 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   result->parameterTypes = create_object_array(
       thread, bootstrap_class_create(thread, str("java/lang/Class")),
       method->parsed_descriptor->args_count);
+}
+
+void bjvm_reflect_initialize_method(bjvm_thread *thread,
+  bjvm_classdesc* classdesc,
+  bjvm_cp_method *method) {
+  bjvm_classdesc *reflect_Method =
+    bootstrap_class_create(thread, str("java/lang/reflect/Method"));
+  bjvm_initialize_class(thread, reflect_Method);
+
+  struct bjvm_native_Method *result = method->reflection_method =
+    (void *)new_object(thread, reflect_Method);
+  result->reflected_method = method;
+  result->name = bjvm_intern_string(thread, method->name);
+  result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+
+  // TODO fill the rest in
 }
 
 bjvm_stack_value bjvm_Class_getDeclaredFields(bjvm_thread *thread,
@@ -1265,7 +1275,6 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
       "sun/reflect/NativeConstructorAccessorImpl", "newInstance0",
       "(Ljava/lang/reflect/Constructor;[Ljava/lang/Object;)Ljava/lang/Object;",
       bjvm_NativeConstructorAccessImpl_newInstance);
-  REGISTER("java/lang/Object", "hashCode", "()I", bjvm_Object_hashCode);
 
   REGISTER("java/lang/Thread", "registerNatives", "()V", unimplemented_native);
   REGISTER("java/lang/Thread", "currentThread", "()Ljava/lang/Thread;",
@@ -2485,10 +2494,12 @@ bjvm_obj_header *bjvm_multianewarray_impl(bjvm_thread *thread,
                                      this_dim);
   }
   bjvm_obj_header *arr = create_object_array(thread, desc, this_dim);
-  for (int i = 0; i < this_dim; ++i) {
-    bjvm_obj_header *next =
-        bjvm_multianewarray_impl(thread, desc->array_type, value, dims - 1);
-    *((bjvm_obj_header **)array_data(arr) + i) = next;
+  if (dims > 1) {
+    for (int i = 0; i < this_dim; ++i) {
+      bjvm_obj_header *next =
+          bjvm_multianewarray_impl(thread, desc->array_type, value, dims - 1);
+      *((bjvm_obj_header **)array_data(arr) + i) = next;
+    }
   }
   return arr;
 }

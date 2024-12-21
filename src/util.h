@@ -76,8 +76,7 @@ static inline bjvm_utf8 slice_to(bjvm_utf8 str, int start, int end) {
 
 /// Uses the given format string and arguments to print a string into the given
 /// buffer; returns a slice of the buffer containing the string.
-__attribute__((no_sanitize("address"))) static inline bjvm_utf8
-bprintf(bjvm_utf8 buffer, const char *format, ...) {
+static inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
   va_list args;
   va_start(args, format);
   char clobbered = buffer.chars[buffer.len];
