@@ -711,7 +711,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
 
 #define PUSH_BRANCH_TARGET(target)                                             \
   {                                                                            \
-    assert((int)target < code->insn_count && target >= 0);                     \
+    assert((int)target < code->insn_count);                                    \
     if (inferred_stacks[target].entries) {                                     \
       error_str =                                                              \
           expect_analy_stack_states_equal(inferred_stacks[target], stack);     \
