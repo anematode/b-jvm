@@ -135,7 +135,7 @@ bjvm_obj_header *CreateArray(bjvm_thread *thread,
 										  int *dim_sizes, int dims) {
 	int this_dim = *(dim_sizes + dims - 1);
 
-	if (dims == 1 && desc->kind != BJVM_CD_KIND_ORDINARY_ARRAY) {
+	if (dims == 1 && desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY) {
 		return create_1d_primitive_array(thread, desc->primitive_component,
 										 this_dim);
 	}

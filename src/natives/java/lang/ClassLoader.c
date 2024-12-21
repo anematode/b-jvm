@@ -17,3 +17,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0,
   free_heap_str(read);
   return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, cd)};
 }
+
+DECLARE_NATIVE("java/lang", ClassLoader, findBuiltinLib, "(Ljava/lang/String;)Ljava/lang/String;") {
+  return value_null();
+}
