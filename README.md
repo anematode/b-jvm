@@ -33,5 +33,5 @@ Common abbreviations:
 ### Useful
 
 ```
-clang-format -i test/*.cc src/*.c src/*.h
+clang-format -i test/*.cc src/**/*.c src/**/*.h
 ```

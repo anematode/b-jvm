@@ -1,5 +1,6 @@
 java/lang/String
 java/lang/StackTraceElement
+java/lang/Throwable
 java/lang/Class
   bjvm_classdesc *reflected_class;
 java/lang/reflect/Field

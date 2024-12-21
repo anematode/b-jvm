@@ -1,13 +1,25 @@
+#include "analysis.h"
+
 #include <natives.h>
 
 bool frame_mentions_object(bjvm_stack_frame *frame, bjvm_obj_header *obj) {
-  // TODO filter by bitset to avoid false positives
   for (int i = 0; i < frame->max_locals + frame->max_stack; ++i) {
     if (frame->values[i].obj == obj) {
-      return true;
+      bjvm_compressed_bitset refs =
+          ((bjvm_code_analysis *)frame->method->code_analysis)
+              ->insn_index_to_references[frame->program_counter];
+      if (bjvm_test_compressed_bitset(refs, i)) {
+        return true;
+      }
     }
   }
   return false;
+}
+
+// Implementation-dependent field where we can store the stack trace
+bjvm_obj_header **backtrace_object(bjvm_obj_header *throwable) {
+  assert(utf8_equals(throwable->descriptor->name, "java/lang/Throwable"));
+  return &((struct bjvm_native_Throwable *)throwable)->backtrace;
 }
 
 DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
@@ -23,19 +35,17 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   int i = thread->frames_count - 1;
   for (; i >= 0; --i) {
     bjvm_stack_frame *frame = thread->frames[i];
-    // The first frame in which the exceptioned object is not mentioned
-    if (!frame_mentions_object(frame, obj)) {
+    // The first frame in which the exception object is not mentioned
+    if (!frame_mentions_object(frame, obj))
       break;
-    }
   }
 
-  // Create stack trace of length i + 1
+  // Create stack trace of the appropriate height
   ++i;
   bjvm_obj_header *stack_trace =
       create_object_array(thread, StackTraceElement, i + 1);
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
-
     bjvm_obj_header *class_name =
         bjvm_intern_string(thread, hslc(frame->method->my_class->name));
     bjvm_obj_header *method_name =
@@ -44,7 +54,6 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
         bjvm_intern_string(thread, frame->method->my_class->source_file->name);
     int line =
         bjvm_get_line_number(frame->method->code, frame->program_counter);
-
     struct bjvm_native_StackTraceElement *e =
         (void *)new_object(thread, StackTraceElement);
     e->declaringClass = class_name;
@@ -54,35 +63,25 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     *((struct bjvm_native_StackTraceElement **)array_data(stack_trace) + j) = e;
   }
 
-  // Look up field "stackTrace" and set it to the stack trace
-  bjvm_cp_field *field = bjvm_easy_field_lookup(
-      obj->descriptor, str("backtrace"), str("Ljava/lang/Object;"));
-  store_stack_value((void *)obj + field->byte_offset,
-                    (bjvm_stack_value){.obj = stack_trace},
-                    BJVM_TYPE_KIND_REFERENCE);
-
+  *backtrace_object(obj) = stack_trace;
   return (bjvm_stack_value){.obj = obj};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
   assert(argc == 0);
 
-  bjvm_cp_field *field = bjvm_easy_field_lookup(
-      obj->descriptor, str("backtrace"), str("Ljava/lang/Object;"));
-  bjvm_obj_header *stack_trace =
-      *(bjvm_obj_header **)((void *)obj + field->byte_offset);
-  int length = *array_length(stack_trace);
-
-  return (bjvm_stack_value){.i = length};
+  return (bjvm_stack_value){.i = *array_length(*backtrace_object(obj))};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
                "(I)Ljava/lang/StackTraceElement;") {
   assert(argc == 1);
-  bjvm_cp_field *field = bjvm_easy_field_lookup(
-      obj->descriptor, str("backtrace"), str("Ljava/lang/Object;"));
-  bjvm_obj_header *stack_trace =
-      *(bjvm_obj_header **)((void *)obj + field->byte_offset);
-  return (bjvm_stack_value){
-      .obj = *((bjvm_obj_header **)array_data(stack_trace) + args[0].i)};
+  bjvm_obj_header *stack_trace = *backtrace_object(obj);
+  int index = args[0].i;
+  if (index < 0 || index >= *array_length(stack_trace)) {
+    return value_null();
+  }
+  bjvm_obj_header *element =
+      *((bjvm_obj_header **)array_data(stack_trace) + index);
+  return (bjvm_stack_value){.obj = element};
 }

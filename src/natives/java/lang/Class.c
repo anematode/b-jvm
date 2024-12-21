@@ -136,8 +136,7 @@ DECLARE_NATIVE("java/lang", Class, getName0, "()Ljava/lang/String;") {
     name.chars[i] = name.chars[i] == '/' ? '.' : name.chars[i];
   }
   name.len = classdesc->name.len;
-  return (bjvm_stack_value){
-      .obj = bjvm_intern_string(thread, name)};
+  return (bjvm_stack_value){.obj = bjvm_intern_string(thread, name)};
 }
 
 DECLARE_NATIVE("java/lang", Class, forName0,

@@ -197,8 +197,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
                   &result);
   data[0] = result.obj;
 
-  printf("MN INDEX: %llu\n", mn->vmindex);
-
   data[1] = mn->vmtarget;
 
   return (bjvm_stack_value){.obj = array};
@@ -214,17 +212,21 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
     // TODO we're not given the method handle type. Huh?
     bjvm_cp_method *m = *bjvm_unmirror_method(target);
     fill_mn_with_method(thread, mn, m, false, true);
-    mn->flags |= (m->access_flags & BJVM_ACCESS_STATIC) ? BJVM_MH_KIND_INVOKE_STATIC << 24 : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
+    mn->flags |= (m->access_flags & BJVM_ACCESS_STATIC)
+                     ? BJVM_MH_KIND_INVOKE_STATIC << 24
+                     : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
     fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), false, true);
     mn->flags |= BJVM_MH_KIND_NEW_INVOKE_SPECIAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Field")) {
-    bjvm_cp_field *field =  *bjvm_unmirror_field(target);
+    bjvm_cp_field *field = *bjvm_unmirror_field(target);
     fill_mn_with_field(thread, mn, field);
-    mn->flags |= (field->access_flags & BJVM_ACCESS_STATIC) ? BJVM_MH_KIND_GET_STATIC << 24 : BJVM_MH_KIND_GET_FIELD << 24;
+    mn->flags |= (field->access_flags & BJVM_ACCESS_STATIC)
+                     ? BJVM_MH_KIND_GET_STATIC << 24
+                     : BJVM_MH_KIND_GET_FIELD << 24;
   } else {
     UNREACHABLE();
   }
-  mn->resolution = nullptr;  // ??
+  mn->resolution = nullptr; // ??
   return value_null();
 }

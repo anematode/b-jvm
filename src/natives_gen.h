@@ -13,6 +13,15 @@ struct bjvm_native_StackTraceElement {
   bjvm_obj_header *fileName;       // Ljava/lang/String;
   int32_t lineNumber;              // I
 };
+struct bjvm_native_Throwable {
+  bjvm_obj_header base;
+  // my fields
+  bjvm_obj_header *backtrace;            // Ljava/lang/Object;
+  bjvm_obj_header *detailMessage;        // Ljava/lang/String;
+  bjvm_obj_header *cause;                // Ljava/lang/Throwable;
+  bjvm_obj_header *stackTrace;           // [Ljava/lang/StackTraceElement;
+  bjvm_obj_header *suppressedExceptions; // Ljava/util/List;
+};
 struct bjvm_native_Class {
   bjvm_obj_header base;
   // implementation-dependent fields
