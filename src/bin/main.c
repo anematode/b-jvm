@@ -4,6 +4,5 @@
 
 #include <stdio.h>
 
-#include "bjvm.h"
-
-int main() { return 0; }
+int main() {
+}

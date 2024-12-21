@@ -36,8 +36,16 @@ typedef struct {
 } bjvm_analy_stack_state;
 
 int bjvm_locals_on_method_entry(const bjvm_cp_method *descriptor,
-                                    bjvm_analy_stack_state *locals);
+                                bjvm_analy_stack_state *locals);
 
-char *bjvm_analyze_method_code_segment(bjvm_cp_method *method);
+/**
+ * Analyze the method's code segment if it exists, rewriting instructions in
+ * place to make longs/doubles one stack value wide, writing the analysis into
+ * analysis.
+ * <br/>
+ * Returns -1 if an error occurred, and writes the error message into error.
+ */
+int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+                                     heap_string *error);
 
 #endif // BJVM_ANALYSIS_H
