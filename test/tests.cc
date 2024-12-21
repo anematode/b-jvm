@@ -242,6 +242,7 @@ int preregister_all_classes(bjvm_vm *vm) {
       continue;
     }
     auto read = ReadFile(file);
+    file = file.substr(5); // remove "jre8/"
     bjvm_utf8 filename = {.chars = (char *)file.c_str(),
                           .len = (int)file.size()};
     bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
@@ -508,7 +509,7 @@ TEST_CASE("Interning") {
 
 TEST_CASE("NegativeArraySizeException") {
   auto result = run_test_case("test_files/negative_array_size/");
-  std::string expected = std::string(12, 'k');
+  std::string expected = "abcdefghij";
   REQUIRE(result.stdout_ == expected);
 }
 

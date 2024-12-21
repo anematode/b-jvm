@@ -77,26 +77,27 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   // an ArrayStoreException as appropriate.
   if (src_is_1d_primitive || bjvm_instanceof(src->descriptor->one_fewer_dim,
                                              dest->descriptor->one_fewer_dim)) {
-    size_t element_size;
+    size_t element_size = sizeof(void*);
 
-    switch (src->descriptor->primitive_component) {
+    if (src_is_1d_primitive) {
+      switch (src->descriptor->primitive_component) {
 #define CASE(type, underlying)                                                 \
-  case BJVM_TYPE_KIND_##type:                                                  \
-    element_size = sizeof(underlying);                                         \
-    break;
-      CASE(BYTE, int8_t)
-      CASE(CHAR, uint16_t)
-      CASE(DOUBLE, double)
-      CASE(FLOAT, float)
-      CASE(INT, int32_t)
-      CASE(LONG, int64_t)
-      CASE(SHORT, int16_t)
-      CASE(BOOLEAN, uint8_t)
-      CASE(REFERENCE, bjvm_obj_header *)
-#undef CASE
+case BJVM_TYPE_KIND_##type:                                                  \
+element_size = sizeof(underlying);                                         \
+break;
+        CASE(BYTE, int8_t)
+        CASE(CHAR, uint16_t)
+        CASE(DOUBLE, double)
+        CASE(FLOAT, float)
+        CASE(INT, int32_t)
+        CASE(LONG, int64_t)
+        CASE(SHORT, int16_t)
+        CASE(BOOLEAN, uint8_t)
+  #undef CASE
 
-    default:
-      UNREACHABLE();
+      default:
+        UNREACHABLE();
+      }
     }
 
     memmove((char *)array_data(dest) + dest_pos * element_size,

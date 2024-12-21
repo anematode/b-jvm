@@ -526,10 +526,8 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     heap_string utf8 = {0};
 
-    if (!skip_linking) {
-      utf8 = parse_modified_utf8(bytes_reader.bytes, length);
-      free_on_format_error(ctx, utf8.chars);
-    }
+    utf8 = parse_modified_utf8(bytes_reader.bytes, length);
+    free_on_format_error(ctx, utf8.chars);
 
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_UTF8, .utf8 = utf8};
   }
@@ -605,7 +603,6 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_INVOKE_DYNAMIC: {
-    puts("indy");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     char *error = parse_method_descriptor(
@@ -617,7 +614,6 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    puts("method ref");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
@@ -633,7 +629,6 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
-    puts("method type");
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
     char *error = parse_method_descriptor(entry->method_type_info.descriptor,
