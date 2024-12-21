@@ -71,7 +71,8 @@ typedef struct bjvm_obj_header {
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
 
-void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf, size_t *len); // todo: get rid of
+void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
+                 size_t *len); // todo: get rid of
 
 struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;

@@ -27,8 +27,8 @@ char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8) {
   return result;
 }
 
-int convert_modified_utf8_to_chars(const char *bytes, int len,
-    short **result, int *result_len, bool sloppy) {
+int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
+                                   int *result_len, bool sloppy) {
   *result = malloc(len * sizeof(short)); // conservatively large
   int i = 0, j = 0;
 
@@ -69,5 +69,5 @@ int convert_modified_utf8_to_chars(const char *bytes, int len,
 
 inval:
   free(*result);
-  return -1;  // invalid UTF-8 sequence
+  return -1; // invalid UTF-8 sequence
 }

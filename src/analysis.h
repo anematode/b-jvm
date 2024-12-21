@@ -40,6 +40,7 @@ char *bjvm_locals_on_function_entry(const bjvm_utf8 *descriptor,
  * <br/>
  * Returns -1 if an error occurred, and writes the error message into error.
  */
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error);
+int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+                                     heap_string *error);
 
 #endif // BJVM_ANALYSIS_H

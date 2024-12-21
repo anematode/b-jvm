@@ -336,7 +336,8 @@ const char *bjvm_type_kind_to_string(bjvm_type_kind kind) {
 
 char *class_info_entry_to_string(const bjvm_cp_class_info *ent) {
   char result[1000];
-  snprintf(result, sizeof(result), "Class: %.*s", ent->name.len, ent->name.chars);
+  snprintf(result, sizeof(result), "Class: %.*s", ent->name.len,
+           ent->name.chars);
   return strdup(result);
 }
 
@@ -344,7 +345,8 @@ char *
 name_and_type_entry_to_string(const bjvm_cp_name_and_type *name_and_type) {
   char result[1000];
   snprintf(result, sizeof(result), "NameAndType: %.*s:%.*s",
-           name_and_type->name.len, name_and_type->name.chars, name_and_type->descriptor.len, name_and_type->descriptor.chars);
+           name_and_type->name.len, name_and_type->name.chars,
+           name_and_type->descriptor.len, name_and_type->descriptor.chars);
   return strdup(result);
 }
 
@@ -379,7 +381,8 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_CLASS:
     return class_info_entry_to_string(&ent->class_info);
   case BJVM_CP_KIND_STRING: {
-    snprintf(result, sizeof(result), "String: '%.*s'", ent->string.chars.len, ent->string.chars.chars);
+    snprintf(result, sizeof(result), "String: '%.*s'", ent->string.chars.len,
+             ent->string.chars.chars);
     break;
   }
   case BJVM_CP_KIND_FIELD_REF: {
@@ -577,7 +580,8 @@ bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->kind);
 }
 
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error) {
+int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+                                     heap_string *error) {
   bjvm_attribute_code *code = method->code;
   if (!code) {
     return 0;
@@ -1201,8 +1205,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method, heap_string *error)
     char *stack_str = print_analy_stack_state(&stack_before);
     char *context = code_attribute_to_string(method->code);
     bprintf(hslc(*error),
-             "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
-             error_str, insn_str, stack_str, context);
+            "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
+            error_str, insn_str, stack_str, context);
     free(insn_str);
     free(stack_str);
     free(context);

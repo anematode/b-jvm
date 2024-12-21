@@ -209,8 +209,9 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
   printf("Unsatisfied link error %.*s on %.*s\n", fmt_slice(method->name),
          fmt_slice(method->my_class->name));
   INIT_STACK_STRING(err, 1000);
-  bprintf(err, "Method %.*s on class %.*s with descriptor %.*s", fmt_slice(method->name),
-          fmt_slice(method->my_class->name), fmt_slice(method->descriptor));
+  bprintf(err, "Method %.*s on class %.*s with descriptor %.*s",
+          fmt_slice(method->name), fmt_slice(method->my_class->name),
+          fmt_slice(method->descriptor));
 
   bjvm_raise_exception(thread, str("java/lang/UnsatisfiedLinkError"), err);
 }
@@ -246,8 +247,8 @@ void bjvm_incompatible_class_change_error(bjvm_thread *thread,
 void bjvm_abstract_method_error(bjvm_thread *thread,
                                 const bjvm_cp_method *method) {
   INIT_STACK_STRING(complaint, 1000);
-  bprintf(complaint, "Abstract method '%.*s' on class %.*s", fmt_slice(method->name),
-          fmt_slice(method->my_class->name));
+  bprintf(complaint, "Abstract method '%.*s' on class %.*s",
+          fmt_slice(method->name), fmt_slice(method->my_class->name));
   bjvm_raise_exception(thread, str("java/lang/AbstractMethodError"), complaint);
 }
 
@@ -267,7 +268,8 @@ void bjvm_array_index_oob_exception(bjvm_thread *thread, int index,
                        complaint);
 }
 
-void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf, size_t *len) {
+void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
+                 size_t *len) {
   assert(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
   bjvm_obj_header *array = ((struct bjvm_native_String *)obj)->value;
   *buf = array_data(array);
@@ -533,8 +535,7 @@ bjvm_stack_value bjvm_Class_getClassLoader(bjvm_thread *, bjvm_obj_header *,
 }
 
 static bjvm_obj_header *make_byte_array(bjvm_thread *thread, int count) {
-  bjvm_classdesc *byte_array_class =
-      bootstrap_class_create(thread, str("[B"));
+  bjvm_classdesc *byte_array_class = bootstrap_class_create(thread, str("[B"));
   bjvm_initialize_class(thread, byte_array_class);
   return create_object_array(thread, byte_array_class, count);
 }
@@ -569,7 +570,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   bjvm_initialize_class(thread, java_lang_String);
   struct bjvm_native_String *str = (void *)new_object(thread, java_lang_String);
 
-  short* chars;
+  short *chars;
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
   str->value = create_1d_primitive_array(thread, BJVM_TYPE_KIND_CHAR, len);
@@ -593,7 +594,6 @@ bjvm_stack_value bjvm_Class_forName(bjvm_thread *thread, bjvm_obj_header *,
   short *name;
   size_t len;
   read_string(thread, name_obj, &name, &len);
-
 
   heap_string name_str = make_heap_str(len);
   for (size_t i = 0; i < len; ++i) {
@@ -1012,7 +1012,8 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   }
 
 #ifndef EMSCRIPTEN
-  printf("Exception: %.*s: %.*s\n", fmt_slice(exception_name), fmt_slice(exception_string));
+  printf("Exception: %.*s: %.*s\n", fmt_slice(exception_name),
+         fmt_slice(exception_string));
 #endif
   bjvm_raise_exception_object(thread, obj);
   return 0;
@@ -1445,7 +1446,8 @@ bjvm_classdesc *primitive_array_classdesc(bjvm_thread *thread,
   result->primitive_component = component_type->primitive_component;
   if (component_type->kind == BJVM_CD_KIND_PRIMITIVE) {
     result->name = make_heap_str(2);
-    bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
+    bprintf(hslc(result->name), "[%c",
+            (char)component_type->primitive_component);
   } else {
     result->name = make_heap_str(component_type->name.len + 1);
     bprintf(hslc(result->name), "[%.*s", fmt_slice(component_type->name));
@@ -1840,7 +1842,8 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 
 #if AGGRESSIVE_DEBUG
     printf("Allocating nonstatic field %.*s for class %.*s at %d\n",
-           fmt_slice(field->name), fmt_slice(classdesc->name), field->byte_offset);
+           fmt_slice(field->name), fmt_slice(classdesc->name),
+           field->byte_offset);
 #endif
   }
 
@@ -2312,7 +2315,8 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     insn->ic2 = lookup_on;
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
-      bprintf(complaint, "Could not find method %.*s with descriptor %.*s on %.*s %.*s",
+      bprintf(complaint,
+              "Could not find method %.*s with descriptor %.*s on %.*s %.*s",
               fmt_slice(info->name_and_type->name),
               fmt_slice(info->name_and_type->descriptor),
               lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
@@ -2393,7 +2397,8 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       bprintf(complaint,
               "Could not find method %.*s with descriptor %.*s on class %.*s",
               fmt_slice(info->name_and_type->name),
-              fmt_slice(info->name_and_type->descriptor), fmt_slice(class->name));
+              fmt_slice(info->name_and_type->descriptor),
+              fmt_slice(class->name));
       bjvm_incompatible_class_change_error(thread, complaint);
       return -1;
     }
@@ -2497,8 +2502,9 @@ int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
   bjvm_cp_method *method = frame->method;
 
 #if AGGRESSIVE_DEBUG
-  printf("Calling method %.*s, descriptor %.*s, on class %.*s\n", fmt_slice(method->name),
-         fmt_slice(method->descriptor), fmt_slice(method->my_class->name));
+  printf("Calling method %.*s, descriptor %.*s, on class %.*s\n",
+         fmt_slice(method->name), fmt_slice(method->descriptor),
+         fmt_slice(method->my_class->name));
 #endif
 
 start:
@@ -2506,7 +2512,7 @@ start:
     bjvm_bytecode_insn *insn = &method->code->code[frame->program_counter];
 
 #if AGGRESSIVE_DEBUG
-    char* insn_dump = insn_to_string(insn, frame->program_counter);
+    char *insn_dump = insn_to_string(insn, frame->program_counter);
     printf("Insn: %s\n", insn_to_string(insn, frame->program_counter));
     printf("Method: %.*s in class %.*s\n", fmt_slice(method->name),
            fmt_slice(method->my_class->name));
@@ -3328,7 +3334,8 @@ start:
       if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
         INIT_STACK_STRING(complaint, 1000);
         bprintf(complaint, "Expected nonstatic field %.*s on class %.*s",
-                fmt_slice(field_info->nat->name), fmt_slice(field_info->class_info->name));
+                fmt_slice(field_info->nat->name),
+                fmt_slice(field_info->class_info->name));
 
         bjvm_incompatible_class_change_error(thread, complaint);
         goto done;
@@ -3368,7 +3375,8 @@ start:
         if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
           INIT_STACK_STRING(complaint, 1000);
           bprintf(complaint, "Expected static field %.*s on class %.*s",
-                  fmt_slice(field_info->nat->name), fmt_slice(field_info->class_info->name));
+                  fmt_slice(field_info->nat->name),
+                  fmt_slice(field_info->class_info->name));
           bjvm_incompatible_class_change_error(thread, complaint);
           goto done;
         }
