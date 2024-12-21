@@ -1,6 +1,7 @@
 #include "util.h"
 
 #include <stdlib.h>
+#include <stdint.h>
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str) {
   if (entry.len != (int)strlen(str))
@@ -39,24 +40,25 @@ int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
   for (; i < len; ++i) {
     // "Code points in the range '\u0001' to '\u007F' are represented by a
     // single byte"
-    if (bytes[i] >= 0x01 && bytes[i] <= 0x7F) {
-      (*result)[j++] = bytes[i];
+    uint8_t byte = bytes[i];
+    if (byte >= 0x01 && byte <= 0x7F) {
+      (*result)[j++] = byte;
     } else if ((bytes[i] & 0xE0) == 0xC0) {
       // "Code points in the range '\u0080' to '\u07FF' are represented by two
       // bytes"
       if (i >= len - 1)
         goto inval;
-      (*result)[j++] = ((bytes[i] & 0x1F) << 6) | (bytes[i + 1] & 0x3F);
+      (*result)[j++] = (short)((byte & 0x1F) << 6) | (bytes[i + 1] & 0x3F);
       i++;
     } else if ((bytes[i] & 0xF0) == 0xE0) {
       // "Code points in the range '\u0800' to '\uFFFF' are represented by three
       // bytes"
       if (i >= len - 2)
         goto inval;
-      (*result)[j++] = ((bytes[i] & 0x0F) << 12) |
+      (*result)[j++] = (short)((byte & 0x0F) << 12) |
                        ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F);
       i += 2;
-    } else if (sloppy && bytes[i] == 0) {
+    } else if (sloppy && byte == 0) {
       break;
     } else {
       // "No byte may have the value (byte)0 or lie in the range (byte)0xf0 -
