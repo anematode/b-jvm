@@ -294,6 +294,14 @@ DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
   return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
 }
 
+DECLARE_NATIVE("java/lang", Class, isInstance, "(Ljava/lang/Object;)Z") {
+  bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
+  if (!args[0].obj)
+    UNREACHABLE(); // TODO check reference for what to do here
+  bjvm_classdesc *other_desc = args[0].obj->descriptor;
+  return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
+}
+
 DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj);
   return (bjvm_stack_value){.i = desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
