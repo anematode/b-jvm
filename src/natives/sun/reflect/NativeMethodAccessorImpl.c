@@ -6,9 +6,9 @@ DECLARE_NATIVE(
   // TODO all this
   bjvm_cp_method *method = *bjvm_unmirror_method(args[0].obj);
   bjvm_stack_value result;
-
-  if (method->access_flags & BJVM_ACCESS_STATIC) {
-
+  int arg_i = 0;
+  if (!(method->access_flags & BJVM_ACCESS_STATIC)) {
+    // Instance method. Try converting obj to the class of the method and
   }
 
   return value_null();

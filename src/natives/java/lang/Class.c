@@ -168,72 +168,97 @@ DECLARE_NATIVE("java/lang", Class, desiredAssertionStatus0,
   return (bjvm_stack_value){.i = 1}; // TODO add thread option
 }
 
+bool include_field(const bjvm_cp_field *field, bool public_only) {
+  return !public_only || field->access_flags & BJVM_ACCESS_PUBLIC;
+}
+
 DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
                "(Z)[Ljava/lang/reflect/Field;") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-  bjvm_stack_value ret;
-  ret.obj = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/reflect/Field")),
-      classdesc->fields_count);
-
-  for (int i = 0; i < classdesc->fields_count; ++i) {
-    bjvm_reflect_initialize_field(thread, classdesc, classdesc->fields + i);
-    *((struct bjvm_native_Field **)ArrayData(ret.obj) + i) =
-        classdesc->fields[i].reflection_field;
+  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bool public_only = args[0].i;
+  int fields = 0;
+  // First initialize the reflection objects
+  for (int i = 0; i < class->fields_count; ++i) {
+    bjvm_cp_field *field = class->fields + i;
+    if (include_field(field, public_only)) {
+      bjvm_reflect_initialize_field(thread, class, field);
+      ++fields;
+    }
   }
-  return ret;
+  bjvm_obj_header *result = CreateObjectArray1D(
+      thread, bootstrap_class_create(thread, STR("java/lang/reflect/Field")),
+      fields);
+  struct bjvm_native_Field **data = ArrayData(result);
+  for (int i = 0, j = 0; i < class->fields_count; ++i) {
+    bjvm_cp_field *field = class->fields + i;
+    if (include_field(field, public_only))
+      data[j++] = field->reflection_field;
+  }
+  return (bjvm_stack_value) { .obj = result };
 }
 
+bool include_ctor(const bjvm_cp_method *method, bool public_only) {
+  return utf8_equals(method->name, "<init>") &&
+         (!public_only || method->access_flags & BJVM_ACCESS_PUBLIC);
+}
+
+// Get a list of all constructors on a class, optionally filtering by public_only
 DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
                "(Z)[Ljava/lang/reflect/Constructor;") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-
-  int count = 0;
-  for (int i = 0; i < classdesc->methods_count; ++i) {
-    if (utf8_equals(classdesc->methods[i].name, "<init>")) {
-      bjvm_reflect_initialize_constructor(thread, classdesc,
-                                          classdesc->methods + i);
-      ++count;
+  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bool public_only = args[0].i;
+  int ctors = 0;
+  // First initialize the reflection objects
+  for (int i = 0; i < class->methods_count; ++i) {
+    bjvm_cp_method *method = class->methods + i;
+    if (include_ctor(method, public_only)) {
+      bjvm_reflect_initialize_constructor(thread, class, method);
+      ++ctors;
     }
   }
-
-  bjvm_stack_value ret;
-  ret.obj = CreateObjectArray1D(
-      thread,
-      bootstrap_class_create(thread, STR("java/lang/reflect/Constructor")),
-      count);
-  for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
-    if (utf8_equals(classdesc->methods[i].name, "<init>")) {
-      *((struct bjvm_native_Constructor **)ArrayData(ret.obj) + j++) =
-          classdesc->methods[i].reflection_ctor;
-    }
+  // Then create the array
+  bjvm_classdesc *Ctor = bootstrap_class_create(thread, STR("java/lang/reflect/Constructor"));
+  bjvm_obj_header *result = CreateObjectArray1D(thread, Ctor, ctors);
+  struct bjvm_native_Constructor **data = ArrayData(result);
+  int j = 0;
+  for (int i = 0; i < class->methods_count; ++i) {
+    bjvm_cp_method *method = class->methods + i;
+    if (include_ctor(method, public_only))
+      data[j++] = method->reflection_ctor;
   }
-  return ret;
+  return (bjvm_stack_value) { .obj = result };
 }
 
+bool include_method(const bjvm_cp_method *method, bool public_only) {
+  return !utf8_equals(method->name, "<init>") &&
+         (!public_only || method->access_flags & BJVM_ACCESS_PUBLIC);
+}
+
+// Get a list of all methods on a class, optionally filtering by public_only
 DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
                "(Z)[Ljava/lang/reflect/Method;") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
-
-  int count = 0;
-  for (int i = 0; i < classdesc->methods_count; ++i) {
-    if (!utf8_equals(classdesc->methods[i].name, "<init>")) {
-      bjvm_reflect_initialize_method(thread, classdesc, classdesc->methods + i);
-      ++count;
+  assert(argc == 1);
+  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bool public_only = args[0].i;
+  int methods = 0;
+  // First initialize the reflection objects
+  for (int i = 0; i < class->methods_count; ++i) {
+    bjvm_cp_method *method = class->methods + i;
+    if (include_method(method, public_only)) {
+      bjvm_reflect_initialize_method(thread, class, method);
+      ++methods;
     }
   }
-
-  bjvm_stack_value ret;
-  ret.obj = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/reflect/Method")),
-      count);
-  for (int i = 0, j = 0; i < classdesc->methods_count; ++i) {
-    if (!utf8_equals(classdesc->methods[i].name, "<init>")) {
-      *((struct bjvm_native_Method **)ArrayData(ret.obj) + j++) =
-          classdesc->methods[i].reflection_method;
-    }
+  // Then create the array
+  bjvm_classdesc *Method = bootstrap_class_create(thread, STR("java/lang/reflect/Method"));
+  bjvm_obj_header *result = CreateObjectArray1D(thread, Method, methods);
+  struct bjvm_native_Method **data = ArrayData(result);
+  for (int i = 0, j = 0; i < class->methods_count; ++i) {
+    bjvm_cp_method *method = class->methods + i;
+    if (include_method(method, public_only))
+      data[j++] = method->reflection_method;
   }
-  return ret;
+  return (bjvm_stack_value) { .obj = result };
 }
 
 DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
@@ -257,8 +282,8 @@ DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
 }
 
 DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
-  return (bjvm_stack_value){.i = bjvm_unmirror_class(obj)->access_flags &
-                                 BJVM_ACCESS_INTERFACE};
+  return (bjvm_stack_value){.i = !!(bjvm_unmirror_class(obj)->access_flags &
+                                 BJVM_ACCESS_INTERFACE)};
 }
 
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {

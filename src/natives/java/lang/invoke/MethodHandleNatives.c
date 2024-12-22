@@ -294,10 +294,5 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMembers,
   int totalCount = args[5].i;
   bjvm_obj_header *buf = args[6].obj;
 
-  printf("defc: %.*s, matchName: %.*s, matchSig: %.*s, matchFlags: %d, "
-         " totalCount: %d\n",
-         fmt_slice(defc->name), fmt_slice(matchName), fmt_slice(matchSig),
-         matchFlags, totalCount);
-
   return (bjvm_stack_value){.i = 0};
 }
