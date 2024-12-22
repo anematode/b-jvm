@@ -4,7 +4,7 @@ project(bjvm)
 enable_testing()
 
 set(CMAKE_C_STANDARD 23)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 Include(FetchContent)
 
 FetchContent_Declare(
@@ -18,7 +18,7 @@ FetchContent_MakeAvailable(Catch2)
 # If doing emscripten
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -Wextra -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
-    set(CMAKE_CXX_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
+    set(CMAKE_CXX_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type ")
     set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=100000000 -fsanitize=undefined -s ALLOW_MEMORY_GROWTH=1")
 elseif (APPLE)
     set(CMAKE_C_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing")
@@ -57,8 +57,9 @@ add_executable(gen_natives codegen/gen_natives.c)
 target_link_libraries(gen_natives PRIVATE bjvm)
 set_target_properties(gen_natives PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
-add_executable(tests test/tests.cc)
+add_executable(tests test/tests.cc test/arrays-test.cc test/tests-common.cc)
 target_link_libraries(tests PRIVATE bjvm)
+target_include_directories(tests PRIVATE src)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 

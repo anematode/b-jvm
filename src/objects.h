@@ -1,5 +1,7 @@
 #include "bjvm.h"
 
+uint64_t ObjNextHashCode();
+
 /// Create a java.lang.String from a null-terminated C string.
 bjvm_obj_header *MakeJavaStringUtf8(bjvm_thread *thread, char const *chars);
 
@@ -15,4 +17,9 @@ inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
   return result.i;
 }
 
-uint64_t ObjNextHashCode();
+static inline bjvm_obj_header *AllocateObject(bjvm_classdesc *descriptor, size_t data_size) {
+  bjvm_obj_header *obj = calloc(1, sizeof(bjvm_obj_header) + data_size);
+  obj->mark_word = ObjNextHashCode();
+  obj->descriptor = descriptor;
+  return obj;
+}

@@ -10,17 +10,17 @@
 #include <iostream>
 #include <unordered_map>
 #include <optional>
+#include <ranges>
 
+
+#include "tests-common.h"
 #include "../src/adt.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
 
-bool EndsWith(const std::string &s, const std::string &suffix) {
-  if (s.size() < suffix.size()) {
-    return false;
-  }
-  return s.substr(s.size() - suffix.size()) == suffix;
-}
+using namespace Bjvm::Tests;
+using namespace std::views;
+using namespace std::ranges;
 
 bool HasSuffix(std::string_view str, std::string_view suffix) {
   // Credit: https://stackoverflow.com/a/20446239/13458117
@@ -81,73 +81,6 @@ std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
   } else {
     return {};
   }
-  return result;
-#endif
-}
-
-std::vector<std::string> ListDirectory(const std::string &path,
-                                       bool recursive) {
-#ifdef EMSCRIPTEN
-  void *length_and_data = EM_ASM_PTR(
-      {
-        // Credit: https://stackoverflow.com/a/5827895
-        const fs = require('fs');
-        const path = require('path');
-        function *walkSync(dir, recursive) {
-          const files = fs.readdirSync(dir, {withFileTypes : true});
-          for (const file of files) {
-            if (file.isDirectory() && recursive) {
-              yield *walkSync(path.join(dir, file.name), recursive);
-            } else {
-              yield path.join(dir, file.name);
-            }
-          }
-        }
-
-        var s = "";
-        for (const filePath of walkSync(UTF8ToString($0), $1))
-          s += filePath + "\n";
-
-        const length = s.length;
-        const result = _malloc(length + 4);
-        Module.HEAPU32[result >> 2] = length;
-        Module.HEAPU8.set(new TextEncoder().encode(s), result + 4);
-
-        return result;
-      },
-      path.c_str(), recursive);
-
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
-
-  std::string s(data, data + length);
-  free(length_and_data);
-
-  std::vector<std::string> result;
-  size_t start = 0;
-
-  for (size_t i = 0; i < s.size(); i++) {
-    if (s[i] == '\n') {
-      result.push_back(s.substr(start, i - start));
-      start = i + 1;
-    }
-  }
-
-  return result;
-#else // !EMSCRIPTEN
-  using namespace std::filesystem;
-
-  // Recursively list files (TODO: fix recursive = false)
-  std::vector<std::string> result;
-
-  (void)recursive;
-
-  for (const auto &entry : recursive_directory_iterator(path)) {
-    if (entry.is_regular_file()) {
-      result.push_back(entry.path().string());
-    }
-  }
-
   return result;
 #endif
 }
@@ -231,28 +164,12 @@ TEST_CASE("Test classfile parsing") {
   };
 }
 
-int preregister_all_classes(bjvm_vm *vm) {
-  auto files = ListDirectory("jre8", true);
-  int file_count = 0;
-  for (auto file : files) {
-    if (!EndsWith(file, ".class")) {
-      continue;
-    }
-    auto read = ReadFile(file).value();
-    file = file.substr(5); // remove "jre8/"
-    bjvm_utf8 filename = {.chars = (char *)file.c_str(),
-                          .len = (int)file.size()};
-    bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
-    file_count++;
-  }
-  return file_count;
-}
-
 TEST_CASE("Class file management") {
-  bjvm_vm_options options = {};
-  bjvm_vm *vm = bjvm_create_vm(options);
+  bjvm_vm *vm = CreateTestVM(true);
+  int file_count = count_if(ListDirectory("jre8", true), [](auto &file) {
+    return EndsWith(file, ".class");
+  });
 
-  int file_count = preregister_all_classes(vm);
   size_t len;
   const uint8_t *bytes;
   REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes,
@@ -393,21 +310,8 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   return -1;
 }
 
-bjvm_vm *create_vm(bool preregister, const char **classpath = nullptr) {
-  bjvm_vm_options options = {};
-
-  options.load_classfile = load_classfile;
-  options.load_classfile_param = classpath;
-  bjvm_vm *vm = bjvm_create_vm(options);
-
-  if (preregister)
-    preregister_all_classes(vm);
-
-  return vm;
-}
-
 TEST_CASE("VM initialization") {
-  bjvm_vm *vm = create_vm(true);
+  bjvm_vm *vm = CreateTestVM(true);
   bjvm_free_vm(vm);
 }
 
@@ -579,7 +483,7 @@ TEST_CASE("Playground") {
 #if 0
 TEST_CASE("Class circularity error") {
   const char* cp[2] = { "test_files/circularity/", nullptr };
-  bjvm_vm *vm = create_vm(false, cp);
+  bjvm_vm *vm = CreateTestVM(true, classpath = cp);
 
   bjvm_thread_options options;
   bjvm_fill_default_thread_options(&options);
