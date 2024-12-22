@@ -3226,6 +3226,27 @@ typedef struct bjvm_gc_ctx {
     }                                                                          \
   }
 
+void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
+  // Push the mirrors of this base class and all of its array types
+  bjvm_classdesc *array = desc;
+  while (array) {
+    PUSH_ROOT(&array->mirror);
+    array = array->array_type;
+  }
+
+  // Push all the method mirrors
+  for (int i = 0; i < desc->methods_count; ++i) {
+    PUSH_ROOT(&desc->methods[i].reflection_method);
+    PUSH_ROOT(&desc->methods[i].reflection_ctor);
+    PUSH_ROOT(&desc->methods[i].method_type_obj);
+  }
+
+  // Push all the field mirrors
+  for (int i = 0; i < desc->fields_count; ++i) {
+    PUSH_ROOT(&desc->fields[i].reflection_field);
+  }
+}
+
 void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
@@ -3247,12 +3268,9 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     for (int i = 0; i < bs_list_len; ++i) {
       PUSH_ROOT(((bjvm_obj_header **)desc->static_fields) + bitset_list[i]);
     }
-    // Push the mirrors of this base class and all of its array types
-    bjvm_classdesc *array = desc;
-    while (array) {
-      PUSH_ROOT(&array->mirror);
-      array = array->array_type;
-    }
+
+    // Also, push things like Class, Method and Constructors
+    enumerate_reflection_roots(ctx, desc);
     bjvm_hash_table_iterator_next(&it);
   }
 
