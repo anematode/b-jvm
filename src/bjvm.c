@@ -144,6 +144,7 @@ void free_primitive_classdesc(bjvm_classdesc *classdesc) {
 }
 
 void free_classdesc(void *classdesc_) {
+  if (!classdesc_) return;
   bjvm_classdesc *classdesc = classdesc_;
   if (classdesc->array_type)
     free_classdesc(classdesc->array_type);
