@@ -205,6 +205,7 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference);
 
 bjvm_vm_options bjvm_default_vm_options();
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
+void bjvm_major_gc(bjvm_vm *vm);
 
 typedef struct {
   uint32_t stack_space;
@@ -337,6 +338,8 @@ static inline int sizeof_type_kind(bjvm_type_kind kind) {
 
 bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread,
 										 bjvm_type_kind prim_kind);
+void *bump_allocate(bjvm_thread *thread, size_t bytes);
+
 #ifdef __cplusplus
 }
 #endif

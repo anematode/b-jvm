@@ -21,6 +21,18 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
     free(bits.ptr.bits);
 }
 
+void push_bits(uint64_t bits, int offset, int **existing_buf, int *length,
+               int *capacity) {
+  while (bits) {
+    int shift = __builtin_ctzll(bits);
+    bits >>= shift;
+    offset += shift;
+    *VECTOR_PUSH((*existing_buf), (*length), (*capacity)) = offset;
+    bits >>= 1;
+    offset += 1;
+  }
+}
+
 /**
  * List all set bits, starting from 0, in the given bitset. Stores the list into
  * the given buffer, which must have the existing length in words (or
@@ -31,15 +43,12 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
 int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity) {
+  *length = 0;
   if (bjvm_is_bitset_compressed(bits)) {
-    for (int i = 1; i < 64; ++i)
-      if (bits.bits_inl & (1ULL << i))
-        *VECTOR_PUSH(existing_buf, (*length), (*capacity)) = i - 1;
+    push_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
   } else {
     for (uint32_t i = 0; i < bits.ptr.size_words; ++i)
-      for (int j = 0; j < 64; ++j)
-        if (bits.ptr.bits[i] & (1ULL << j))
-          *VECTOR_PUSH(existing_buf, (*length), (*capacity)) = i * 64 + j;
+      push_bits(bits.ptr.bits[i], (int)i << 6, &existing_buf, length, capacity);
   }
   return existing_buf;
 }

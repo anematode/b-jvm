@@ -166,7 +166,7 @@ TEST_CASE("Test classfile parsing") {
 
 TEST_CASE("Class file management") {
   bjvm_vm *vm = CreateTestVM(true);
-  int file_count = count_if(ListDirectory("jre8", true), [](auto &file) {
+  int file_count = (int)count_if(ListDirectory("jre8", true), [](auto &file) {
     return EndsWith(file, ".class");
   });
 
@@ -189,6 +189,7 @@ TEST_CASE("Class file management") {
   for (size_t i = 0; i < len; ++i) {
     found = found ||
             utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
+    free_heap_str(strings[i]);
   }
   REQUIRE(found);
   bjvm_free_vm(vm);
@@ -322,7 +323,7 @@ struct TestCaseResult {
 
 TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   const char *classpath[2] = {folder.c_str(), nullptr};
-  bjvm_vm_options options = {};
+  bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
 

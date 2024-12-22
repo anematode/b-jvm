@@ -151,6 +151,9 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
   case BJVM_ATTRIBUTE_KIND_SOURCE_FILE:
     break;
+  case BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE:
+    free(attribute->lnt.entries);
+    break;
   }
 }
 
@@ -163,6 +166,7 @@ void bjvm_free_classfile(bjvm_classdesc cf) {
     free_method(&cf.methods[i]);
   for (int i = 0; i < cf.fields_count; ++i)
     free_field(&cf.fields[i]);
+  free_heap_str(cf.name);
   free(cf.static_fields);
   free(cf.fields);
   free(cf.methods);
@@ -207,6 +211,7 @@ void free_code_analysis(bjvm_code_analysis *code_analysis) {
       bjvm_free_compressed_bitset(code_analysis->insn_index_to_references[i]);
     free(code_analysis->insn_index_to_references);
   }
+  free(code_analysis->insn_index_to_stack_depth);
   free(code_analysis);
 }
 
@@ -527,8 +532,10 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     heap_string utf8 = {0};
 
-    utf8 = parse_modified_utf8(bytes_reader.bytes, length);
-    free_on_format_error(ctx, utf8.chars);
+    if (skip_linking) {
+      utf8 = parse_modified_utf8(bytes_reader.bytes, length);
+      free_on_format_error(ctx, utf8.chars);
+    }
 
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_UTF8, .utf8 = utf8};
   }
@@ -664,7 +671,12 @@ bjvm_constant_pool *parse_constant_pool(cf_byteslice *reader,
     // pointers
     for (int cp_i = 1; cp_i < cp_count; ++cp_i) {
       bjvm_cp_entry *ent = get_constant_pool_entry(pool, cp_i);
-      *ent = parse_constant_pool_entry(reader, ctx, !(bool)resolution_pass);
+      bjvm_cp_entry new_entry =
+          parse_constant_pool_entry(reader, ctx, !(bool)resolution_pass);
+      if (new_entry.kind != BJVM_CP_KIND_UTF8 || resolution_pass == 0) {
+        *ent = new_entry; // don't store UTF-8 entries on the second pass
+        // TODO fix ^^ this is janky af
+      }
       ent->my_index = cp_i;
 
       if (ent->kind == BJVM_CP_KIND_LONG || ent->kind == BJVM_CP_KIND_DOUBLE) {
