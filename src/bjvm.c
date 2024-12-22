@@ -174,7 +174,7 @@ void free_native_entries(void *entries_) {
   if (!entries_)
     return;
 
-  free(((native_entries*)entries_)->entries);
+  free(((native_entries *)entries_)->entries);
   free(entries_);
 }
 
@@ -1291,9 +1291,10 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       &thread->vm->class_padding, classdesc->name.chars, classdesc->name.len);
 
   // Assign memory locations to all static/non-static fields
-  bjvm_classdesc *super = classdesc->super_class ? classdesc->super_class->classdesc : NULL;
+  bjvm_classdesc *super =
+      classdesc->super_class ? classdesc->super_class->classdesc : NULL;
   int static_offset = 0,
-    nonstatic_offset = super ? super->data_bytes : sizeof(bjvm_obj_header);
+      nonstatic_offset = super ? super->data_bytes : sizeof(bjvm_obj_header);
   nonstatic_offset += imp_padding;
   for (int field_i = 0; field_i < classdesc->fields_count; ++field_i) {
     bjvm_cp_field *field = classdesc->fields + field_i;
@@ -1310,12 +1311,14 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 #endif
   }
 
-  classdesc->static_references = bjvm_init_compressed_bitset(static_offset / sizeof(void*));
-  classdesc->instance_references = bjvm_init_compressed_bitset(nonstatic_offset / sizeof(void*));
+  classdesc->static_references =
+      bjvm_init_compressed_bitset(static_offset / sizeof(void *));
+  classdesc->instance_references =
+      bjvm_init_compressed_bitset(nonstatic_offset / sizeof(void *));
   // Add superclass instance references
   if (super) {
     bjvm_compressed_bitset bs = super->instance_references;
-    for (int i = 0; i < super->data_bytes / sizeof(void*); ++i) {
+    for (int i = 0; i < super->data_bytes / sizeof(void *); ++i) {
       if (bjvm_test_compressed_bitset(bs, i)) {
         bjvm_test_set_compressed_bitset(&classdesc->instance_references, i);
       }
@@ -1323,12 +1326,12 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   }
   for (int field_i = 0; field_i < classdesc->fields_count; ++field_i) {
     bjvm_cp_field *field = classdesc->fields + field_i;
-    if (field_to_representable_kind(&field->parsed_descriptor) == BJVM_TYPE_KIND_REFERENCE) {
-      bjvm_compressed_bitset *bs =
-          field->access_flags & BJVM_ACCESS_STATIC
-              ? &classdesc->static_references
-              : &classdesc->instance_references;
-      bjvm_test_set_compressed_bitset(bs, field->byte_offset / sizeof(void*));
+    if (field_to_representable_kind(&field->parsed_descriptor) ==
+        BJVM_TYPE_KIND_REFERENCE) {
+      bjvm_compressed_bitset *bs = field->access_flags & BJVM_ACCESS_STATIC
+                                       ? &classdesc->static_references
+                                       : &classdesc->instance_references;
+      bjvm_test_set_compressed_bitset(bs, field->byte_offset / sizeof(void *));
     }
   }
 
@@ -1339,7 +1342,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   return 0;
 }
 
-void* bump_allocate(bjvm_thread *thread, size_t bytes) {
+void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = (bytes + 7) & ~7;
   bjvm_vm *vm = thread->vm;
@@ -1354,7 +1357,7 @@ void* bump_allocate(bjvm_thread *thread, size_t bytes) {
       UNREACHABLE();
     }
   }
-  void* result = vm->heap + vm->heap_used;
+  void *result = vm->heap + vm->heap_used;
   memset(result, 0, bytes);
   vm->heap_used += bytes;
   return result;
@@ -3232,27 +3235,38 @@ typedef struct bjvm_gc_ctx {
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
 #define PUSH_ROOT(x)                                                           \
   {                                                                            \
-__typeof(x) v = (x); \
-if (*v) {\
-*VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) = (bjvm_obj_header**) v; \
-}\
+    __typeof(x) v = (x);                                                       \
+    if (*v) {                                                                  \
+      *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) =             \
+          (bjvm_obj_header **)v;                                               \
+    }                                                                          \
   }
 
 void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
     for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
-      { __typeof(&vm->primitive_classes[i]->mirror) v = (&vm->primitive_classes[i]->mirror);
+      {
+        __typeof(&vm->primitive_classes[i]->mirror) v =
+            (&vm->primitive_classes[i]->mirror);
         if (*v) {
-          *({ if ((ctx->roots_count) >= (ctx->roots_cap)) {
-            int new_cap;
-            int overflow = __builtin_mul_overflow((ctx->roots_cap), 2, &new_cap);
-            assert(!overflow); if (new_cap < 2) new_cap = 2;
-            void *next = realloc(ctx->roots, new_cap * sizeof(*ctx->roots));
-            assert(next);
-            (ctx->roots_cap) = new_cap; ctx->roots = next;
-          } &ctx->roots[(ctx->roots_count)++]; }) = (bjvm_obj_header**) v;
-        } };
+          *({
+            if ((ctx->roots_count) >= (ctx->roots_cap)) {
+              int new_cap;
+              int overflow =
+                  __builtin_mul_overflow((ctx->roots_cap), 2, &new_cap);
+              assert(!overflow);
+              if (new_cap < 2)
+                new_cap = 2;
+              void *next = realloc(ctx->roots, new_cap * sizeof(*ctx->roots));
+              assert(next);
+              (ctx->roots_cap) = new_cap;
+              ctx->roots = next;
+            }
+            &ctx->roots[(ctx->roots_count)++];
+          }) = (bjvm_obj_header **)v;
+        }
+      };
     }
   }
 
@@ -3267,7 +3281,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     bitset_list = bjvm_list_compressed_bitset_bits(
         desc->static_references, bitset_list, &bs_list_len, &bs_list_cap);
     for (int i = 0; i < bs_list_len; ++i) {
-      PUSH_ROOT(((bjvm_obj_header**)desc->static_fields) + bitset_list[i]);
+      PUSH_ROOT(((bjvm_obj_header **)desc->static_fields) + bitset_list[i]);
     }
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
@@ -3302,7 +3316,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   // Interned strings (TODO remove)
   it = bjvm_hash_table_get_iterator(&vm->interned_strings);
   bjvm_obj_header *str;
-  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void**) &str)) {
+  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void **)&str)) {
     PUSH_ROOT(&it.current->data);
     bjvm_hash_table_iterator_next(&it);
   }
@@ -3310,7 +3324,8 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
-void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, int* capacities, int depth) {
+void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
+                         int *capacities, int depth) {
   obj->mark_word |= REACHABLE_BIT;
   *VECTOR_PUSH(ctx->objs, ctx->objs_count, ctx->objs_cap) = obj;
 
@@ -3319,20 +3334,23 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, 
   int len = 0;
   if (desc->kind == BJVM_CD_KIND_ORDINARY) {
     bjvm_compressed_bitset bits = desc->instance_references;
-    int** bitset = &bitsets[depth];
-    *bitset = bjvm_list_compressed_bitset_bits(bits, *bitset, &len, &capacities[depth]);
+    int **bitset = &bitsets[depth];
+    *bitset = bjvm_list_compressed_bitset_bits(bits, *bitset, &len,
+                                               &capacities[depth]);
     for (int i = 0; i < len; ++i) {
-      bjvm_obj_header *field = *((bjvm_obj_header**) obj + (*bitset)[i]);
+      bjvm_obj_header *field = *((bjvm_obj_header **)obj + (*bitset)[i]);
       if (field && !(field->mark_word & REACHABLE_BIT)) {
         // Visiting instance field at offset on class
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
     }
-  } else if (desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY || (desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && desc->dimensions > 1)) {
+  } else if (desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
+             (desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
+              desc->dimensions > 1)) {
     // Visit all components
     int len = *array_length(obj);
     for (int i = 0; i < len; ++i) {
-      bjvm_obj_header *field = *((bjvm_obj_header**) array_data(obj) + i);
+      bjvm_obj_header *field = *((bjvm_obj_header **)array_data(obj) + i);
       if (field && !(field->mark_word & REACHABLE_BIT)) {
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
@@ -3341,32 +3359,38 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int** bitsets, 
 }
 
 int comparator(const void *a, const void *b) {
-  return *(bjvm_obj_header**)a - *(bjvm_obj_header**)b;
+  return *(bjvm_obj_header **)a - *(bjvm_obj_header **)b;
 }
 
 size_t size_of_object(bjvm_obj_header *obj) {
   if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
     return obj->descriptor->data_bytes;
   }
-  if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY || (obj->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && obj->descriptor->dimensions > 1)) {
-    return 24 + *array_length(obj) * sizeof(void*);
+  if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
+      (obj->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
+       obj->descriptor->dimensions > 1)) {
+    return 24 + *array_length(obj) * sizeof(void *);
   }
-  return 24 + *array_length(obj) * sizeof_type_kind(obj->descriptor->primitive_component);
+  return 24 + *array_length(obj) *
+                  sizeof_type_kind(obj->descriptor->primitive_component);
 }
 
-void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header** obj) {
-  if (!*obj) return;
+void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header **obj) {
+  if (!*obj)
+    return;
 
   // Binary search for obj in ctx->roots
-  bjvm_obj_header** found = (bjvm_obj_header**)bsearch(obj, ctx->objs, ctx->objs_count, sizeof(bjvm_obj_header*), comparator);
+  bjvm_obj_header **found = (bjvm_obj_header **)bsearch(
+      obj, ctx->objs, ctx->objs_count, sizeof(bjvm_obj_header *), comparator);
   if (found) {
-    //printf("RELOCATING %p to %p\n", *obj, ctx->new_location[found - ctx->roots]);
+    // printf("RELOCATING %p to %p\n", *obj, ctx->new_location[found -
+    // ctx->roots]);
     *obj = ctx->new_location[found - ctx->objs];
   } else {
   }
 }
 
-void relocate_static_fields(bjvm_gc_ctx* ctx) {
+void relocate_static_fields(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
 
   // Static fields of bootstrap-loaded classes
@@ -3374,17 +3398,19 @@ void relocate_static_fields(bjvm_gc_ctx* ctx) {
   char *key;
   size_t key_len;
   bjvm_classdesc *desc;
-  int* bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
-  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void**) &desc)) {
-    bitset_list = bjvm_list_compressed_bitset_bits(desc->static_references,
-      bitset_list, &bs_list_len, &bs_list_cap);
+  int *bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
+  while (
+      bjvm_hash_table_iterator_has_next(it, &key, &key_len, (void **)&desc)) {
+    bitset_list = bjvm_list_compressed_bitset_bits(
+        desc->static_references, bitset_list, &bs_list_len, &bs_list_cap);
     for (int i = 0; i < bs_list_len; ++i) {
-      relocate_object(ctx, ((bjvm_obj_header**) desc->static_fields) + bitset_list[i]);
+      relocate_object(ctx, ((bjvm_obj_header **)desc->static_fields) +
+                               bitset_list[i]);
     }
     // Push the mirrors of this base class and all of its array types
     bjvm_classdesc *array = desc;
     while (array) {
-      relocate_object(ctx, (bjvm_obj_header**) &array->mirror);
+      relocate_object(ctx, (bjvm_obj_header **)&array->mirror);
       array = array->array_type;
     }
     bjvm_hash_table_iterator_next(&it);
@@ -3392,9 +3418,9 @@ void relocate_static_fields(bjvm_gc_ctx* ctx) {
   free(bitset_list);
 }
 
-void relocate_instance_fields(bjvm_gc_ctx * ctx) {
+void relocate_instance_fields(bjvm_gc_ctx *ctx) {
   int len = 0, cap = 0;
-  int* bitset = NULL;
+  int *bitset = NULL;
   for (int i = 0; i < ctx->objs_count; ++i) {
     bjvm_obj_header *obj = ctx->new_location[i];
     if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
@@ -3403,13 +3429,15 @@ void relocate_instance_fields(bjvm_gc_ctx * ctx) {
       len = 0;
       bitset = bjvm_list_compressed_bitset_bits(bits, bitset, &len, &cap);
       for (int i = 0; i < len; ++i) {
-        bjvm_obj_header **field = (bjvm_obj_header**)obj + bitset[i];
+        bjvm_obj_header **field = (bjvm_obj_header **)obj + bitset[i];
         relocate_object(ctx, field);
       }
-    } else if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY || (obj->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY && obj->descriptor->dimensions > 1)) {
+    } else if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
+               (obj->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
+                obj->descriptor->dimensions > 1)) {
       int len = *array_length(obj);
       for (int i = 0; i < len; ++i) {
-        bjvm_obj_header **field = (bjvm_obj_header**)array_data(obj) + i;
+        bjvm_obj_header **field = (bjvm_obj_header **)array_data(obj) + i;
         relocate_object(ctx, field);
       }
     }
@@ -3424,7 +3452,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
   bjvm_major_gc_enumerate_gc_roots(&ctx);
 
   // Mark phase
-  int* bitset_list[1000] = { nullptr }, capacity[1000] = { 0 };
+  int *bitset_list[1000] = {nullptr}, capacity[1000] = {0};
   for (int i = 0; i < ctx.roots_count; ++i) {
     bjvm_obj_header *root = *ctx.roots[i];
     if (!(root->mark_word & REACHABLE_BIT))
@@ -3435,17 +3463,19 @@ void bjvm_major_gc(bjvm_vm *vm) {
   }
 
   // Sort roots by address
-  qsort(ctx.objs, ctx.objs_count, sizeof(bjvm_obj_header*), comparator);
-  bjvm_obj_header** new_location = ctx.new_location = malloc(ctx.objs_count * sizeof(bjvm_obj_header*));
+  qsort(ctx.objs, ctx.objs_count, sizeof(bjvm_obj_header *), comparator);
+  bjvm_obj_header **new_location = ctx.new_location =
+      malloc(ctx.objs_count * sizeof(bjvm_obj_header *));
 
   // For now, create a new heap of the same size
-  uint8_t *new_heap = aligned_alloc(4096, vm->heap_capacity), *end = new_heap + vm->heap_capacity;
+  uint8_t *new_heap = aligned_alloc(4096, vm->heap_capacity),
+          *end = new_heap + vm->heap_capacity;
   uint8_t *write_ptr = new_heap;
 
   // Copy object by object
   for (int i = 0; i < ctx.objs_count; ++i) {
     // Align to 8 bytes
-    write_ptr = (uint8_t*)((uintptr_t)write_ptr + 7 & ~7);
+    write_ptr = (uint8_t *)((uintptr_t)write_ptr + 7 & ~7);
     bjvm_obj_header *obj = ctx.objs[i];
     size_t sz = size_of_object(obj);
 
@@ -3454,7 +3484,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
     obj->mark_word &= ~REACHABLE_BIT;
     memcpy(write_ptr, obj, sz);
 
-    new_location[i] = (bjvm_obj_header*)write_ptr;
+    new_location[i] = (bjvm_obj_header *)write_ptr;
     write_ptr += sz;
   }
 

@@ -671,9 +671,10 @@ bjvm_constant_pool *parse_constant_pool(cf_byteslice *reader,
     // pointers
     for (int cp_i = 1; cp_i < cp_count; ++cp_i) {
       bjvm_cp_entry *ent = get_constant_pool_entry(pool, cp_i);
-      bjvm_cp_entry new_entry = parse_constant_pool_entry(reader, ctx, !(bool)resolution_pass);
+      bjvm_cp_entry new_entry =
+          parse_constant_pool_entry(reader, ctx, !(bool)resolution_pass);
       if (new_entry.kind != BJVM_CP_KIND_UTF8 || resolution_pass == 0) {
-        *ent = new_entry;  // don't store UTF-8 entries on the second pass
+        *ent = new_entry; // don't store UTF-8 entries on the second pass
         // TODO fix ^^ this is janky af
       }
       ent->my_index = cp_i;
