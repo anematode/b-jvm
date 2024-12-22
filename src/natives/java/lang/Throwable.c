@@ -35,14 +35,13 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   for (; i >= 0; --i) {
     bjvm_stack_frame *frame = thread->frames[i];
     // The first frame in which the exception object is not mentioned
-    if (!frame_mentions_object(frame, obj))
+    if (!frame_mentions_object(frame, obj->obj))
       break;
   }
 
   // Create stack trace of the appropriate height
   ++i;
-  bjvm_obj_header *stack_trace =
-      CreateObjectArray1D(thread, StackTraceElement, i + 1);
+  bjvm_handle *stack_trace = bjvm_make_local_handle(thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
   // TODO UAF here if we GC while creating the stack trace
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
@@ -60,23 +59,23 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     e->methodName = method_name;
     e->fileName = file_name;
     e->lineNumber = line;
-    *((struct bjvm_native_StackTraceElement **)ArrayData(stack_trace) + j) = e;
+    *((struct bjvm_native_StackTraceElement **)ArrayData(stack_trace->obj) + j) = e;
   }
 
-  *backtrace_object(obj) = stack_trace;
-  return (bjvm_stack_value){.obj = obj};
+  *backtrace_object(obj->obj) = stack_trace->obj;
+  return (bjvm_stack_value){.obj = obj->obj};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
   assert(argc == 0);
 
-  return (bjvm_stack_value){.i = *ArrayLength(*backtrace_object(obj))};
+  return (bjvm_stack_value){.i = *ArrayLength(*backtrace_object(obj->obj))};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
                "(I)Ljava/lang/StackTraceElement;") {
   assert(argc == 1);
-  bjvm_obj_header *stack_trace = *backtrace_object(obj);
+  bjvm_obj_header *stack_trace = *backtrace_object(obj->obj);
   int index = args[0].i;
   if (index < 0 || index >= *ArrayLength(stack_trace)) {
     return value_null();

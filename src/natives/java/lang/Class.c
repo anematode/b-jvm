@@ -60,7 +60,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0,
   // class, the immediately enclosing method or constructor's name (can be
   // null). the immediately enclosing method or constructor's descriptor (null
   // iff name is).
-  bjvm_classdesc *desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   // Search the class attributes for an EnclosingMethod attribute
   bjvm_attribute *attr =
       find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD);
@@ -85,7 +85,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0,
 }
 
 DECLARE_NATIVE("java/lang", Class, getDeclaringClass0, "()Ljava/lang/Class;") {
-  bjvm_classdesc *desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   bjvm_attribute *attr =
       find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD);
   if (!attr) {
@@ -102,7 +102,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaringClass0, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getComponentType, "()Ljava/lang/Class;") {
-  bjvm_classdesc *desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   if (desc->kind == BJVM_CD_KIND_ORDINARY ||
       desc->kind == BJVM_CD_KIND_PRIMITIVE) {
     // ints and ordinary objects have no components
@@ -114,12 +114,12 @@ DECLARE_NATIVE("java/lang", Class, getComponentType, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getModifiers, "()I") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
   return (bjvm_stack_value){.i = classdesc->access_flags};
 }
 
 DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
-  bjvm_cp_class_info *super = bjvm_unmirror_class(obj)->super_class;
+  bjvm_cp_class_info *super = bjvm_unmirror_class(obj->obj)->super_class;
   if (!super)
     return value_null();
   return (bjvm_stack_value) { .obj = (void*)bjvm_get_class_mirror(thread, super->classdesc) };
@@ -132,7 +132,7 @@ DECLARE_NATIVE("java/lang", Class, getClassLoader,
 }
 
 DECLARE_NATIVE("java/lang", Class, getName0, "()Ljava/lang/String;") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
   INIT_STACK_STRING(name, 1000);
   bprintf(name, "%.*s", fmt_slice(classdesc->name));
   for (int i = 0; i < classdesc->name.len; ++i) {
@@ -174,7 +174,7 @@ bool include_field(const bjvm_cp_field *field, bool public_only) {
 
 DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
                "(Z)[Ljava/lang/reflect/Field;") {
-  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bjvm_classdesc *class = bjvm_unmirror_class(obj->obj);
   bool public_only = args[0].i;
   int fields = 0;
   // First initialize the reflection objects
@@ -205,7 +205,7 @@ bool include_ctor(const bjvm_cp_method *method, bool public_only) {
 // Get a list of all constructors on a class, optionally filtering by public_only
 DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
                "(Z)[Ljava/lang/reflect/Constructor;") {
-  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bjvm_classdesc *class = bjvm_unmirror_class(obj->obj);
   bool public_only = args[0].i;
   int ctors = 0;
   // First initialize the reflection objects
@@ -238,7 +238,7 @@ bool include_method(const bjvm_cp_method *method, bool public_only) {
 DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
                "(Z)[Ljava/lang/reflect/Method;") {
   assert(argc == 1);
-  bjvm_classdesc *class = bjvm_unmirror_class(obj);
+  bjvm_classdesc *class = bjvm_unmirror_class(obj->obj);
   bool public_only = args[0].i;
   int methods = 0;
   // First initialize the reflection objects
@@ -263,7 +263,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
 
 DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
                "()[Ljava/lang/Class;") {
-  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
 
   printf("Calling incompletely implemented getDeclaredClasses0\n");
 
@@ -277,17 +277,17 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
 }
 
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
-  return (bjvm_stack_value){.i = bjvm_unmirror_class(obj)->kind ==
+  return (bjvm_stack_value){.i = bjvm_unmirror_class(obj->obj)->kind ==
                                  BJVM_CD_KIND_PRIMITIVE};
 }
 
 DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
-  return (bjvm_stack_value){.i = !!(bjvm_unmirror_class(obj)->access_flags &
+  return (bjvm_stack_value){.i = !!(bjvm_unmirror_class(obj->obj)->access_flags &
                                  BJVM_ACCESS_INTERFACE)};
 }
 
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
-  bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *this_desc = bjvm_unmirror_class(obj->obj);
   if (!args[0].handle->obj) {
     bjvm_null_pointer_exception(thread);
     return value_null();
@@ -298,7 +298,7 @@ DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
 
 // Returns false when passed object is null
 DECLARE_NATIVE("java/lang", Class, isInstance, "(Ljava/lang/Object;)Z") {
-  bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *this_desc = bjvm_unmirror_class(obj->obj);
   int result = 0;
   if (args[0].handle)
     result = bjvm_instanceof(args[0].handle->obj->descriptor, this_desc);
@@ -306,7 +306,7 @@ DECLARE_NATIVE("java/lang", Class, isInstance, "(Ljava/lang/Object;)Z") {
 }
 
 DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
-  bjvm_classdesc *desc = bjvm_unmirror_class(obj);
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   return (bjvm_stack_value){.i = desc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
                                  desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY};
 }

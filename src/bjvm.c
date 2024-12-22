@@ -1901,7 +1901,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       frame->values + frame->stack_depth - args + 1);
 
     invoked_result = ((bjvm_native_callback)method->native_handle)(
-        thread, target, native_args, args - 1);
+        thread, target_handle, native_args, args - 1);
     frame->stack_depth -= args;
 
     bjvm_drop_local_handle(thread, target_handle);

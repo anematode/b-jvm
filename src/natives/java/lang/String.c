@@ -1,13 +1,13 @@
 #include <natives.h>
 
 DECLARE_NATIVE("java/lang", String, intern, "()Ljava/lang/String;") {
-  if (obj == nullptr) {
+  if (obj->obj == nullptr) {
     ThrowLangException(NullPointerException);
     return value_null();
   }
   short *buf;
   size_t len;
-  read_string(thread, obj, &buf, &len);
+  read_string(thread, obj->obj, &buf, &len);
 
   heap_string utf8_str = make_heap_str(len);
 

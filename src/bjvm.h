@@ -62,7 +62,7 @@ static inline bjvm_stack_value value_null() {
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
-                                                 bjvm_obj_header *obj,
+                                                 bjvm_handle *obj,
                                                  bjvm_value *args,
                                                  int argc);
 
