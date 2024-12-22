@@ -651,7 +651,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   bjvm_analy_stack_state stack, locals;
   // Swizzle local entries so that the first n arguments correspond to the first
   // n locals (i.e., we should remap aload #1 to aload swizzle[#1])
-  int* local_swizzle;
+  int *local_swizzle;
   if (bjvm_locals_on_method_entry(method, &locals, &local_swizzle)) {
     return -1;
   }

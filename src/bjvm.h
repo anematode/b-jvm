@@ -63,8 +63,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
                                                  bjvm_handle *obj,
-                                                 bjvm_value *args,
-                                                 int argc);
+                                                 bjvm_value *args, int argc);
 
 // represents a native method somewhere in this binary
 typedef struct {
@@ -215,7 +214,7 @@ typedef struct bjvm_thread {
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
-bjvm_handle *bjvm_make_handle(bjvm_thread* thread, bjvm_obj_header* obj);
+bjvm_handle *bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj);
 
 void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
 
@@ -230,8 +229,10 @@ bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
  */
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method);
 
-void pass_args_to_frame(bjvm_stack_frame *new_frame, bjvm_stack_frame *old_frame,
-  int args, const bjvm_method_descriptor* descriptor, bool is_static);
+void pass_args_to_frame(bjvm_stack_frame *new_frame,
+                        bjvm_stack_frame *old_frame, int args,
+                        const bjvm_method_descriptor *descriptor,
+                        bool is_static);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -305,7 +306,7 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           bjvm_native_callback callback);
 
 int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
-                          bjvm_stack_value *result);
+                            bjvm_stack_value *result);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);

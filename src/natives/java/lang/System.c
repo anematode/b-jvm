@@ -32,7 +32,7 @@ DECLARE_NATIVE("java/lang", System, initProperties,
 
 DECLARE_NATIVE("java/lang", System, mapLibraryName,
                "(Ljava/lang/String;)Ljava/lang/String;") {
-  return (bjvm_stack_value) { .obj = args[0].handle->obj };
+  return (bjvm_stack_value){.obj = args[0].handle->obj};
 }
 
 DECLARE_NATIVE("java/lang", System, arraycopy,

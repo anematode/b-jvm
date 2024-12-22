@@ -41,22 +41,24 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
 
   // Create stack trace of the appropriate height
   ++i;
-  bjvm_handle *stack_trace = bjvm_make_handle(thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
+  bjvm_handle *stack_trace = bjvm_make_handle(
+      thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
 
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
     // Create the stack trace element
-    bjvm_handle *e = bjvm_make_handle(thread, new_object(thread, StackTraceElement));
+    bjvm_handle *e =
+        bjvm_make_handle(thread, new_object(thread, StackTraceElement));
     int line =
         bjvm_get_line_number(frame->method->code, frame->program_counter);
-    ((struct bjvm_native_StackTraceElement *) e->obj)->declaringClass =
-      bjvm_intern_string(thread, hslc(frame->method->my_class->name));
-    ((struct bjvm_native_StackTraceElement *) e->obj)->methodName =
-      bjvm_intern_string(thread, frame->method->name);
-    ((struct bjvm_native_StackTraceElement *) e->obj)->fileName =
-      bjvm_intern_string(thread, frame->method->my_class->source_file->name);
-    ((struct bjvm_native_StackTraceElement *) e->obj)->lineNumber = line;
-    *((void**)ArrayData(stack_trace->obj) + j) = e->obj;
+    ((struct bjvm_native_StackTraceElement *)e->obj)->declaringClass =
+        bjvm_intern_string(thread, hslc(frame->method->my_class->name));
+    ((struct bjvm_native_StackTraceElement *)e->obj)->methodName =
+        bjvm_intern_string(thread, frame->method->name);
+    ((struct bjvm_native_StackTraceElement *)e->obj)->fileName =
+        bjvm_intern_string(thread, frame->method->my_class->source_file->name);
+    ((struct bjvm_native_StackTraceElement *)e->obj)->lineNumber = line;
+    *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
     bjvm_drop_handle(thread, e);
   }
 

@@ -130,10 +130,10 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     printf("Of type %.*s \n", fmt_slice(mn->type->descriptor->name));
     printf("On class %.*s\n", fmt_slice(bjvm_unmirror_class(mn->clazz)->name));
     INIT_STACK_STRING(field_str, 1000);
-    bjvm_utf8 field_desc = unparse_classdesc_to_field_descriptor(
-        field_str, field_type);
-    bjvm_cp_field *field = bjvm_easy_field_lookup(
-        search_on, hslc(search_for), field_desc);
+    bjvm_utf8 field_desc =
+        unparse_classdesc_to_field_descriptor(field_str, field_type);
+    bjvm_cp_field *field =
+        bjvm_easy_field_lookup(search_on, hslc(search_for), field_desc);
     printf("Field: %p\n", field);
     if (!field) {
       break;
@@ -188,9 +188,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   (void)found;
   if (!found) {
     // Raise LinkageError
-    bjvm_raise_exception(
-        thread, STR("java/lang/LinkageError"),
-        STR("Failed to resolve MemberName"));
+    bjvm_raise_exception(thread, STR("java/lang/LinkageError"),
+                         STR("Failed to resolve MemberName"));
     return value_null();
   }
 
@@ -230,7 +229,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   case BJVM_MH_KIND_NEW_INVOKE_SPECIAL:
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_INTERFACE:
-    data[1] = (void*)mn;
+    data[1] = (void *)mn;
     break;
   default:
     UNREACHABLE();
@@ -275,7 +274,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset,
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMembers,
-               "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Class;I[Ljava/lang/invoke/MemberName;)I") {
+               "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;ILjava/"
+               "lang/Class;I[Ljava/lang/invoke/MemberName;)I") {
   assert(argc == 7);
   // defc, matchName, matchSig, matchFlags, lookupClass, totalCount, buf
 

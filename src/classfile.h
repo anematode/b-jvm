@@ -586,7 +586,6 @@ typedef struct bjvm_cp_field {
   struct bjvm_native_Field *reflection_field;
 
   bjvm_classdesc *my_class;
-  int my_index;
 } bjvm_cp_field;
 
 typedef bjvm_utf8 cp_string;
@@ -619,11 +618,6 @@ typedef struct bjvm_classdesc {
   bjvm_attribute *attributes;
 
   bjvm_classdesc *array_type;
-
-  // Whether this class corresponds to the primordial object class
-  bool is_primordial_object;
-  uint16_t minor_version;
-  uint16_t major_version;
 
   uint8_t *static_fields;
   int data_bytes;

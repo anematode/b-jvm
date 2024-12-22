@@ -12,8 +12,7 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
   return (bjvm_stack_value){.obj = array};
 }
 
-DECLARE_NATIVE("java/lang/reflect", Array, getLength,
-               "(Ljava/lang/Object;)I") {
+DECLARE_NATIVE("java/lang/reflect", Array, getLength, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
   return (bjvm_stack_value){.i = *ArrayLength(args[0].handle->obj)};
 }
