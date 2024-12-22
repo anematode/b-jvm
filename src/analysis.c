@@ -636,6 +636,13 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
 
   int result = 0;
 
+  bjvm_analy_stack_state stack, locals;
+  if (bjvm_locals_on_method_entry(method, &locals)) {
+    return -1;
+  }
+
+  stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
+
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
@@ -645,11 +652,6 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
   uint16_t *insn_index_to_stack_depth =
       calloc(code->insn_count, sizeof(uint16_t));
-
-  bjvm_analy_stack_state stack, locals;
-
-  stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
-  bjvm_locals_on_method_entry(method, &locals);
 
   // Initialize stack to the stack at exception handler entry
   stack.entries_cap = code->max_stack + 1;
@@ -1317,7 +1319,6 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     }
   }
 
-  free(branch_targets_to_process);
   for (int i = 0; i < code->insn_count; ++i) {
     insn_index_to_stack_depth[i] = inferred_stacks[i].entries_count;
 
@@ -1330,8 +1331,11 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     free(inferred_stacks[i].entries);
     free(inferred_locals[i].entries);
   }
+  free(branch_targets_to_process);
   free(inferred_stacks);
+  free(inferred_locals);
   free(stack.entries);
+  free(locals.entries);
   free(stack_before.entries);
 
   return result;

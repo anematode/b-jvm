@@ -43,6 +43,7 @@ void push_bits(uint64_t bits, int offset, int **existing_buf, int *length,
 int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *existing_buf, int *length,
                                       int *capacity) {
+  *length = 0;
   if (bjvm_is_bitset_compressed(bits)) {
     push_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
   } else {

@@ -247,7 +247,7 @@ int preregister_all_classes(bjvm_vm *vm) {
 }
 
 TEST_CASE("Class file management") {
-  bjvm_vm_options options = {};
+  bjvm_vm_options options = bjvm_default_vm_options();
   bjvm_vm *vm = bjvm_create_vm(options);
 
   int file_count = preregister_all_classes(vm);
@@ -390,7 +390,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
 }
 
 bjvm_vm *create_vm(bool preregister, const char **classpath = nullptr) {
-  bjvm_vm_options options = {};
+  bjvm_vm_options options = bjvm_default_vm_options();
 
   options.load_classfile = load_classfile;
   options.load_classfile_param = classpath;
@@ -414,7 +414,7 @@ struct TestCaseResult {
 
 TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   const char *classpath[2] = {folder.c_str(), nullptr};
-  bjvm_vm_options options = {};
+  bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
 

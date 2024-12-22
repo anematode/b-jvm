@@ -65,4 +65,4 @@ set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 add_test(NAME tests
         COMMAND tests --skip-benchmarks
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
-set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0,detect_container_overflow=0")
+set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=1,detect_container_overflow=0")

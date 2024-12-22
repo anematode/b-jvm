@@ -205,6 +205,7 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference);
 
 bjvm_vm_options bjvm_default_vm_options();
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
+void bjvm_major_gc(bjvm_vm *vm);
 
 typedef struct {
   uint32_t stack_space;
