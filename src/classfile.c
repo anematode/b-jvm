@@ -1898,7 +1898,7 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   } else if (utf8_equals(attr->name, "MethodParameters")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS;
     int count = attr->method_parameters.count = reader_next_u8(&attr_reader, "method parameters count");
-    auto *params = attr->method_parameters.params =
+    bjvm_method_parameter_info *params = attr->method_parameters.params =
             calloc(count, sizeof(bjvm_method_parameter_info));
     free_on_format_error(ctx, params);
     for (int i = 0; i < count; ++i) {

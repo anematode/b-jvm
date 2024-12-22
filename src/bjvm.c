@@ -1018,7 +1018,6 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
       for (; i < chars.len; ++i)
         filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
       // ClassNotFoundException: com.google.DontBeEvil
-      *(char*)1 = 0;
       bjvm_raise_exception(thread, STR("java/lang/ClassNotFoundException"),
                            filename);
       return nullptr;
@@ -1692,15 +1691,6 @@ void bjvm_invokevirtual_signature_polymorphic(bjvm_thread *thread,
 
   struct bjvm_native_MethodHandle *mh = (void*)target;
   struct bjvm_native_MethodType *targ = (void*)mh->type;
-
-  auto a = debug_dump_string(thread, (void*)provider_mt);
-  auto b = debug_dump_string(thread, (void*)targ);
-
-  printf("Provider: %.*s\n", fmt_slice(a));
-  printf("Target: %.*s\n", fmt_slice(b));
-
-  free_heap_str(a);
-  free_heap_str(b);
 
   bool mts_are_same = compare_method_types(provider_mt, targ);
   printf("Mts are same: %d\n", mts_are_same);
