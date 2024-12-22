@@ -119,12 +119,15 @@ DECLARE_NATIVE("java/lang", Class, getModifiers, "()I") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
-
-  return value_null(); // TODO
+  bjvm_cp_class_info *super = bjvm_unmirror_class(obj)->super_class;
+  if (!super)
+    return value_null();
+  return (bjvm_stack_value) { .obj = (void*)bjvm_get_class_mirror(thread, super->classdesc) };
 }
 
 DECLARE_NATIVE("java/lang", Class, getClassLoader,
                "()Ljava/lang/ClassLoader;") {
+  printf("TODO: getClassLoader\n");
   return value_null(); // TODO
 }
 

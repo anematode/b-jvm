@@ -8,7 +8,6 @@ DECLARE_NATIVE(
   if (bjvm_initialize_class(thread, method->my_class))
     return value_null();
   bjvm_obj_header *instance = new_object(thread, method->my_class);
-
   bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = instance}},
                   &result);
   return (bjvm_stack_value){.obj = instance};

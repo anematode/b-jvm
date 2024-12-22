@@ -13,9 +13,11 @@ public class Main {
         mh = lookup.findVirtual(String.class, "replace", mt);
         s = (String) mh.invokeExact("daddy",'d','n');
         // invokeExact(Ljava/lang/String;CC)Ljava/lang/String;
+        System.out.println(s);
         assertEquals(s, "nanny");
         // weakly typed invocation (using MHs.invoke)
         s = (String) mh.invokeWithArguments("sappy", 'p', 'v');
+        System.out.println(s);
         assertEquals(s, "savvy");
         // mt is (Object[])List
         mt = MethodType.methodType(java.util.List.class, Object[].class);

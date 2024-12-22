@@ -154,3 +154,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass, "(Ljava/lang/Class;[B[L
 
   return (bjvm_stack_value) { .obj = (void*)bjvm_get_class_mirror(thread, result) };
 }
+
+DECLARE_NATIVE("sun/misc", Unsafe, storeFence, "()V") {
+  __sync_synchronize();
+  return value_null();
+}

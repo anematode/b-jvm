@@ -8,7 +8,12 @@ public class Main {
 }
 
 class BigDecimalTest {
+    static void error() {
+        throw new RuntimeException("HI");
+    }
+
     static void testBigDecimalOperations() {
+        error();
         System.out.println("hello");
         for (int i = 0; i < 1; ++i) {
         BigDecimal a = new BigDecimal("10.5");

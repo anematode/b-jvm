@@ -43,6 +43,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   ++i;
   bjvm_obj_header *stack_trace =
       CreateObjectArray1D(thread, StackTraceElement, i + 1);
+  // TODO UAF here if we GC while creating the stack trace
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
     bjvm_obj_header *class_name =

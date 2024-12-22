@@ -76,7 +76,7 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
   if (component->kind == BJVM_CD_KIND_ORDINARY) {
     result->base_component = component;
     result->name = make_heap_str(component->name.len + 3);
-    bprintf(hslc(result->name), "[%.*s;", fmt_slice(component->name));
+    bprintf(hslc(result->name), "[L%.*s;", fmt_slice(component->name));
   } else {
     result->base_component = component->base_component;
     result->name = make_heap_str(component->name.len + 1);

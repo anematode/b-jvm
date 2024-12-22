@@ -197,6 +197,9 @@ bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
  */
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method);
 
+void pass_args_to_frame(bjvm_stack_frame *new_frame, bjvm_stack_frame *old_frame,
+  int args, const bjvm_method_descriptor* descriptor, bool is_static);
+
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
  * check.
@@ -267,6 +270,9 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
+
+int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
+                          bjvm_stack_value *result);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);

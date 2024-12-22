@@ -35,7 +35,7 @@ bjvm_utf8 unparse_classdesc_to_field_descriptor(bjvm_utf8 str,
     return bprintf(str, "L%.*s;", fmt_slice(desc->name));
   case BJVM_CD_KIND_ORDINARY_ARRAY:
   case BJVM_CD_KIND_PRIMITIVE_ARRAY:
-    return bprintf(str, "%s", fmt_slice(desc->name));
+    return bprintf(str, "%.*s", fmt_slice(desc->name));
   case BJVM_CD_KIND_PRIMITIVE:
     return bprintf(str, "%c", desc->primitive_component);
   default:
@@ -76,13 +76,13 @@ void fill_mn_with_field(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
                         bjvm_cp_field *field) {
   bjvm_classdesc *search_on = field->my_class;
   bjvm_reflect_initialize_field(thread, search_on, field);
-  mn->resolution = (void *)field->reflection_field;
   mn->vmindex = field->byte_offset; // field offset
   mn->flags |= field->access_flags;
   mn->flags |= MN_IS_FIELD;
   bjvm_classdesc *field_cd =
       load_class_of_field_descriptor(thread, field->descriptor);
-  mn->vmtarget = mn->type = (void *)bjvm_get_class_mirror(thread, field_cd);
+  mn->vmtarget = field;
+  mn->type = (void *)bjvm_get_class_mirror(thread, field_cd);
   mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
@@ -93,15 +93,13 @@ void fill_mn_with_method(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
   bjvm_classdesc *search_on = method->my_class;
   if (utf8_equals(method->name, "<init>")) {
     bjvm_reflect_initialize_constructor(thread, search_on, method);
-    mn->resolution = (void *)method->reflection_ctor;
     mn->flags |= MN_IS_CONSTRUCTOR;
   } else {
     bjvm_reflect_initialize_method(thread, search_on, method);
-    mn->resolution = (void *)method->reflection_method;
     mn->flags |= MN_IS_METHOD;
   }
 
-  mn->vmtarget = (void *)mn;
+  mn->vmtarget = method;
   mn->vmindex =
       dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
   mn->flags |= method->access_flags;
@@ -152,13 +150,18 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_INTERFACE:
+    printf("Trying to resolve method %.*s\n", fmt_slice(search_for));
+    printf("On class %.*s\n", fmt_slice(bjvm_unmirror_class(mn->clazz)->name));
+
     struct bjvm_native_MethodType *mt = (void *)mn->type;
     heap_string descriptor = unparse_method_type(mt);
+    printf("With descriptor %.*s\n", fmt_slice(descriptor));
     bjvm_cp_method *method = bjvm_easy_method_lookup(
-        search_on, hslc(search_for), hslc(descriptor), false, false);
+        search_on, hslc(search_for), hslc(descriptor), true, false);
     free_heap_str(descriptor);
 
     if (!method) {
+      mn->type = nullptr;
       break;
     }
 
@@ -182,8 +185,16 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   struct bjvm_native_MemberName *mn = (void *)args[0].obj;
 
   bool found = resolve_mn(thread, mn);
+  (void)found;
+  if (!found) {
+    // Raise LinkageError
+    bjvm_raise_exception(
+        thread, STR("java/lang/LinkageError"),
+        STR("Failed to resolve MemberName"));
+    return value_null();
+  }
 
-  return found ? (bjvm_stack_value){.obj = (void *)mn} : value_null();
+  return (bjvm_stack_value){.obj = (void *)mn};
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
@@ -206,7 +217,24 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
                   &result);
   data[0] = result.obj;
 
-  data[1] = mn->vmtarget;
+  // either mn->type or mn itself depending on the kind
+  switch (unpack_mn_kind(mn)) {
+  case BJVM_MH_KIND_GET_STATIC:
+  case BJVM_MH_KIND_PUT_STATIC:
+  case BJVM_MH_KIND_GET_FIELD:
+  case BJVM_MH_KIND_PUT_FIELD:
+    data[1] = mn->type;
+    break;
+  case BJVM_MH_KIND_INVOKE_STATIC:
+  case BJVM_MH_KIND_INVOKE_SPECIAL:
+  case BJVM_MH_KIND_NEW_INVOKE_SPECIAL:
+  case BJVM_MH_KIND_INVOKE_VIRTUAL:
+  case BJVM_MH_KIND_INVOKE_INTERFACE:
+    data[1] = (void*)mn;
+    break;
+  default:
+    UNREACHABLE();
+  }
 
   return (bjvm_stack_value){.obj = array};
 }
@@ -218,7 +246,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
 
   bjvm_utf8 s = hslc(target->descriptor->name);
   if (utf8_equals(s, "java/lang/reflect/Method")) {
-    // TODO we're not given the method handle type. Huh?
     bjvm_cp_method *m = *bjvm_unmirror_method(target);
     fill_mn_with_method(thread, mn, m, false, true);
     mn->flags |= (m->access_flags & BJVM_ACCESS_STATIC)
@@ -236,7 +263,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
   } else {
     UNREACHABLE();
   }
-  mn->resolution = nullptr; // ??
+  mn->resolution = nullptr;
   return value_null();
 }
 
