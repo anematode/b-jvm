@@ -25,7 +25,7 @@ static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
 int preregister_all_classes(bjvm_vm *vm);
 
 std::unique_ptr<bjvm_vm, void (*)(bjvm_vm *)>
-Bjvm::Tests::CreateTestVM(bool preregister, bjvm_vm_options options,
+CreateTestVM(bool preregister, bjvm_vm_options options,
                           const char **classpath) {
   options.load_classfile = load_classfile;
   options.load_classfile_param = classpath;
@@ -36,7 +36,7 @@ Bjvm::Tests::CreateTestVM(bool preregister, bjvm_vm_options options,
 }
 
 optional<vector<uint8_t>>
-Bjvm::Tests::ResolveClassPath(string const &filename,
+ResolveClassPath(string const &filename,
                               std::vector<string> const &extra_paths) {
   std::vector<string> paths = extra_paths;
   paths.emplace_back("jre8/"); // for testing
@@ -51,7 +51,7 @@ Bjvm::Tests::ResolveClassPath(string const &filename,
   return {};
 }
 
-std::vector<std::string> Bjvm::Tests::ListDirectory(const std::string &path,
+std::vector<std::string> ListDirectory(const std::string &path,
                                                     bool recursive) {
 #ifdef EMSCRIPTEN
   void *length_and_data = EM_ASM_PTR(
@@ -157,7 +157,7 @@ static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
 
   string filename_sv(filename.chars, filename.len);
 
-  auto file_data = Bjvm::Tests::ResolveClassPath(filename_sv, extra_paths);
+  auto file_data = ResolveClassPath(filename_sv, extra_paths);
   if (file_data.has_value()) {
     *bytes = (uint8_t *)malloc(file_data->size());
     memcpy(*bytes, file_data->data(), file_data->size());
