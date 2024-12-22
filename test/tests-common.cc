@@ -2,6 +2,10 @@
 // Created by alec on 12/21/24.
 //
 
+#ifdef EMSCRIPTEN
+#include <emscripten/emscripten.h>
+#endif
+
 #include "tests-common.h"
 
 #include <fstream>
@@ -38,15 +42,9 @@ Bjvm::Tests::ResolveClassPath(string const &filename,
   paths.emplace_back("jre8/"); // for testing
 
   for (const auto &path : paths) {
-    ifstream file(path + filename, std::ios::in | std::ios::binary);
-    if (file.is_open()) {
-      file.seekg(0, std::ios::end);
-      size_t len = file.tellg();
-      file.seekg(0, std::ios::beg);
-
-      vector<uint8_t> data(len);
-      file.read(reinterpret_cast<char *>(data.data()), len);
-      return data;
+    optional<vector<uint8_t>> file_data = ReadFile(path + filename);
+    if (file_data.has_value()) {
+      return file_data;
     }
   }
 
@@ -135,12 +133,7 @@ int preregister_all_classes(bjvm_vm *vm) {
       continue;
     }
 
-    ifstream ifs(file, std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
-
-    vector<uint8_t> read(pos);
-    ifs.seekg(0, std::ios::beg);
-    ifs.read(reinterpret_cast<char *>(read.data()), pos);
+    vector<uint8_t> read = ReadFile(file).value();
 
     file = file.substr(5); // remove "jre8/"
     bjvm_utf8 filename = {.chars = (char *)file.c_str(),
@@ -173,5 +166,52 @@ static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   }
 
   return -1;
+}
+
+std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
+#ifdef EMSCRIPTEN
+  bool exists = EM_ASM_INT(
+      {
+        const fs = require('fs');
+        return fs.existsSync(UTF8ToString($0));
+      },
+      file.c_str());
+  if (!exists)
+    return {};
+
+  void *length_and_data = EM_ASM_PTR(
+      {
+        const fs = require('fs');
+        const buffer = fs.readFileSync(UTF8ToString($0));
+        const length = buffer.length;
+
+        const result = _malloc(length + 4);
+        Module.HEAPU32[result >> 2] = length;
+        Module.HEAPU8.set(buffer, result + 4);
+
+        return result;
+      },
+      file.c_str());
+
+  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
+  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
+
+  std::vector result(data, data + length);
+  free(length_and_data);
+  return result;
+#else // !EMSCRIPTEN
+  std::vector<uint8_t> result;
+  if (std::filesystem::exists(file)) {
+    std::ifstream ifs(file, std::ios::binary | std::ios::ate);
+    std::ifstream::pos_type pos = ifs.tellg();
+
+    result.resize(pos);
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(reinterpret_cast<char *>(result.data()), pos);
+  } else {
+    return {};
+  }
+  return result;
+#endif
 }
 } // namespace Bjvm::Tests

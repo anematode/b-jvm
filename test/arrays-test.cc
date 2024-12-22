@@ -5,13 +5,13 @@
 #include <optional>
 #include <unordered_map>
 
-#include <arrays.h>
-#include <bjvm.h>
-
-#include "tests-common.h"
-
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
+
+#include "../src/arrays.h"
+#include "../src/bjvm.h"
+
+#include "tests-common.h"
 
 using namespace Bjvm::Tests;
 using std::array;

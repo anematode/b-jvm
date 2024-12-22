@@ -328,20 +328,6 @@ int primitive_order(bjvm_type_kind kind) {
 void primitive_type_kind_to_array_info(bjvm_type_kind kind,
                                        const bjvm_utf8 *type, int *size);
 
-size_t object_size_bytes(const bjvm_obj_header *obj) {
-  const bjvm_classdesc *desc = obj->descriptor;
-  if (desc->kind == BJVM_CD_KIND_ORDINARY) {
-    return desc->data_bytes;
-  }
-  int element_size = sizeof(void *);
-  if (desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY) {
-    if (desc->dimensions == 1) {
-      element_size = sizeof_type_kind(desc->primitive_component);
-    }
-  }
-  return 24 + element_size * *ArrayLength((bjvm_obj_header *)obj);
-}
-
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
 
@@ -3206,9 +3192,9 @@ size_t size_of_object(bjvm_obj_header *obj) {
   if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
       (obj->descriptor->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY &&
        obj->descriptor->dimensions > 1)) {
-    return 24 + *ArrayLength(obj) * sizeof(void *);
+    return kArrayDataOffset + *ArrayLength(obj) * sizeof(void *);
   }
-  return 24 + *ArrayLength(obj) *
+  return kArrayDataOffset + *ArrayLength(obj) *
                   sizeof_type_kind(obj->descriptor->primitive_component);
 }
 

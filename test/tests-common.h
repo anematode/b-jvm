@@ -5,9 +5,7 @@
 #ifndef BJVM_TESTS_COMMON_H
 #define BJVM_TESTS_COMMON_H
 
-#undef __APPLE__
-
-#include <bjvm.h>
+#include "../src/bjvm.h"
 
 #include <memory>
 #include <filesystem>
@@ -27,6 +25,8 @@ namespace Bjvm::Tests {
   std::vector<std::string> ListDirectory(const std::string &path,
                                          bool recursive);
   bool EndsWith(const std::string &s, const std::string &suffix);
+
+    std::optional<std::vector<uint8_t>> ReadFile(const std::string &file);
 }
 
 #endif // BJVM_TESTS_COMMON_H

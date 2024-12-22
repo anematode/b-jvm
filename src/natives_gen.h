@@ -181,7 +181,7 @@ struct bjvm_native_MemberName {
   // implementation-dependent fields
   bjvm_obj_header *vmtarget;
 
-  int64_t vmindex;
+  intptr_t vmindex;
   // my fields
   bjvm_obj_header *clazz;      // Ljava/lang/Class;
   bjvm_obj_header *name;       // Ljava/lang/String;

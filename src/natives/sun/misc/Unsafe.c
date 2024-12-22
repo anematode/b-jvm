@@ -9,7 +9,7 @@ DECLARE_NATIVE("sun/misc", Unsafe, registerNatives, "()V") {
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, arrayBaseOffset, "(Ljava/lang/Class;)I") {
-  return (bjvm_stack_value){.i = 24};
+  return (bjvm_stack_value){.i = kArrayDataOffset};
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized,

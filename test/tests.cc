@@ -2,6 +2,9 @@
 #include <emscripten.h>
 #endif
 
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/catch_test_macros.hpp>
+
 #include <climits>
 #include <filesystem>
 #include <fstream>
@@ -15,12 +18,9 @@
 #include "../src/util.h"
 #include "tests-common.h"
 
-#include <catch2/benchmark/catch_benchmark.hpp>
-#include <catch2/catch_test_macros.hpp>
+#include <numeric>
 
 using namespace Bjvm::Tests;
-using namespace std::views;
-using namespace std::ranges;
 
 bool HasSuffix(std::string_view str, std::string_view suffix) {
   // Credit: https://stackoverflow.com/a/20446239/13458117
@@ -35,53 +35,6 @@ double get_time() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
-#endif
-}
-
-std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
-#ifdef EMSCRIPTEN
-  bool exists = EM_ASM_INT(
-      {
-        const fs = require('fs');
-        return fs.existsSync(UTF8ToString($0));
-      },
-      file.c_str());
-  if (!exists)
-    return {};
-
-  void *length_and_data = EM_ASM_PTR(
-      {
-        const fs = require('fs');
-        const buffer = fs.readFileSync(UTF8ToString($0));
-        const length = buffer.length;
-
-        const result = _malloc(length + 4);
-        Module.HEAPU32[result >> 2] = length;
-        Module.HEAPU8.set(buffer, result + 4);
-
-        return result;
-      },
-      file.c_str());
-
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
-
-  std::vector result(data, data + length);
-  free(length_and_data);
-  return result;
-#else // !EMSCRIPTEN
-  std::vector<uint8_t> result;
-  if (std::filesystem::exists(file)) {
-    std::ifstream ifs(file, std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
-
-    result.resize(pos);
-    ifs.seekg(0, std::ios::beg);
-    ifs.read(reinterpret_cast<char *>(result.data()), pos);
-  } else {
-    return {};
-  }
-  return result;
 #endif
 }
 
@@ -166,9 +119,11 @@ TEST_CASE("Test classfile parsing") {
 
 TEST_CASE("Class file management") {
   auto vm = CreateTestVM(true);
-  int file_count = (int)count_if(ListDirectory("jre8", true), [](auto &file) {
-    return EndsWith(file, ".class");
-  });
+  auto files = ListDirectory("jre8", true);
+
+  int file_count = std::accumulate(
+      files.begin(), files.end(), 0,
+      [](int acc, const std::string &file) { return acc + EndsWith(file, ".class"); });
 
   size_t len;
   const uint8_t *bytes;
@@ -191,6 +146,7 @@ TEST_CASE("Class file management") {
             utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
     free_heap_str(strings[i]);
   }
+  printf("Hello");
   REQUIRE(found);
 }
 
