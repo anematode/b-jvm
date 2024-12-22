@@ -17,8 +17,11 @@ inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
   return result.i;
 }
 
-static inline bjvm_obj_header *AllocateObject(bjvm_thread *thread, bjvm_classdesc *descriptor, size_t data_size) {
-  bjvm_obj_header *obj = bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
+static inline bjvm_obj_header *AllocateObject(bjvm_thread *thread,
+                                              bjvm_classdesc *descriptor,
+                                              size_t data_size) {
+  bjvm_obj_header *obj =
+      bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
   obj->mark_word = ObjNextHashCode();
   obj->descriptor = descriptor;
   return obj;

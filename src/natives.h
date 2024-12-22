@@ -1,8 +1,8 @@
 #ifndef BJVM_NATIVES_H
 #define BJVM_NATIVES_H
 
-#include "bjvm.h"
 #include "arrays.h"
+#include "bjvm.h"
 
 #define ThrowLangException(exception_name)                                     \
   bjvm_raise_exception(thread, str("java/lang/" #exception_name), null_str())

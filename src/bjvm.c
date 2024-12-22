@@ -18,9 +18,9 @@
 #include "util.h"
 
 #include "analysis.h"
+#include "arrays.h"
 #include "bjvm.h"
 #include "objects.h"
-#include "arrays.h"
 #include "strings.h"
 
 #include "natives.h"

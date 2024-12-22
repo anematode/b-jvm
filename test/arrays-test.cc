@@ -1,15 +1,15 @@
+#include <array>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <unordered_map>
 #include <optional>
-#include <array>
+#include <unordered_map>
 
-#include <bjvm.h>
 #include <arrays.h>
+#include <bjvm.h>
 
 #include "tests-common.h"
 

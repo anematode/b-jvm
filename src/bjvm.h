@@ -337,7 +337,7 @@ static inline int sizeof_type_kind(bjvm_type_kind kind) {
 }
 
 bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread,
-										 bjvm_type_kind prim_kind);
+                                         bjvm_type_kind prim_kind);
 void *bump_allocate(bjvm_thread *thread, size_t bytes);
 
 #ifdef __cplusplus

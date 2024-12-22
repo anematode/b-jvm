@@ -8,15 +8,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <unordered_map>
 #include <optional>
 #include <ranges>
+#include <unordered_map>
 
-
-#include "tests-common.h"
 #include "../src/adt.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
+#include "tests-common.h"
 
 using namespace Bjvm::Tests;
 using namespace std::views;
@@ -172,14 +171,14 @@ TEST_CASE("Class file management") {
 
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.class"), &bytes,
-                                 &len) == 0);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.class"),
+                                 &bytes, &len) == 0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.clas"), nullptr,
-                                 &len) != 0);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.classe"), nullptr,
-                                 &len) != 0);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.clas"),
+                                 nullptr, &len) != 0);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.classe"),
+                                 nullptr, &len) != 0);
   bjvm_vm_list_classfiles(vm.get(), nullptr, &len);
   REQUIRE((int)len == file_count);
   std::vector<heap_string> strings(len);
@@ -310,9 +309,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   return -1;
 }
 
-TEST_CASE("VM initialization") {
-  CreateTestVM(true);
-}
+TEST_CASE("VM initialization") { CreateTestVM(true); }
 
 struct TestCaseResult {
   std::string stdout_;
