@@ -18,8 +18,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToVirtual,
         kind == BJVM_TYPE_KIND_REFERENCE
             ? (bjvm_stack_value){.obj = args[i].handle->obj}
             : load_stack_value(&args[i], kind);
-    if (i >= 1)
-      j += bjvm_is_field_wide(method->parsed_descriptor->args[i - 1]);
   }
   bjvm_stack_value result;
   bjvm_bytecode_interpret(thread, new_frame, &result);
@@ -40,7 +38,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToStatic,
         kind == BJVM_TYPE_KIND_REFERENCE
             ? (bjvm_stack_value){.obj = args[i].handle->obj}
             : load_stack_value(&args[i], kind);
-    j += bjvm_is_field_wide(method->parsed_descriptor->args[i]);
   }
   bjvm_stack_value result;
   bjvm_bytecode_interpret(thread, new_frame, &result);

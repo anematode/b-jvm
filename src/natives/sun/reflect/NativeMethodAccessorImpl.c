@@ -23,9 +23,6 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
   bjvm_stack_frame *frame = bjvm_push_frame(thread, method);
   for (int i = 0, j = 0; i < arg_i; i++) {
     frame->values[frame->max_stack + j] = assembled[i];
-    if (is_static || i >= 1) {
-      j += bjvm_is_field_wide(method->parsed_descriptor->args[i]);
-    }
   }
   bjvm_stack_value result;
 

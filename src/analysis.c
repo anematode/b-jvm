@@ -552,6 +552,10 @@ bool is_kind_wide(bjvm_type_kind kind) {
   return kind == BJVM_TYPE_KIND_LONG || kind == BJVM_TYPE_KIND_DOUBLE;
 }
 
+bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
+  return is_kind_wide(desc.kind) && !desc.dimensions;
+}
+
 bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:

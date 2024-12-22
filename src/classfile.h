@@ -249,8 +249,6 @@ struct bjvm_field_descriptor {
   heap_string class_name; // For reference and array types only
 };
 
-bool bjvm_is_field_wide(bjvm_field_descriptor desc);
-
 typedef struct bjvm_cp_field bjvm_cp_field;
 
 typedef struct {

@@ -1914,12 +1914,6 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   }
 }
 
-bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
-  return (desc.kind == BJVM_TYPE_KIND_LONG ||
-          desc.kind == BJVM_TYPE_KIND_DOUBLE) &&
-         !desc.dimensions;
-}
-
 /**
  * Parse a method in a classfile.
  */
