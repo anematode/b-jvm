@@ -106,7 +106,8 @@ void fill_mn_with_method(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
   mn->vmindex =
       dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
   mn->flags |= method->access_flags;
-  mn->type = bjvm_intern_string(thread, method->descriptor);
+  if (!method->is_signature_polymorphic)
+    mn->type = bjvm_intern_string(thread, method->descriptor);
   mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
