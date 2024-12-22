@@ -590,35 +590,48 @@ void write_references_to_bitset(
 }
 
 int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
-                                bjvm_analy_stack_state *locals) {
+                                bjvm_analy_stack_state *locals,
+                                int **local_swizzle) {
   const bjvm_attribute_code *code = method->code;
   const bjvm_method_descriptor *desc = method->parsed_descriptor;
   assert(code);
-  locals->entries = calloc(code->max_locals, sizeof(bjvm_analy_stack_entry));
-  for (int i = 0; i < code->max_locals; ++i)
+  uint16_t max_locals = code->max_locals;
+  locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
+  *local_swizzle = malloc(max_locals * sizeof(int));
+  for (int i = 0; i < max_locals; ++i) {
     locals->entries[i] = BJVM_TYPE_KIND_VOID;
+    (*local_swizzle)[i] = -1;
+  }
   int i = 0, j = 0;
   if (!(method->access_flags & BJVM_ACCESS_STATIC)) {
-    // if the method is nonstatic, the first local is  'this'
-    if (code->max_locals == 0)
+    // if the method is nonstatic, the first local is a reference 'this'
+    if (max_locals == 0)
       goto fail;
+    (*local_swizzle)[j] = i;
     locals->entries[j++] = BJVM_TYPE_KIND_REFERENCE;
   }
-  locals->entries_cap = locals->entries_count = code->max_locals;
-  for (; i < desc->args_count && j < code->max_locals; ++i, ++j) {
+  locals->entries_cap = locals->entries_count = max_locals;
+  for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
     locals->entries[j] = field_to_representable_kind(&arg);
+    (*local_swizzle)[j] = i;
     if (bjvm_is_field_wide(arg)) {
-      if (++j >= code->max_locals)
+      if (++j >= max_locals)
         goto fail;
       locals->entries[j] = BJVM_TYPE_KIND_VOID;
     }
   }
-  if (i == desc->args_count)
-    return 0; // packed all arguments
+  if (i != desc->args_count)
+    goto fail;
+  j = 0;
+  for (; j < max_locals; ++j)
+    if ((*local_swizzle)[j] == -1)
+      (*local_swizzle)[j] = i++;
+  return 0;
 
 fail:
   free(locals->entries);
+  free(*local_swizzle);
   return -1;
 }
 
@@ -637,7 +650,10 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   int result = 0;
 
   bjvm_analy_stack_state stack, locals;
-  if (bjvm_locals_on_method_entry(method, &locals)) {
+  // Swizzle local entries so that the first n arguments correspond to the first
+  // n locals (i.e., we should remap aload #1 to aload swizzle[#1])
+  int* local_swizzle;
+  if (bjvm_locals_on_method_entry(method, &locals, &local_swizzle)) {
     return -1;
   }
 
@@ -1337,6 +1353,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   free(stack.entries);
   free(locals.entries);
   free(stack_before.entries);
+  free(local_swizzle);
 
   return result;
 }
