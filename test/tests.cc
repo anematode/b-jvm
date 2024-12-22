@@ -121,9 +121,10 @@ TEST_CASE("Class file management") {
   auto vm = CreateTestVM(true);
   auto files = ListDirectory("jre8", true);
 
-  int file_count = std::accumulate(
-      files.begin(), files.end(), 0,
-      [](int acc, const std::string &file) { return acc + EndsWith(file, ".class"); });
+  int file_count = std::accumulate(files.begin(), files.end(), 0,
+                                   [](int acc, const std::string &file) {
+                                     return acc + EndsWith(file, ".class");
+                                   });
 
   size_t len;
   const uint8_t *bytes;

@@ -52,7 +52,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, getIntVolatile, "(Ljava/lang/Object;J)I") {
   return (bjvm_stack_value){.i = *(int *)((void *)args[0].obj + args[1].l)};
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, putObjectVolatile, "(Ljava/lang/Object;JLjava/lang/Object;)V") {
+DECLARE_NATIVE("sun/misc", Unsafe, putObjectVolatile,
+               "(Ljava/lang/Object;JLjava/lang/Object;)V") {
   assert(argc == 3);
   *(void **)((void *)args[0].obj + args[1].l) = args[2].obj;
   return value_null();

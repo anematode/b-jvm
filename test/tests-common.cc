@@ -26,7 +26,7 @@ int preregister_all_classes(bjvm_vm *vm);
 
 std::unique_ptr<bjvm_vm, void (*)(bjvm_vm *)>
 CreateTestVM(bool preregister, bjvm_vm_options options,
-                          const char **classpath) {
+             const char **classpath) {
   options.load_classfile = load_classfile;
   options.load_classfile_param = classpath;
   bjvm_vm *vm = bjvm_create_vm(options);
@@ -37,7 +37,7 @@ CreateTestVM(bool preregister, bjvm_vm_options options,
 
 optional<vector<uint8_t>>
 ResolveClassPath(string const &filename,
-                              std::vector<string> const &extra_paths) {
+                 std::vector<string> const &extra_paths) {
   std::vector<string> paths = extra_paths;
   paths.emplace_back("jre8/"); // for testing
 
@@ -52,7 +52,7 @@ ResolveClassPath(string const &filename,
 }
 
 std::vector<std::string> ListDirectory(const std::string &path,
-                                                    bool recursive) {
+                                       bool recursive) {
 #ifdef EMSCRIPTEN
   void *length_and_data = EM_ASM_PTR(
       {

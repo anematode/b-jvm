@@ -15,13 +15,13 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "util.h"
 #include "analysis.h"
 #include "arrays.h"
 #include "bjvm.h"
+#include "natives.h"
 #include "objects.h"
 #include "strings.h"
-#include "natives.h"
+#include "util.h"
 
 struct classfile_entry {
   size_t len;
@@ -3192,8 +3192,9 @@ size_t size_of_object(bjvm_obj_header *obj) {
        obj->descriptor->dimensions > 1)) {
     return kArrayDataOffset + *ArrayLength(obj) * sizeof(void *);
   }
-  return kArrayDataOffset + *ArrayLength(obj) *
-                  sizeof_type_kind(obj->descriptor->primitive_component);
+  return kArrayDataOffset +
+         *ArrayLength(obj) *
+             sizeof_type_kind(obj->descriptor->primitive_component);
 }
 
 void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header **obj) {
