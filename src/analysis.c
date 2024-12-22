@@ -576,7 +576,6 @@ bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
 bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
   if (field->dimensions)
     return BJVM_TYPE_KIND_REFERENCE;
-
   return kind_to_representable_kind(field->kind);
 }
 

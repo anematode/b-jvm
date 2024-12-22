@@ -19,7 +19,7 @@ DECLARE_NATIVE("java/lang", Class, getPrimitiveClass,
   assert(argc == 1);
   short *chars;
   size_t len;
-  read_string(thread, args[0].obj, &chars, &len);
+  read_string(thread, args[0].handle->obj, &chars, &len);
   if (len > 10) {
     return value_null();
   }
@@ -146,7 +146,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
                "(Ljava/lang/String;ZLjava/lang/ClassLoader;Ljava/lang/"
                "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
-  bjvm_obj_header *name_obj = args[0].obj;
+  bjvm_obj_header *name_obj = args[0].handle->obj;
   short *name;
   size_t len;
   read_string(thread, name_obj, &name, &len);
@@ -288,18 +288,21 @@ DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
 
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
-  if (!args[0].obj)
-    UNREACHABLE(); // TODO check reference for what to do here
-  bjvm_classdesc *other_desc = bjvm_unmirror_class(args[0].obj);
+  if (!args[0].handle->obj) {
+    bjvm_null_pointer_exception(thread);
+    return value_null();
+  }
+  bjvm_classdesc *other_desc = bjvm_unmirror_class(args[0].handle->obj);
   return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
 }
 
+// Returns false when passed object is null
 DECLARE_NATIVE("java/lang", Class, isInstance, "(Ljava/lang/Object;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj);
-  if (!args[0].obj)
-    UNREACHABLE(); // TODO check reference for what to do here
-  bjvm_classdesc *other_desc = args[0].obj->descriptor;
-  return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
+  int result = 0;
+  if (args[0].handle)
+    result = bjvm_instanceof(args[0].handle->obj->descriptor, this_desc);
+  return (bjvm_stack_value){.i = result};
 }
 
 DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {

@@ -13,7 +13,7 @@ DECLARE_NATIVE("sun/reflect", Reflection, getCallerClass,
 
 DECLARE_NATIVE("sun/reflect", Reflection, getClassAccessFlags,
                "(Ljava/lang/Class;)I") {
-  bjvm_obj_header *obj_ = args[0].obj;
+  bjvm_obj_header *obj_ = args[0].handle->obj;
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj_);
   return (bjvm_stack_value){.i = classdesc->access_flags};
 }

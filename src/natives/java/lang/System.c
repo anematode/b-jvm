@@ -6,7 +6,7 @@
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
-  bjvm_obj_header *props_obj = args[0].obj;
+  bjvm_obj_header *props_obj = args[0].handle->obj;
   const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
                                 {STR("stdout.encoding"), STR("UTF-8")},
                                 {STR("native.encoding"), STR("UTF-8")},
@@ -32,14 +32,14 @@ DECLARE_NATIVE("java/lang", System, initProperties,
 
 DECLARE_NATIVE("java/lang", System, mapLibraryName,
                "(Ljava/lang/String;)Ljava/lang/String;") {
-  return args[0];
+  return (bjvm_stack_value) { .obj = args[0].handle->obj };
 }
 
 DECLARE_NATIVE("java/lang", System, arraycopy,
                "(Ljava/lang/Object;ILjava/lang/Object;II)V") {
   assert(argc == 5);
-  bjvm_obj_header *src = args[0].obj;
-  bjvm_obj_header *dest = args[2].obj;
+  bjvm_obj_header *src = args[0].handle->obj;
+  bjvm_obj_header *dest = args[2].handle->obj;
   if (src == nullptr || dest == nullptr) {
     ThrowLangException(NullPointerException);
     return value_null();
@@ -132,7 +132,7 @@ DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
       system_class, STR("out"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
-  *(bjvm_obj_header **)field = args[0].obj;
+  *(bjvm_obj_header **)field = args[0].handle->obj;
   return value_null();
 }
 
@@ -148,11 +148,11 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
       system_class, STR("err"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
-  *(bjvm_obj_header **)field = args[0].obj;
+  *(bjvm_obj_header **)field = args[0].handle->obj;
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
-  return (bjvm_stack_value){.i = (int)args[0].obj->mark_word};
+  return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
 }

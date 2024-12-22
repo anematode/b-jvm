@@ -181,8 +181,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
                "invoke/MemberName;") {
   assert(argc == 2);
 
-  struct bjvm_native_Class *caller = (void *)args[1].obj;
-  struct bjvm_native_MemberName *mn = (void *)args[0].obj;
+  struct bjvm_native_Class *caller = (void *)args[1].handle->obj;
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
 
   bool found = resolve_mn(thread, mn);
   (void)found;
@@ -202,7 +202,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   // Create object array of length 2. Make the first element the vmtarget and
   // the second the vmindex as a boxed Long.
   assert(argc == 1);
-  struct bjvm_native_MemberName *mn = (void *)args[0].obj;
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   bjvm_obj_header *array = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Object")), 2);
 
@@ -241,8 +241,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
                "(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V") {
-  struct bjvm_native_MemberName *mn = (void *)args[0].obj;
-  bjvm_obj_header *target = args[1].obj;
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
+  bjvm_obj_header *target = args[1].handle->obj;
 
   bjvm_utf8 s = hslc(target->descriptor->name);
   if (utf8_equals(s, "java/lang/reflect/Method")) {
@@ -270,7 +270,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset,
                "(Ljava/lang/invoke/MemberName;)J") {
   assert(argc == 1);
-  struct bjvm_native_MemberName *mn = (void *)args[0].obj;
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   return (bjvm_stack_value){.l = mn->vmindex};
 }
 
@@ -278,21 +278,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMembers,
                "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Class;I[Ljava/lang/invoke/MemberName;)I") {
   assert(argc == 7);
   // defc, matchName, matchSig, matchFlags, lookupClass, totalCount, buf
-
-  bjvm_classdesc *defc = bjvm_unmirror_class(args[0].obj);
-  heap_string matchName, matchSig;
-  bool has_match_name = args[1].obj != nullptr;
-  bool has_match_sig = args[2].obj != nullptr;
-  if (has_match_name) {
-    matchName = read_string_to_utf8(args[1].obj);
-  }
-  if (has_match_sig) {
-    matchSig = read_string_to_utf8(args[2].obj);
-  }
-  int matchFlags = args[3].i;
-  bjvm_classdesc *lookupClass = args[4].obj ? bjvm_unmirror_class(args[4].obj) : nullptr;
-  int totalCount = args[5].i;
-  bjvm_obj_header *buf = args[6].obj;
 
   return (bjvm_stack_value){.i = 0};
 }

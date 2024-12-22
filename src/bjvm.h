@@ -32,6 +32,27 @@ typedef union {
   bjvm_obj_header *obj; // reference type
 } bjvm_stack_value;
 
+// A thread-local handle to an underlying object. Used in case the object is
+// relocated.
+//
+// Implementation-wise, each thread contains an array of pointers to objects
+// fixed in memory. This handle points into that array. During GC compaction/
+// relocation, the array is updated to point to the new locations of the
+// objects.
+typedef struct {
+  bjvm_obj_header *obj;
+} bjvm_handle;
+
+// Value set as viewed by native functions (rather than by the VM itself,
+// which deals in bjvm_stack_value).
+typedef union {
+  int64_t l;
+  int i;
+  float f;
+  double d;
+  bjvm_handle *handle;
+} bjvm_value;
+
 // Generally, use this to indicate that a native function is returning void or
 // null
 static inline bjvm_stack_value value_null() {
@@ -42,7 +63,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
                                                  bjvm_obj_header *obj,
-                                                 bjvm_stack_value *args,
+                                                 bjvm_value *args,
                                                  int argc);
 
 // represents a native method somewhere in this binary
@@ -183,8 +204,20 @@ typedef struct bjvm_thread {
   // Instance of java.lang.Thread
   struct bjvm_native_Thread *thread_obj;
 
+  // Array of handles, see bjvm_handle (null entries are free for use)
+  // TODO make this a linked list to accommodate arbitrary # of handles
+  bjvm_handle *handles;
+  int handles_capacity;
+
+  // Null handle, for convenience
+  bjvm_handle null_handle;
+
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
+
+bjvm_handle *bjvm_make_local_handle(bjvm_thread* thread, bjvm_obj_header* obj);
+
+void bjvm_drop_local_handle(bjvm_thread *thread, bjvm_handle *handle);
 
 bjvm_array_classdesc *
 bjvm_checked_to_array_classdesc(bjvm_classdesc *classdesc);
@@ -292,6 +325,7 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
 bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field);
 int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                          const bjvm_utf8 exception_string);
+void bjvm_null_pointer_exception(bjvm_thread *thread);
 
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,

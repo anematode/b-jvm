@@ -56,6 +56,24 @@ int add_classfile_bytes(bjvm_vm *vm, const bjvm_utf8 filename,
   return 0;
 }
 
+bjvm_handle *
+bjvm_make_local_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
+  if (!obj) return &thread->null_handle;
+  for (int i = 0; i < thread->handles_capacity; ++i) {
+    if (!thread->handles[i].obj) {
+      thread->handles[i].obj = obj;
+      return thread->handles + i;
+    }
+  }
+  UNREACHABLE();  // When we need more handles, rewrite to use a LL impl
+}
+
+void bjvm_drop_local_handle(bjvm_thread *thread, bjvm_handle *handle) {
+  if (handle == &thread->null_handle) return;
+  assert(handle >= thread->handles && handle < thread->handles + thread->handles_capacity);
+  handle->obj = nullptr;
+}
+
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
   assert(method != nullptr);
 
@@ -744,6 +762,9 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->frame_buffer =
       calloc(1, thr->frame_buffer_capacity = options.stack_space);
   thr->js_jit_enabled = options.js_jit_enabled;
+  const int HANDLES_CAPACITY = 100;
+  thr->handles = calloc(1, sizeof(bjvm_handle) * HANDLES_CAPACITY);
+  thr->handles_capacity = HANDLES_CAPACITY;
 
   bjvm_classdesc *desc;
 
@@ -810,6 +831,7 @@ void bjvm_free_thread(bjvm_thread *thread) {
   // TODO what happens to ->current_exception etc.?
   free(thread->frames);
   free(thread->frame_buffer);
+  free(thread->handles);
   free(thread);
 }
 
@@ -1768,6 +1790,33 @@ void bjvm_invokevirtual_signature_polymorphic(bjvm_thread *thread,
   }
 }
 
+// Used when passing arguments into a native function:
+bjvm_value *make_handles_array(bjvm_thread *thread,
+  const bjvm_method_descriptor *calling, bjvm_stack_value *stack_args) {
+  int argc = calling->args_count;
+  bjvm_value *result = malloc(argc * sizeof(bjvm_value));
+  for (int i = 0; i < argc; ++i) {
+    // For each argument, if it's a reference, wrap it in a handle; otherwise
+    // just memcpy it over since the representations of primitives are the same
+    if (field_to_representable_kind(calling->args + i) == BJVM_TYPE_KIND_REFERENCE) {
+      result[i].handle = bjvm_make_local_handle(thread, stack_args[i].obj);
+    } else {
+      memcpy(result + i, stack_args + i, sizeof(bjvm_stack_value));
+    }
+  }
+  return result;
+}
+
+void drop_handles_array(bjvm_thread *thread, bjvm_method_descriptor *called, bjvm_value *array) {
+  int argc = called->args_count;
+  for (int i = 0; i < argc; ++i) {
+    if (field_to_representable_kind(called->args + i) == BJVM_TYPE_KIND_REFERENCE) {
+      bjvm_drop_local_handle(thread, array[i].handle);
+    }
+  }
+  free(array);
+}
+
 // Implementation of invokespecial/invokeinterface/invokevirtual
 int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
                          bjvm_bytecode_insn *insn) {
@@ -1777,12 +1826,12 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
 
   int args = insn->args;
   bjvm_obj_header *target = frame->values[frame->stack_depth - args].obj;
+  const bjvm_cp_method_info *info = &insn->cp->methodref;
 
   if (!method || !target ||
       (insn->kind != bjvm_insn_invokespecial &&
        target->descriptor != insn->ic2) ||
       !CACHE_INVOKENONSTATIC) {
-    const bjvm_cp_method_info *info = &insn->cp->methodref;
     args = insn->args = info->method_descriptor->args_count + 1;
 
     assert(args <= frame->stack_depth);
@@ -1835,7 +1884,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
   bjvm_stack_value invoked_result;
   if (method->access_flags & BJVM_ACCESS_NATIVE) {
     if (method->is_signature_polymorphic) {
-      bjvm_invokevirtual_signature_polymorphic(thread, frame, method, insn->cp->methodref.method_descriptor, target, args);
+      bjvm_invokevirtual_signature_polymorphic(thread, frame, method, info->method_descriptor, target, args);
       return thread->current_exception != NULL;
     }
 
@@ -1844,10 +1893,20 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       return -1;
     }
 
+    // Need to wrap arguments in handles
+
+    bjvm_handle *target_handle = bjvm_make_local_handle(thread, target);
+    bjvm_value *native_args = make_handles_array(thread,
+      info->method_descriptor,
+      frame->values + frame->stack_depth - args + 1);
+
     invoked_result = ((bjvm_native_callback)method->native_handle)(
-        thread, target, frame->values + frame->stack_depth - args + 1,
-        args - 1);
+        thread, target, native_args, args - 1);
     frame->stack_depth -= args;
+
+    bjvm_drop_local_handle(thread, target_handle);
+    drop_handles_array(thread, info->method_descriptor, native_args);
+
     if (thread->current_exception)
       return -1;
   } else {
@@ -1914,8 +1973,15 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       return -1;
     }
 
+    bjvm_value *native_args = make_handles_array(thread,
+      info->method_descriptor,
+      frame->values + frame->stack_depth - args);
+
     invoked_result = ((bjvm_native_callback)method->native_handle)(
-        thread, nullptr, frame->values + frame->stack_depth - args, args);
+        thread, nullptr, native_args, args);
+
+    drop_handles_array(thread, info->method_descriptor, native_args);
+
     frame->stack_depth -= args;
     if (thread->current_exception)
       return -1;
