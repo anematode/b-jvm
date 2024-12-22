@@ -56,9 +56,9 @@ heap_string unparse_method_type(const struct bjvm_native_MethodType *mt) {
   INIT_STACK_STRING(desc, 10000);
   bjvm_utf8 write = desc;
   write = slice(write, bprintf(write, "(").len);
-  for (int i = 0; i < *array_length(mt->ptypes); ++i) {
+  for (int i = 0; i < *ArrayLength(mt->ptypes); ++i) {
     struct bjvm_native_Class *class =
-        *((struct bjvm_native_Class **)array_data(mt->ptypes) + i);
+        *((struct bjvm_native_Class **)ArrayData(mt->ptypes) + i);
     write = slice(write, unparse_classdesc_to_field_descriptor(
                              write, class->reflected_class)
                              .len);
@@ -106,7 +106,8 @@ void fill_mn_with_method(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
   mn->vmindex =
       dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
   mn->flags |= method->access_flags;
-  mn->type = bjvm_intern_string(thread, method->descriptor);
+  if (!method->is_signature_polymorphic)
+    mn->type = bjvm_intern_string(thread, method->descriptor);
   mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
@@ -183,14 +184,14 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   // the second the vmindex as a boxed Long.
   assert(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].obj;
-  bjvm_obj_header *array = create_object_array(
-      thread, bootstrap_class_create(thread, str("java/lang/Object")), 2);
+  bjvm_obj_header *array = CreateObjectArray1D(
+      thread, bootstrap_class_create(thread, STR("java/lang/Object")), 2);
 
-  bjvm_obj_header **data = array_data(array);
+  bjvm_obj_header **data = ArrayData(array);
 
-  bjvm_classdesc *Long = bootstrap_class_create(thread, str("java/lang/Long"));
+  bjvm_classdesc *Long = bootstrap_class_create(thread, STR("java/lang/Long"));
   bjvm_cp_method *valueFrom = bjvm_easy_method_lookup(
-      Long, str("valueOf"), str("(J)Ljava/lang/Long;"), false, false);
+      Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
   bjvm_stack_value result;
   bjvm_thread_run(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},

@@ -269,11 +269,6 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           bjvm_native_callback callback);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
-
-int *array_length(bjvm_obj_header *array);
-
-void *array_data(bjvm_obj_header *array);
-
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
 
 bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror);
@@ -281,9 +276,6 @@ bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror);
 bjvm_cp_method **bjvm_unmirror_method(bjvm_obj_header *mirror);
 
 bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror);
-
-bjvm_obj_header *create_object_array(bjvm_thread *thread,
-                                     bjvm_classdesc *classdesc, int count);
 
 void bjvm_set_field(bjvm_obj_header *obj, bjvm_cp_field *field,
                     bjvm_stack_value bjvm_stack_value);
@@ -343,6 +335,10 @@ static inline int sizeof_type_kind(bjvm_type_kind kind) {
     UNREACHABLE();
   }
 }
+
+bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread,
+                                         bjvm_type_kind prim_kind);
+void *bump_allocate(bjvm_thread *thread, size_t bytes);
 
 #ifdef __cplusplus
 }

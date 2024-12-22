@@ -4,22 +4,23 @@
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
+
 #include <climits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
+#include <ranges>
 #include <unordered_map>
 
 #include "../src/adt.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
+#include "tests-common.h"
 
-bool EndsWith(const std::string &s, const std::string &suffix) {
-  if (s.size() < suffix.size()) {
-    return false;
-  }
-  return s.substr(s.size() - suffix.size()) == suffix;
-}
+#include <numeric>
+
+using namespace Bjvm::Tests;
 
 bool HasSuffix(std::string_view str, std::string_view suffix) {
   // Credit: https://stackoverflow.com/a/20446239/13458117
@@ -37,122 +38,8 @@ double get_time() {
 #endif
 }
 
-std::vector<uint8_t> ReadFile(const std::string &file) {
-#ifdef EMSCRIPTEN
-  bool exists = EM_ASM_INT(
-      {
-        const fs = require('fs');
-        return fs.existsSync(UTF8ToString($0));
-      },
-      file.c_str());
-  if (!exists)
-    return {};
-
-  void *length_and_data = EM_ASM_PTR(
-      {
-        const fs = require('fs');
-        const buffer = fs.readFileSync(UTF8ToString($0));
-        const length = buffer.length;
-
-        const result = _malloc(length + 4);
-        Module.HEAPU32[result >> 2] = length;
-        Module.HEAPU8.set(buffer, result + 4);
-
-        return result;
-      },
-      file.c_str());
-
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
-
-  std::vector result(data, data + length);
-  free(length_and_data);
-  return result;
-#else // !EMSCRIPTEN
-  std::vector<uint8_t> result;
-  if (std::filesystem::exists(file)) {
-    std::ifstream ifs(file, std::ios::binary | std::ios::ate);
-    std::ifstream::pos_type pos = ifs.tellg();
-
-    result.resize(pos);
-    ifs.seekg(0, std::ios::beg);
-    ifs.read(reinterpret_cast<char *>(result.data()), pos);
-  } else {
-    throw std::runtime_error("Classpath file not found: " + file);
-  }
-  return result;
-#endif
-}
-
-std::vector<std::string> ListDirectory(const std::string &path,
-                                       bool recursive) {
-#ifdef EMSCRIPTEN
-  void *length_and_data = EM_ASM_PTR(
-      {
-        // Credit: https://stackoverflow.com/a/5827895
-        const fs = require('fs');
-        const path = require('path');
-        function *walkSync(dir, recursive) {
-          const files = fs.readdirSync(dir, {withFileTypes : true});
-          for (const file of files) {
-            if (file.isDirectory() && recursive) {
-              yield *walkSync(path.join(dir, file.name), recursive);
-            } else {
-              yield path.join(dir, file.name);
-            }
-          }
-        }
-
-        var s = "";
-        for (const filePath of walkSync(UTF8ToString($0), $1))
-          s += filePath + "\n";
-
-        const length = s.length;
-        const result = _malloc(length + 4);
-        Module.HEAPU32[result >> 2] = length;
-        Module.HEAPU8.set(new TextEncoder().encode(s), result + 4);
-
-        return result;
-      },
-      path.c_str(), recursive);
-
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
-
-  std::string s(data, data + length);
-  free(length_and_data);
-
-  std::vector<std::string> result;
-  size_t start = 0;
-
-  for (size_t i = 0; i < s.size(); i++) {
-    if (s[i] == '\n') {
-      result.push_back(s.substr(start, i - start));
-      start = i + 1;
-    }
-  }
-
-  return result;
-#else // !EMSCRIPTEN
-  using namespace std::filesystem;
-
-  // Recursively list files (TODO: fix recursive = false)
-  std::vector<std::string> result;
-
-  (void)recursive;
-
-  for (const auto &entry : recursive_directory_iterator(path)) {
-    if (entry.is_regular_file()) {
-      result.push_back(entry.path().string());
-    }
-  }
-
-  return result;
-#endif
-}
-
-TEST_CASE("ATest str() macro") {
-  bjvm_utf8 utf = str("abc");
+TEST_CASE("ATest STR() macro") {
+  bjvm_utf8 utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
   REQUIRE(utf.chars[2] == 'c');
@@ -176,7 +63,7 @@ TEST_CASE("Test classfile parsing") {
       continue;
     }
 
-    auto read = ReadFile(file);
+    auto read = ReadFile(file).value();
     double start = get_time();
 
     // std::cout << "Reading " << file << "\n";
@@ -216,7 +103,8 @@ TEST_CASE("Test classfile parsing") {
   std::cout << "Total time: " << total_millis << "ms\n";
 
   BENCHMARK_ADVANCED("Parse classfile")(Catch::Benchmark::Chronometer meter) {
-    auto read = ReadFile("./jre8/sun/security/tools/keytool/Main.class");
+    auto read =
+        ReadFile("./jre8/sun/security/tools/keytool/Main.class").value();
     bjvm_classdesc cf;
 
     meter.measure([&] {
@@ -229,51 +117,38 @@ TEST_CASE("Test classfile parsing") {
   };
 }
 
-int preregister_all_classes(bjvm_vm *vm) {
-  auto files = ListDirectory("jre8", true);
-  int file_count = 0;
-  for (auto file : files) {
-    if (!EndsWith(file, ".class")) {
-      continue;
-    }
-    auto read = ReadFile(file);
-    file = file.substr(5); // remove "jre8/"
-    bjvm_utf8 filename = {.chars = (char *)file.c_str(),
-                          .len = (int)file.size()};
-    bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
-    file_count++;
-  }
-  return file_count;
-}
-
 TEST_CASE("Class file management") {
-  bjvm_vm_options options = bjvm_default_vm_options();
-  bjvm_vm *vm = bjvm_create_vm(options);
+  auto vm = CreateTestVM(true);
+  auto files = ListDirectory("jre8", true);
 
-  int file_count = preregister_all_classes(vm);
+  int file_count = std::accumulate(files.begin(), files.end(), 0,
+                                   [](int acc, const std::string &file) {
+                                     return acc + EndsWith(file, ".class");
+                                   });
+
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes,
-                                 &len) == 0);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.class"),
+                                 &bytes, &len) == 0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.clas"), nullptr,
-                                 &len) != 0);
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.classe"), nullptr,
-                                 &len) != 0);
-  bjvm_vm_list_classfiles(vm, nullptr, &len);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.clas"),
+                                 nullptr, &len) != 0);
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.classe"),
+                                 nullptr, &len) != 0);
+  bjvm_vm_list_classfiles(vm.get(), nullptr, &len);
   REQUIRE((int)len == file_count);
   std::vector<heap_string> strings(len);
 
-  bjvm_vm_list_classfiles(vm, strings.data(), &len);
+  bjvm_vm_list_classfiles(vm.get(), strings.data(), &len);
   bool found = false;
   for (size_t i = 0; i < len; ++i) {
     found = found ||
             utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
     free_heap_str(strings[i]);
   }
+  printf("Hello");
   REQUIRE(found);
-  bjvm_free_vm(vm);
 }
 
 TEST_CASE("Compressed bitset") {
@@ -375,8 +250,10 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   for (const auto &path : paths) {
     std::string file = path + std::string(filename.chars, filename.len);
     try {
-      auto file_data = ReadFile(file);
-      if (file_data.size() > 0) {
+      auto file_data_ = ReadFile(file);
+      if (file_data_.has_value()) {
+        auto file_data = file_data_.value();
+
         auto *data = (uint8_t *)malloc(file_data.size());
         memcpy(data, file_data.data(), file_data.size());
         *bytes = data;
@@ -390,23 +267,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   return -1;
 }
 
-bjvm_vm *create_vm(bool preregister, const char **classpath = nullptr) {
-  bjvm_vm_options options = bjvm_default_vm_options();
-
-  options.load_classfile = load_classfile;
-  options.load_classfile_param = classpath;
-  bjvm_vm *vm = bjvm_create_vm(options);
-
-  if (preregister)
-    preregister_all_classes(vm);
-
-  return vm;
-}
-
-TEST_CASE("VM initialization") {
-  bjvm_vm *vm = create_vm(true);
-  bjvm_free_vm(vm);
-}
+TEST_CASE("VM initialization") { CreateTestVM(true); }
 
 struct TestCaseResult {
   std::string stdout_;
@@ -423,7 +284,7 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   options.load_classfile_param = classpath;
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
-    result->stdout_ += (char)ch;
+  result->stdout_ += (char)ch;
   } : nullptr;
   options.write_stderr = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
@@ -434,21 +295,21 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_classdesc *desc = bootstrap_class_create(thr, str("Main"));
+  bjvm_classdesc *desc = bootstrap_class_create(thr, STR("Main"));
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(desc, str("main"),
-                                   str("([Ljava/lang/String;)V"), false, false);
+  method = bjvm_easy_method_lookup(desc, STR("main"),
+                                   STR("([Ljava/lang/String;)V"), false, false);
 
   bjvm_thread_run(thr, method, args, nullptr);
 
   if (thr->current_exception) {
     method = bjvm_easy_method_lookup(thr->current_exception->descriptor,
-                                     str("toString"),
-                                     str("()Ljava/lang/String;"), true, false);
+                                     STR("toString"),
+                                     STR("()Ljava/lang/String;"), true, false);
     bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
     thr->current_exception = nullptr;
     bjvm_thread_run(thr, method, args, &result);
@@ -458,8 +319,8 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
     // Then call printStackTrace ()V
     method =
-        bjvm_easy_method_lookup(args[0].obj->descriptor, str("printStackTrace"),
-                                str("()V"), true, false);
+        bjvm_easy_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
+                                STR("()V"), true, false);
     bjvm_thread_run(thr, method, args, nullptr);
   }
 
@@ -576,7 +437,7 @@ TEST_CASE("Playground") {
 #if 0
 TEST_CASE("Class circularity error") {
   const char* cp[2] = { "test_files/circularity/", nullptr };
-  bjvm_vm *vm = create_vm(false, cp);
+  bjvm_vm *vm = CreateTestVM(true, classpath = cp);
 
   bjvm_thread_options options;
   bjvm_fill_default_thread_options(&options);

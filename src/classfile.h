@@ -630,6 +630,8 @@ typedef struct bjvm_classdesc {
 
   int dimensions;                     // array types only
   bjvm_type_kind primitive_component; // primitives and array types only
+
+  void (*dtor)(bjvm_classdesc *); // apoptosis
 } bjvm_classdesc;
 
 char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

@@ -28,7 +28,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   // inspecting the stack.
 
   bjvm_classdesc *StackTraceElement =
-      bootstrap_class_create(thread, str("java/lang/StackTraceElement"));
+      bootstrap_class_create(thread, STR("java/lang/StackTraceElement"));
   bjvm_link_class(thread, StackTraceElement);
 
   int i = thread->frames_count - 1;
@@ -42,7 +42,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   // Create stack trace of the appropriate height
   ++i;
   bjvm_obj_header *stack_trace =
-      create_object_array(thread, StackTraceElement, i + 1);
+      CreateObjectArray1D(thread, StackTraceElement, i + 1);
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
     bjvm_obj_header *class_name =
@@ -59,7 +59,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     e->methodName = method_name;
     e->fileName = file_name;
     e->lineNumber = line;
-    *((struct bjvm_native_StackTraceElement **)array_data(stack_trace) + j) = e;
+    *((struct bjvm_native_StackTraceElement **)ArrayData(stack_trace) + j) = e;
   }
 
   *backtrace_object(obj) = stack_trace;
@@ -69,7 +69,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
   assert(argc == 0);
 
-  return (bjvm_stack_value){.i = *array_length(*backtrace_object(obj))};
+  return (bjvm_stack_value){.i = *ArrayLength(*backtrace_object(obj))};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
@@ -77,10 +77,10 @@ DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
   assert(argc == 1);
   bjvm_obj_header *stack_trace = *backtrace_object(obj);
   int index = args[0].i;
-  if (index < 0 || index >= *array_length(stack_trace)) {
+  if (index < 0 || index >= *ArrayLength(stack_trace)) {
     return value_null();
   }
   bjvm_obj_header *element =
-      *((bjvm_obj_header **)array_data(stack_trace) + index);
+      *((bjvm_obj_header **)ArrayData(stack_trace) + index);
   return (bjvm_stack_value){.obj = element};
 }
