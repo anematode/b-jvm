@@ -152,6 +152,9 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS:
     free(attribute->method_parameters.params);
     break;
+  case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
+    free(attribute->runtime_visible_annotations.data);
+    break;
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
@@ -1909,6 +1912,12 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
       params[i].access_flags =
           reader_next_u16(&attr_reader, "method parameter access flags");
     }
+  } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS;
+    uint8_t *data = attr->runtime_visible_annotations.data = malloc(attr_reader.len);
+    free_on_format_error(ctx, data);
+    memcpy(data, attr_reader.bytes, attr_reader.len);
+    attr->runtime_visible_annotations.length = attr_reader.len;
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }

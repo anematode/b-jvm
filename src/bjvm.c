@@ -428,39 +428,35 @@ bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
 void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_classdesc *classdesc,
                                    bjvm_cp_field *field) {
+
   bjvm_classdesc *reflect_Field =
       bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
   bjvm_initialize_class(thread, reflect_Field);
-  struct bjvm_native_Field *result = field->reflection_field =
-      (void *)new_object(thread, reflect_Field);
 
-  result->reflected_field = field;
-  result->name = bjvm_intern_string(thread, field->name);
-  result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
-  result->type = (void *)bjvm_get_class_mirror(
+  bjvm_handle *field_mirror = bjvm_make_handle(thread, new_object(thread, reflect_Field));
+
+#define F ((struct bjvm_native_Field *)field_mirror->obj)
+  field->reflection_field = (void*)F;
+
+  F->reflected_field = field;
+  F->name = bjvm_intern_string(thread, field->name);
+  F->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+  F->type = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, field->descriptor));
-  result->modifiers = field->access_flags;
-}
+  F->modifiers = field->access_flags;
 
-void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
-                                         bjvm_classdesc *classdesc,
-                                         bjvm_cp_method *method) {
-  assert(utf8_equals(method->name, "<init>"));
+  // Find runtimevisibleannotations attribute
+  for (int i = 0; i < field->attributes_count; ++i) {
+    if (field->attributes[i].kind == BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
+      const bjvm_attribute_runtime_visible_annotations a = field->attributes[i].runtime_visible_annotations;
+      F->annotations = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length);
+      memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
+      break;
+    }
+  }
+#undef F
 
-  bjvm_classdesc *reflect_Constructor =
-      bootstrap_class_create(thread, STR("java/lang/reflect/Constructor"));
-  bjvm_initialize_class(thread, reflect_Constructor);
-
-  struct bjvm_native_Constructor *result = method->reflection_ctor =
-      (void *)new_object(thread, reflect_Constructor);
-  result->reflected_ctor = method;
-  result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
-  result->modifiers = method->access_flags;
-
-  // TODO fill these in
-  result->parameterTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      method->parsed_descriptor->args_count);
+  bjvm_drop_handle(thread, field_mirror);
 }
 
 bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
@@ -493,6 +489,39 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
   }
   str.len = write.chars - str.chars;
   return str;
+}
+
+void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
+                                         bjvm_classdesc *classdesc,
+                                         bjvm_cp_method *method) {
+  assert(utf8_equals(method->name, "<init>"));
+
+  bjvm_classdesc *reflect_Constructor =
+      bootstrap_class_create(thread, STR("java/lang/reflect/Constructor"));
+  bjvm_initialize_class(thread, reflect_Constructor);
+
+  method->reflection_ctor =
+      (void *)new_object(thread, reflect_Constructor);
+  bjvm_handle *result = bjvm_make_handle(thread, (void*) method->reflection_ctor);
+#define C ((struct bjvm_native_Constructor *)result->obj)
+  C->reflected_ctor = method;
+  C->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+  C->modifiers = method->access_flags;
+
+  // TODO fill these in
+  C->parameterTypes = CreateObjectArray1D(
+      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
+      method->parsed_descriptor->args_count);
+
+  for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
+    INIT_STACK_STRING(desc, 1000);
+    desc = unparse_field_descriptor(desc, &method->parsed_descriptor->args[i]);
+    struct bjvm_native_Class *type = (void *)bjvm_get_class_mirror(
+        thread, load_class_of_field_descriptor(thread, desc));
+    ((struct bjvm_native_Class **)ArrayData(C->parameterTypes))[i] = type;
+  }
+
+#undef C
 }
 
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
@@ -1556,7 +1585,7 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
 }
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  (void)thread;
+  assert(classdesc->state >= BJVM_CD_STATE_LINKED);
   bjvm_obj_header *obj =
       bump_allocate(thread, classdesc->data_bytes + sizeof(bjvm_obj_header));
   obj->descriptor = classdesc;
@@ -1602,6 +1631,22 @@ bjvm_cp_method **bjvm_unmirror_method(bjvm_obj_header *mirror) {
   if (root)
     mirror = root;
   return &((struct bjvm_native_Method *)mirror)->reflected_method;
+}
+
+struct bjvm_native_ConstantPool *bjvm_get_constant_pool_mirror(
+    bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  if (!classdesc)
+    return nullptr;
+  if (classdesc->cp_mirror)
+    return classdesc->cp_mirror;
+  bjvm_classdesc *java_lang_ConstantPool =
+      bootstrap_class_create(thread, STR("sun/reflect/ConstantPool"));
+  bjvm_initialize_class(thread, java_lang_ConstantPool);
+  struct bjvm_native_ConstantPool *cp_mirror =
+      classdesc->cp_mirror = (void *)new_object(thread, java_lang_ConstantPool);
+  cp_mirror->reflected_class = classdesc;
+  printf("Mirror, desc: %p %p\n", cp_mirror, cp_mirror->reflected_class);
+  return cp_mirror;
 }
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
@@ -1962,7 +2007,7 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
 
     method = insn->ic =
         bjvm_method_lookup(class->classdesc, info->name_and_type->name,
-                           info->name_and_type->descriptor, false, false);
+                           info->name_and_type->descriptor, true, false);
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
       bprintf(complaint,
@@ -3300,6 +3345,7 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
   bjvm_classdesc *array = desc;
   while (array) {
     PUSH_ROOT(&array->mirror);
+    PUSH_ROOT(&array->cp_mirror);
     array = array->array_type;
   }
 
@@ -3320,7 +3366,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
     for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
-      PUSH_ROOT(&vm->primitive_classes[i]->mirror);
+      enumerate_reflection_roots(ctx, vm->primitive_classes[i]);
     }
   }
 

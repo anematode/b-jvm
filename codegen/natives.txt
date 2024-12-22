@@ -2,6 +2,8 @@ java/lang/String
 java/lang/StackTraceElement
 java/lang/Throwable
 java/lang/invoke/LambdaForm
+sun/reflect/ConstantPool
+  bjvm_classdesc *reflected_class;
 java/lang/Class
   bjvm_classdesc *reflected_class;
 java/lang/reflect/Parameter

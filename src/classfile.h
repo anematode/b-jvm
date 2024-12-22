@@ -391,7 +391,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
   BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
   BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
-  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7
+  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -528,6 +529,11 @@ typedef struct {
 } bjvm_attribute_enclosing_method;
 
 typedef struct {
+  uint8_t* data;
+  int length;
+} bjvm_attribute_runtime_visible_annotations;
+
+typedef struct {
   bjvm_utf8 name;
 } bjvm_attribute_source_file;
 
@@ -544,6 +550,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_source_file source_file;
     bjvm_attribute_line_number_table lnt;
     bjvm_attribute_method_parameters method_parameters;
+    bjvm_attribute_runtime_visible_annotations runtime_visible_annotations;
   };
 } bjvm_attribute;
 
@@ -624,6 +631,7 @@ typedef struct bjvm_classdesc {
   int imp_padding;
 
   struct bjvm_native_Class *mirror;
+  struct bjvm_native_ConstantPool *cp_mirror;
 
   // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets
   // correspond to references that need to be followed

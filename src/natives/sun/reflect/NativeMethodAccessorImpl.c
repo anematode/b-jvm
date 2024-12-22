@@ -32,6 +32,5 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
 
   printf("CALLED INVOKE, got result %p\n", result.obj);
 
-  // TODO box the result
   return result;
 }
