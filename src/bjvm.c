@@ -1146,6 +1146,9 @@ int allocate_field(int *current, bjvm_type_kind kind) {
 }
 
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  if (!classdesc) {
+    printf("Null classdesc\n");
+  }
   assert(classdesc);
   if (classdesc->state != BJVM_CD_STATE_LOADED) // already linked
     return 0;
@@ -1532,18 +1535,18 @@ bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
                              const bjvm_utf8 name) {
-  return utf8_equals_utf8(hslc(mirror->descriptor->name), name);
+  return mirror && utf8_equals_utf8(hslc(mirror->descriptor->name), name);
 }
 
 // nullptrABLE because bjvm_unmirror_class on int.class etc. will return
 // nullptr! (For now...)
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, str("java/lang/Class")));
+  assert(bjvm_is_instanceof_name(mirror, STR("java/lang/Class")));
   return ((struct bjvm_native_Class *)mirror)->reflected_class;
 }
 
 bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Field")));
+  assert(bjvm_is_instanceof_name(mirror, STR("java/lang/reflect/Field")));
   // Fields get copied around, but all reference the "root" created by the VM
   bjvm_obj_header *root = ((struct bjvm_native_Field *)mirror)->root;
   if (root)
@@ -1552,7 +1555,7 @@ bjvm_cp_field **bjvm_unmirror_field(bjvm_obj_header *mirror) {
 }
 
 bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Constructor")));
+  assert(bjvm_is_instanceof_name(mirror, STR("java/lang/reflect/Constructor")));
   // Constructors get copied around, but all reference the "root" created by the
   // VM
   bjvm_obj_header *root = ((struct bjvm_native_Constructor *)mirror)->root;
@@ -1562,7 +1565,7 @@ bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror) {
 }
 
 bjvm_cp_method **bjvm_unmirror_method(bjvm_obj_header *mirror) {
-  assert(bjvm_is_instanceof_name(mirror, str("java/lang/reflect/Method")));
+  assert(bjvm_is_instanceof_name(mirror, STR("java/lang/reflect/Method")));
   // Methods get copied around, but all reference the "root" created by the VM
   bjvm_obj_header *root = ((struct bjvm_native_Method *)mirror)->root;
   if (root)

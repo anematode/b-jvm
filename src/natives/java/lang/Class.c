@@ -233,6 +233,21 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
   return ret;
 }
 
+DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
+               "()[Ljava/lang/Class;") {
+  bjvm_classdesc *classdesc = bjvm_unmirror_class(obj);
+
+  printf("Calling incompletely implemented getDeclaredClasses0\n");
+
+  int count = 0;
+  bjvm_stack_value ret;
+  ret.obj = CreateObjectArray1D(
+      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
+      count);
+  // TODO parse inner classes and return them here
+  return ret;
+}
+
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
   return (bjvm_stack_value){.i = bjvm_unmirror_class(obj)->kind ==
                                  BJVM_CD_KIND_PRIMITIVE};

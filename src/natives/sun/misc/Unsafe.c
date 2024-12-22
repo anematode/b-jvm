@@ -123,3 +123,34 @@ DECLARE_NATIVE("sun/misc", Unsafe, getObjectVolatile,
   assert(argc == 2);
   return (bjvm_stack_value){.obj = *(void **)((void *)args[0].obj + args[1].l)};
 }
+
+DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass, "(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;") {
+  assert(argc == 3);
+  bjvm_obj_header *host = args[0].obj;
+  bjvm_obj_header *data = args[1].obj;
+  bjvm_obj_header *cp_patches = args[2].obj;
+
+  // Read data into byte array
+  int length = *ArrayLength(data);
+  uint8_t *bytes = ArrayData(data);
+
+  bjvm_classdesc *cd = calloc(1, sizeof(bjvm_classdesc));
+  // Pre-parse to get the name of the class
+  bjvm_parse_classfile(bytes, length, cd);
+
+  INIT_STACK_STRING(random_name, 1000);
+  random_name = bprintf(random_name, "%.*s$%d", fmt_slice(hslc(cd->name)), rand());
+
+  bjvm_free_classfile(*cd);
+  free(cd);
+
+  INIT_STACK_STRING(cf_name, 1000);
+  cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(random_name));
+
+  bjvm_vm_preregister_classfile(thread->vm, cf_name, bytes, length);
+  bjvm_classdesc *result = bootstrap_class_create(thread, random_name);
+
+  bjvm_initialize_class(thread, result);
+
+  return (bjvm_stack_value) { .obj = (void*)bjvm_get_class_mirror(thread, result) };
+}

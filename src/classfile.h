@@ -574,6 +574,7 @@ typedef struct bjvm_cp_field {
   struct bjvm_native_Field *reflection_field;
 
   bjvm_classdesc *my_class;
+  int my_index;
 } bjvm_cp_field;
 
 typedef bjvm_utf8 cp_string;

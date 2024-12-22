@@ -2171,6 +2171,7 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   for (int i = 0; i < cf->fields_count; i++) {
     cf->fields[i] = read_field(&reader, &ctx);
     cf->fields[i].my_class = result;
+    cf->fields[i].my_index = i;
   }
   cf->static_fields = nullptr;
   cf->static_references = bjvm_empty_bitset();

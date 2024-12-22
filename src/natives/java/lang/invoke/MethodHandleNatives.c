@@ -76,14 +76,13 @@ void fill_mn_with_field(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
                         bjvm_cp_field *field) {
   bjvm_classdesc *search_on = field->my_class;
   bjvm_reflect_initialize_field(thread, search_on, field);
-  mn->vmtarget = (void *)mn;
   mn->resolution = (void *)field->reflection_field;
-  mn->vmindex = 1; // field offset
+  mn->vmindex = field->byte_offset; // field offset
   mn->flags |= field->access_flags;
   mn->flags |= MN_IS_FIELD;
   bjvm_classdesc *field_cd =
       load_class_of_field_descriptor(thread, field->descriptor);
-  mn->type = (void *)bjvm_get_class_mirror(thread, field_cd);
+  mn->vmtarget = mn->type = (void *)bjvm_get_class_mirror(thread, field_cd);
   mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
@@ -128,11 +127,20 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_GET_FIELD:
   case BJVM_MH_KIND_PUT_FIELD:
+    printf("Trying to resolve field %.*s\n", fmt_slice(search_for));
+    bjvm_classdesc *field_type = bjvm_unmirror_class(mn->type);
+    printf("Of type %.*s \n", fmt_slice(mn->type->descriptor->name));
+    printf("On class %.*s\n", fmt_slice(bjvm_unmirror_class(mn->clazz)->name));
+    INIT_STACK_STRING(field_str, 1000);
+    bjvm_utf8 field_desc = unparse_classdesc_to_field_descriptor(
+        field_str, field_type);
     bjvm_cp_field *field = bjvm_easy_field_lookup(
-        search_on, hslc(search_for), hslc(mn->type->descriptor->name));
+        search_on, hslc(search_for), field_desc);
+    printf("Field: %p\n", field);
     if (!field) {
       break;
     }
+    found = true;
     fill_mn_with_field(thread, mn, field);
     break;
   case BJVM_MH_KIND_INVOKE_STATIC:
@@ -230,4 +238,39 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
   }
   mn->resolution = nullptr; // ??
   return value_null();
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset,
+               "(Ljava/lang/invoke/MemberName;)J") {
+  assert(argc == 1);
+  struct bjvm_native_MemberName *mn = (void *)args[0].obj;
+  return (bjvm_stack_value){.l = mn->vmindex};
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMembers,
+               "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Class;I[Ljava/lang/invoke/MemberName;)I") {
+  assert(argc == 7);
+  // defc, matchName, matchSig, matchFlags, lookupClass, totalCount, buf
+
+  bjvm_classdesc *defc = bjvm_unmirror_class(args[0].obj);
+  heap_string matchName, matchSig;
+  bool has_match_name = args[1].obj != nullptr;
+  bool has_match_sig = args[2].obj != nullptr;
+  if (has_match_name) {
+    matchName = read_string_to_utf8(args[1].obj);
+  }
+  if (has_match_sig) {
+    matchSig = read_string_to_utf8(args[2].obj);
+  }
+  int matchFlags = args[3].i;
+  bjvm_classdesc *lookupClass = args[4].obj ? bjvm_unmirror_class(args[4].obj) : nullptr;
+  int totalCount = args[5].i;
+  bjvm_obj_header *buf = args[6].obj;
+
+  printf("defc: %.*s, matchName: %.*s, matchSig: %.*s, matchFlags: %d, "
+         " totalCount: %d\n",
+         fmt_slice(defc->name), fmt_slice(matchName), fmt_slice(matchSig),
+         matchFlags, totalCount);
+
+  return (bjvm_stack_value){.i = 0};
 }
