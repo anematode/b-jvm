@@ -17,8 +17,8 @@ FetchContent_MakeAvailable(Catch2)
 
 # If doing emscripten
 if (EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -Wextra -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
-    set(CMAKE_CXX_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type ")
+    set(CMAKE_C_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -Wextra -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
+    set(CMAKE_CXX_FLAGS "-O3 -fexceptions -fwasm-exceptions -Wall -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type ")
     set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=100000000 -fsanitize=undefined -s ALLOW_MEMORY_GROWTH=1")
 elseif (APPLE)
     set(CMAKE_C_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -fno-strict-aliasing")

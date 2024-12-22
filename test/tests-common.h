@@ -5,8 +5,12 @@
 #ifndef BJVM_TESTS_COMMON_H
 #define BJVM_TESTS_COMMON_H
 
+#undef __APPLE__
+
 #include <bjvm.h>
 
+#include <memory>
+#include <filesystem>
 #include <vector>
 #include <string>
 #include <optional>

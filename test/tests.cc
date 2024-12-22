@@ -2,8 +2,6 @@
 #include <emscripten.h>
 #endif
 
-#include <catch2/benchmark/catch_benchmark.hpp>
-#include <catch2/catch_test_macros.hpp>
 #include <climits>
 #include <filesystem>
 #include <fstream>
@@ -16,6 +14,9 @@
 #include "../src/bjvm.h"
 #include "../src/util.h"
 #include "tests-common.h"
+
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 using namespace Bjvm::Tests;
 using namespace std::views;
