@@ -7,16 +7,16 @@
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
   bjvm_obj_header *props_obj = args[0].obj;
-  const bjvm_utf8 props[][2] = {{str("file.encoding"), str("UTF-8")},
-                                {str("stdout.encoding"), str("UTF-8")},
-                                {str("native.encoding"), str("UTF-8")},
-                                {str("stderr.encoding"), str("UTF-8")},
-                                {str("line.separator"), str("\n")},
-                                {str("path.separator"), str(":")},
-                                {str("file.separator"), str("/")}};
+  const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
+                                {STR("stdout.encoding"), STR("UTF-8")},
+                                {STR("native.encoding"), STR("UTF-8")},
+                                {STR("stderr.encoding"), STR("UTF-8")},
+                                {STR("line.separator"), STR("\n")},
+                                {STR("path.separator"), STR(":")},
+                                {STR("file.separator"), STR("/")}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
-      props_obj->descriptor, str("put"),
-      str("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,
+      props_obj->descriptor, STR("put"),
+      STR("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,
       false);
   for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
     bjvm_stack_value put_args[3] = {
@@ -128,9 +128,9 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
 DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   // Look up the field System.out
   bjvm_classdesc *system_class =
-      bootstrap_class_create(thread, str("java/lang/System"));
+      bootstrap_class_create(thread, STR("java/lang/System"));
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
-      system_class, str("out"), str("Ljava/io/PrintStream;"));
+      system_class, STR("out"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
   return value_null();
@@ -144,9 +144,9 @@ DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") {
 }
 DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
   bjvm_classdesc *system_class =
-      bootstrap_class_create(thread, str("java/lang/System"));
+      bootstrap_class_create(thread, STR("java/lang/System"));
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
-      system_class, str("err"), str("Ljava/io/PrintStream;"));
+      system_class, STR("err"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].obj;
   return value_null();

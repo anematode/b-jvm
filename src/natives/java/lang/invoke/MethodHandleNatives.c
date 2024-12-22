@@ -184,13 +184,13 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   assert(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].obj;
   bjvm_obj_header *array = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, str("java/lang/Object")), 2);
+      thread, bootstrap_class_create(thread, STR("java/lang/Object")), 2);
 
   bjvm_obj_header **data = ArrayData(array);
 
-  bjvm_classdesc *Long = bootstrap_class_create(thread, str("java/lang/Long"));
+  bjvm_classdesc *Long = bootstrap_class_create(thread, STR("java/lang/Long"));
   bjvm_cp_method *valueFrom = bjvm_easy_method_lookup(
-      Long, str("valueOf"), str("(J)Ljava/lang/Long;"), false, false);
+      Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
   bjvm_stack_value result;
   bjvm_thread_run(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},

@@ -38,8 +38,8 @@ double get_time() {
 #endif
 }
 
-TEST_CASE("ATest str() macro") {
-  bjvm_utf8 utf = str("abc");
+TEST_CASE("ATest STR() macro") {
+  bjvm_utf8 utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
   REQUIRE(utf.chars[2] == 'c');
@@ -127,13 +127,13 @@ TEST_CASE("Class file management") {
 
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.class"),
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.class"),
                                  &bytes, &len) == 0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.clas"),
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.clas"),
                                  nullptr, &len) != 0);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.classe"),
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.classe"),
                                  nullptr, &len) != 0);
   bjvm_vm_list_classfiles(vm.get(), nullptr, &len);
   REQUIRE((int)len == file_count);
@@ -294,21 +294,21 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_classdesc *desc = bootstrap_class_create(thr, str("Main"));
+  bjvm_classdesc *desc = bootstrap_class_create(thr, STR("Main"));
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(desc, str("main"),
-                                   str("([Ljava/lang/String;)V"), false, false);
+  method = bjvm_easy_method_lookup(desc, STR("main"),
+                                   STR("([Ljava/lang/String;)V"), false, false);
 
   bjvm_thread_run(thr, method, args, nullptr);
 
   if (thr->current_exception) {
     method = bjvm_easy_method_lookup(thr->current_exception->descriptor,
-                                     str("toString"),
-                                     str("()Ljava/lang/String;"), true, false);
+                                     STR("toString"),
+                                     STR("()Ljava/lang/String;"), true, false);
     bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
     thr->current_exception = nullptr;
     bjvm_thread_run(thr, method, args, &result);
@@ -318,8 +318,8 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
     // Then call printStackTrace ()V
     method =
-        bjvm_easy_method_lookup(args[0].obj->descriptor, str("printStackTrace"),
-                                str("()V"), true, false);
+        bjvm_easy_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
+                                STR("()V"), true, false);
     bjvm_thread_run(thr, method, args, nullptr);
   }
 

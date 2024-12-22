@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-#include "bjvm.h"
 #include <stdint.h>
+#include "bjvm.h"
 
 #define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 

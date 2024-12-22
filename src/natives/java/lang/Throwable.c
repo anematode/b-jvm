@@ -28,7 +28,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   // inspecting the stack.
 
   bjvm_classdesc *StackTraceElement =
-      bootstrap_class_create(thread, str("java/lang/StackTraceElement"));
+      bootstrap_class_create(thread, STR("java/lang/StackTraceElement"));
   bjvm_link_class(thread, StackTraceElement);
 
   int i = thread->frames_count - 1;

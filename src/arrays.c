@@ -25,7 +25,7 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
 static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   base->access_flags = BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL;
 
-  bjvm_utf8 name = str("java/lang/Object");
+  bjvm_utf8 name = STR("java/lang/Object");
 
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
   info->classdesc = bootstrap_class_create(thread, name);
@@ -38,8 +38,8 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   fields->access_flags =
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_STATIC | BJVM_ACCESS_FINAL;
 
-  fields->name = str("length");
-  fields->descriptor = str("I");
+  fields->name = STR("length");
+  fields->descriptor = STR("I");
 }
 
 static bjvm_classdesc *
