@@ -55,6 +55,17 @@ struct bjvm_native_Class {
   bjvm_obj_header *annotationType;  // Lsun/reflect/annotation/AnnotationType;
   bjvm_obj_header *classValueMap;  // Ljava/lang/ClassValue$ClassValueMap;
 };
+struct bjvm_native_Parameter {
+  bjvm_obj_header base;
+  // my fields
+  bjvm_obj_header *name;  // Ljava/lang/String;
+  int32_t modifiers;  // I
+  bjvm_obj_header *executable;  // Ljava/lang/reflect/Executable;
+  int32_t index;  // I
+  bjvm_obj_header *parameterTypeCache;  // Ljava/lang/reflect/Type;
+  bjvm_obj_header *parameterClassCache;  // Ljava/lang/Class;
+  bjvm_obj_header *declaredAnnotations;  // Ljava/util/Map;
+};
 struct bjvm_native_Field {
   bjvm_obj_header base;
   // superclass fields

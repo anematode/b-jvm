@@ -393,6 +393,7 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
   BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
   BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
+  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -425,6 +426,16 @@ typedef struct {
   bjvm_line_number_table_entry *entries;
   int entry_count;
 } bjvm_attribute_line_number_table;
+
+typedef struct {
+  bjvm_utf8 name;
+  uint16_t access_flags;
+} bjvm_method_parameter_info;
+
+typedef struct {
+  bjvm_method_parameter_info *params;
+  int count;
+} bjvm_attribute_method_parameters;
 
 struct bjvm_bc_tableswitch_data {
   int default_target;
@@ -534,6 +545,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_enclosing_method enclosing_method;
     bjvm_attribute_source_file source_file;
     bjvm_attribute_line_number_table lnt;
+    bjvm_attribute_method_parameters method_parameters;
   };
 } bjvm_attribute;
 

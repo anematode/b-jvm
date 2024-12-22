@@ -146,13 +146,16 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS:
     bjvm_free_bootstrap_methods_attribute(&attribute->bootstrap_methods);
     break;
+  case BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE:
+    free(attribute->lnt.entries);
+    break;
+  case BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS:
+    free(attribute->method_parameters.params);
+    break;
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
   case BJVM_ATTRIBUTE_KIND_SOURCE_FILE:
-    break;
-  case BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE:
-    free(attribute->lnt.entries);
     break;
   }
 }
@@ -1891,6 +1894,16 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
       bjvm_line_number_table_entry *entry = attr->lnt.entries + i;
       entry->start_pc = reader_next_u16(&attr_reader, "line number start pc");
       entry->line = reader_next_u16(&attr_reader, "line number");
+    }
+  } else if (utf8_equals(attr->name, "MethodParameters")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS;
+    int count = attr->method_parameters.count = reader_next_u8(&attr_reader, "method parameters count");
+    auto *params = attr->method_parameters.params =
+            calloc(count, sizeof(bjvm_method_parameter_info));
+    free_on_format_error(ctx, params);
+    for (int i = 0; i < count; ++i) {
+      params[i].name = checked_get_utf8(ctx->cp, reader_next_u16(&attr_reader, "method parameter name"), "method parameter name");
+      params[i].access_flags = reader_next_u16(&attr_reader, "method parameter access flags");
     }
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;

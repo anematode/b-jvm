@@ -4,6 +4,7 @@ java/lang/Throwable
 java/lang/invoke/LambdaForm
 java/lang/Class
   bjvm_classdesc *reflected_class;
+java/lang/reflect/Parameter
 java/lang/reflect/Field
   bjvm_cp_field *reflected_field;
 java/lang/reflect/Method
