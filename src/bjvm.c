@@ -3247,27 +3247,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
     for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
-      {
-        __typeof(&vm->primitive_classes[i]->mirror) v =
-            (&vm->primitive_classes[i]->mirror);
-        if (*v) {
-          *({
-            if ((ctx->roots_count) >= (ctx->roots_cap)) {
-              int new_cap;
-              int overflow =
-                  __builtin_mul_overflow((ctx->roots_cap), 2, &new_cap);
-              assert(!overflow);
-              if (new_cap < 2)
-                new_cap = 2;
-              void *next = realloc(ctx->roots, new_cap * sizeof(*ctx->roots));
-              assert(next);
-              (ctx->roots_cap) = new_cap;
-              ctx->roots = next;
-            }
-            &ctx->roots[(ctx->roots_count)++];
-          }) = (bjvm_obj_header **)v;
-        }
-      };
+      PUSH_ROOT(&vm->primitive_classes[i]->mirror);
     }
   }
 

@@ -270,6 +270,7 @@ TEST_CASE("Class file management") {
   for (size_t i = 0; i < len; ++i) {
     found = found ||
             utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
+    free_heap_str(strings[i]);
   }
   REQUIRE(found);
   bjvm_free_vm(vm);
