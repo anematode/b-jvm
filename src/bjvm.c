@@ -1701,11 +1701,6 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
   for (int i = 0, j = 0; i < args; ++i, ++j) {
     new_frame->values[new_frame->max_stack + j] =
         old_frame->values[old_frame->stack_depth - args + i];
-    if (is_static || i >= 1) {
-      // Do this because locals are not renamed, so the method will expect
-      // long or double locals to take up two slots
-      j += bjvm_is_field_wide(descriptor->args[i - !is_static]);
-    }
   }
 }
 
@@ -1932,8 +1927,6 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     for (int i = 0, j = 0; i < args; ++i, ++j) {
       invoked_frame->values[invoked_frame->max_stack + j] =
           frame->values[frame->stack_depth - args + i];
-      if (i >= 1)
-        j += bjvm_is_field_wide(method->parsed_descriptor->args[i - 1]);
     }
     frame->stack_depth -= args;
 

@@ -590,30 +590,32 @@ void write_references_to_bitset(
 
 int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
                                 bjvm_analy_stack_state *locals,
-                                int **local_swizzle) {
+                                int **locals_swizzle) {
   const bjvm_attribute_code *code = method->code;
   const bjvm_method_descriptor *desc = method->parsed_descriptor;
   assert(code);
   uint16_t max_locals = code->max_locals;
   locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
-  *local_swizzle = malloc(max_locals * sizeof(int));
+  *locals_swizzle = malloc(max_locals * sizeof(int));
   for (int i = 0; i < max_locals; ++i) {
     locals->entries[i] = BJVM_TYPE_KIND_VOID;
-    (*local_swizzle)[i] = -1;
+    (*locals_swizzle)[i] = -1;
   }
   int i = 0, j = 0;
-  if (!(method->access_flags & BJVM_ACCESS_STATIC)) {
+  bool is_static = method->access_flags & BJVM_ACCESS_STATIC;
+  if (!is_static) {
     // if the method is nonstatic, the first local is a reference 'this'
     if (max_locals == 0)
       goto fail;
-    (*local_swizzle)[j] = i;
+    (*locals_swizzle)[0] = 0;  // map 0 -> 0
     locals->entries[j++] = BJVM_TYPE_KIND_REFERENCE;
   }
   locals->entries_cap = locals->entries_count = max_locals;
   for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
     locals->entries[j] = field_to_representable_kind(&arg);
-    (*local_swizzle)[j] = i;
+    // map nth local to nth argument if static, n+1th if nonstatic
+    (*locals_swizzle)[j] = i + !is_static;
     if (bjvm_is_field_wide(arg)) {
       if (++j >= max_locals)
         goto fail;
@@ -623,14 +625,15 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   if (i != desc->args_count)
     goto fail;
   j = 0;
+  // Map the rest of the locals
   for (; j < max_locals; ++j)
-    if ((*local_swizzle)[j] == -1)
-      (*local_swizzle)[j] = i++;
+    if ((*locals_swizzle)[j] == -1)
+      (*locals_swizzle)[j] = i++ + !is_static;
   return 0;
 
 fail:
   free(locals->entries);
-  free(*local_swizzle);
+  free(*locals_swizzle);
   return -1;
 }
 
@@ -651,8 +654,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   bjvm_analy_stack_state stack, locals;
   // Swizzle local entries so that the first n arguments correspond to the first
   // n locals (i.e., we should remap aload #1 to aload swizzle[#1])
-  int *local_swizzle;
-  if (bjvm_locals_on_method_entry(method, &locals, &local_swizzle)) {
+  int *locals_swizzle;
+  if (bjvm_locals_on_method_entry(method, &locals, &locals_swizzle)) {
     return -1;
   }
 
@@ -727,6 +730,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       goto local_overflow;                                                     \
     locals.entries[index] = BJVM_TYPE_KIND_##kind;                             \
   }
+
+#define SWIZZLE_INDEX(index) index = locals_swizzle[index];
 
 #define PUSH_BRANCH_TARGET(target)                                             \
   {                                                                            \
@@ -1173,47 +1178,57 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     }
     case bjvm_insn_dload: {
       PUSH(DOUBLE)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_fload: {
       PUSH(FLOAT)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_iload: {
       PUSH(INT)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_lload: {
       PUSH(LONG)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_dstore: {
       POP(DOUBLE)
       SET_LOCAL(insn->index, DOUBLE)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_fstore: {
       POP(FLOAT)
       SET_LOCAL(insn->index, FLOAT)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_istore: {
       POP(INT)
       SET_LOCAL(insn->index, INT)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_lstore: {
       POP(LONG)
       SET_LOCAL(insn->index, LONG)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_aload: {
       PUSH(REFERENCE)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_astore: {
       POP(REFERENCE)
       SET_LOCAL(insn->index, REFERENCE)
+      SWIZZLE_INDEX(insn->index)
       break;
     }
     case bjvm_insn_goto: {
@@ -1352,7 +1367,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   free(stack.entries);
   free(locals.entries);
   free(stack_before.entries);
-  free(local_swizzle);
+  free(locals_swizzle);
 
   return result;
 }
