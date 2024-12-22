@@ -1,5 +1,9 @@
 #include <natives.h>
 
+// In general, for the Unsafe API, we use the byte offset of the field
+// (be it static or nonstatic) to identify it. This works well because we're
+// supposed to use the static memory offset when the object is null.
+
 DECLARE_NATIVE("sun/misc", Unsafe, registerNatives, "()V") {
   return value_null();
 }
@@ -10,17 +14,16 @@ DECLARE_NATIVE("sun/misc", Unsafe, arrayBaseOffset, "(Ljava/lang/Class;)I") {
 
 DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized,
                "(Ljava/lang/Class;)Z") {
-  return (bjvm_stack_value){.i = 1}; // TODO
+  bjvm_classdesc *desc = bjvm_unmirror_class(args[0].obj);
+  return (bjvm_stack_value){.i = desc->state == BJVM_CD_STATE_INITIALIZED};
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized,
                "(Ljava/lang/Class;)V") {
+  bjvm_classdesc *desc = bjvm_unmirror_class(args[0].obj);
+  if (desc->state != BJVM_CD_STATE_INITIALIZED)
+    UNREACHABLE(); // TODO figure out what normal JVM does here
   return value_null();
-}
-
-DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapObject,
-               "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
-  return (bjvm_stack_value){.i = 1}; // TODO
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, objectFieldOffset,
@@ -67,6 +70,17 @@ DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapLong,
   int64_t offset = args[1].l;
   int64_t expected = args[2].l, update = args[3].l;
   int ret = __sync_bool_compare_and_swap((int64_t *)((void *)target + offset),
+                                         expected, update);
+  return (bjvm_stack_value){.l = ret};
+}
+
+DECLARE_NATIVE("sun/misc", Unsafe, compareAndSwapObject,
+               "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
+  assert(argc == 4);
+  bjvm_obj_header *target = args[0].obj;
+  int64_t offset = args[1].l;
+  uintptr_t expected = (uintptr_t)args[2].obj, update = (uintptr_t)args[3].obj;
+  int ret = __sync_bool_compare_and_swap((uintptr_t *)((void *)target + offset),
                                          expected, update);
   return (bjvm_stack_value){.l = ret};
 }
