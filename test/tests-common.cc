@@ -20,16 +20,15 @@ static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
                           size_t *len);
 int preregister_all_classes(bjvm_vm *vm);
 
-bjvm_vm *Bjvm::Tests::CreateTestVM(bool preregister, bjvm_vm_options options,
-                                   const char **classpath) {
+std::unique_ptr<bjvm_vm, void(*)(bjvm_vm *)> Bjvm::Tests::CreateTestVM(
+    bool preregister, bjvm_vm_options options,
+    const char **classpath) {
   options.load_classfile = load_classfile;
   options.load_classfile_param = classpath;
   bjvm_vm *vm = bjvm_create_vm(options);
-
   if (preregister)
     preregister_all_classes(vm);
-
-  return vm;
+  return { vm, bjvm_free_vm };
 }
 
 optional<vector<uint8_t>>

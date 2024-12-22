@@ -13,6 +13,10 @@
 static void free_array_classdesc(bjvm_classdesc *classdesc) {
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
          classdesc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY);
+  if (classdesc->array_type)
+    free_array_classdesc(classdesc->array_type);
+  free_heap_str(classdesc->name);
+  free(classdesc->super_class);
   free(classdesc->fields);
   free(classdesc);
 }
@@ -93,7 +97,6 @@ bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
     } else {
       classdesc->array_type = ordinary_array_classdesc(thread, classdesc);
     }
-
     classdesc->array_type->dtor = free_array_classdesc;
   }
   return classdesc->array_type;

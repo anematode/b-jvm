@@ -165,26 +165,26 @@ TEST_CASE("Test classfile parsing") {
 }
 
 TEST_CASE("Class file management") {
-  bjvm_vm *vm = CreateTestVM(true);
+  auto vm = CreateTestVM(true);
   int file_count = (int)count_if(ListDirectory("jre8", true), [](auto &file) {
     return EndsWith(file, ".class");
   });
 
   size_t len;
   const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.class"), &bytes,
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.class"), &bytes,
                                  &len) == 0);
   REQUIRE(len > 0);
   REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.clas"), nullptr,
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.clas"), nullptr,
                                  &len) != 0);
-  REQUIRE(bjvm_vm_read_classfile(vm, str("java/lang/Object.classe"), nullptr,
+  REQUIRE(bjvm_vm_read_classfile(vm.get(), str("java/lang/Object.classe"), nullptr,
                                  &len) != 0);
-  bjvm_vm_list_classfiles(vm, nullptr, &len);
+  bjvm_vm_list_classfiles(vm.get(), nullptr, &len);
   REQUIRE((int)len == file_count);
   std::vector<heap_string> strings(len);
 
-  bjvm_vm_list_classfiles(vm, strings.data(), &len);
+  bjvm_vm_list_classfiles(vm.get(), strings.data(), &len);
   bool found = false;
   for (size_t i = 0; i < len; ++i) {
     found = found ||
@@ -192,7 +192,6 @@ TEST_CASE("Class file management") {
     free_heap_str(strings[i]);
   }
   REQUIRE(found);
-  bjvm_free_vm(vm);
 }
 
 TEST_CASE("Compressed bitset") {
@@ -312,8 +311,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
 }
 
 TEST_CASE("VM initialization") {
-  bjvm_vm *vm = CreateTestVM(true);
-  bjvm_free_vm(vm);
+  CreateTestVM(true);
 }
 
 struct TestCaseResult {

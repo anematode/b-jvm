@@ -130,6 +130,8 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
 // Symmetry with make_primitive_classdesc
 static void free_primitive_classdesc(bjvm_classdesc *classdesc) {
   assert(classdesc->kind == BJVM_CD_KIND_PRIMITIVE);
+  if (classdesc->array_type)
+    classdesc->array_type->dtor(classdesc->array_type);
   free_heap_str(classdesc->name);
   free(classdesc);
 }
@@ -968,6 +970,8 @@ int bjvm_resolve_method_handle(bjvm_thread *thread,
 }
 
 static void free_ordinary_classdesc(bjvm_classdesc *cd) {
+  if (cd->array_type)
+    cd->array_type->dtor(cd->array_type);
   bjvm_free_classfile(*cd);
   free(cd);
 }
