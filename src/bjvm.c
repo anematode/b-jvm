@@ -57,7 +57,7 @@ int add_classfile_bytes(bjvm_vm *vm, const bjvm_utf8 filename,
 }
 
 bjvm_handle *
-bjvm_make_local_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
+bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
   if (!obj) return &thread->null_handle;
   for (int i = 0; i < thread->handles_capacity; ++i) {
     if (!thread->handles[i].obj) {
@@ -68,7 +68,7 @@ bjvm_make_local_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
   UNREACHABLE();  // When we need more handles, rewrite to use a LL impl
 }
 
-void bjvm_drop_local_handle(bjvm_thread *thread, bjvm_handle *handle) {
+void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle) {
   if (handle == &thread->null_handle) return;
   assert(handle >= thread->handles && handle < thread->handles + thread->handles_capacity);
   handle->obj = nullptr;
@@ -707,7 +707,7 @@ void bjvm_free_vm(bjvm_vm *vm) {
 
 bjvm_thread_options bjvm_default_thread_options() {
   bjvm_thread_options options = {};
-  options.stack_space = 1 << 20;
+  options.stack_space = 1 << 19;
   options.js_jit_enabled = true;
   options.thread_group = nullptr;
   return options;
@@ -1799,7 +1799,7 @@ bjvm_value *make_handles_array(bjvm_thread *thread,
     // For each argument, if it's a reference, wrap it in a handle; otherwise
     // just memcpy it over since the representations of primitives are the same
     if (field_to_representable_kind(calling->args + i) == BJVM_TYPE_KIND_REFERENCE) {
-      result[i].handle = bjvm_make_local_handle(thread, stack_args[i].obj);
+      result[i].handle = bjvm_make_handle(thread, stack_args[i].obj);
     } else {
       memcpy(result + i, stack_args + i, sizeof(bjvm_stack_value));
     }
@@ -1811,7 +1811,7 @@ void drop_handles_array(bjvm_thread *thread, bjvm_method_descriptor *called, bjv
   int argc = called->args_count;
   for (int i = 0; i < argc; ++i) {
     if (field_to_representable_kind(called->args + i) == BJVM_TYPE_KIND_REFERENCE) {
-      bjvm_drop_local_handle(thread, array[i].handle);
+      bjvm_drop_handle(thread, array[i].handle);
     }
   }
   free(array);
@@ -1895,7 +1895,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
 
     // Need to wrap arguments in handles
 
-    bjvm_handle *target_handle = bjvm_make_local_handle(thread, target);
+    bjvm_handle *target_handle = bjvm_make_handle(thread, target);
     bjvm_value *native_args = make_handles_array(thread,
       info->method_descriptor,
       frame->values + frame->stack_depth - args + 1);
@@ -1904,7 +1904,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
         thread, target_handle, native_args, args - 1);
     frame->stack_depth -= args;
 
-    bjvm_drop_local_handle(thread, target_handle);
+    bjvm_drop_handle(thread, target_handle);
     drop_handles_array(thread, info->method_descriptor, native_args);
 
     if (thread->current_exception)
@@ -3346,6 +3346,11 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
       for (int i = 0; i < bs_list_len; ++i) {
         PUSH_ROOT(&frame->values[bitset_list[i]].obj);
       }
+    }
+
+    // Non-null local handles
+    for (int i = 0; i < thr->handles_capacity; ++i) {
+      PUSH_ROOT(&thr->handles[i].obj);
     }
   }
 

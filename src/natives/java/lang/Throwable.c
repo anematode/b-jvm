@@ -41,28 +41,28 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
 
   // Create stack trace of the appropriate height
   ++i;
-  bjvm_handle *stack_trace = bjvm_make_local_handle(thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
-  // TODO UAF here if we GC while creating the stack trace
+  bjvm_handle *stack_trace = bjvm_make_handle(thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
+
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
-    bjvm_obj_header *class_name =
-        bjvm_intern_string(thread, hslc(frame->method->my_class->name));
-    bjvm_obj_header *method_name =
-        bjvm_intern_string(thread, frame->method->name);
-    bjvm_obj_header *file_name =
-        bjvm_intern_string(thread, frame->method->my_class->source_file->name);
+    // Create the stack trace element
+    bjvm_handle *e = bjvm_make_handle(thread, new_object(thread, StackTraceElement));
     int line =
         bjvm_get_line_number(frame->method->code, frame->program_counter);
-    struct bjvm_native_StackTraceElement *e =
-        (void *)new_object(thread, StackTraceElement);
-    e->declaringClass = class_name;
-    e->methodName = method_name;
-    e->fileName = file_name;
-    e->lineNumber = line;
-    *((struct bjvm_native_StackTraceElement **)ArrayData(stack_trace->obj) + j) = e;
+    ((struct bjvm_native_StackTraceElement *) e->obj)->declaringClass =
+      bjvm_intern_string(thread, hslc(frame->method->my_class->name));
+    ((struct bjvm_native_StackTraceElement *) e->obj)->methodName =
+      bjvm_intern_string(thread, frame->method->name);
+    ((struct bjvm_native_StackTraceElement *) e->obj)->fileName =
+      bjvm_intern_string(thread, frame->method->my_class->source_file->name);
+    ((struct bjvm_native_StackTraceElement *) e->obj)->lineNumber = line;
+    *((void**)ArrayData(stack_trace->obj) + j) = e->obj;
+    bjvm_drop_handle(thread, e);
   }
 
   *backtrace_object(obj->obj) = stack_trace->obj;
+  bjvm_drop_handle(thread, stack_trace);
+
   return (bjvm_stack_value){.obj = obj->obj};
 }
 

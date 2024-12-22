@@ -215,9 +215,9 @@ typedef struct bjvm_thread {
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
-bjvm_handle *bjvm_make_local_handle(bjvm_thread* thread, bjvm_obj_header* obj);
+bjvm_handle *bjvm_make_handle(bjvm_thread* thread, bjvm_obj_header* obj);
 
-void bjvm_drop_local_handle(bjvm_thread *thread, bjvm_handle *handle);
+void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
 
 bjvm_array_classdesc *
 bjvm_checked_to_array_classdesc(bjvm_classdesc *classdesc);
