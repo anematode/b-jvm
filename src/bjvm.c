@@ -2575,8 +2575,7 @@ start:
 #define JMP_INSN continue
 #endif
 
-    switch (0) {
-
+    do {
     bjvm_insn_nop:
       NEXT_INSN;
     bjvm_insn_aaload: {
@@ -3560,7 +3559,7 @@ start:
     bjvm_insn_ret:
       UNREACHABLE("bjvm_insn_ret");
       NEXT_INSN;
-    }
+    } while (false);
 
     frame->program_counter++;
   }

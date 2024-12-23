@@ -365,7 +365,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_INVALID:
     return strdup("<invalid>");
   case BJVM_CP_KIND_UTF8:
-    return lossy_utf8_entry_to_chars(hslc(ent->utf8));
+    return strndup(ent->utf8.chars, ent->utf8.len);
   case BJVM_CP_KIND_INTEGER:
     snprintf(result, sizeof(result), "%" PRId64, ent->integral.value);
     break;
@@ -1180,6 +1180,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_lconst:
     PUSH(LONG) break;
   case bjvm_insn_iinc:
+    SWIZZLE_LOCAL(insn->iinc.index);
     break;
   case bjvm_insn_multianewarray: {
     for (int i = 0; i < insn->multianewarray.dimensions; ++i)

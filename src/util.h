@@ -123,7 +123,6 @@ static inline bjvm_utf8 hslc(heap_string str) {
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
-char *lossy_utf8_entry_to_chars(const bjvm_utf8 utf8);
 
 int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
                                    int *result_len, bool sloppy);

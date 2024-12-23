@@ -10,9 +10,7 @@ DECLARE_NATIVE("java/lang", System, initProperties,
   bjvm_obj_header *props_obj = args[0].handle->obj;
   INIT_STACK_STRING(cwd, 1024);
   getcwd(cwd.chars, 1024);
-  cwd.len = strlen(cwd.chars);
-
-  printf("Cwd: %s\n", cwd);
+  cwd.len = (int)strlen(cwd.chars);
 
   const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
                                 {STR("stdout.encoding"), STR("UTF-8")},
