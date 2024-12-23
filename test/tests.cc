@@ -478,24 +478,12 @@ TEST_CASE("NPE") {
   REQUIRE(result.stdout_ == "abcdefghijklmnop");
 }
 
+TEST_CASE("ClassCircularityError") {
+  auto result = run_test_case("test_files/circularity/", true);
+  REQUIRE(result.stdout_ == "abc");
+}
+
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/playground/", false);
+  auto result = run_test_case("test_files/circularity/", true);
+
 }
-
-#if 0
-TEST_CASE("Class circularity error") {
-  const char* cp[2] = { "test_files/circularity/", nullptr };
-  bjvm_vm *vm = CreateTestVM(true, classpath = cp);
-
-  bjvm_thread_options options;
-  bjvm_fill_default_thread_options(&options);
-  bjvm_thread *thr = bjvm_create_thread(vm, options);
-
-  bjvm_utf8 Main = bjvm_make_utf8(L"Main");
-  bootstrap_class_create(thr, Main);
-  free_utf8(Main);
-
-  bjvm_free_thread(thr);
-  bjvm_free_vm(vm);
-}
-#endif

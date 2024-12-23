@@ -1,14 +1,31 @@
-class Poop{}
-class Egg extends Poop /* extends Main */ {
+class Egg extends Chicken {
 
 }
 
-class Chicken extends Egg {
+class Chick extends Egg {
 
 }
 
-public class Main extends Egg {
+class Chicken extends Chick {
+
+}
+
+public class Main {
     public static void main(String[] args) {
-
+        try {
+            Chick chick = new Chick();
+        } catch (ClassCircularityError e) {
+            System.out.print("a");
+        }
+        try {
+            Egg egg = new Egg();
+        } catch (ClassCircularityError e) {
+            System.out.print("b");
+        }
+        try {
+            Chicken chicken = new Chicken();
+        } catch (ClassCircularityError e) {
+            System.out.print("c");
+        }
     }
 }

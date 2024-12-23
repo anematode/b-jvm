@@ -1159,6 +1159,113 @@ static void free_ordinary_classdesc(bjvm_classdesc *cd) {
   free(cd);
 }
 
+void bjvm_class_circularity_error(bjvm_thread * thread, const bjvm_classdesc *class) {
+  INIT_STACK_STRING(message, 1000);
+  message = bprintf(message, "While loading class %.*s", fmt_slice(class->name));
+  bjvm_raise_exception(thread, STR("java/lang/ClassCircularityError"), message);
+}
+
+bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread, bjvm_utf8 chars) {
+  bjvm_vm *vm = thread->vm;
+  bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
+
+  // e.g. "java/lang/Object.class"
+  const bjvm_utf8 cf_ending = STR(".class");
+  INIT_STACK_STRING(filename, MAX_CF_NAME_LENGTH + 6);
+  memcpy(filename.chars, chars.chars, chars.len);
+  memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
+  filename.len = chars.len + cf_ending.len;
+
+  uint8_t *bytes;
+  size_t cf_len;
+  int read_status =
+      bjvm_vm_read_classfile(vm, filename, (const uint8_t **)&bytes, &cf_len);
+  if (read_status) {
+    int i = 0;
+    for (; i < chars.len; ++i)
+      filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
+    // ClassNotFoundException: com.google.DontBeEvil
+    bjvm_raise_exception(thread, STR("java/lang/ClassNotFoundException"),
+                         filename);
+    goto error_1;
+  }
+
+  parse_result_t error = bjvm_parse_classfile(bytes, cf_len, class);
+  if (error != PARSE_SUCCESS) {
+    // Raise VerifyError
+    UNREACHABLE();
+    goto error_1;
+  }
+
+  // 3. If C has a direct superclass, the symbolic reference from C to its
+  // direct superclass is resolved using the algorithm of §5.4.3.1.
+  bjvm_cp_class_info *super = class->super_class;
+  if (super) {
+    // If the superclass is currently being loaded -> circularity  error
+    if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name.chars,
+                               super->name.len)) {
+      bjvm_class_circularity_error(thread, class);
+      goto error_2;
+    }
+
+    int status = bjvm_resolve_class(thread, class->super_class);
+    if (status) {
+      // Check whether the current exception is a ClassNotFoundException and
+      // if so, raise a NoClassDefFoundError TODO
+      goto error_2;
+    }
+  }
+
+  // 4. If C has any direct superinterfaces, the symbolic references from C to
+  // its direct superinterfaces are resolved using the algorithm of §5.4.3.1.
+  for (int i = 0; i < class->interfaces_count; ++i) {
+    bjvm_cp_class_info *super = class->interfaces[i];
+    if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name.chars,
+      super->name.len)) {
+      bjvm_class_circularity_error(thread, class);
+      goto error_2;
+    }
+
+    int status = bjvm_resolve_class(thread, class->interfaces[i]);
+    if (status) {
+      // Check whether the current exception is a ClassNotFoundException and
+      // if so, raise a NoClassDefFoundError TODO
+      goto error_2;
+    }
+  }
+
+  // Look up in the native methods list and add native handles as appropriate
+  native_entries *entries =
+      bjvm_hash_table_lookup(&vm->natives, chars.chars, chars.len);
+  if (entries) {
+    for (int i = 0; i < entries->entries_count; i++) {
+      native_entry *entry = entries->entries + i;
+
+      for (int j = 0; j < class->methods_count; ++j) {
+        bjvm_cp_method *method = class->methods + j;
+
+        if (utf8_equals_utf8(method->name, entry->name) &&
+            utf8_equals_utf8(method->descriptor, entry->descriptor)) {
+          method->native_handle = entry->callback;
+          break;
+        }
+      }
+    }
+  }
+
+  class->kind = BJVM_CD_KIND_ORDINARY;
+  class->dtor = free_ordinary_classdesc;
+
+  (void)bjvm_hash_table_insert(&vm->classes, chars.chars, chars.len, class);
+  return class;
+
+error_2:
+  bjvm_free_classfile(*class);
+error_1:
+  free(class);
+  return nullptr;
+}
+
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name) {
@@ -1200,99 +1307,10 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
   }
 
   if (!class) {
-    // Add entry to inchoate_classes
     (void)bjvm_hash_table_insert(&vm->inchoate_classes, chars.chars, chars.len,
                                  (void *)1);
-
-    // e.g. "java/lang/Object.class"
-    const bjvm_utf8 cf_ending = STR(".class");
-    INIT_STACK_STRING(filename, MAX_CF_NAME_LENGTH + 6);
-    memcpy(filename.chars, chars.chars, chars.len);
-    memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
-    filename.len = chars.len + cf_ending.len;
-
-    uint8_t *bytes;
-    size_t cf_len;
-    int read_status =
-        bjvm_vm_read_classfile(vm, filename, (const uint8_t **)&bytes, &cf_len);
-    if (read_status) {
-      int i = 0;
-      for (; i < chars.len; ++i)
-        filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
-      // ClassNotFoundException: com.google.DontBeEvil
-      bjvm_raise_exception(thread, STR("java/lang/ClassNotFoundException"),
-                           filename);
-      return nullptr;
-    }
-
-    class = calloc(1, sizeof(bjvm_classdesc));
-    parse_result_t error = bjvm_parse_classfile(bytes, cf_len, class);
-    if (error != PARSE_SUCCESS) {
-      free(class);
-      // TODO raise VerifyError
-      UNREACHABLE();
-    }
-
-    // 3. If C has a direct superclass, the symbolic reference from C to its
-    // direct superclass is resolved using the algorithm of §5.4.3.1.
-    bjvm_cp_class_info *super = class->super_class;
-    if (super) {
-      // If the superclass is currently being loaded -> circularity  error
-      if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name.chars,
-                                 super->name.len)) {
-        // TODO raise ClassCircularityError
-        UNREACHABLE();
-      }
-
-      int status = bjvm_resolve_class(thread, class->super_class);
-      if (status) {
-        // TODO raise NoClassDefFoundError
-        UNREACHABLE();
-      }
-    }
-
-    // 4. If C has any direct superinterfaces, the symbolic references from C to
-    // its direct superinterfaces are resolved using the algorithm of §5.4.3.1.
-    for (int i = 0; i < class->interfaces_count; ++i) {
-      bjvm_cp_class_info *super = class->interfaces[i];
-      if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name.chars,
-                                 super->name.len)) {
-        // TODO raise ClassCircularityError
-        UNREACHABLE();
-      }
-
-      int status = bjvm_resolve_class(thread, class->interfaces[i]);
-      if (status) {
-        // TODO raise NoClassDefFoundError
-        UNREACHABLE();
-      }
-    }
-
-    // Look up in the native methods list and add native handles as appropriate
-    native_entries *entries =
-        bjvm_hash_table_lookup(&vm->natives, chars.chars, chars.len);
-    if (entries) {
-      for (int i = 0; i < entries->entries_count; i++) {
-        native_entry *entry = entries->entries + i;
-
-        for (int j = 0; j < class->methods_count; ++j) {
-          bjvm_cp_method *method = class->methods + j;
-
-          if (utf8_equals_utf8(method->name, entry->name) &&
-              utf8_equals_utf8(method->descriptor, entry->descriptor)) {
-            method->native_handle = entry->callback;
-            break;
-          }
-        }
-      }
-    }
-
-    // Remove from inchoate_classes
+    class = bootstrap_load_class_and_supers(thread, chars);
     (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars.chars, chars.len);
-    (void)bjvm_hash_table_insert(&vm->classes, chars.chars, chars.len, class);
-
-    class->kind = BJVM_CD_KIND_ORDINARY;
-    class->dtor = free_ordinary_classdesc;
   }
 
   // Derive nth dimension
