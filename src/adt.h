@@ -14,8 +14,7 @@ extern "C" {
 
 typedef struct {
   union {
-    // Used if the number of bits in the local variable table/stack is less than
-    // 64
+    // Used if the # of bits is less than 63, and the lowest bit = 1
     uint64_t bits_inl;
     struct {
       uint64_t *bits;
@@ -58,7 +57,6 @@ typedef struct bjvm_string_hash_table {
 
   size_t entries_count;
   size_t entries_cap;
-
   double load_factor;
 } bjvm_string_hash_table;
 
@@ -77,8 +75,6 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter);
 
 uint32_t bjvm_hash_string(const char *key, size_t len);
 
-void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity);
-
 /**
  * Insert the key/value pair into the hash table and return the old value, if
  * any. Ownership of the key is passed into the function.
@@ -96,7 +92,7 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
 
 /**
  * Delete the key from the hash table and return the old value, if any. If len =
- * -1, the key is treated as a null- terminated string literal. Pass the result
+ * -1, the key is treated as a null-terminated string literal. Pass the result
  * of this function to the free function, as long as it accepts nullptr
  * pointers.
  */

@@ -25,6 +25,8 @@ char *parse_field_descriptor(const char **chars, size_t len,
  * Instruction code. Similar instructions like aload_0 are canonicalised to
  * aload with an argument of 0.
  *
+ * The order of the instructions matters.
+ *
  * List of canonicalisations:
  *   aload_<n> -> aload, dload_<n> -> dload, fload_<n> -> fload, iload_<n> ->
  * iload, lload_<n> -> lload, astore_<n> -> astore, dstore_<n> -> dstore,

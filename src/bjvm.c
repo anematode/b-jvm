@@ -3191,6 +3191,10 @@ start:
     bjvm_insn_saload: {
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);

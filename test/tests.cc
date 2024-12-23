@@ -473,6 +473,11 @@ java.io.Serializable1537nullfalsetruetruetruetruetrue00nullfalsenull
 )");
 }
 
+TEST_CASE("NPE") {
+  auto result = run_test_case("test_files/npe/", true);
+  REQUIRE(result.stdout_ == "abcdefghijklmnop");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

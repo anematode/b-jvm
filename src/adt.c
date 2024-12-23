@@ -232,6 +232,27 @@ void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const char *key,
   return ret_val;
 }
 
+void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
+  bjvm_string_hash_table new_table =
+      bjvm_make_hash_table(tbl->free_fn, tbl->load_factor, new_capacity);
+  bjvm_hash_table_iterator iter = bjvm_hash_table_get_iterator(tbl);
+  char *key;
+  size_t len;
+  void *value;
+  while (bjvm_hash_table_iterator_has_next(iter, &key, &len, &value)) {
+    bjvm_hash_table_insert_impl(&new_table, key, len, value,
+                                false /* don't copy key */);
+    bjvm_hash_table_entry *ent = iter.current;
+    bool entry_on_chain = iter.current != iter.current_base;
+    bjvm_hash_table_iterator_next(&iter);
+    if (entry_on_chain)
+      free(ent);
+  }
+  free(tbl->entries); // Don't need to free the linked lists, keys etc. as they
+  // were moved over
+  *tbl = new_table;
+}
+
 void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len, void *value, bool copy_key) {
   len = len == -1 ? (int)strlen(key) : len;
@@ -272,27 +293,6 @@ void *bjvm_hash_table_insert(bjvm_string_hash_table *tbl, const char *key,
                              int len, void *value) {
   return bjvm_hash_table_insert_impl(tbl, (char *)key /* key copied */, len,
                                      value, true);
-}
-
-void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
-  bjvm_string_hash_table new_table =
-      bjvm_make_hash_table(tbl->free_fn, tbl->load_factor, new_capacity);
-  bjvm_hash_table_iterator iter = bjvm_hash_table_get_iterator(tbl);
-  char *key;
-  size_t len;
-  void *value;
-  while (bjvm_hash_table_iterator_has_next(iter, &key, &len, &value)) {
-    bjvm_hash_table_insert_impl(&new_table, key, len, value,
-                                false /* don't copy key */);
-    bjvm_hash_table_entry *ent = iter.current;
-    bool entry_on_chain = iter.current != iter.current_base;
-    bjvm_hash_table_iterator_next(&iter);
-    if (entry_on_chain)
-      free(ent);
-  }
-  free(tbl->entries); // Don't need to free the linked lists, keys etc. as they
-                      // were moved over
-  *tbl = new_table;
 }
 
 void *bjvm_hash_table_lookup(bjvm_string_hash_table *tbl, const char *key,
