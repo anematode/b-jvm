@@ -2,7 +2,6 @@
 
 #define CACHE_INVOKESTATIC 1
 #define CACHE_INVOKENONSTATIC 1
-#define SKIP_CLEARING_FRAMES 1
 #define ONE_GOTO_PER_INSN 1
 
 #include <assert.h>
@@ -97,9 +96,9 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 
   bjvm_stack_frame *frame =
       (bjvm_stack_frame *)(thread->frame_buffer + thread->frame_buffer_used);
-#if !SKIP_CLEARING_FRAMES
+  // For now, this is required: the reference bitset isn't precise enough to
+  // not mistakenly scan non-references as references.
   memset(frame, 0, total);
-#endif
   thread->frame_buffer_used += total;
   *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) =
       frame;
@@ -1351,7 +1350,6 @@ int allocate_field(int *current, bjvm_type_kind kind) {
     *current += 8;
     break;
   case BJVM_TYPE_KIND_VOID:
-  case BJVM_TYPE_KIND_RETURN_ADDRESS:
     UNREACHABLE();
   }
   return result;
@@ -1698,7 +1696,6 @@ void store_stack_value(void *field_location, bjvm_stack_value value,
     *(void **)field_location = value.obj;
     break;
   case BJVM_TYPE_KIND_VOID:
-  case BJVM_TYPE_KIND_RETURN_ADDRESS:
   default:
     UNREACHABLE();
   }
@@ -1733,7 +1730,6 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
     result.obj = *(void **)field_location;
     break;
   case BJVM_TYPE_KIND_VOID:
-  case BJVM_TYPE_KIND_RETURN_ADDRESS:
   default:
     UNREACHABLE();
   }

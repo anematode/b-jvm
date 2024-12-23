@@ -330,8 +330,6 @@ const char *bjvm_type_kind_to_string(bjvm_type_kind kind) {
     return "void";
   case BJVM_TYPE_KIND_REFERENCE:
     return "<reference>";
-  case BJVM_TYPE_KIND_RETURN_ADDRESS:
-    return "<retaddr>";
   }
   UNREACHABLE();
 }
@@ -633,6 +631,614 @@ fail:
   return -1;
 }
 
+struct method_analysis_ctx {
+  const bjvm_attribute_code *code;
+  bjvm_analy_stack_state stack, stack_before, locals;
+  bool stack_terminated;
+  int* locals_swizzle;
+  bjvm_analy_stack_state* inferred_stacks;
+  bjvm_analy_stack_state* inferred_locals;
+  int* branch_q;
+  int branch_count;
+  char* insn_error;
+
+  heap_string *error;
+};
+
+// Pop a value from the analysis stack and return it.
+#define POP_VAL                                                                \
+  ({                                                                           \
+    if (ctx->stack.entries_count == 0)                                              \
+      goto stack_underflow;                                                    \
+    ctx->stack.entries[--ctx->stack.entries_count];                        \
+  })
+// Pop a value from the analysis stack and assert its kind.
+#define POP_KIND(kind)                                                         \
+  {                                                                            \
+    bjvm_analy_stack_entry popped_kind = POP_VAL;                              \
+    if (kind != popped_kind)                                                   \
+      goto stack_type_mismatch;                                                \
+  }
+#define POP(kind) POP_KIND(BJVM_TYPE_KIND_##kind)
+// Push a kind to the analysis stack.
+#define PUSH_KIND(kind)                                                        \
+  {                                                                            \
+    if (ctx->stack.entries_count == ctx->stack.entries_cap)                              \
+      goto stack_overflow;                                                     \
+    if (kind != BJVM_TYPE_KIND_VOID)                                           \
+      ctx->stack.entries[ctx->stack.entries_count++] = kind_to_representable_kind(kind); \
+  }
+#define PUSH(kind) PUSH_KIND(BJVM_TYPE_KIND_##kind)
+
+// Set the kind of the local variable, in pre-swizzled indices.
+#define SET_LOCAL(index, kind)                                                 \
+  {                                                                            \
+    if (index >= ctx->code->max_locals)                                        \
+      goto local_overflow;                                                     \
+    ctx->locals.entries[index] = BJVM_TYPE_KIND_##kind;                        \
+  }
+// Remap the index to the new local variable index after unwidening.
+#define SWIZZLE_LOCAL(index) index = ctx->locals_swizzle[index];
+
+int push_branch_target(struct method_analysis_ctx* ctx, uint32_t target) {
+  assert((int)target < ctx->code->insn_count);
+  if (ctx->inferred_stacks[target].entries) {
+    if ((ctx->insn_error =
+        expect_analy_stack_states_equal(ctx->inferred_stacks[target], ctx->stack))) {
+      return -1;
+    }
+  } else {
+    copy_analy_stack_state(ctx->stack, &ctx->inferred_stacks[target]);
+    ctx->inferred_stacks[target].from_jump_target = true;
+    ctx->branch_q[ctx->branch_count++] = target;
+  }
+  return 0;
+}
+
+int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_analysis_ctx* ctx) {
+  switch (insn->kind) {
+  case bjvm_insn_nop:
+  case bjvm_insn_ret:
+    break;
+  case bjvm_insn_aaload:
+    POP(INT) POP(REFERENCE) PUSH(REFERENCE) break;
+  case bjvm_insn_aastore:
+    POP(REFERENCE) POP(INT) POP(REFERENCE) break;
+  case bjvm_insn_aconst_null:
+    PUSH(REFERENCE) break;
+  case bjvm_insn_areturn:
+    POP(REFERENCE)
+    ctx->stack_terminated = true;
+    break;
+  case bjvm_insn_arraylength:
+    POP(REFERENCE) PUSH(INT) break;
+  case bjvm_insn_athrow:
+    POP(REFERENCE)
+    ctx->stack_terminated = true;
+    break;
+  case bjvm_insn_baload:
+  case bjvm_insn_caload:
+  case bjvm_insn_saload:
+  case bjvm_insn_iaload:
+    POP(INT) POP(REFERENCE) PUSH(INT) break;
+  case bjvm_insn_bastore:
+  case bjvm_insn_castore:
+  case bjvm_insn_sastore:
+  case bjvm_insn_iastore:
+    POP(INT) POP(INT) POP(REFERENCE) break;
+  case bjvm_insn_d2f:
+    POP(DOUBLE) PUSH(FLOAT) break;
+  case bjvm_insn_d2i:
+    POP(DOUBLE) PUSH(INT) break;
+  case bjvm_insn_d2l:
+    POP(DOUBLE) PUSH(LONG) break;
+  case bjvm_insn_dadd:
+  case bjvm_insn_ddiv:
+  case bjvm_insn_dmul:
+  case bjvm_insn_drem:
+  case bjvm_insn_dsub:
+    POP(DOUBLE) POP(DOUBLE) PUSH(DOUBLE) break;
+  case bjvm_insn_daload:
+    POP(INT) POP(REFERENCE) PUSH(DOUBLE) break;
+  case bjvm_insn_dastore:
+    POP(DOUBLE) POP(INT) POP(REFERENCE) break;
+  case bjvm_insn_dcmpg:
+  case bjvm_insn_dcmpl:
+    POP(DOUBLE) POP(DOUBLE) PUSH(INT) break;
+  case bjvm_insn_dneg:
+    POP(DOUBLE) PUSH(DOUBLE) break;
+  case bjvm_insn_dreturn:
+    POP(DOUBLE)
+    ctx->stack_terminated = true;
+    break;
+  case bjvm_insn_dup: {
+    if (ctx->stack.entries_count == 0)
+      goto stack_underflow;
+    PUSH_KIND(ctx->stack.entries[ctx->stack.entries_count - 1])
+    break;
+  }
+  case bjvm_insn_dup_x1: {
+    if (ctx->stack.entries_count <= 1)
+      goto stack_underflow;
+    bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
+    if (is_kind_wide(kind1) || is_kind_wide(kind2))
+      goto stack_type_mismatch;
+    PUSH_KIND(kind1) PUSH_KIND(kind2) PUSH_KIND(kind1) break;
+  }
+  case bjvm_insn_dup_x2: {
+    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
+    if (is_kind_wide(to_dup))
+      goto stack_type_mismatch;
+    if (is_kind_wide(kind2)) {
+      PUSH_KIND(to_dup) PUSH_KIND(kind2) insn->kind = bjvm_insn_dup_x1;
+    } else {
+      kind3 = POP_VAL;
+      PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2)
+    }
+    PUSH_KIND(to_dup)
+    break;
+  }
+  case bjvm_insn_dup2: {
+    bjvm_type_kind to_dup = POP_VAL, kind2;
+    if (is_kind_wide(to_dup)) {
+      PUSH_KIND(to_dup) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup;
+    } else {
+      kind2 = POP_VAL;
+      if (is_kind_wide(kind2))
+        goto stack_type_mismatch;
+      PUSH_KIND(kind2) PUSH_KIND(to_dup) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+    }
+    break;
+  }
+  case bjvm_insn_dup2_x1: {
+    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
+    if (is_kind_wide(to_dup)) {
+      PUSH_KIND(to_dup)
+      PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
+    } else {
+      kind3 = POP_VAL;
+      if (is_kind_wide(kind3))
+        goto stack_type_mismatch;
+      PUSH_KIND(kind2)
+      PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+    }
+    break;
+  }
+  case bjvm_insn_dup2_x2: {
+    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3, kind4;
+    if (is_kind_wide(to_dup)) {
+      if (is_kind_wide(kind2)) {
+        PUSH_KIND(to_dup)
+        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
+      } else {
+        kind3 = POP_VAL;
+        if (is_kind_wide(kind3))
+          goto stack_type_mismatch;
+        PUSH_KIND(to_dup)
+        PUSH_KIND(kind3)
+        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x2;
+      }
+    } else {
+      kind3 = POP_VAL;
+      if (is_kind_wide(kind3)) {
+        PUSH_KIND(kind2)
+        PUSH_KIND(to_dup)
+        PUSH_KIND(kind3)
+        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup2_x1;
+      } else {
+        kind4 = POP_VAL;
+        if (is_kind_wide(kind4))
+          goto stack_type_mismatch;
+        PUSH_KIND(kind2)
+        PUSH_KIND(to_dup)
+        PUSH_KIND(kind4) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+      }
+    }
+    break;
+  }
+  case bjvm_insn_f2d: {
+    POP(FLOAT) PUSH(DOUBLE) break;
+  }
+  case bjvm_insn_f2i: {
+    POP(FLOAT) PUSH(INT) break;
+  }
+  case bjvm_insn_f2l: {
+    POP(FLOAT) PUSH(LONG) break;
+  }
+  case bjvm_insn_fadd: {
+    POP(FLOAT) POP(FLOAT) PUSH(FLOAT) break;
+  }
+  case bjvm_insn_faload: {
+    POP(INT) POP(REFERENCE) PUSH(FLOAT) break;
+  }
+  case bjvm_insn_fastore: {
+    POP(FLOAT) POP(INT) POP(REFERENCE) break;
+  }
+  case bjvm_insn_fcmpg:
+  case bjvm_insn_fcmpl: {
+    POP(FLOAT) POP(FLOAT) PUSH(INT) break;
+  }
+  case bjvm_insn_fdiv:
+  case bjvm_insn_fmul:
+  case bjvm_insn_frem:
+  case bjvm_insn_fsub: {
+    POP(FLOAT) POP(FLOAT) PUSH(FLOAT) break;
+  }
+  case bjvm_insn_fneg: {
+    POP(FLOAT) PUSH(FLOAT);
+    break;
+  }
+  case bjvm_insn_freturn: {
+    POP(FLOAT)
+    ctx->stack_terminated = true;
+    break;
+  }
+  case bjvm_insn_i2b:
+  case bjvm_insn_i2c: {
+    POP(INT) PUSH(INT) break;
+  }
+  case bjvm_insn_i2d: {
+    POP(INT) PUSH(DOUBLE) break;
+  }
+  case bjvm_insn_i2f: {
+    POP(INT) PUSH(FLOAT) break;
+  }
+  case bjvm_insn_i2l: {
+    POP(INT) PUSH(LONG) break;
+  }
+  case bjvm_insn_i2s: {
+    POP(INT) PUSH(INT) break;
+  }
+  case bjvm_insn_iadd:
+  case bjvm_insn_iand:
+  case bjvm_insn_idiv:
+  case bjvm_insn_imul:
+  case bjvm_insn_irem:
+  case bjvm_insn_ior:
+  case bjvm_insn_ishl:
+  case bjvm_insn_ishr:
+  case bjvm_insn_isub:
+  case bjvm_insn_ixor:
+  case bjvm_insn_iushr: {
+    POP(INT) POP(INT) PUSH(INT)
+  } break;
+  case bjvm_insn_ineg: {
+    POP(INT) PUSH(INT) break;
+  }
+  case bjvm_insn_ireturn: {
+    POP(INT);
+    break;
+  }
+  case bjvm_insn_l2d: {
+    POP(LONG) PUSH(DOUBLE) break;
+  }
+  case bjvm_insn_l2f: {
+    POP(LONG) PUSH(FLOAT) break;
+  }
+  case bjvm_insn_l2i: {
+    POP(LONG) PUSH(INT) break;
+  }
+  case bjvm_insn_ladd:
+  case bjvm_insn_land:
+  case bjvm_insn_ldiv:
+  case bjvm_insn_lmul:
+  case bjvm_insn_lor:
+  case bjvm_insn_lrem:
+  case bjvm_insn_lsub:
+  case bjvm_insn_lxor: {
+    POP(LONG) POP(LONG) PUSH(LONG) break;
+  }
+  case bjvm_insn_lshl:
+  case bjvm_insn_lshr:
+  case bjvm_insn_lushr: {
+    POP(INT) POP(LONG) PUSH(LONG) break;
+  }
+  case bjvm_insn_laload: {
+    POP(INT) POP(REFERENCE) PUSH(LONG) break;
+  }
+  case bjvm_insn_lastore: {
+    POP(LONG) POP(INT) POP(REFERENCE) break;
+  }
+  case bjvm_insn_lcmp: {
+    POP(LONG) POP(LONG) PUSH(INT) break;
+  }
+  case bjvm_insn_lneg: {
+    POP(LONG) PUSH(LONG) break;
+  }
+  case bjvm_insn_lreturn: {
+    POP(LONG)
+    ctx->stack_terminated = true;
+    break;
+  }
+  case bjvm_insn_monitorenter: {
+    POP(REFERENCE)
+    break;
+  }
+  case bjvm_insn_monitorexit: {
+    POP(REFERENCE)
+    break;
+  }
+  case bjvm_insn_pop: {
+    bjvm_type_kind kind = POP_VAL;
+    if (is_kind_wide(kind))
+      goto stack_type_mismatch;
+    break;
+  }
+  case bjvm_insn_pop2: {
+    bjvm_type_kind kind = POP_VAL;
+    if (!is_kind_wide(kind)) {
+      bjvm_type_kind kind2 = POP_VAL;
+      if (is_kind_wide(kind2))
+        goto stack_type_mismatch;
+    } else {
+      insn->kind = bjvm_insn_pop;
+    }
+    break;
+  }
+  case bjvm_insn_return: {
+    ctx->stack_terminated = true;
+    break;
+  }
+  case bjvm_insn_swap: {
+    bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
+    if (is_kind_wide(kind1) || is_kind_wide(kind2))
+      goto stack_type_mismatch;
+    ;
+    PUSH_KIND(kind1) PUSH_KIND(kind2) break;
+  }
+  case bjvm_insn_anewarray: {
+    POP(INT) PUSH(REFERENCE) break;
+  }
+  case bjvm_insn_checkcast: {
+    POP(REFERENCE) PUSH(REFERENCE) break;
+  }
+  case bjvm_insn_getfield:
+    POP(REFERENCE)
+    [[fallthrough]];
+  case bjvm_insn_getstatic: {
+    bjvm_field_descriptor *field =
+        bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
+                            "getstatic/getfield argument")
+            ->fieldref_info.parsed_descriptor;
+    PUSH_KIND(field_to_kind(field));
+    break;
+  }
+  case bjvm_insn_instanceof: {
+    POP(REFERENCE) PUSH(INT) break;
+  }
+  case bjvm_insn_invokedynamic: {
+    bjvm_method_descriptor *descriptor =
+        bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_INVOKE_DYNAMIC,
+                            "invokedynamic argument")
+            ->indy_info.method_descriptor;
+    for (int j = descriptor->args_count - 1; j >= 0; --j) {
+      bjvm_field_descriptor *field = descriptor->args + j;
+      POP_KIND(field_to_kind(field));
+    }
+    if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
+      PUSH_KIND(field_to_kind(&descriptor->return_type))
+    break;
+  }
+  case bjvm_insn_new: {
+    PUSH(REFERENCE)
+    break;
+  }
+  case bjvm_insn_putfield:
+  case bjvm_insn_putstatic: {
+    bjvm_type_kind kind = POP_VAL;
+    // TODO check that the field matches
+    (void)kind;
+    if (insn->kind == bjvm_insn_putfield) {
+      POP(REFERENCE)
+    }
+    break;
+  }
+  case bjvm_insn_invokevirtual:
+  case bjvm_insn_invokespecial:
+  case bjvm_insn_invokeinterface:
+  case bjvm_insn_invokestatic: {
+    bjvm_method_descriptor *descriptor =
+        bjvm_check_cp_entry(insn->cp,
+                            BJVM_CP_KIND_METHOD_REF |
+                                BJVM_CP_KIND_INTERFACE_METHOD_REF,
+                            "invoke* argument")
+            ->methodref.method_descriptor;
+    for (int j = descriptor->args_count - 1; j >= 0; --j) {
+      bjvm_field_descriptor *field = descriptor->args + j;
+      POP_KIND(field_to_kind(field))
+    }
+    if (insn->kind != bjvm_insn_invokestatic) {
+      POP(REFERENCE)
+    }
+    if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
+      PUSH_KIND(field_to_kind(&descriptor->return_type));
+    break;
+  }
+  case bjvm_insn_ldc: {
+    bjvm_cp_entry *ent =
+        bjvm_check_cp_entry(insn->cp,
+                            BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
+                                BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
+                            "ldc argument");
+    PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
+              : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT
+                                                : BJVM_TYPE_KIND_REFERENCE)
+    break;
+  }
+  case bjvm_insn_ldc2_w: {
+    bjvm_cp_entry *ent = bjvm_check_cp_entry(
+        insn->cp, BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_LONG, "ldc2_w argument");
+    PUSH_KIND(ent->kind == BJVM_CP_KIND_DOUBLE ? BJVM_TYPE_KIND_DOUBLE
+                                               : BJVM_TYPE_KIND_LONG)
+    break;
+  }
+  case bjvm_insn_dload: {
+    PUSH(DOUBLE)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_fload: {
+    PUSH(FLOAT)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_iload: {
+    PUSH(INT)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_lload: {
+    PUSH(LONG)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_dstore: {
+    POP(DOUBLE)
+    SET_LOCAL(insn->index, DOUBLE)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_fstore: {
+    POP(FLOAT)
+    SET_LOCAL(insn->index, FLOAT)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_istore: {
+    POP(INT)
+    SET_LOCAL(insn->index, INT)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_lstore: {
+    POP(LONG)
+    SET_LOCAL(insn->index, LONG)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_aload: {
+    PUSH(REFERENCE)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_astore: {
+    POP(REFERENCE)
+    SET_LOCAL(insn->index, REFERENCE)
+    SWIZZLE_LOCAL(insn->index)
+    break;
+  }
+  case bjvm_insn_goto: {
+    if (push_branch_target(ctx, insn->index))
+      return -1;
+    ctx->stack_terminated = true;
+    break;
+  }
+  case bjvm_insn_jsr: {
+    PUSH(INT)
+    break;
+  }
+  case bjvm_insn_if_acmpeq:
+  case bjvm_insn_if_acmpne: {
+    POP(REFERENCE) POP(REFERENCE)
+    if (push_branch_target(ctx, insn->index))
+      return -1;
+    break;
+  }
+  case bjvm_insn_if_icmpeq:
+  case bjvm_insn_if_icmpne:
+  case bjvm_insn_if_icmplt:
+  case bjvm_insn_if_icmpge:
+  case bjvm_insn_if_icmpgt:
+  case bjvm_insn_if_icmple:
+    POP(INT)
+    [[fallthrough]];
+  case bjvm_insn_ifeq:
+  case bjvm_insn_ifne:
+  case bjvm_insn_iflt:
+  case bjvm_insn_ifge:
+  case bjvm_insn_ifgt:
+  case bjvm_insn_ifle: {
+    POP(INT)
+    if (push_branch_target(ctx, insn->index))
+      return -1;
+    break;
+  }
+  case bjvm_insn_ifnonnull:
+  case bjvm_insn_ifnull: {
+    POP(REFERENCE)
+    if (push_branch_target(ctx, insn->index))
+      return -1;
+    break;
+  }
+  case bjvm_insn_iconst:
+    PUSH(INT) break;
+  case bjvm_insn_dconst:
+    PUSH(DOUBLE) break;
+  case bjvm_insn_fconst:
+    PUSH(FLOAT) break;
+  case bjvm_insn_lconst:
+    PUSH(LONG) break;
+  case bjvm_insn_iinc:
+    break;
+  case bjvm_insn_multianewarray: {
+    for (int i = 0; i < insn->multianewarray.dimensions; ++i)
+      POP(INT)
+    PUSH(REFERENCE)
+    break;
+  }
+  case bjvm_insn_newarray: {
+    POP(INT) PUSH(REFERENCE) break;
+  }
+  case bjvm_insn_tableswitch: {
+    POP(INT)
+    if (push_branch_target(ctx, insn->tableswitch.default_target))
+      return -1;
+    for (int i = 0; i < insn->tableswitch.targets_count; ++i)
+      if (push_branch_target(ctx, insn->tableswitch.targets[i]))
+        return -1;
+    ctx->stack_terminated = true;
+    break;
+  }
+  case bjvm_insn_lookupswitch: {
+    POP(INT)
+    if (push_branch_target(ctx, insn->lookupswitch.default_target))
+      return -1;
+    for (int i = 0; i < insn->lookupswitch.targets_count; ++i)
+      if (push_branch_target(ctx, insn->lookupswitch.targets[i]))
+        return -1;
+    ctx->stack_terminated = true;
+    break;
+  }
+  }
+
+  return 0; // ok
+
+  local_overflow:
+    ctx->insn_error = strdup("Local overflow:");
+    goto error;
+  stack_overflow:
+    ctx->insn_error = strdup("Stack overflow:");
+    goto error;
+  stack_underflow:
+    ctx->insn_error = strdup("Stack underflow:");
+    goto error;
+  stack_type_mismatch:
+    ctx->insn_error = "Stack type mismatch:";
+  error:;
+    *ctx->error = make_heap_str(50000);
+    char *insn_str = insn_to_string(insn, insn_index);
+    char *stack_str = print_analy_stack_state(&ctx->stack_before);
+    char *context = code_attribute_to_string(ctx->code);
+    bprintf(hslc(*ctx->error),
+            "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
+            ctx->insn_error, insn_str, stack_str, context);
+    free(insn_str);
+    free(stack_str);
+    free(context);
+    free(ctx->insn_error);
+    return -1;
+}
+
 /**
  * Analyze the method's code segment if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
@@ -645,21 +1251,21 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     return 0;
   }
 
-  bjvm_analy_stack_state stack, locals;
+  struct method_analysis_ctx ctx = {code};
+
   // Swizzle local entries so that the first n arguments correspond to the first
   // n locals (i.e., we should remap aload #1 to aload swizzle[#1])
-  int *locals_swizzle;
-  if (bjvm_locals_on_method_entry(method, &locals, &locals_swizzle)) {
+  if (bjvm_locals_on_method_entry(method, &ctx.locals, &ctx.locals_swizzle)) {
     return -1;
   }
 
   int result = 0;
-  stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
+  ctx.stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
 
   // After jumps, we can infer the stack and locals at these points
-  bjvm_analy_stack_state *inferred_stacks =
+  bjvm_analy_stack_state *inferred_stacks = ctx.inferred_stacks =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
-  bjvm_analy_stack_state *inferred_locals =
+  bjvm_analy_stack_state *inferred_locals = ctx.inferred_locals =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_compressed_bitset *insn_index_to_references =
       calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
@@ -667,9 +1273,11 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       calloc(code->insn_count, sizeof(uint16_t));
 
   // Initialize stack to the stack at exception handler entry
-  stack.entries_cap = code->max_stack + 1;
-  stack.entries_count = 1;
-  stack.entries[0] = BJVM_TYPE_KIND_REFERENCE;
+  ctx.stack.entries_cap = code->max_stack + 1;
+  ctx.stack.entries_count = 1;
+  ctx.stack.entries[0] = BJVM_TYPE_KIND_REFERENCE;
+
+  ctx.error = error;
 
   // Mark all exception handlers as having a stack which is just a reference
   // (that reference is the exception object)
@@ -678,14 +1286,14 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       bjvm_exception_table_entry *ent = code->exception_table->entries + i;
       if (!inferred_stacks[ent->handler_pc].entries) {
         bjvm_analy_stack_state *target = inferred_stacks + ent->handler_pc;
-        copy_analy_stack_state(stack, target);
+        copy_analy_stack_state(ctx.stack, target);
         target->is_exc_handler = true;
         target->exc_handler_start = ent->start_insn;
       }
     }
   }
 
-  stack.entries_count = 0;
+  ctx.stack.entries_count = 0;
 
   bjvm_code_analysis *analy = method->code_analysis =
       malloc(sizeof(bjvm_code_analysis));
@@ -694,66 +1302,11 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   analy->insn_index_to_references = insn_index_to_references;
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
 
-  int *branch_targets_to_process = calloc(code->max_formal_pc, sizeof(int));
-  int branch_targets_count = 0;
-
-#define POP_VAL                                                                \
-  ({                                                                           \
-    if (stack.entries_count == 0)                                              \
-      goto stack_underflow;                                                    \
-    stack.entries[--stack.entries_count];                                      \
-  })
-#define POP_KIND(kind)                                                         \
-  {                                                                            \
-    bjvm_analy_stack_entry popped_kind = POP_VAL;                              \
-    if (kind != popped_kind)                                                   \
-      goto stack_type_mismatch;                                                \
-  }
-#define POP(kind) POP_KIND(BJVM_TYPE_KIND_##kind)
-#define PUSH_KIND(kind)                                                        \
-  {                                                                            \
-    if (stack.entries_count == stack.entries_cap)                              \
-      goto stack_overflow;                                                     \
-    if (kind != BJVM_TYPE_KIND_VOID)                                           \
-      stack.entries[stack.entries_count++] = kind_to_representable_kind(kind); \
-  }
-#define PUSH(kind) PUSH_KIND(BJVM_TYPE_KIND_##kind)
-
-#define SET_LOCAL(index, kind)                                                 \
-  {                                                                            \
-    if (index >= code->max_locals)                                             \
-      goto local_overflow;                                                     \
-    locals.entries[index] = BJVM_TYPE_KIND_##kind;                             \
-  }
-
-#define SWIZZLE_INDEX(index) index = locals_swizzle[index];
-
-#define PUSH_BRANCH_TARGET(target)                                             \
-  {                                                                            \
-    assert((int)target < code->insn_count);                                    \
-    if (inferred_stacks[target].entries) {                                     \
-      error_str =                                                              \
-          expect_analy_stack_states_equal(inferred_stacks[target], stack);     \
-      if (error_str) {                                                         \
-        error_str_needs_free = true;                                           \
-        goto error;                                                            \
-      }                                                                        \
-    } else {                                                                   \
-      copy_analy_stack_state(stack, &inferred_stacks[target]);                 \
-      inferred_stacks[target].from_jump_target = true;                         \
-      branch_targets_to_process[branch_targets_count++] = target;              \
-    }                                                                          \
-  }
-
-  bjvm_analy_stack_state stack_before = {0};
-
-  char *error_str;
-  bool error_str_needs_free = false;
-  bool stack_terminated = false;
+  ctx.branch_q = calloc(code->max_formal_pc, sizeof(int));
 
   for (int i = 0; i < code->insn_count; ++i) {
     if (inferred_stacks[i].entries) {
-      copy_analy_stack_state(inferred_stacks[i], &stack);
+      copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
       bjvm_analy_stack_state *this_locals = &inferred_locals[i];
 
       if (inferred_locals[i].is_exc_handler) {
@@ -761,590 +1314,61 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
         // the exception block. Later we'll properly validate this by taking
         // the intersection of all types.
         copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start],
-                               &locals);
-        copy_analy_stack_state(locals, this_locals);
+                               &ctx.locals);
+        copy_analy_stack_state(ctx.locals, this_locals);
       }
 
       inferred_stacks[i].from_jump_target = false;
-      stack_terminated = false;
+      ctx.stack_terminated = false;
     }
 
     if (inferred_locals[i].entries) {
-      copy_analy_stack_state(inferred_locals[i], &locals);
+      copy_analy_stack_state(inferred_locals[i], &ctx.locals);
     }
 
-    if (stack_terminated) {
+    if (ctx.stack_terminated) {
       // We expect to be able to recover the stack/locals from a previously
       // encountered jump, or an exception handler. If this isn't possible then
       // there will be weeping and wailing and gnashing of teeth, and we'll
       // choose a different branch to continue analyzing from.
-      if (branch_targets_count == 0) {
+      if (ctx.branch_count == 0) {
         break;
       }
 
-      i = branch_targets_to_process[--branch_targets_count];
-      copy_analy_stack_state(inferred_stacks[i], &stack);
-      copy_analy_stack_state(inferred_locals[i], &locals);
+      i = ctx.branch_q[--ctx.branch_count];
+      copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
+      copy_analy_stack_state(inferred_locals[i], &ctx.locals);
       inferred_stacks[i].from_jump_target = false;
-      stack_terminated = false;
+      ctx.stack_terminated = false;
     }
 
-    copy_analy_stack_state(stack, &stack_before);
+    copy_analy_stack_state(ctx.stack, &ctx.stack_before);
     if (!inferred_stacks[i].entries)
-      copy_analy_stack_state(stack, &inferred_stacks[i]);
+      copy_analy_stack_state(ctx.stack, &inferred_stacks[i]);
     if (!inferred_locals[i].entries)
-      copy_analy_stack_state(locals, &inferred_locals[i]);
+      copy_analy_stack_state(ctx.locals, &inferred_locals[i]);
 
     bjvm_bytecode_insn *insn = &code->code[i];
-    switch (insn->kind) {
-    case bjvm_insn_nop:
-    case bjvm_insn_ret:
-      break;
-    case bjvm_insn_aaload:
-      POP(INT) POP(REFERENCE) PUSH(REFERENCE) break;
-    case bjvm_insn_aastore:
-      POP(REFERENCE) POP(INT) POP(REFERENCE) break;
-    case bjvm_insn_aconst_null:
-      PUSH(REFERENCE) break;
-    case bjvm_insn_areturn:
-      POP(REFERENCE)
-      stack_terminated = true;
-      break;
-    case bjvm_insn_arraylength:
-      POP(REFERENCE) PUSH(INT) break;
-    case bjvm_insn_athrow:
-      POP(REFERENCE)
-      stack_terminated = true;
-      break;
-    case bjvm_insn_baload:
-    case bjvm_insn_caload:
-    case bjvm_insn_saload:
-    case bjvm_insn_iaload:
-      POP(INT) POP(REFERENCE) PUSH(INT) break;
-    case bjvm_insn_bastore:
-    case bjvm_insn_castore:
-    case bjvm_insn_sastore:
-    case bjvm_insn_iastore:
-      POP(INT) POP(INT) POP(REFERENCE) break;
-    case bjvm_insn_d2f:
-      POP(DOUBLE) PUSH(FLOAT) break;
-    case bjvm_insn_d2i:
-      POP(DOUBLE) PUSH(INT) break;
-    case bjvm_insn_d2l:
-      POP(DOUBLE) PUSH(LONG) break;
-    case bjvm_insn_dadd:
-    case bjvm_insn_ddiv:
-    case bjvm_insn_dmul:
-    case bjvm_insn_drem:
-    case bjvm_insn_dsub:
-      POP(DOUBLE) POP(DOUBLE) PUSH(DOUBLE) break;
-    case bjvm_insn_daload:
-      POP(INT) POP(REFERENCE) PUSH(DOUBLE) break;
-    case bjvm_insn_dastore:
-      POP(DOUBLE) POP(INT) POP(REFERENCE) break;
-    case bjvm_insn_dcmpg:
-    case bjvm_insn_dcmpl:
-      POP(DOUBLE) POP(DOUBLE) PUSH(INT) break;
-    case bjvm_insn_dneg:
-      POP(DOUBLE) PUSH(DOUBLE) break;
-    case bjvm_insn_dreturn:
-      POP(DOUBLE)
-      stack_terminated = true;
-      break;
-    case bjvm_insn_dup: {
-      if (stack.entries_count == 0)
-        goto stack_underflow;
-      PUSH_KIND(stack.entries[stack.entries_count - 1])
-      break;
+    if (analyze_instruction(insn, i, &ctx)) {
+      result = -1;
+      goto done;
     }
-    case bjvm_insn_dup_x1: {
-      if (stack.entries_count <= 1)
-        goto stack_underflow;
-      bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
-      if (is_kind_wide(kind1) || is_kind_wide(kind2))
-        goto stack_type_mismatch;
-      PUSH_KIND(kind1) PUSH_KIND(kind2) PUSH_KIND(kind1) break;
-    }
-    case bjvm_insn_dup_x2: {
-      bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
-      if (is_kind_wide(to_dup))
-        goto stack_type_mismatch;
-      if (is_kind_wide(kind2)) {
-        PUSH_KIND(to_dup) PUSH_KIND(kind2) insn->kind = bjvm_insn_dup_x1;
-      } else {
-        kind3 = POP_VAL;
-        PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2)
-      }
-      PUSH_KIND(to_dup)
-      break;
-    }
-    case bjvm_insn_dup2: {
-      bjvm_type_kind to_dup = POP_VAL, kind2;
-      if (is_kind_wide(to_dup)) {
-        PUSH_KIND(to_dup) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup;
-      } else {
-        kind2 = POP_VAL;
-        if (is_kind_wide(kind2))
-          goto stack_type_mismatch;
-        PUSH_KIND(kind2) PUSH_KIND(to_dup) PUSH_KIND(kind2) PUSH_KIND(to_dup)
-      }
-      break;
-    }
-    case bjvm_insn_dup2_x1: {
-      bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
-      if (is_kind_wide(to_dup)) {
-        PUSH_KIND(to_dup)
-        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
-      } else {
-        kind3 = POP_VAL;
-        if (is_kind_wide(kind3))
-          goto stack_type_mismatch;
-        PUSH_KIND(kind2)
-        PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
-      }
-      break;
-    }
-    case bjvm_insn_dup2_x2: {
-      bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3, kind4;
-      if (is_kind_wide(to_dup)) {
-        if (is_kind_wide(kind2)) {
-          PUSH_KIND(to_dup)
-          PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
-        } else {
-          kind3 = POP_VAL;
-          if (is_kind_wide(kind3))
-            goto stack_type_mismatch;
-          PUSH_KIND(to_dup)
-          PUSH_KIND(kind3)
-          PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x2;
-        }
-      } else {
-        kind3 = POP_VAL;
-        if (is_kind_wide(kind3)) {
-          PUSH_KIND(kind2)
-          PUSH_KIND(to_dup)
-          PUSH_KIND(kind3)
-          PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup2_x1;
-        } else {
-          kind4 = POP_VAL;
-          if (is_kind_wide(kind4))
-            goto stack_type_mismatch;
-          PUSH_KIND(kind2)
-          PUSH_KIND(to_dup)
-          PUSH_KIND(kind4) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
-        }
-      }
-      break;
-    }
-    case bjvm_insn_f2d: {
-      POP(FLOAT) PUSH(DOUBLE) break;
-    }
-    case bjvm_insn_f2i: {
-      POP(FLOAT) PUSH(INT) break;
-    }
-    case bjvm_insn_f2l: {
-      POP(FLOAT) PUSH(LONG) break;
-    }
-    case bjvm_insn_fadd: {
-      POP(FLOAT) POP(FLOAT) PUSH(FLOAT) break;
-    }
-    case bjvm_insn_faload: {
-      POP(INT) POP(REFERENCE) PUSH(FLOAT) break;
-    }
-    case bjvm_insn_fastore: {
-      POP(FLOAT) POP(INT) POP(REFERENCE) break;
-    }
-    case bjvm_insn_fcmpg:
-    case bjvm_insn_fcmpl: {
-      POP(FLOAT) POP(FLOAT) PUSH(INT) break;
-    }
-    case bjvm_insn_fdiv:
-    case bjvm_insn_fmul:
-    case bjvm_insn_frem:
-    case bjvm_insn_fsub: {
-      POP(FLOAT) POP(FLOAT) PUSH(FLOAT) break;
-    }
-    case bjvm_insn_fneg: {
-      POP(FLOAT) PUSH(FLOAT);
-      break;
-    }
-    case bjvm_insn_freturn: {
-      POP(FLOAT)
-      stack_terminated = true;
-      break;
-    }
-    case bjvm_insn_i2b:
-    case bjvm_insn_i2c: {
-      POP(INT) PUSH(INT) break;
-    }
-    case bjvm_insn_i2d: {
-      POP(INT) PUSH(DOUBLE) break;
-    }
-    case bjvm_insn_i2f: {
-      POP(INT) PUSH(FLOAT) break;
-    }
-    case bjvm_insn_i2l: {
-      POP(INT) PUSH(LONG) break;
-    }
-    case bjvm_insn_i2s: {
-      POP(INT) PUSH(INT) break;
-    }
-    case bjvm_insn_iadd:
-    case bjvm_insn_iand:
-    case bjvm_insn_idiv:
-    case bjvm_insn_imul:
-    case bjvm_insn_irem:
-    case bjvm_insn_ior:
-    case bjvm_insn_ishl:
-    case bjvm_insn_ishr:
-    case bjvm_insn_isub:
-    case bjvm_insn_ixor:
-    case bjvm_insn_iushr: {
-      POP(INT) POP(INT) PUSH(INT)
-    } break;
-    case bjvm_insn_ineg: {
-      POP(INT) PUSH(INT) break;
-    }
-    case bjvm_insn_ireturn: {
-      POP(INT);
-      break;
-    }
-    case bjvm_insn_l2d: {
-      POP(LONG) PUSH(DOUBLE) break;
-    }
-    case bjvm_insn_l2f: {
-      POP(LONG) PUSH(FLOAT) break;
-    }
-    case bjvm_insn_l2i: {
-      POP(LONG) PUSH(INT) break;
-    }
-    case bjvm_insn_ladd:
-    case bjvm_insn_land:
-    case bjvm_insn_ldiv:
-    case bjvm_insn_lmul:
-    case bjvm_insn_lor:
-    case bjvm_insn_lrem:
-    case bjvm_insn_lsub:
-    case bjvm_insn_lxor: {
-      POP(LONG) POP(LONG) PUSH(LONG) break;
-    }
-    case bjvm_insn_lshl:
-    case bjvm_insn_lshr:
-    case bjvm_insn_lushr: {
-      POP(INT) POP(LONG) PUSH(LONG) break;
-    }
-    case bjvm_insn_laload: {
-      POP(INT) POP(REFERENCE) PUSH(LONG) break;
-    }
-    case bjvm_insn_lastore: {
-      POP(LONG) POP(INT) POP(REFERENCE) break;
-    }
-    case bjvm_insn_lcmp: {
-      POP(LONG) POP(LONG) PUSH(INT) break;
-    }
-    case bjvm_insn_lneg: {
-      POP(LONG) PUSH(LONG) break;
-    }
-    case bjvm_insn_lreturn: {
-      POP(LONG)
-      stack_terminated = true;
-      break;
-    }
-    case bjvm_insn_monitorenter: {
-      POP(REFERENCE)
-      break;
-    }
-    case bjvm_insn_monitorexit: {
-      POP(REFERENCE)
-      break;
-    }
-    case bjvm_insn_pop: {
-      bjvm_type_kind kind = POP_VAL;
-      if (is_kind_wide(kind))
-        goto stack_type_mismatch;
-      break;
-    }
-    case bjvm_insn_pop2: {
-      bjvm_type_kind kind = POP_VAL;
-      if (!is_kind_wide(kind)) {
-        bjvm_type_kind kind2 = POP_VAL;
-        if (is_kind_wide(kind2))
-          goto stack_type_mismatch;
-      } else {
-        insn->kind = bjvm_insn_pop;
-      }
-      break;
-    }
-    case bjvm_insn_return: {
-      stack_terminated = true;
-      break;
-    }
-    case bjvm_insn_swap: {
-      bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
-      if (is_kind_wide(kind1) || is_kind_wide(kind2))
-        goto stack_type_mismatch;
-      ;
-      PUSH_KIND(kind1) PUSH_KIND(kind2) break;
-    }
-    case bjvm_insn_anewarray: {
-      POP(INT) PUSH(REFERENCE) break;
-    }
-    case bjvm_insn_checkcast: {
-      POP(REFERENCE) PUSH(REFERENCE) break;
-    }
-    case bjvm_insn_getfield:
-      POP(REFERENCE)
-      [[fallthrough]];
-    case bjvm_insn_getstatic: {
-      bjvm_field_descriptor *field =
-          bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
-                              "getstatic/getfield argument")
-              ->fieldref_info.parsed_descriptor;
-      PUSH_KIND(field_to_kind(field));
-      break;
-    }
-    case bjvm_insn_instanceof: {
-      POP(REFERENCE) PUSH(INT) break;
-    }
-    case bjvm_insn_invokedynamic: {
-      bjvm_method_descriptor *descriptor =
-          bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_INVOKE_DYNAMIC,
-                              "invokedynamic argument")
-              ->indy_info.method_descriptor;
-      for (int j = descriptor->args_count - 1; j >= 0; --j) {
-        bjvm_field_descriptor *field = descriptor->args + j;
-        POP_KIND(field_to_kind(field));
-      }
-      if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
-        PUSH_KIND(field_to_kind(&descriptor->return_type))
-      break;
-    }
-    case bjvm_insn_new: {
-      PUSH(REFERENCE)
-      break;
-    }
-    case bjvm_insn_putfield:
-    case bjvm_insn_putstatic: {
-      bjvm_type_kind kind = POP_VAL;
-      // TODO check that the field matches
-      (void)kind;
-      if (insn->kind == bjvm_insn_putfield) {
-        POP(REFERENCE)
-      }
-      break;
-    }
-    case bjvm_insn_invokevirtual:
-    case bjvm_insn_invokespecial:
-    case bjvm_insn_invokeinterface:
-    case bjvm_insn_invokestatic: {
-      bjvm_method_descriptor *descriptor =
-          bjvm_check_cp_entry(insn->cp,
-                              BJVM_CP_KIND_METHOD_REF |
-                                  BJVM_CP_KIND_INTERFACE_METHOD_REF,
-                              "invoke* argument")
-              ->methodref.method_descriptor;
-      for (int j = descriptor->args_count - 1; j >= 0; --j) {
-        bjvm_field_descriptor *field = descriptor->args + j;
-        POP_KIND(field_to_kind(field))
-      }
-      if (insn->kind != bjvm_insn_invokestatic) {
-        POP(REFERENCE)
-      }
-      if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
-        PUSH_KIND(field_to_kind(&descriptor->return_type));
-      break;
-    }
-    case bjvm_insn_ldc: {
-      bjvm_cp_entry *ent =
-          bjvm_check_cp_entry(insn->cp,
-                              BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
-                                  BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
-                              "ldc argument");
-      PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
-                : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT
-                                                  : BJVM_TYPE_KIND_REFERENCE)
-      break;
-    }
-    case bjvm_insn_ldc2_w: {
-      bjvm_cp_entry *ent = bjvm_check_cp_entry(
-          insn->cp, BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_LONG, "ldc2_w argument");
-      PUSH_KIND(ent->kind == BJVM_CP_KIND_DOUBLE ? BJVM_TYPE_KIND_DOUBLE
-                                                 : BJVM_TYPE_KIND_LONG)
-      break;
-    }
-    case bjvm_insn_dload: {
-      PUSH(DOUBLE)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_fload: {
-      PUSH(FLOAT)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_iload: {
-      PUSH(INT)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_lload: {
-      PUSH(LONG)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_dstore: {
-      POP(DOUBLE)
-      SET_LOCAL(insn->index, DOUBLE)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_fstore: {
-      POP(FLOAT)
-      SET_LOCAL(insn->index, FLOAT)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_istore: {
-      POP(INT)
-      SET_LOCAL(insn->index, INT)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_lstore: {
-      POP(LONG)
-      SET_LOCAL(insn->index, LONG)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_aload: {
-      PUSH(REFERENCE)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_astore: {
-      POP(REFERENCE)
-      SET_LOCAL(insn->index, REFERENCE)
-      SWIZZLE_INDEX(insn->index)
-      break;
-    }
-    case bjvm_insn_goto: {
-      PUSH_BRANCH_TARGET(insn->index)
-      stack_terminated = true;
-      break;
-    }
-    case bjvm_insn_jsr: {
-      PUSH(RETURN_ADDRESS)
-      break;
-    }
-    case bjvm_insn_if_acmpeq:
-    case bjvm_insn_if_acmpne: {
-      POP(REFERENCE) POP(REFERENCE) PUSH_BRANCH_TARGET(insn->index);
-      break;
-    }
-    case bjvm_insn_if_icmpeq:
-    case bjvm_insn_if_icmpne:
-    case bjvm_insn_if_icmplt:
-    case bjvm_insn_if_icmpge:
-    case bjvm_insn_if_icmpgt:
-    case bjvm_insn_if_icmple:
-      POP(INT)
-      [[fallthrough]];
-    case bjvm_insn_ifeq:
-    case bjvm_insn_ifne:
-    case bjvm_insn_iflt:
-    case bjvm_insn_ifge:
-    case bjvm_insn_ifgt:
-    case bjvm_insn_ifle: {
-      POP(INT)
-      PUSH_BRANCH_TARGET(insn->index);
-      break;
-    }
-    case bjvm_insn_ifnonnull:
-    case bjvm_insn_ifnull: {
-      POP(REFERENCE)
-      PUSH_BRANCH_TARGET(insn->index);
-      break;
-    }
-    case bjvm_insn_iconst:
-      PUSH(INT) break;
-    case bjvm_insn_dconst:
-      PUSH(DOUBLE) break;
-    case bjvm_insn_fconst:
-      PUSH(FLOAT) break;
-    case bjvm_insn_lconst:
-      PUSH(LONG) break;
-    case bjvm_insn_iinc:
-      break;
-    case bjvm_insn_multianewarray: {
-      for (int i = 0; i < insn->multianewarray.dimensions; ++i)
-        POP(INT)
-      PUSH(REFERENCE)
-      break;
-    }
-    case bjvm_insn_newarray: {
-      POP(INT) PUSH(REFERENCE) break;
-    }
-    case bjvm_insn_tableswitch: {
-      POP(INT)
-      PUSH_BRANCH_TARGET(insn->tableswitch.default_target);
-      for (int i = 0; i < insn->tableswitch.targets_count; ++i)
-        PUSH_BRANCH_TARGET(insn->tableswitch.targets[i]);
-      stack_terminated = true;
-      break;
-    }
-    case bjvm_insn_lookupswitch: {
-      POP(INT)
-      PUSH_BRANCH_TARGET(insn->lookupswitch.default_target);
-      for (int i = 0; i < insn->lookupswitch.targets_count; ++i)
-        PUSH_BRANCH_TARGET(insn->lookupswitch.targets[i]);
-      stack_terminated = true;
-      break;
-    }
-    }
-
-    continue;
-
-  local_overflow:
-    error_str = "Local overflow:";
-    goto error;
-  stack_overflow:
-    error_str = "Stack overflow:";
-    goto error;
-  stack_underflow:
-    error_str = "Stack underflow:";
-    goto error;
-  stack_type_mismatch: {
-    error_str = "Stack type mismatch:";
-  error:;
-    result = -1;
-    *error = make_heap_str(50000);
-    char *insn_str = insn_to_string(insn, i);
-    char *stack_str = print_analy_stack_state(&stack_before);
-    char *context = code_attribute_to_string(method->code);
-    bprintf(hslc(*error),
-            "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
-            error_str, insn_str, stack_str, context);
-    free(insn_str);
-    free(stack_str);
-    free(context);
-    if (error_str_needs_free)
-      free(error_str);
-    break;
-  }
   }
 
   // Check that all entries have been filled
   for (int i = 0; i < code->insn_count; ++i) {
-    if (!inferred_stacks[i].entries && !error) {
+    if (!inferred_stacks[i].entries) {
       char buf[1000], *write = buf, *end = buf + sizeof(buf);
       write +=
           snprintf(buf, 1000, "Unreachable code detected at instruction %d", i);
       char *context = code_attribute_to_string(method->code);
       write += snprintf(write, end - write, "\nContext: %s\n", context);
+      result = -1;
       break;
     }
   }
 
+done:
   for (int i = 0; i < code->insn_count; ++i) {
     insn_index_to_stack_depth[i] = inferred_stacks[i].entries_count;
 
@@ -1357,13 +1381,13 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     free(inferred_stacks[i].entries);
     free(inferred_locals[i].entries);
   }
-  free(branch_targets_to_process);
+  free(ctx.branch_q);
+  free(ctx.stack.entries);
+  free(ctx.locals.entries);
+  free(ctx.stack_before.entries);
+  free(ctx.locals_swizzle);
   free(inferred_stacks);
   free(inferred_locals);
-  free(stack.entries);
-  free(locals.entries);
-  free(stack_before.entries);
-  free(locals_swizzle);
 
   return result;
 }

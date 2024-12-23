@@ -204,10 +204,7 @@ typedef enum : char {
   BJVM_TYPE_KIND_INT = 'I',
   BJVM_TYPE_KIND_LONG = 'J',
   BJVM_TYPE_KIND_VOID = 'V',
-  BJVM_TYPE_KIND_REFERENCE = 'L',
-
-  // used by jsr/jsr_w (lol) but shouldn't appear outside of that
-  BJVM_TYPE_KIND_RETURN_ADDRESS
+  BJVM_TYPE_KIND_REFERENCE = 'L'
 } bjvm_type_kind;
 
 typedef enum {
