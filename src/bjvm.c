@@ -2,7 +2,8 @@
 
 #define CACHE_INVOKESTATIC 1
 #define CACHE_INVOKENONSTATIC 1
-#define ONE_GOTO_PER_INSN 0
+#define SKIP_CLEARING_FRAMES 1
+#define ONE_GOTO_PER_INSN 1
 
 #include <assert.h>
 #include <limits.h>
@@ -96,7 +97,9 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 
   bjvm_stack_frame *frame =
       (bjvm_stack_frame *)(thread->frame_buffer + thread->frame_buffer_used);
+#if !SKIP_CLEARING_FRAMES
   memset(frame, 0, total);
+#endif
   thread->frame_buffer_used += total;
   *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) =
       frame;
@@ -1650,6 +1653,8 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
 }
 
 int bjvm_resolve_field(bjvm_thread *thread, bjvm_cp_field_info *info) {
+  if (info->field)
+    return 0;
   bjvm_cp_class_info *class = info->class_info;
   int error = bjvm_resolve_class(thread, class);
   if (error)
@@ -1703,8 +1708,8 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
   bjvm_stack_value result;
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
-  case BJVM_TYPE_KIND_BYTE:
-    result.i = *(int8_t *)field_location;
+  case BJVM_TYPE_KIND_BYTE:  // sign-extend the byte
+    result.i = (int) *(int8_t *)field_location;
     break;
   case BJVM_TYPE_KIND_CHAR:
     result.i = *(uint16_t *)field_location;
@@ -1857,9 +1862,11 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
   return false;
 }
 
-bool compare_method_types(struct bjvm_native_MethodType *provider_mt,
+bool method_types_compatible(struct bjvm_native_MethodType *provider_mt,
                           struct bjvm_native_MethodType *targ) {
   // Compare ptypes
+  if (provider_mt == targ)
+    return true;
   if (*ArrayLength(provider_mt->ptypes) != *ArrayLength(targ->ptypes)) {
     printf("Different lengths!\n");
     return false;
@@ -1908,12 +1915,10 @@ void bjvm_invokevirtual_signature_polymorphic(
     bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_cp_method *method,
     struct bjvm_native_MethodType *provider_mt, bjvm_obj_header *target,
     int args) {
-  // TODO attach this to the descriptor
-  // TODO check invokeExact, invoke
   struct bjvm_native_MethodHandle *mh = (void *)target;
   struct bjvm_native_MethodType *targ = (void *)mh->type;
 
-  // varargs if mh is of class AsVarargsCollector
+  // varargs iff mh is of class AsVarargsCollector
   bool is_varargs =
       utf8_equals(hslc(mh->base.descriptor->name),
                   "java/lang/invoke/MethodHandleImpl$AsVarargsCollector");
@@ -1922,9 +1927,10 @@ void bjvm_invokevirtual_signature_polymorphic(
     UNREACHABLE();
   }
 
-  bool mts_are_same = compare_method_types(provider_mt, targ);
+  bool mts_are_same = method_types_compatible(provider_mt, targ);
   bool is_invoke_exact = utf8_equals_utf8(method->name, STR("invokeExact"));
   bool is_invoke_basic = utf8_equals_utf8(method->name, STR("invokeBasic"));
+
   if (is_invoke_exact) {
     if (!mts_are_same) {
       bjvm_wrong_method_type_error(thread, provider_mt, targ);
@@ -1932,7 +1938,7 @@ void bjvm_invokevirtual_signature_polymorphic(
   }
 
   if (!mts_are_same && !is_invoke_basic) {
-    // Call asType
+    // Call asType to get an adapter handle
     bjvm_cp_method *asType = bjvm_easy_method_lookup(
         mh->base.descriptor, STR("asType"),
         STR("(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"),
@@ -3283,6 +3289,14 @@ start:
     }
     bjvm_insn_getfield:
     bjvm_insn_putfield: {
+      bjvm_stack_value val;
+      if (insn->kind == bjvm_insn_putfield)
+        val = checked_pop(frame);
+      bjvm_obj_header *obj = checked_pop(frame).obj;
+      if (!obj) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
       int error = bjvm_resolve_field(thread, field_info);
       if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
@@ -3294,10 +3308,6 @@ start:
         bjvm_incompatible_class_change_error(thread, complaint);
         goto done;
       }
-      bjvm_stack_value val;
-      if (insn->kind == bjvm_insn_putfield)
-        val = checked_pop(frame);
-      bjvm_obj_header *obj = checked_pop(frame).obj;
 
       // TODO raise NPE
 
