@@ -475,24 +475,11 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
     write.chars[0] = '[';
     write = slice(write, 1);
   }
-  switch (desc->base_kind) {
-  case BJVM_TYPE_KIND_BOOLEAN:
-  case BJVM_TYPE_KIND_CHAR:
-  case BJVM_TYPE_KIND_FLOAT:
-  case BJVM_TYPE_KIND_DOUBLE:
-  case BJVM_TYPE_KIND_BYTE:
-  case BJVM_TYPE_KIND_SHORT:
-  case BJVM_TYPE_KIND_INT:
-  case BJVM_TYPE_KIND_LONG:
-  case BJVM_TYPE_KIND_VOID:
-    write = slice(write, bprintf(write, "%c", desc->base_kind).len);
-    break;
-  case BJVM_TYPE_KIND_REFERENCE:
+  if (desc->base_kind == BJVM_TYPE_KIND_REFERENCE) {
     write =
         slice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
-    break;
-  default:
-    UNREACHABLE();
+  } else {
+    write = slice(write, bprintf(write, "%c", desc->base_kind).len);
   }
   str.len = write.chars - str.chars;
   return str;
@@ -930,40 +917,11 @@ void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count) {
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
-heap_string field_descriptor_to_name(bjvm_field_descriptor desc) {
-  heap_string result = make_heap_str(
-      desc.dimensions + 6 +
-      (desc.base_kind == BJVM_TYPE_KIND_REFERENCE ? desc.class_name.len : 0));
-
-  bjvm_utf8 write = hslc(result);
-  if (desc.dimensions) {
-    memset(write.chars, '[', desc.dimensions);
-    write = slice(write, desc.dimensions);
-  }
-
-  if (desc.base_kind == BJVM_TYPE_KIND_REFERENCE) {
-    *write.chars = 'L';
-    write = slice(write, 1);
-
-    memcpy(write.chars, desc.class_name.chars, desc.class_name.len);
-    write = slice(write, desc.class_name.len);
-
-    *write.chars = ';';
-    write = slice(write, 1);
-  } else {
-    *write.chars = desc.base_kind;
-    write = slice(write, 1);
-  }
-
-  result.len = write.chars - result.chars;
-  return result;
-}
-
 bjvm_classdesc *load_class_of_field(bjvm_thread *thread,
                                     const bjvm_field_descriptor *field) {
-  heap_string name = field_descriptor_to_name(*field);
-  bjvm_classdesc *result = load_class_of_field_descriptor(thread, hslc(name));
-  free_heap_str(name);
+  INIT_STACK_STRING(name, 1000);
+  name = unparse_field_descriptor(name, field);
+  bjvm_classdesc *result = load_class_of_field_descriptor(thread, name);
   return result;
 }
 
@@ -989,10 +947,10 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   // TODO handlify
 
   for (int i = 0; i < method->args_count; ++i) {
-    heap_string name = field_descriptor_to_name(method->args[i]);
+    INIT_STACK_STRING(name, 1000);
+    name = unparse_field_descriptor(name, method->args + i);
     bjvm_classdesc *arg_desc =
-        load_class_of_field_descriptor(thread, hslc(name));
-    free_heap_str(name);
+        load_class_of_field_descriptor(thread, name);
 
     if (!arg_desc)
       return nullptr;
@@ -1000,9 +958,9 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
         bjvm_get_class_mirror(thread, arg_desc);
   }
 
-  heap_string name = field_descriptor_to_name(method->return_type);
-  bjvm_classdesc *ret_desc = load_class_of_field_descriptor(thread, hslc(name));
-  free_heap_str(name);
+  INIT_STACK_STRING(return_name, 1000);
+  return_name = unparse_field_descriptor(return_name, &method->return_type);
+  bjvm_classdesc *ret_desc = load_class_of_field_descriptor(thread, return_name);
   if (!ret_desc)
     return nullptr;
   rtype = bjvm_get_class_mirror(thread, ret_desc);
@@ -1846,9 +1804,7 @@ bool bjvm_instanceof_interface(const bjvm_classdesc *o,
 }
 
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
-  // Walk the superclasses/superinterfaces of bjvm_obj_header and see if any are
-  // equal to classdesc
-  // TODO compare class loaders too, superinterfaces
+  // TODO compare class loaders too
   if (o == nullptr || o == target)
     return true;
 

@@ -483,7 +483,11 @@ TEST_CASE("ClassCircularityError") {
   REQUIRE(result.stdout_ == "abc");
 }
 
+TEST_CASE("Array creation doesn't induce <clinit>") {
+  auto result = run_test_case("test_files/array_clinit/", true);
+  REQUIRE(result.stdout_ == "Hey :)\n");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/circularity/", true);
-
 }
