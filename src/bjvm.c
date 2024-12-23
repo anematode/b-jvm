@@ -1407,6 +1407,7 @@ bool method_candidate_matches(const bjvm_cp_method *candidate,
           utf8_equals_utf8(candidate->descriptor, method_descriptor));
 }
 
+// TODO look at this more carefully
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
                                    const bjvm_utf8 name,
                                    const bjvm_utf8 method_descriptor,
@@ -1438,6 +1439,12 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
                            method_descriptor, false, true);
     if (result)
       return result;
+  }
+
+  // Look in superinterfaces of superclasses
+  if (search_superclasses && descriptor->super_class) {
+    return bjvm_method_lookup(descriptor->super_class->classdesc, name,
+                            method_descriptor, true, true);
   }
 
   return nullptr;
@@ -1598,8 +1605,6 @@ bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
   return mirror && utf8_equals_utf8(hslc(mirror->descriptor->name), name);
 }
 
-// nullptrABLE because bjvm_unmirror_class on int.class etc. will return
-// nullptr! (For now...)
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror) {
   assert(bjvm_is_instanceof_name(mirror, STR("java/lang/Class")));
   return ((struct bjvm_native_Class *)mirror)->reflected_class;
@@ -1714,8 +1719,10 @@ bool compare_method_types(struct bjvm_native_MethodType *provider_mt,
     return false;
   }
   for (int i = 0; i < *ArrayLength(provider_mt->ptypes); ++i) {
-    if (((bjvm_obj_header **)ArrayData(provider_mt->ptypes))[i] !=
-        ((bjvm_obj_header **)ArrayData(targ->ptypes))[i]) {
+    bjvm_classdesc* left = bjvm_unmirror_class(((bjvm_obj_header **)ArrayData(provider_mt->ptypes))[i]);
+    bjvm_classdesc* right = bjvm_unmirror_class(((bjvm_obj_header **)ArrayData(targ->ptypes))[i]);
+
+    if (left != right) {
       printf("Different ptypes!\n");
       return false;
     }
@@ -1752,21 +1759,20 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
 void bjvm_invokevirtual_signature_polymorphic(
     bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_cp_method *method,
     bjvm_method_descriptor *descriptor, bjvm_obj_header *target, int args) {
-  struct bjvm_native_MethodType *provider_mt = method->method_type_obj;
-  if (!provider_mt) {
-    method->method_type_obj = bjvm_resolve_method_type(thread, descriptor);
-    provider_mt = method->method_type_obj;
-  }
+  // TODO attach this to the descriptor
+  struct bjvm_native_MethodType *provider_mt = bjvm_resolve_method_type(thread, descriptor);
   // TODO check invokeExact, invoke
 
   struct bjvm_native_MethodHandle *mh = (void *)target;
   struct bjvm_native_MethodType *targ = (void *)mh->type;
 
+  printf("Sigpoly: %.*s\n", fmt_slice(method->name));
+
   heap_string a = debug_dump_string(thread, (void *)provider_mt);
   heap_string b = debug_dump_string(thread, (void *)targ);
 
-  printf("Provider: %.*s\n", a.len, a.chars);
-  printf("Target: %.*s\n", b.len, b.chars);
+  printf("Method 1: %.*s\n", fmt_slice(a));
+  printf("Method 2: %.*s\n", fmt_slice(b));
 
   bool mts_are_same = compare_method_types(provider_mt, targ);
   printf("Mts are same: %d\n", mts_are_same);
@@ -1775,13 +1781,14 @@ void bjvm_invokevirtual_signature_polymorphic(
   free_heap_str(b);
 
   bool is_invoke_exact = utf8_equals_utf8(method->name, STR("invokeExact"));
+  bool is_invoke_basic = utf8_equals_utf8(method->name, STR("invokeBasic"));
   if (is_invoke_exact) {
     if (!mts_are_same) {
       bjvm_wrong_method_type_error(thread, provider_mt, targ);
     }
   }
 
-  if (!mts_are_same) {
+  if (!mts_are_same && !is_invoke_basic) {
     // Call asType
     bjvm_cp_method *asType = bjvm_easy_method_lookup(
         mh->base.descriptor, STR("asType"),
@@ -1925,7 +1932,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     }
     method = insn->ic = bjvm_method_lookup(
         lookup_on, info->name_and_type->name, info->name_and_type->descriptor,
-        true, insn->kind == bjvm_insn_invokeinterface);
+        true, true);
     insn->ic2 = lookup_on;
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
@@ -2911,8 +2918,12 @@ start:
         if (bjvm_instanceof(obj->descriptor, info->classdesc)) {
           checked_push(frame, (bjvm_stack_value){.obj = obj});
         } else {
+          INIT_STACK_STRING(complaint, 1000);
+          complaint = bprintf(complaint, "Expected instance of %.*s, got %.*s",
+                  fmt_slice(info->classdesc->name),
+                  fmt_slice(obj->descriptor->name));
           bjvm_raise_exception(thread, STR("java/lang/ClassCastException"),
-                               null_str());
+                               complaint);
           goto done;
         }
       } else {

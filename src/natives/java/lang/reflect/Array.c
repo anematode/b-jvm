@@ -4,11 +4,17 @@
 DECLARE_NATIVE("java/lang/reflect", Array, newArray,
                "(Ljava/lang/Class;I)Ljava/lang/Object;") {
   assert(argc == 2);
-  struct bjvm_native_Class *class = (void *)args[0].handle->obj;
+  if (!args[0].handle->obj)
+    return value_null();
+  bjvm_classdesc *class = bjvm_unmirror_class(args[0].handle->obj);
   int32_t count = args[1].i;
-  bjvm_obj_header *array =
-      CreateObjectArray1D(thread, class->reflected_class, count);
-  return (bjvm_stack_value){.obj = array};
+  bjvm_obj_header *result;
+  if (class->kind == BJVM_CD_KIND_PRIMITIVE) {
+    result = CreatePrimitiveArray1D(thread, class->primitive_component, count);
+  } else {
+    result = CreateObjectArray1D(thread, class, count);
+  }
+  return (bjvm_stack_value){.obj = result};
 }
 
 DECLARE_NATIVE("java/lang/reflect", Array, getLength, "(Ljava/lang/Object;)I") {
