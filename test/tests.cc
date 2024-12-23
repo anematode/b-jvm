@@ -450,6 +450,28 @@ variable passed in
 )");
 }
 
+TEST_CASE("Class<?> implementation") {
+  auto result = run_test_case("test_files/reflection_class/", true);
+  REQUIRE(result.stdout_ == R"(int1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+boolean1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+byte1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+char1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+void1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+short1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+long1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+float1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+double1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+java.lang.Integer17nullfalsefalsetruefalsefalsefalse1153class java.lang.Numberfalsenull
+[Ljava.lang.Integer;1041class java.lang.Integertruefalsefalsetruefalsefalse00class java.lang.Objectfalsenull
+[[Ljava.lang.Integer;1041class [Ljava.lang.Integer;truefalsefalsefalsefalsefalse00class java.lang.Objectfalsenull
+[I1041inttruefalsefalsefalsetruefalse00class java.lang.Objectfalsenull
+[[I1041class [Itruefalsefalsefalsefalsetrue00class java.lang.Objectfalsenull
+[C1041chartruefalsefalsefalsefalsefalse00class java.lang.Objectfalsenull
+[[C1041class [Ctruefalsefalsefalsefalsefalse00class java.lang.Objectfalsenull
+java.io.Serializable1537nullfalsetruetruetruetruetrue00nullfalsenull
+)");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

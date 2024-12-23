@@ -635,7 +635,7 @@ bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread,
   desc->kind = BJVM_CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
   desc->name = make_heap_str_from(name);
-  desc->access_flags = 0x411; // result of int.class.getModifiers()
+  desc->access_flags = BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
   desc->array_type = nullptr;
   desc->mirror = mirror;
   desc->primitive_component = kind;
@@ -1805,19 +1805,19 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
   // Walk the superclasses/superinterfaces of bjvm_obj_header and see if any are
   // equal to classdesc
   // TODO compare class loaders too, superinterfaces
-  if (o == nullptr)
+  if (o == nullptr || o == target)
     return true;
 
   if (target->kind != BJVM_CD_KIND_ORDINARY) {
     if (o->kind == BJVM_CD_KIND_ORDINARY)
       return false;
     if (o->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-      return target->dimensions == o->dimensions &&
-             bjvm_instanceof(o->base_component, target->base_component);
+      return target->dimensions == o->dimensions && o->primitive_component == target->primitive_component &&
+             (!o->base_component || !target->base_component || bjvm_instanceof(o->base_component, target->base_component));
     }
-    // o is primitive array, equality check suffices
+    // o is 1D primitive array, equality check suffices
     return target->dimensions == o->dimensions &&
-           o->base_component == target->base_component;
+           target->primitive_component == o->primitive_component;
   }
 
   // o is normal object
@@ -2205,6 +2205,7 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame,
     dim_sizes[i] = dim;
   }
 
+
   bjvm_obj_header *result =
       CreateArray(thread, multianewarray->entry->classdesc, dim_sizes, dims);
   frame->stack_depth -= dims;
@@ -2350,6 +2351,7 @@ int bjvm_invokedynamic(bjvm_thread *thread, bjvm_stack_frame *frame,
 int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
                             bjvm_stack_value *result) {
   bjvm_cp_method *method = frame->method;
+  bjvm_bytecode_insn *code = method->code->code;
 
 #if AGGRESSIVE_DEBUG
   printf("Calling method %.*s, descriptor %.*s, on class %.*s\n",
@@ -2359,7 +2361,7 @@ int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
 
 start:
   while (true) {
-    bjvm_bytecode_insn *insn = &method->code->code[frame->program_counter];
+    bjvm_bytecode_insn *insn = &code[frame->program_counter];
 
 #if AGGRESSIVE_DEBUG
     char *insn_dump = insn_to_string(insn, frame->program_counter);
@@ -2525,12 +2527,12 @@ start:
 #if ONE_GOTO_PER_INSN
 #define NEXT_INSN                                                              \
   {                                                                            \
-    insn = &method->code->code[++frame->program_counter];                      \
+    insn = &code[++frame->program_counter];                                    \
     goto *insn_jump_table[insn->kind];                                         \
   }
 #define JMP_INSN                                                               \
   {                                                                            \
-    insn = &method->code->code[frame->program_counter];                        \
+    insn = &code[frame->program_counter];                                      \
     goto *insn_jump_table[insn->kind];                                         \
   }
 #else
@@ -2579,7 +2581,6 @@ start:
     bjvm_insn_arraylength: {
       bjvm_obj_header *obj = checked_pop(frame).obj;
       if (!obj) {
-        // NullPointerException
         bjvm_null_pointer_exception(thread);
         goto done;
       }
@@ -2612,6 +2613,10 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -2641,6 +2646,10 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -2902,6 +2911,10 @@ start:
       int value = checked_pop(frame).i;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
@@ -3024,6 +3037,10 @@ start:
       int64_t value = checked_pop(frame).l;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);

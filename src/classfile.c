@@ -2161,6 +2161,14 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
 
   cf->pool = parse_constant_pool(&reader, &ctx);
   cf->access_flags = reader_next_u16(&reader, "access flags");
+  // "Compilers to the instruction set of the Java Virtual Machine should se
+  // the ACC_SUPER flag. In Java SE 8 and above, the Java Virtual Machine
+  // considers the ACC_SUPER flag to be set in every class file, regardless of
+  // the actual value of the flag in the class file and the version of the
+  // class file."
+  // -> getModifiers doesn't return this bit
+  cf->access_flags &= ~0x0020;
+
   bjvm_cp_class_info *this_class =
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),
                         BJVM_CP_KIND_CLASS, "this class")

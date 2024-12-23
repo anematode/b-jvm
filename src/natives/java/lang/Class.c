@@ -119,8 +119,9 @@ DECLARE_NATIVE("java/lang", Class, getModifiers, "()I") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
-  bjvm_cp_class_info *super = bjvm_unmirror_class(obj->obj)->super_class;
-  if (!super)
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
+  bjvm_cp_class_info *super = desc->super_class;
+  if (!super || desc->access_flags & BJVM_ACCESS_INTERFACE)
     return value_null();
   return (bjvm_stack_value){
       .obj = (void *)bjvm_get_class_mirror(thread, super->classdesc)};

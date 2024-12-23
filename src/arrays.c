@@ -17,13 +17,15 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
     free_array_classdesc(classdesc->array_type);
   free_heap_str(classdesc->name);
   free(classdesc->super_class);
-  free(classdesc->fields);
+  free(classdesc->interfaces[0]);  // Cloneable
+  free(classdesc->interfaces[1]);  // Serializable
+  free(classdesc->interfaces);
   free(classdesc);
 }
 
 // Called for both primitive and object arrays
 static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
-  base->access_flags = BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL;
+  base->access_flags = BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
 
   bjvm_utf8 name = STR("java/lang/Object");
 
@@ -31,15 +33,19 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   info->classdesc = bootstrap_class_create(thread, name);
   info->name = name;
   base->super_class = info;
-  base->fields_count = 1;
 
-  bjvm_cp_field *fields = calloc(1, sizeof(bjvm_cp_field));
-  base->fields = fields;
-  fields->access_flags =
-      BJVM_ACCESS_PUBLIC | BJVM_ACCESS_STATIC | BJVM_ACCESS_FINAL;
+  bjvm_cp_class_info *Cloneable = calloc(1, sizeof(bjvm_cp_class_info));
+  Cloneable->classdesc = bootstrap_class_create(thread, STR("java/lang/Cloneable"));
+  Cloneable->name = STR("java/lang/Cloneable");
 
-  fields->name = STR("length");
-  fields->descriptor = STR("I");
+  bjvm_cp_class_info *Serializable = calloc(1, sizeof(bjvm_cp_class_info));
+  Serializable->classdesc = bootstrap_class_create(thread, STR("java/io/Serializable"));
+  Serializable->name = STR("java/io/Serializable");
+
+  base->interfaces_count = 2;
+  base->interfaces = calloc(2, sizeof(bjvm_cp_class_info *));
+  base->interfaces[0] = Cloneable;
+  base->interfaces[1] = Serializable;
 }
 
 static bjvm_classdesc *
@@ -83,6 +89,9 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
     bprintf(hslc(result->name), "[%.*s", fmt_slice(component->name));
     assert(result->dimensions == component->dimensions + 1);
   }
+
+  // propagate to n-D primitive arrays
+  result->primitive_component = component->primitive_component;
 
   return result;
 }
@@ -151,7 +160,7 @@ bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
     }
   }
 
-  auto arr = create_1d_object_array(thread, desc, dim_sizes[0]);
+  auto arr = create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
 
   for (int i = 0; i < dim_sizes[0]; i++) {
     bjvm_obj_header *subarray = CreateArray(
