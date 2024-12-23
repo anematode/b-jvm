@@ -635,12 +635,12 @@ struct method_analysis_ctx {
   const bjvm_attribute_code *code;
   bjvm_analy_stack_state stack, stack_before, locals;
   bool stack_terminated;
-  int* locals_swizzle;
-  bjvm_analy_stack_state* inferred_stacks;
-  bjvm_analy_stack_state* inferred_locals;
-  int* branch_q;
+  int *locals_swizzle;
+  bjvm_analy_stack_state *inferred_stacks;
+  bjvm_analy_stack_state *inferred_locals;
+  int *branch_q;
   int branch_count;
-  char* insn_error;
+  char *insn_error;
 
   heap_string *error;
 };
@@ -648,9 +648,9 @@ struct method_analysis_ctx {
 // Pop a value from the analysis stack and return it.
 #define POP_VAL                                                                \
   ({                                                                           \
-    if (ctx->stack.entries_count == 0)                                              \
+    if (ctx->stack.entries_count == 0)                                         \
       goto stack_underflow;                                                    \
-    ctx->stack.entries[--ctx->stack.entries_count];                        \
+    ctx->stack.entries[--ctx->stack.entries_count];                            \
   })
 // Pop a value from the analysis stack and assert its kind.
 #define POP_KIND(kind)                                                         \
@@ -663,10 +663,11 @@ struct method_analysis_ctx {
 // Push a kind to the analysis stack.
 #define PUSH_KIND(kind)                                                        \
   {                                                                            \
-    if (ctx->stack.entries_count == ctx->stack.entries_cap)                              \
+    if (ctx->stack.entries_count == ctx->stack.entries_cap)                    \
       goto stack_overflow;                                                     \
     if (kind != BJVM_TYPE_KIND_VOID)                                           \
-      ctx->stack.entries[ctx->stack.entries_count++] = kind_to_representable_kind(kind); \
+      ctx->stack.entries[ctx->stack.entries_count++] =                         \
+          kind_to_representable_kind(kind);                                    \
   }
 #define PUSH(kind) PUSH_KIND(BJVM_TYPE_KIND_##kind)
 
@@ -680,11 +681,11 @@ struct method_analysis_ctx {
 // Remap the index to the new local variable index after unwidening.
 #define SWIZZLE_LOCAL(index) index = ctx->locals_swizzle[index];
 
-int push_branch_target(struct method_analysis_ctx* ctx, uint32_t target) {
+int push_branch_target(struct method_analysis_ctx *ctx, uint32_t target) {
   assert((int)target < ctx->code->insn_count);
   if (ctx->inferred_stacks[target].entries) {
-    if ((ctx->insn_error =
-        expect_analy_stack_states_equal(ctx->inferred_stacks[target], ctx->stack))) {
+    if ((ctx->insn_error = expect_analy_stack_states_equal(
+             ctx->inferred_stacks[target], ctx->stack))) {
       return -1;
     }
   } else {
@@ -695,7 +696,8 @@ int push_branch_target(struct method_analysis_ctx* ctx, uint32_t target) {
   return 0;
 }
 
-int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_analysis_ctx* ctx) {
+int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
+                        struct method_analysis_ctx *ctx) {
   switch (insn->kind) {
   case bjvm_insn_nop:
   case bjvm_insn_ret:
@@ -1139,9 +1141,8 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
   }
   case bjvm_insn_if_acmpeq:
   case bjvm_insn_if_acmpne: {
-    POP(REFERENCE) POP(REFERENCE)
-    if (push_branch_target(ctx, insn->index))
-      return -1;
+    POP(REFERENCE)
+    POP(REFERENCE) if (push_branch_target(ctx, insn->index)) return -1;
     break;
   }
   case bjvm_insn_if_icmpeq:
@@ -1213,30 +1214,30 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
 
   return 0; // ok
 
-  local_overflow:
-    ctx->insn_error = strdup("Local overflow:");
-    goto error;
-  stack_overflow:
-    ctx->insn_error = strdup("Stack overflow:");
-    goto error;
-  stack_underflow:
-    ctx->insn_error = strdup("Stack underflow:");
-    goto error;
-  stack_type_mismatch:
-    ctx->insn_error = "Stack type mismatch:";
-  error:;
-    *ctx->error = make_heap_str(50000);
-    char *insn_str = insn_to_string(insn, insn_index);
-    char *stack_str = print_analy_stack_state(&ctx->stack_before);
-    char *context = code_attribute_to_string(ctx->code);
-    bprintf(hslc(*ctx->error),
-            "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
-            ctx->insn_error, insn_str, stack_str, context);
-    free(insn_str);
-    free(stack_str);
-    free(context);
-    free(ctx->insn_error);
-    return -1;
+local_overflow:
+  ctx->insn_error = strdup("Local overflow:");
+  goto error;
+stack_overflow:
+  ctx->insn_error = strdup("Stack overflow:");
+  goto error;
+stack_underflow:
+  ctx->insn_error = strdup("Stack underflow:");
+  goto error;
+stack_type_mismatch:
+  ctx->insn_error = "Stack type mismatch:";
+error:;
+  *ctx->error = make_heap_str(50000);
+  char *insn_str = insn_to_string(insn, insn_index);
+  char *stack_str = print_analy_stack_state(&ctx->stack_before);
+  char *context = code_attribute_to_string(ctx->code);
+  bprintf(hslc(*ctx->error),
+          "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
+          ctx->insn_error, insn_str, stack_str, context);
+  free(insn_str);
+  free(stack_str);
+  free(context);
+  free(ctx->insn_error);
+  return -1;
 }
 
 /**
@@ -1260,7 +1261,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   }
 
   int result = 0;
-  ctx.stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
+  ctx.stack.entries =
+      calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks = ctx.inferred_stacks =

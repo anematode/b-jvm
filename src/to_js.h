@@ -5,4 +5,4 @@
 #ifndef TO_JS_H
 #define TO_JS_H
 
-#endif //TO_JS_H
+#endif // TO_JS_H

@@ -949,8 +949,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   for (int i = 0; i < method->args_count; ++i) {
     INIT_STACK_STRING(name, 1000);
     name = unparse_field_descriptor(name, method->args + i);
-    bjvm_classdesc *arg_desc =
-        load_class_of_field_descriptor(thread, name);
+    bjvm_classdesc *arg_desc = load_class_of_field_descriptor(thread, name);
 
     if (!arg_desc)
       return nullptr;
@@ -960,7 +959,8 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
 
   INIT_STACK_STRING(return_name, 1000);
   return_name = unparse_field_descriptor(return_name, &method->return_type);
-  bjvm_classdesc *ret_desc = load_class_of_field_descriptor(thread, return_name);
+  bjvm_classdesc *ret_desc =
+      load_class_of_field_descriptor(thread, return_name);
   if (!ret_desc)
     return nullptr;
   rtype = bjvm_get_class_mirror(thread, ret_desc);
@@ -1117,13 +1117,16 @@ static void free_ordinary_classdesc(bjvm_classdesc *cd) {
   free(cd);
 }
 
-void bjvm_class_circularity_error(bjvm_thread * thread, const bjvm_classdesc *class) {
+void bjvm_class_circularity_error(bjvm_thread *thread,
+                                  const bjvm_classdesc *class) {
   INIT_STACK_STRING(message, 1000);
-  message = bprintf(message, "While loading class %.*s", fmt_slice(class->name));
+  message =
+      bprintf(message, "While loading class %.*s", fmt_slice(class->name));
   bjvm_raise_exception(thread, STR("java/lang/ClassCircularityError"), message);
 }
 
-bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread, bjvm_utf8 chars) {
+bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread,
+                                                bjvm_utf8 chars) {
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
@@ -1179,7 +1182,7 @@ bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread, bjvm_utf8 c
   for (int i = 0; i < class->interfaces_count; ++i) {
     bjvm_cp_class_info *super = class->interfaces[i];
     if (bjvm_hash_table_lookup(&vm->inchoate_classes, super->name.chars,
-      super->name.len)) {
+                               super->name.len)) {
       bjvm_class_circularity_error(thread, class);
       goto error_2;
     }
@@ -1681,8 +1684,8 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
   bjvm_stack_value result;
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
-  case BJVM_TYPE_KIND_BYTE:  // sign-extend the byte
-    result.i = (int) *(int8_t *)field_location;
+  case BJVM_TYPE_KIND_BYTE: // sign-extend the byte
+    result.i = (int)*(int8_t *)field_location;
     break;
   case BJVM_TYPE_KIND_CHAR:
     result.i = *(uint16_t *)field_location;
@@ -1833,7 +1836,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
 }
 
 bool method_types_compatible(struct bjvm_native_MethodType *provider_mt,
-                          struct bjvm_native_MethodType *targ) {
+                             struct bjvm_native_MethodType *targ) {
   // Compare ptypes
   if (provider_mt == targ)
     return true;
