@@ -36,6 +36,11 @@ struct bjvm_native_LambdaForm {
   bjvm_obj_header *transformCache;  // Ljava/lang/Object;
   int32_t invocationCounter;  // I
 };
+struct bjvm_native_CallSite {
+  bjvm_obj_header base;
+  // my fields
+  bjvm_obj_header *target;  // Ljava/lang/invoke/MethodHandle;
+};
 struct bjvm_native_ConstantPool {
   bjvm_obj_header base;
   // implementation-dependent fields

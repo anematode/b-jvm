@@ -8,6 +8,12 @@
     <option name="pythonIntegrationState" value="YES" />
   </component>
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
+  <component name="CidrRootsConfiguration">
+    <excludeRoots>
+      <file path="$PROJECT_DIR$/test/jre8" />
+      <file path="$PROJECT_DIR$/test/lib" />
+    </excludeRoots>
+  </component>
   <component name="JsBuildToolPackageJson" sorting="DEFINITION_ORDER" />
   <component name="WestSettings">{}</component>
 </project>

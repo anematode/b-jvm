@@ -436,6 +436,10 @@ TEST_CASE("Signature polymorphism") {
   auto result = run_test_case("test_files/signature_polymorphism/", false);
 }
 
+TEST_CASE("Basic lambda") {
+  auto result = run_test_case("test_files/basic_lambda/", false);
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

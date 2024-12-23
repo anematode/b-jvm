@@ -80,7 +80,7 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
-    free_method_descriptor(entry->method_type_info.parsed_descriptor);
+    free_method_descriptor(entry->method_type.parsed_descriptor);
     break;
   }
   default: // TODO will need to add more as we resolve descriptors
@@ -555,13 +555,13 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     // TODO validate both
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_METHOD_HANDLE,
-        .method_handle_info = {.handle_kind = handle_kind, .reference = entry}};
+        .method_handle = {.handle_kind = handle_kind, .reference = entry}};
   }
   case CONSTANT_MethodType: {
     uint16_t desc_index = reader_next_u16(reader, "descriptor index");
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_METHOD_TYPE,
-        .method_type_info = {
+        .method_type = {
             .descriptor = skip_linking
                               ? null_str()
                               : checked_get_utf8(ctx->cp, desc_index,
@@ -645,11 +645,11 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   case BJVM_CP_KIND_METHOD_TYPE: {
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
-    char *error = parse_method_descriptor(entry->method_type_info.descriptor,
+    char *error = parse_method_descriptor(entry->method_type.descriptor,
                                           desc); // TODO free on FormatError
     if (error)
       format_error_dynamic(error);
-    entry->method_type_info.parsed_descriptor = desc;
+    entry->method_type.parsed_descriptor = desc;
     break;
   }
   default:
@@ -1722,7 +1722,7 @@ void parse_bootstrap_methods_attribute(cf_byteslice attr_reader,
         &checked_cp_entry(ctx->cp,
                           reader_next_u16(&attr_reader, "bootstrap method ref"),
                           BJVM_CP_KIND_METHOD_HANDLE, "bootstrap method ref")
-             ->method_handle_info;
+             ->method_handle;
     uint16_t arg_count =
         reader_next_u16(&attr_reader, "bootstrap method arg count");
     method->args_count = arg_count;

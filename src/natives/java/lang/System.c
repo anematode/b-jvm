@@ -2,15 +2,23 @@
 #include <natives.h>
 #include <objects.h>
 #include <util.h>
+#include <unistd.h>
 
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
   bjvm_obj_header *props_obj = args[0].handle->obj;
+  INIT_STACK_STRING(cwd, 1024);
+  getcwd(cwd.chars, 1024);
+  cwd.len = strlen(cwd.chars);
+
+  printf("Cwd: %s\n", cwd);
+
   const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
                                 {STR("stdout.encoding"), STR("UTF-8")},
                                 {STR("native.encoding"), STR("UTF-8")},
                                 {STR("stderr.encoding"), STR("UTF-8")},
+                                  {STR("java.home"), cwd},
                                 {STR("line.separator"), STR("\n")},
                                 {STR("path.separator"), STR(":")},
                                 {STR("file.separator"), STR("/")}};

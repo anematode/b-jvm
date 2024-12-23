@@ -56,8 +56,8 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
         bjvm_intern_string(thread, hslc(frame->method->my_class->name));
     E->methodName =
         bjvm_intern_string(thread, frame->method->name);
-    E->fileName =
-        bjvm_intern_string(thread, frame->method->my_class->source_file->name);
+    bjvm_attribute_source_file *sf = frame->method->my_class->source_file;
+    E->fileName = sf ? bjvm_intern_string(thread, sf->name) : nullptr;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
 #undef E

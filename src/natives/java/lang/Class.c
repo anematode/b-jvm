@@ -349,3 +349,8 @@ DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   return (bjvm_stack_value){.obj = array->obj};
 }
 
+DECLARE_NATIVE("java/lang", Class, getProtectionDomain0,
+               "()Ljava/security/ProtectionDomain;") {
+  printf("TODO: getProtectionDomain0\n");
+  return value_null(); // TODO
+}

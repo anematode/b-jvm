@@ -216,6 +216,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineClass,
   INIT_STACK_STRING(cf_name, 1000);
   cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(name_str));
 
+  printf("Defining class %.*s\n", fmt_slice(name_str));
+
   bjvm_vm_preregister_classfile(thread->vm, cf_name, bytes, length);
   bjvm_classdesc *result = bootstrap_class_create(thread, hslc(name_str));
 

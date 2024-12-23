@@ -6,10 +6,7 @@
 bool utf8_equals(const bjvm_utf8 entry, const char *str) {
   if (entry.len != (int)strlen(str))
     return false;
-  for (int i = 0; i < entry.len; ++i)
-    if (entry.chars[i] != str[i])
-      return false;
-  return true;
+  return memcmp(entry.chars, str, entry.len) == 0;
 }
 
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right) {
