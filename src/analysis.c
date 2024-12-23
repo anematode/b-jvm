@@ -553,7 +553,7 @@ bool is_kind_wide(bjvm_type_kind kind) {
 }
 
 bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
-  return is_kind_wide(desc.kind) && !desc.dimensions;
+  return is_kind_wide(desc.base_kind) && !desc.dimensions;
 }
 
 bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
@@ -564,23 +564,15 @@ bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
   case BJVM_TYPE_KIND_SHORT:
   case BJVM_TYPE_KIND_INT:
     return BJVM_TYPE_KIND_INT;
-  case BJVM_TYPE_KIND_FLOAT:
-  case BJVM_TYPE_KIND_DOUBLE:
-  case BJVM_TYPE_KIND_LONG:
-  case BJVM_TYPE_KIND_REFERENCE:
-  case BJVM_TYPE_KIND_RETURN_ADDRESS:
-    return kind;
-  case BJVM_TYPE_KIND_VOID:
   default:
-    UNREACHABLE();
-    break;
+    return kind;
   }
 }
 
-bjvm_type_kind field_to_representable_kind(const bjvm_field_descriptor *field) {
+bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
   if (field->dimensions)
     return BJVM_TYPE_KIND_REFERENCE;
-  return kind_to_representable_kind(field->kind);
+  return kind_to_representable_kind(field->base_kind);
 }
 
 void write_references_to_bitset(
@@ -617,7 +609,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   locals->entries_cap = locals->entries_count = max_locals;
   for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
-    locals->entries[j] = field_to_representable_kind(&arg);
+    locals->entries[j] = field_to_kind(&arg);
     // map nth local to nth argument if static, n+1th if nonstatic
     (*locals_swizzle)[j] = i + !is_static;
     if (bjvm_is_field_wide(arg)) {
@@ -653,8 +645,6 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     return 0;
   }
 
-  int result = 0;
-
   bjvm_analy_stack_state stack, locals;
   // Swizzle local entries so that the first n arguments correspond to the first
   // n locals (i.e., we should remap aload #1 to aload swizzle[#1])
@@ -663,6 +653,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     return -1;
   }
 
+  int result = 0;
   stack.entries = calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
 
   // After jumps, we can infer the stack and locals at these points
@@ -759,6 +750,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   char *error_str;
   bool error_str_needs_free = false;
   bool stack_terminated = false;
+
   for (int i = 0; i < code->insn_count; ++i) {
     if (inferred_stacks[i].entries) {
       copy_analy_stack_state(inferred_stacks[i], &stack);
@@ -1108,7 +1100,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
           bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
                               "getstatic/getfield argument")
               ->fieldref_info.parsed_descriptor;
-      PUSH_KIND(field_to_representable_kind(field));
+      PUSH_KIND(field_to_kind(field));
       break;
     }
     case bjvm_insn_instanceof: {
@@ -1121,10 +1113,10 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
               ->indy_info.method_descriptor;
       for (int j = descriptor->args_count - 1; j >= 0; --j) {
         bjvm_field_descriptor *field = descriptor->args + j;
-        POP_KIND(field_to_representable_kind(field));
+        POP_KIND(field_to_kind(field));
       }
-      if (descriptor->return_type.kind != BJVM_TYPE_KIND_VOID)
-        PUSH_KIND(field_to_representable_kind(&descriptor->return_type))
+      if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
+        PUSH_KIND(field_to_kind(&descriptor->return_type))
       break;
     }
     case bjvm_insn_new: {
@@ -1153,13 +1145,13 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
               ->methodref.method_descriptor;
       for (int j = descriptor->args_count - 1; j >= 0; --j) {
         bjvm_field_descriptor *field = descriptor->args + j;
-        POP_KIND(field_to_representable_kind(field))
+        POP_KIND(field_to_kind(field))
       }
       if (insn->kind != bjvm_insn_invokestatic) {
         POP(REFERENCE)
       }
-      if (descriptor->return_type.kind != BJVM_TYPE_KIND_VOID)
-        PUSH_KIND(field_to_representable_kind(&descriptor->return_type));
+      if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
+        PUSH_KIND(field_to_kind(&descriptor->return_type));
       break;
     }
     case bjvm_insn_ldc: {

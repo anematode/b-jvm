@@ -243,7 +243,7 @@ typedef struct bjvm_cp_name_and_type {
 } bjvm_cp_name_and_type;
 
 struct bjvm_field_descriptor {
-  bjvm_type_kind kind;
+  bjvm_type_kind base_kind;
   // Can be nonzero for any kind
   int dimensions;
   heap_string class_name; // For reference and array types only

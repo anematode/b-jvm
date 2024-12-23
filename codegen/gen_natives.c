@@ -38,7 +38,7 @@ void print_field(const bjvm_cp_field *field) {
   if ((field->access_flags & BJVM_ACCESS_STATIC))
     return;
   const char *name;
-  switch (field_to_representable_kind(&field->parsed_descriptor)) {
+  switch (field_to_kind(&field->parsed_descriptor)) {
   case BJVM_TYPE_KIND_FLOAT:
     name = "float ";
     break;

@@ -188,7 +188,7 @@ bjvm_cp_entry *get_constant_pool_entry(bjvm_constant_pool *pool, int index) {
 }
 
 void free_field_descriptor(bjvm_field_descriptor descriptor) {
-  if (descriptor.kind == BJVM_TYPE_KIND_REFERENCE) {
+  if (descriptor.base_kind == BJVM_TYPE_KIND_REFERENCE) {
     free_heap_str(descriptor.class_name);
   }
 }
@@ -403,7 +403,7 @@ char *parse_complete_field_descriptor(const bjvm_utf8 entry,
   char *error = parse_field_descriptor(&chars, entry.len, result);
   if (error)
     return error;
-  if (result->kind == BJVM_TYPE_KIND_REFERENCE)
+  if (result->base_kind == BJVM_TYPE_KIND_REFERENCE)
     free_on_format_error(ctx, result->class_name.chars);
   if (chars != entry.chars + entry.len) {
     char buf[64];
@@ -2003,31 +2003,31 @@ char *parse_field_descriptor(const char **chars, size_t len,
     (*chars)++;
     switch (c) {
     case L'B':
-      result->kind = BJVM_TYPE_KIND_BYTE;
+      result->base_kind = BJVM_TYPE_KIND_BYTE;
       return nullptr;
     case L'C':
-      result->kind = BJVM_TYPE_KIND_CHAR;
+      result->base_kind = BJVM_TYPE_KIND_CHAR;
       return nullptr;
     case L'D':
-      result->kind = BJVM_TYPE_KIND_DOUBLE;
+      result->base_kind = BJVM_TYPE_KIND_DOUBLE;
       return nullptr;
     case L'F':
-      result->kind = BJVM_TYPE_KIND_FLOAT;
+      result->base_kind = BJVM_TYPE_KIND_FLOAT;
       return nullptr;
     case L'I':
-      result->kind = BJVM_TYPE_KIND_INT;
+      result->base_kind = BJVM_TYPE_KIND_INT;
       return nullptr;
     case L'J':
-      result->kind = BJVM_TYPE_KIND_LONG;
+      result->base_kind = BJVM_TYPE_KIND_LONG;
       return nullptr;
     case L'S':
-      result->kind = BJVM_TYPE_KIND_SHORT;
+      result->base_kind = BJVM_TYPE_KIND_SHORT;
       return nullptr;
     case L'Z':
-      result->kind = BJVM_TYPE_KIND_BOOLEAN;
+      result->base_kind = BJVM_TYPE_KIND_BOOLEAN;
       return nullptr;
     case L'V': {
-      result->kind = BJVM_TYPE_KIND_VOID;
+      result->base_kind = BJVM_TYPE_KIND_VOID;
       if (dimensions > 0)
         return strdup("void cannot have dimensions");
       return nullptr; // lol, check this later
@@ -2046,7 +2046,7 @@ char *parse_field_descriptor(const char **chars, size_t len,
         return strdup("missing reference type name");
       }
       ++*chars;
-      result->kind = BJVM_TYPE_KIND_REFERENCE;
+      result->base_kind = BJVM_TYPE_KIND_REFERENCE;
       result->class_name = make_heap_str_from(
           (bjvm_utf8){.chars = (char *)start, .len = class_name_len});
       return nullptr;
@@ -2088,7 +2088,7 @@ char *parse_method_descriptor(const bjvm_utf8 entry,
     bjvm_field_descriptor arg;
 
     char *error = parse_field_descriptor(&chars, end - chars, &arg);
-    if (error || arg.kind == BJVM_TYPE_KIND_VOID)
+    if (error || arg.base_kind == BJVM_TYPE_KIND_VOID)
       return err_while_parsing_md(
           result, error ? error : strdup("void as method parameter"));
 

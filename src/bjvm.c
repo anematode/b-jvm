@@ -468,7 +468,7 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
     write.chars[0] = '[';
     write = slice(write, 1);
   }
-  switch (desc->kind) {
+  switch (desc->base_kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
   case BJVM_TYPE_KIND_CHAR:
   case BJVM_TYPE_KIND_FLOAT:
@@ -478,7 +478,7 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
   case BJVM_TYPE_KIND_INT:
   case BJVM_TYPE_KIND_LONG:
   case BJVM_TYPE_KIND_VOID:
-    write = slice(write, bprintf(write, "%c", desc->kind).len);
+    write = slice(write, bprintf(write, "%c", desc->base_kind).len);
     break;
   case BJVM_TYPE_KIND_REFERENCE:
     write =
@@ -502,13 +502,12 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 
   method->reflection_ctor =
       (void *)new_object(thread, reflect_Constructor);
+
   bjvm_handle *result = bjvm_make_handle(thread, (void*) method->reflection_ctor);
 #define C ((struct bjvm_native_Constructor *)result->obj)
   C->reflected_ctor = method;
   C->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   C->modifiers = method->access_flags;
-
-  // TODO fill these in
   C->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
       method->parsed_descriptor->args_count);
@@ -775,13 +774,13 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread);
 void bjvm_set_field(bjvm_obj_header *obj, bjvm_cp_field *field,
                     bjvm_stack_value bjvm_stack_value) {
   store_stack_value((void *)obj + field->byte_offset, bjvm_stack_value,
-                    field_to_representable_kind(&field->parsed_descriptor));
+                    field_to_kind(&field->parsed_descriptor));
 }
 
 bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field) {
   return load_stack_value(
       (void *)obj + field->byte_offset,
-      field_to_representable_kind(&field->parsed_descriptor));
+      field_to_kind(&field->parsed_descriptor));
 }
 
 bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
@@ -927,7 +926,7 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 heap_string field_descriptor_to_name(bjvm_field_descriptor desc) {
   heap_string result = make_heap_str(
       desc.dimensions + 6 +
-      (desc.kind == BJVM_TYPE_KIND_REFERENCE ? desc.class_name.len : 0));
+      (desc.base_kind == BJVM_TYPE_KIND_REFERENCE ? desc.class_name.len : 0));
 
   bjvm_utf8 write = hslc(result);
   if (desc.dimensions) {
@@ -935,7 +934,7 @@ heap_string field_descriptor_to_name(bjvm_field_descriptor desc) {
     write = slice(write, desc.dimensions);
   }
 
-  if (desc.kind == BJVM_TYPE_KIND_REFERENCE) {
+  if (desc.base_kind == BJVM_TYPE_KIND_REFERENCE) {
     *write.chars = 'L';
     write = slice(write, 1);
 
@@ -945,7 +944,7 @@ heap_string field_descriptor_to_name(bjvm_field_descriptor desc) {
     *write.chars = ';';
     write = slice(write, 1);
   } else {
-    *write.chars = desc.kind;
+    *write.chars = desc.base_kind;
     write = slice(write, 1);
   }
 
@@ -1388,7 +1387,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   for (int field_i = 0; field_i < classdesc->fields_count; ++field_i) {
     bjvm_cp_field *field = classdesc->fields + field_i;
     bjvm_type_kind kind =
-        field_to_representable_kind(&field->parsed_descriptor);
+        field_to_kind(&field->parsed_descriptor);
     field->byte_offset = field->access_flags & BJVM_ACCESS_STATIC
                              ? allocate_field(&static_offset, kind)
                              : allocate_field(&nonstatic_offset, kind);
@@ -1415,7 +1414,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   }
   for (int field_i = 0; field_i < classdesc->fields_count; ++field_i) {
     bjvm_cp_field *field = classdesc->fields + field_i;
-    if (field_to_representable_kind(&field->parsed_descriptor) ==
+    if (field_to_kind(&field->parsed_descriptor) ==
         BJVM_TYPE_KIND_REFERENCE) {
       bjvm_compressed_bitset *bs = field->access_flags & BJVM_ACCESS_STATIC
                                        ? &classdesc->static_references
@@ -1950,7 +1949,7 @@ void bjvm_invokevirtual_signature_polymorphic(
     bjvm_bytecode_interpret(thread, new_frame, &result);
     bjvm_pop_frame(thread, new_frame);
     frame->stack_depth -= args;
-    if (method->parsed_descriptor->return_type.kind != BJVM_TYPE_KIND_VOID)
+    if (method->parsed_descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
       checked_push(frame, result);
 
     // UNREACHABLE();
@@ -1979,7 +1978,7 @@ bjvm_value *make_handles_array(bjvm_thread *thread,
   for (int i = 0; i < argc; ++i) {
     // For each argument, if it's a reference, wrap it in a handle; otherwise
     // just memcpy it over since the representations of primitives are the same
-    if (field_to_representable_kind(calling->args + i) ==
+    if (field_to_kind(calling->args + i) ==
         BJVM_TYPE_KIND_REFERENCE) {
       result[i].handle = bjvm_make_handle(thread, stack_args[i].obj);
     } else {
@@ -1993,7 +1992,7 @@ void drop_handles_array(bjvm_thread *thread, bjvm_method_descriptor *called,
                         bjvm_value *array) {
   int argc = called->args_count;
   for (int i = 0; i < argc; ++i) {
-    if (field_to_representable_kind(called->args + i) ==
+    if (field_to_kind(called->args + i) ==
         BJVM_TYPE_KIND_REFERENCE) {
       bjvm_drop_handle(thread, array[i].handle);
     }
@@ -2107,7 +2106,7 @@ int bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     if (err)
       return -1;
   }
-  if (method->parsed_descriptor->return_type.kind != BJVM_TYPE_KIND_VOID)
+  if (method->parsed_descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
     checked_push(frame, invoked_result);
 
   return 0;
@@ -2180,7 +2179,7 @@ int bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       return -1;
   }
 
-  if (info->method_descriptor->return_type.kind != BJVM_TYPE_KIND_VOID)
+  if (info->method_descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
     checked_push(frame, invoked_result);
   return 0;
 }
@@ -2341,7 +2340,7 @@ int bjvm_invokedynamic(bjvm_thread *thread, bjvm_stack_frame *frame,
   bjvm_invokevirtual_signature_polymorphic(thread, fake_frame, invokeExact,
     (void*) mh->type, (void*)mh, d->args_count + 1);
   frame->stack_depth -= d->args_count;
-  if (d->return_type.kind != BJVM_TYPE_KIND_VOID) {
+  if (d->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
     checked_push(frame, fake_frame->values[0]);
   }
   free(fake_frame);
@@ -3232,7 +3231,7 @@ start:
       void *addr = (void *)obj + field_info->field->byte_offset;
 
       bjvm_type_kind kind =
-          field_to_representable_kind(field_info->parsed_descriptor);
+          field_to_kind(field_info->parsed_descriptor);
       if (insn->kind == bjvm_insn_getfield) {
         checked_push(frame, load_stack_value(addr, kind));
       } else {
@@ -3272,7 +3271,7 @@ start:
       void *field_location =
           &field->my_class->static_fields[field->byte_offset];
       bjvm_type_kind kind =
-          field_to_representable_kind(field_info->parsed_descriptor);
+          field_to_kind(field_info->parsed_descriptor);
       if (insn->kind == bjvm_insn_putstatic) {
         store_stack_value(field_location, checked_pop(frame), kind);
       } else {

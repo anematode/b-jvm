@@ -216,12 +216,12 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(
       utf8_equals(hslc(com_example_Example.class_name), "com/example/Example"));
   REQUIRE(com_example_Example.dimensions == 0);
-  REQUIRE(com_example_Example.kind == BJVM_TYPE_KIND_REFERENCE);
+  REQUIRE(com_example_Example.base_kind == BJVM_TYPE_KIND_REFERENCE);
 
-  REQUIRE(Iaaa.kind == BJVM_TYPE_KIND_INT);
+  REQUIRE(Iaaa.base_kind == BJVM_TYPE_KIND_INT);
   REQUIRE(Iaaa.dimensions == 1);
 
-  REQUIRE(Jaa.kind == BJVM_TYPE_KIND_LONG);
+  REQUIRE(Jaa.base_kind == BJVM_TYPE_KIND_LONG);
   REQUIRE(Jaa.dimensions == 3);
 
   REQUIRE(utf8_equals(hslc(java_lang_String.class_name), "java/lang/String"));
@@ -230,10 +230,10 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(utf8_equals(hslc(java_lang_Object.class_name), "java/lang/Object"));
   REQUIRE(java_lang_Object.dimensions == 2);
 
-  REQUIRE(B.kind == BJVM_TYPE_KIND_BYTE);
-  REQUIRE(C.kind == BJVM_TYPE_KIND_CHAR);
-  REQUIRE(V.kind == BJVM_TYPE_KIND_VOID);
-  REQUIRE(Z.kind == BJVM_TYPE_KIND_BOOLEAN);
+  REQUIRE(B.base_kind == BJVM_TYPE_KIND_BYTE);
+  REQUIRE(C.base_kind == BJVM_TYPE_KIND_CHAR);
+  REQUIRE(V.base_kind == BJVM_TYPE_KIND_VOID);
+  REQUIRE(Z.base_kind == BJVM_TYPE_KIND_BOOLEAN);
 
   free_field_descriptor(com_example_Example);
   free_field_descriptor(java_lang_Object);
