@@ -15,7 +15,6 @@ DECLARE_NATIVE(
       forward_args[i + 1] = *((bjvm_stack_value*)ArrayData(args[1].handle->obj) + i);
     }
   }
-  printf("Calling method with descriptor %.*s\n", fmt_slice(method->descriptor));
   bjvm_thread_run(thread, method, forward_args, &result);
   return (bjvm_stack_value){.obj = instance};
 }

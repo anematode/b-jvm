@@ -16,7 +16,9 @@ Common abbreviations:
 
 ## Tasks
 
-- Go through existing native functions and handle-ify them
+- Go through existing native functions and handle-ify them so they are safe
+- Make bytecode_interpret interruptable
+- Variadic arguments collector for MethodHandle
 
 ### Goals
 

@@ -177,6 +177,7 @@ void bjvm_free_classfile(bjvm_classdesc cf) {
   free(cf.fields);
   free(cf.methods);
   free(cf.attributes);
+  free(cf.indy_insns);
   bjvm_free_compressed_bitset(cf.static_references);
   bjvm_free_compressed_bitset(cf.instance_references);
 }
@@ -2159,7 +2160,6 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   (void)major;
 
   cf->pool = parse_constant_pool(&reader, &ctx);
-
   cf->access_flags = reader_next_u16(&reader, "access flags");
   bjvm_cp_class_info *this_class =
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),
@@ -2209,12 +2209,13 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   bool in_MethodHandle =
       utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle");
   for (int i = 0; i < cf->methods_count; ++i) {
-    cf->methods[i] = parse_method(&reader, &ctx);
-    cf->methods[i].my_class = result;
+    bjvm_cp_method *method = cf->methods + i;
+    *method = parse_method(&reader, &ctx);
+    method->my_class = result;
 
     // Mark signature polymorphic functions
-    if (in_MethodHandle && cf->methods[i].access_flags & BJVM_ACCESS_NATIVE) {
-      cf->methods[i].is_signature_polymorphic = true;
+    if (in_MethodHandle && method->access_flags & BJVM_ACCESS_NATIVE) {
+      method->is_signature_polymorphic = true;
     }
   }
 
@@ -2237,5 +2238,22 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
 
   result->state = BJVM_CD_STATE_LOADED;
   free(ctx.free_on_error); // we made it :)
+
+  // Add indy instruction pointers
+  int indy_insns_cap = 0;
+  for (int i = 0; i < cf->methods_count; ++i) {
+    bjvm_cp_method *method = cf->methods + i;
+    if (method->code) {
+      // Add pointers to indy instructions for their CallSites to be GC roots
+      for (int j = 0; j < method->code->insn_count; ++j) {
+        bjvm_bytecode_insn *insn = method->code->code + j;
+        if (insn->kind == bjvm_insn_invokedynamic) {
+          *VECTOR_PUSH(cf->indy_insns, cf->indy_insns_count, indy_insns_cap) =
+              insn;
+        }
+      }
+    }
+  }
+
   return PARSE_SUCCESS;
 }

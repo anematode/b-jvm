@@ -172,7 +172,7 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass,
 
   INIT_STACK_STRING(random_name, 1000);
   random_name =
-      bprintf(random_name, "%.*s$%d", fmt_slice(hslc(cd->name)), rand());
+      bprintf(random_name, "%.*s/%d", fmt_slice(hslc(cd->name)), rand());
 
   bjvm_free_classfile(*cd);
   free(cd);

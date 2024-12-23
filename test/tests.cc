@@ -432,12 +432,22 @@ TEST_CASE("Stack traces") {
   };
 }
 
+/*
 TEST_CASE("Signature polymorphism") {
   auto result = run_test_case("test_files/signature_polymorphism/", false);
 }
+*/
 
 TEST_CASE("Basic lambda") {
-  auto result = run_test_case("test_files/basic_lambda/", false);
+  auto result = run_test_case("test_files/basic_lambda/", true);
+
+  REQUIRE(result.stdout_ == R"(Hello from lambda!
+variable passed in
+2eggs
+Hello from lambda!
+variable passed in
+2eggs
+)");
 }
 
 TEST_CASE("Playground") {

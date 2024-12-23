@@ -646,6 +646,9 @@ typedef struct bjvm_classdesc {
   int dimensions;                     // array types only
   bjvm_type_kind primitive_component; // primitives and array types only
 
+  bjvm_bytecode_insn **indy_insns;  // used to get GC roots
+  int indy_insns_count;
+
   void (*dtor)(bjvm_classdesc *); // apoptosis
 } bjvm_classdesc;
 

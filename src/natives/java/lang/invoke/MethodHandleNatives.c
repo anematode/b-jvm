@@ -125,16 +125,12 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_GET_FIELD:
   case BJVM_MH_KIND_PUT_FIELD:
-    printf("Trying to resolve field %.*s\n", fmt_slice(search_for));
     bjvm_classdesc *field_type = bjvm_unmirror_class(mn->type);
-    printf("Of type %.*s \n", fmt_slice(mn->type->descriptor->name));
-    printf("On class %.*s\n", fmt_slice(bjvm_unmirror_class(mn->clazz)->name));
     INIT_STACK_STRING(field_str, 1000);
     bjvm_utf8 field_desc =
         unparse_classdesc_to_field_descriptor(field_str, field_type);
     bjvm_cp_field *field =
         bjvm_easy_field_lookup(search_on, hslc(search_for), field_desc);
-    printf("Field: %p\n", field);
     if (!field) {
       break;
     }
@@ -150,12 +146,8 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_INTERFACE:
-    printf("Trying to resolve method %.*s\n", fmt_slice(search_for));
-    printf("On class %.*s\n", fmt_slice(bjvm_unmirror_class(mn->clazz)->name));
-
     struct bjvm_native_MethodType *mt = (void *)mn->type;
     heap_string descriptor = unparse_method_type(mt);
-    printf("With descriptor %.*s\n", fmt_slice(descriptor));
     bjvm_cp_method *method = bjvm_easy_method_lookup(
         search_on, hslc(search_for), hslc(descriptor), true, false);
     free_heap_str(descriptor);
