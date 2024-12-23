@@ -49,16 +49,18 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     // Create the stack trace element
     bjvm_handle *e =
         bjvm_make_handle(thread, new_object(thread, StackTraceElement));
+#define E ((struct bjvm_native_StackTraceElement *)e->obj)
     int line =
         bjvm_get_line_number(frame->method->code, frame->program_counter);
-    ((struct bjvm_native_StackTraceElement *)e->obj)->declaringClass =
+    E->declaringClass =
         bjvm_intern_string(thread, hslc(frame->method->my_class->name));
-    ((struct bjvm_native_StackTraceElement *)e->obj)->methodName =
+    E->methodName =
         bjvm_intern_string(thread, frame->method->name);
-    ((struct bjvm_native_StackTraceElement *)e->obj)->fileName =
+    E->fileName =
         bjvm_intern_string(thread, frame->method->my_class->source_file->name);
-    ((struct bjvm_native_StackTraceElement *)e->obj)->lineNumber = line;
+    E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
+#undef E
     bjvm_drop_handle(thread, e);
   }
 

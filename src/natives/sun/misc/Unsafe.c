@@ -33,6 +33,21 @@ DECLARE_NATIVE("sun/misc", Unsafe, objectFieldOffset,
   return (bjvm_stack_value){.l = reflect_field->byte_offset};
 }
 
+DECLARE_NATIVE("sun/misc", Unsafe, staticFieldOffset,
+               "(Ljava/lang/reflect/Field;)J") {
+  assert(argc == 1);
+  bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].handle->obj);
+  return (bjvm_stack_value){.l = reflect_field->byte_offset};
+}
+
+DECLARE_NATIVE("sun/misc", Unsafe, staticFieldBase,
+               "(Ljava/lang/reflect/Field;)Ljava/lang/Object;") {
+  assert(argc == 1);
+  // Return pointer to static_fields
+  bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].handle->obj);
+  return (bjvm_stack_value){.obj = (void*)reflect_field->my_class->static_fields};
+}
+
 DECLARE_NATIVE("sun/misc", Unsafe, arrayIndexScale, "(Ljava/lang/Class;)I") {
   assert(argc == 1);
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
@@ -60,6 +75,13 @@ DECLARE_NATIVE("sun/misc", Unsafe, getLongVolatile, "(Ljava/lang/Object;J)J") {
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, putObjectVolatile,
+               "(Ljava/lang/Object;JLjava/lang/Object;)V") {
+  assert(argc == 3);
+  *(void * volatile*)((void *)args[0].handle->obj + args[1].l) = args[2].handle->obj;
+  return value_null();
+}
+
+DECLARE_NATIVE("sun/misc", Unsafe, putObject,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
   assert(argc == 3);
   *(void **)((void *)args[0].handle->obj + args[1].l) = args[2].handle->obj;

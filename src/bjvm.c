@@ -1762,8 +1762,17 @@ void bjvm_invokevirtual_signature_polymorphic(
   struct bjvm_native_MethodHandle *mh = (void *)target;
   struct bjvm_native_MethodType *targ = (void *)mh->type;
 
+  heap_string a = debug_dump_string(thread, (void *)provider_mt);
+  heap_string b = debug_dump_string(thread, (void *)targ);
+
+  printf("Provider: %.*s\n", a.len, a.chars);
+  printf("Target: %.*s\n", b.len, b.chars);
+
   bool mts_are_same = compare_method_types(provider_mt, targ);
   printf("Mts are same: %d\n", mts_are_same);
+
+  free_heap_str(a);
+  free_heap_str(b);
 
   bool is_invoke_exact = utf8_equals_utf8(method->name, STR("invokeExact"));
   if (is_invoke_exact) {
@@ -1775,17 +1784,20 @@ void bjvm_invokevirtual_signature_polymorphic(
   if (!mts_are_same) {
     // Call asType
     bjvm_cp_method *asType = bjvm_easy_method_lookup(
-        provider_mt->base.descriptor, STR("asType"),
+        mh->base.descriptor, STR("asType"),
         STR("(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"),
         true, false);
     if (!asType)
       UNREACHABLE();
 
-    bjvm_stack_value result;
+    bjvm_stack_value result = value_null();
     bjvm_thread_run(
         thread, asType,
         (bjvm_stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}},
         &result);
+    if (thread->current_exception)
+      return;
+    printf("Result: %p\n", result.obj);
     mh = (void *)result.obj;
   }
 
@@ -3426,6 +3438,10 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
+int in_heap(bjvm_gc_ctx * ctx, bjvm_obj_header * field) {
+  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->heap_capacity;
+}
+
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
                          int *capacities, int depth) {
   obj->mark_word |= REACHABLE_BIT;
@@ -3441,7 +3457,7 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
                                                &capacities[depth]);
     for (int i = 0; i < len; ++i) {
       bjvm_obj_header *field = *((bjvm_obj_header **)obj + (*bitset)[i]);
-      if (field && !(field->mark_word & REACHABLE_BIT)) {
+      if (field && !(field->mark_word & REACHABLE_BIT) && in_heap(ctx, field)) {
         // Visiting instance field at offset on class
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
@@ -3453,7 +3469,7 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
     int len = *ArrayLength(obj);
     for (int i = 0; i < len; ++i) {
       bjvm_obj_header *field = *((bjvm_obj_header **)ArrayData(obj) + i);
-      if (field && !(field->mark_word & REACHABLE_BIT)) {
+      if (field && !(field->mark_word & REACHABLE_BIT) && in_heap(ctx, field)) {
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
     }
