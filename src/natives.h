@@ -22,8 +22,8 @@ extern bjvm_native_t *bjvm_natives;
   static bjvm_stack_value                                                      \
       bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
           [[maybe_unused]] bjvm_thread *thread,                                \
-          [[maybe_unused]] bjvm_obj_header *obj,                               \
-          [[maybe_unused]] bjvm_stack_value *args, [[maybe_unused]] int argc)
+          [[maybe_unused]] bjvm_handle *obj,                                   \
+          [[maybe_unused]] bjvm_value *args, [[maybe_unused]] int argc)
 
 #define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,            \
                            method_descriptor_, modifier)                       \

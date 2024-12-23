@@ -14,6 +14,10 @@ Common abbreviations:
 - `bc` – bytecode
 - `vm` – virtual machine
 
+## Tasks
+
+- Go through existing native functions and handle-ify them
+
 ### Goals
 
 - Full implementation of the JVM spec (including esoteric things like classfile verification)

@@ -5,7 +5,7 @@ DECLARE_NATIVE("java/io", FileOutputStream, initIDs, "()V") {
 }
 
 DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
-  bjvm_obj_header *bytes = args[0].obj;
+  bjvm_obj_header *bytes = args[0].handle->obj;
   int offset = args[1].i;
   int length = args[2].i;
   char *data = (char *)ArrayData(bytes);

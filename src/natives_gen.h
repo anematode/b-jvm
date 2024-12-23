@@ -36,6 +36,14 @@ struct bjvm_native_LambdaForm {
   bjvm_obj_header *transformCache;  // Ljava/lang/Object;
   int32_t invocationCounter;  // I
 };
+struct bjvm_native_ConstantPool {
+  bjvm_obj_header base;
+  // implementation-dependent fields
+  bjvm_classdesc *reflected_class;
+
+  // my fields
+  bjvm_obj_header *constantPoolOop;  // Ljava/lang/Object;
+};
 struct bjvm_native_Class {
   bjvm_obj_header base;
   // implementation-dependent fields
@@ -208,6 +216,7 @@ struct bjvm_native_MemberName {
   bjvm_obj_header *resolution;  // Ljava/lang/Object;
 };
 static inline void bjvm_register_native_padding(bjvm_vm *vm) {
+  (void)bjvm_hash_table_insert(&vm->class_padding, "sun/reflect/ConstantPool", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/Class", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/reflect/Field", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/reflect/Method", -1, (void*) (1 * sizeof(void*)));

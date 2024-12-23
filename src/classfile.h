@@ -249,8 +249,6 @@ struct bjvm_field_descriptor {
   heap_string class_name; // For reference and array types only
 };
 
-bool bjvm_is_field_wide(bjvm_field_descriptor desc);
-
 typedef struct bjvm_cp_field bjvm_cp_field;
 
 typedef struct {
@@ -393,7 +391,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
   BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
   BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
-  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7
+  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -530,6 +529,11 @@ typedef struct {
 } bjvm_attribute_enclosing_method;
 
 typedef struct {
+  uint8_t* data;
+  int length;
+} bjvm_attribute_runtime_visible_annotations;
+
+typedef struct {
   bjvm_utf8 name;
 } bjvm_attribute_source_file;
 
@@ -546,6 +550,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_source_file source_file;
     bjvm_attribute_line_number_table lnt;
     bjvm_attribute_method_parameters method_parameters;
+    bjvm_attribute_runtime_visible_annotations runtime_visible_annotations;
   };
 } bjvm_attribute;
 
@@ -586,7 +591,6 @@ typedef struct bjvm_cp_field {
   struct bjvm_native_Field *reflection_field;
 
   bjvm_classdesc *my_class;
-  int my_index;
 } bjvm_cp_field;
 
 typedef bjvm_utf8 cp_string;
@@ -620,11 +624,6 @@ typedef struct bjvm_classdesc {
 
   bjvm_classdesc *array_type;
 
-  // Whether this class corresponds to the primordial object class
-  bool is_primordial_object;
-  uint16_t minor_version;
-  uint16_t major_version;
-
   uint8_t *static_fields;
   int data_bytes;
   // Padding bytes before nonstatic fields for implementation details (e.g.
@@ -632,6 +631,7 @@ typedef struct bjvm_classdesc {
   int imp_padding;
 
   struct bjvm_native_Class *mirror;
+  struct bjvm_native_ConstantPool *cp_mirror;
 
   // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets
   // correspond to references that need to be followed

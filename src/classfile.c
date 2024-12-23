@@ -152,6 +152,9 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS:
     free(attribute->method_parameters.params);
     break;
+  case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
+    free(attribute->runtime_visible_annotations.data);
+    break;
   case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
@@ -1897,23 +1900,27 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     }
   } else if (utf8_equals(attr->name, "MethodParameters")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS;
-    int count = attr->method_parameters.count = reader_next_u8(&attr_reader, "method parameters count");
+    int count = attr->method_parameters.count =
+        reader_next_u8(&attr_reader, "method parameters count");
     bjvm_method_parameter_info *params = attr->method_parameters.params =
-            calloc(count, sizeof(bjvm_method_parameter_info));
+        calloc(count, sizeof(bjvm_method_parameter_info));
     free_on_format_error(ctx, params);
     for (int i = 0; i < count; ++i) {
-      params[i].name = checked_get_utf8(ctx->cp, reader_next_u16(&attr_reader, "method parameter name"), "method parameter name");
-      params[i].access_flags = reader_next_u16(&attr_reader, "method parameter access flags");
+      params[i].name = checked_get_utf8(
+          ctx->cp, reader_next_u16(&attr_reader, "method parameter name"),
+          "method parameter name");
+      params[i].access_flags =
+          reader_next_u16(&attr_reader, "method parameter access flags");
     }
+  } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS;
+    uint8_t *data = attr->runtime_visible_annotations.data = malloc(attr_reader.len);
+    free_on_format_error(ctx, data);
+    memcpy(data, attr_reader.bytes, attr_reader.len);
+    attr->runtime_visible_annotations.length = attr_reader.len;
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
-}
-
-bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
-  return (desc.kind == BJVM_TYPE_KIND_LONG ||
-          desc.kind == BJVM_TYPE_KIND_DOUBLE) &&
-         !desc.dimensions;
 }
 
 /**
@@ -2144,8 +2151,12 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
     format_error_dynamic(strdup(buf));
   }
 
-  cf->minor_version = reader_next_u16(&reader, "minor version");
-  cf->major_version = reader_next_u16(&reader, "major version");
+  uint16_t minor = reader_next_u16(&reader, "minor version");
+  uint16_t major = reader_next_u16(&reader, "major version");
+
+  // TODO check these
+  (void)minor;
+  (void)major;
 
   cf->pool = parse_constant_pool(&reader, &ctx);
 
@@ -2156,8 +2167,7 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
            ->class_info;
   cf->name = make_heap_str_from(this_class->name);
 
-  bool is_primordial_object = cf->is_primordial_object =
-      utf8_equals(hslc(cf->name), "java/lang/Object");
+  bool is_primordial_object = utf8_equals(hslc(cf->name), "java/lang/Object");
 
   uint16_t super_class = reader_next_u16(&reader, "super class");
   cf->super_class = is_primordial_object
@@ -2184,7 +2194,6 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   for (int i = 0; i < cf->fields_count; i++) {
     cf->fields[i] = read_field(&reader, &ctx);
     cf->fields[i].my_class = result;
-    cf->fields[i].my_index = i;
   }
   cf->static_fields = nullptr;
   cf->static_references = bjvm_empty_bitset();

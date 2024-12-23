@@ -6,7 +6,7 @@ DECLARE_NATIVE(
   // Look up method "run" on obj
   assert(argc == 1);
 
-  bjvm_obj_header *target = args[0].obj;
+  bjvm_obj_header *target = args[0].handle->obj;
   bjvm_classdesc *classdesc = target->descriptor;
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
@@ -33,7 +33,7 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
   // Look up method "run" on obj
   assert(argc == 1);
 
-  bjvm_obj_header *target = args[0].obj;
+  bjvm_obj_header *target = args[0].handle->obj;
   bjvm_classdesc *classdesc = target->descriptor;
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);

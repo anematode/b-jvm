@@ -426,6 +426,12 @@ TEST_CASE("Math natives") {
   REQUIRE(result.stdout_ == "abcdefghijklmnopqrstu");
 }
 
+TEST_CASE("Stack traces") {
+  BENCHMARK("Stack traces") {
+    auto result = run_test_case("test_files/stack_trace_bench/", false);
+  };
+}
+
 TEST_CASE("Signature polymorphism") {
   auto result = run_test_case("test_files/signature_polymorphism/", false);
 }
