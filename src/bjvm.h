@@ -168,10 +168,10 @@ typedef struct {
 } bjvm_vm_options;
 
 typedef struct {
-  int program_counter; // in instruction indices
-  int max_stack;
-  int max_locals;
-  int stack_depth;
+  uint16_t program_counter; // in instruction indices
+  uint16_t max_stack;
+  uint16_t max_locals;
+  uint16_t stack_depth;
 
   bjvm_cp_method *method;
 

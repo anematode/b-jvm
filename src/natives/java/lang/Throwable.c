@@ -2,7 +2,7 @@
 
 #include <natives.h>
 
-bool frame_mentions_object(bjvm_stack_frame *frame, bjvm_obj_header *obj) {
+bool frame_mentions_object(bjvm_stack_frame *frame, const bjvm_obj_header *obj) {
   for (int i = 0; i < frame->max_locals + frame->max_stack; ++i) {
     if (frame->values[i].obj == obj) {
       bjvm_compressed_bitset refs =
