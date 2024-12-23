@@ -603,7 +603,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
     // if the method is nonstatic, the first local is a reference 'this'
     if (max_locals == 0)
       goto fail;
-    (*locals_swizzle)[0] = 0;  // map 0 -> 0
+    (*locals_swizzle)[0] = 0; // map 0 -> 0
     locals->entries[j++] = BJVM_TYPE_KIND_REFERENCE;
   }
   locals->entries_cap = locals->entries_count = max_locals;

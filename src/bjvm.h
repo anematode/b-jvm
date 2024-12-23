@@ -339,8 +339,8 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
-struct bjvm_native_ConstantPool *bjvm_get_constant_pool_mirror(
-  bjvm_thread *thread, bjvm_classdesc *classdesc);
+struct bjvm_native_ConstantPool *
+bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc);
 
 void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_classdesc *classdesc,

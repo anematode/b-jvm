@@ -1,7 +1,8 @@
 #include <natives.h>
 
-DECLARE_NATIVE("java/lang/reflect", Proxy, defineClass0,
-"(Ljava/lang/ClassLoader;Ljava/lang/String;[BII)Ljava/lang/Class;") {
+DECLARE_NATIVE(
+    "java/lang/reflect", Proxy, defineClass0,
+    "(Ljava/lang/ClassLoader;Ljava/lang/String;[BII)Ljava/lang/Class;") {
   assert(argc == 5);
 
   bjvm_obj_header *name = args[1].handle->obj;

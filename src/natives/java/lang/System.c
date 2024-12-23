@@ -1,8 +1,8 @@
 #include <math.h>
 #include <natives.h>
 #include <objects.h>
-#include <util.h>
 #include <unistd.h>
+#include <util.h>
 
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
@@ -18,7 +18,7 @@ DECLARE_NATIVE("java/lang", System, initProperties,
                                 {STR("stdout.encoding"), STR("UTF-8")},
                                 {STR("native.encoding"), STR("UTF-8")},
                                 {STR("stderr.encoding"), STR("UTF-8")},
-                                  {STR("java.home"), cwd},
+                                {STR("java.home"), cwd},
                                 {STR("line.separator"), STR("\n")},
                                 {STR("path.separator"), STR(":")},
                                 {STR("file.separator"), STR("/")}};

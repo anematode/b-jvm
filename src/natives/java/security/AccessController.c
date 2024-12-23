@@ -29,7 +29,8 @@ DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
 }
 
 DECLARE_NATIVE("java/security", AccessController, doPrivileged,
-               "(Ljava/security/PrivilegedAction;Ljava/security/AccessControlContext;)Ljava/lang/Object;") {
+               "(Ljava/security/PrivilegedAction;Ljava/security/"
+               "AccessControlContext;)Ljava/lang/Object;") {
   assert(argc == 2);
 
   bjvm_obj_header *target = args[0].handle->obj;

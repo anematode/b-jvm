@@ -316,18 +316,22 @@ DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
                                  desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY};
 }
 
-DECLARE_NATIVE("java/lang", Class, getConstantPool, "()Lsun/reflect/ConstantPool;") {
+DECLARE_NATIVE("java/lang", Class, getConstantPool,
+               "()Lsun/reflect/ConstantPool;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
-  return (bjvm_stack_value){.obj = (void*) bjvm_get_constant_pool_mirror(thread, desc)};
+  return (bjvm_stack_value){
+      .obj = (void *)bjvm_get_constant_pool_mirror(thread, desc)};
 }
 
 DECLARE_NATIVE("java/lang", Class, getRawAnnotations, "()[B") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
-  bjvm_attribute *attr =
-      find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS);
+  bjvm_attribute *attr = find_attribute_by_kind(
+      desc, BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS);
   if (attr) {
-    bjvm_attribute_runtime_visible_annotations r = attr->runtime_visible_annotations;
-    bjvm_obj_header *array = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, r.length);
+    bjvm_attribute_runtime_visible_annotations r =
+        attr->runtime_visible_annotations;
+    bjvm_obj_header *array =
+        CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, r.length);
     memcpy(ArrayData(array), r.data, r.length);
     return (bjvm_stack_value){.obj = array};
   }
@@ -336,14 +340,16 @@ DECLARE_NATIVE("java/lang", Class, getRawAnnotations, "()[B") {
 
 DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
-  bjvm_handle *array = bjvm_make_handle(thread, CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      desc->interfaces_count));
+  bjvm_handle *array = bjvm_make_handle(
+      thread,
+      CreateObjectArray1D(
+          thread, bootstrap_class_create(thread, STR("java/lang/Class")),
+          desc->interfaces_count));
 
   for (int i = 0; i < desc->interfaces_count; ++i) {
     bjvm_cp_class_info *info = desc->interfaces[i];
     bjvm_classdesc *iface = info->classdesc;
-    bjvm_obj_header *mirror = (void*)bjvm_get_class_mirror(thread, iface);
+    bjvm_obj_header *mirror = (void *)bjvm_get_class_mirror(thread, iface);
     *((bjvm_obj_header **)ArrayData(array->obj) + i) = mirror;
   }
 

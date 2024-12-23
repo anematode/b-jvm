@@ -12,7 +12,8 @@ DECLARE_NATIVE(
   forward_args[0] = (bjvm_stack_value){.obj = instance};
   if (args[1].handle->obj) {
     for (int i = 0; i < *ArrayLength(args[1].handle->obj); ++i) {
-      forward_args[i + 1] = *((bjvm_stack_value*)ArrayData(args[1].handle->obj) + i);
+      forward_args[i + 1] =
+          *((bjvm_stack_value *)ArrayData(args[1].handle->obj) + i);
     }
   }
   bjvm_thread_run(thread, method, forward_args, &result);

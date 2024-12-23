@@ -562,11 +562,11 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t desc_index = reader_next_u16(reader, "descriptor index");
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_METHOD_TYPE,
-        .method_type = {
-            .descriptor = skip_linking
-                              ? null_str()
-                              : checked_get_utf8(ctx->cp, desc_index,
-                                                 "method type descriptor")}};
+        .method_type = {.descriptor =
+                            skip_linking
+                                ? null_str()
+                                : checked_get_utf8(ctx->cp, desc_index,
+                                                   "method type descriptor")}};
   }
   case CONSTANT_InvokeDynamic: {
     uint16_t bootstrap_method_attr_index =
@@ -1915,7 +1915,8 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     }
   } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS;
-    uint8_t *data = attr->runtime_visible_annotations.data = malloc(attr_reader.len);
+    uint8_t *data = attr->runtime_visible_annotations.data =
+        malloc(attr_reader.len);
     free_on_format_error(ctx, data);
     memcpy(data, attr_reader.bytes, attr_reader.len);
     attr->runtime_visible_annotations.length = attr_reader.len;

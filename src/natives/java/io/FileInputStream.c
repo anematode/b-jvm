@@ -1,18 +1,20 @@
-#include <natives.h>
 #include <errno.h>
+#include <natives.h>
 
 DECLARE_NATIVE("java/io", FileInputStream, initIDs, "()V") {
   return value_null();
 }
 
 bjvm_obj_header **get_fd(bjvm_obj_header *obj) {
-  bjvm_cp_field *field = bjvm_easy_field_lookup(obj->descriptor, STR("fd"), STR("Ljava/io/FileDescriptor;"));
-  return (void*)obj + field->byte_offset;
+  bjvm_cp_field *field = bjvm_easy_field_lookup(
+      obj->descriptor, STR("fd"), STR("Ljava/io/FileDescriptor;"));
+  return (void *)obj + field->byte_offset;
 }
 
 int64_t *get_native_handle(bjvm_obj_header *obj) {
-  bjvm_cp_field *native_fd_field = bjvm_easy_field_lookup(obj->descriptor, STR("handle"), STR("J"));
-  return (void*)obj + native_fd_field->byte_offset;
+  bjvm_cp_field *native_fd_field =
+      bjvm_easy_field_lookup(obj->descriptor, STR("handle"), STR("J"));
+  return (void *)obj + native_fd_field->byte_offset;
 }
 
 DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
@@ -24,7 +26,8 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
     // TODO use errno to give a better error message
-    bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"), hslc(filename));
+    bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"),
+                         hslc(filename));
   } else {
     *get_native_handle(fd) = (int64_t)file;
   }
@@ -36,7 +39,7 @@ DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
   assert(argc == 3);
   bjvm_obj_header *fd = *get_fd(obj->obj);
   assert(fd);
-  FILE *file = (FILE*)*get_native_handle(fd);
+  FILE *file = (FILE *)*get_native_handle(fd);
   printf("File: %p\n", file);
   if (!file) {
     // Raise java.lang.IOException TODO
@@ -62,9 +65,8 @@ DECLARE_NATIVE("java/io", FileInputStream, close0, "()V") {
   assert(fd);
   int64_t handle = *get_native_handle(fd);
   if (handle != -1 && handle != 0) {
-    fclose((FILE*) handle);
+    fclose((FILE *)handle);
   }
-  *get_native_handle(fd) = -1;  // make invalid again
+  *get_native_handle(fd) = -1; // make invalid again
   return value_null();
 }
-

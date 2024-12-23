@@ -452,7 +452,8 @@ variable passed in
 
 TEST_CASE("Class<?> implementation") {
   auto result = run_test_case("test_files/reflection_class/", true);
-  REQUIRE(result.stdout_ == R"(int1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
+  REQUIRE(result.stdout_ ==
+          R"(int1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 boolean1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 byte1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 char1041nullfalsefalsefalsefalsefalsefalse00nulltruenull

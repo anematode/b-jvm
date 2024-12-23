@@ -17,15 +17,16 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
     free_array_classdesc(classdesc->array_type);
   free_heap_str(classdesc->name);
   free(classdesc->super_class);
-  free(classdesc->interfaces[0]);  // Cloneable
-  free(classdesc->interfaces[1]);  // Serializable
+  free(classdesc->interfaces[0]); // Cloneable
+  free(classdesc->interfaces[1]); // Serializable
   free(classdesc->interfaces);
   free(classdesc);
 }
 
 // Called for both primitive and object arrays
 static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
-  base->access_flags = BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
+  base->access_flags =
+      BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
 
   bjvm_utf8 name = STR("java/lang/Object");
 
@@ -35,11 +36,13 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   base->super_class = info;
 
   bjvm_cp_class_info *Cloneable = calloc(1, sizeof(bjvm_cp_class_info));
-  Cloneable->classdesc = bootstrap_class_create(thread, STR("java/lang/Cloneable"));
+  Cloneable->classdesc =
+      bootstrap_class_create(thread, STR("java/lang/Cloneable"));
   Cloneable->name = STR("java/lang/Cloneable");
 
   bjvm_cp_class_info *Serializable = calloc(1, sizeof(bjvm_cp_class_info));
-  Serializable->classdesc = bootstrap_class_create(thread, STR("java/io/Serializable"));
+  Serializable->classdesc =
+      bootstrap_class_create(thread, STR("java/io/Serializable"));
   Serializable->name = STR("java/io/Serializable");
 
   base->interfaces_count = 2;
