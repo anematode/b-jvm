@@ -1154,7 +1154,8 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_if_acmpne: {
     POP(REFERENCE)
     POP(REFERENCE)
-    if (push_branch_target(ctx, insn_index, insn->index)) return -1;
+    if (push_branch_target(ctx, insn_index, insn->index))
+      return -1;
     break;
   }
   case bjvm_insn_if_icmpeq:

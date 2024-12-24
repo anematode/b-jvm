@@ -20,8 +20,6 @@ using std::string_view;
 using std::vector;
 
 namespace Bjvm::Tests {
-static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
-                          size_t *len);
 int preregister_all_classes(bjvm_vm *vm);
 
 std::unique_ptr<bjvm_vm, void (*)(bjvm_vm *)>
@@ -144,8 +142,8 @@ int preregister_all_classes(bjvm_vm *vm) {
   return file_count;
 }
 
-static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
-                          size_t *len) {
+int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+                   size_t *len) {
   const char **classpath = (const char **)param;
   const char **classpath_end = classpath;
 
@@ -214,4 +212,5 @@ std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
   return result;
 #endif
 }
+
 } // namespace Bjvm::Tests

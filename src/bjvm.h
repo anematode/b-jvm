@@ -12,12 +12,20 @@
 #include "classfile.h"
 #include "util.h"
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct bjvm_thread bjvm_thread;
 typedef struct bjvm_obj_header bjvm_obj_header;
+
+#ifndef EMSCRIPTEN_KEEPALIVE
+#define EMSCRIPTEN_KEEPALIVE // used to allow access from JS
+#endif
 
 /**
  * For simplicity, we always store local variables/stack variables as 64 bits,
@@ -61,9 +69,35 @@ static inline bjvm_stack_value value_null() {
 
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
-typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
-                                                 bjvm_handle *obj,
-                                                 bjvm_value *args, int argc);
+typedef enum {
+  // Execution of the frame completed successfully and it has been removed
+  // from the stack.
+  BJVM_INTERP_RESULT_OK,
+  // An exception was thrown and the frame completed abruptly, so
+  // thread->current_exception is set.
+  BJVM_INTERP_RESULT_EXC,
+  // An interrupt occurred and the interpreter should be called again at some
+  // point. e.g. an interrupt for thread-switching purposes.
+  BJVM_INTERP_RESULT_INT,
+  // An interrupt occurred and the interpreter should be called again at some
+  // point, AND calling this function again without executing something else
+  // is a logical error. e.g. an interrupt of a JS async function
+  BJVM_INTERP_RESULT_MANDATORY_INT
+} bjvm_interpreter_result_t;
+
+typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
+                                                      bjvm_handle *obj,
+                                                      bjvm_value *args,
+                                                      int argc);
+typedef bjvm_interpreter_result_t (*bjvm_async_native_callback)(
+    bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
+    bjvm_stack_value *result, void **sm_state);
+
+typedef struct {
+  bool is_async;
+  // either bjvm_sync_native_callback or bjvm_async_native_callback
+  void *ptr;
+} bjvm_native_callback;
 
 // represents a native method somewhere in this binary
 typedef struct {
@@ -167,12 +201,30 @@ typedef struct {
   size_t heap_size;
 } bjvm_vm_options;
 
+// Frames are aligned to 8 bytes, the natural alignment of a stack value.
+// Layout:
+//             -> stack grows this way
+// ┌──────────┬───────────────────────────────┬───────────────────────────────┐
+// │ metadata │ max_stack * bjvm_stack_value  │ max_locals * bjvm_stack_value │
+// └──────────┴───────────────────────────────┴───────────────────────────────┘
 typedef struct {
   uint16_t program_counter; // in instruction indices
   uint16_t stack_depth;
   uint16_t max_stack;
   uint16_t max_locals;
 
+  // initialized to 0 on frame creation, but used by the currently executing
+  // instruction to enable partial completions due to interruption. All
+  // invoke* instructions use this field.
+  int state;
+  // Used by invoke* instructions: native state passed into the async native
+  void *native_state;
+  // Used by invoke* instructions: handles passed into the native method
+  bjvm_value *native_args;
+  // When an inner frame completes, the result is stored here. (The top-level
+  // frame doesn't have its result stored anywhere.)
+  bjvm_stack_value result_of_next;
+  // The method associated with this frame
   bjvm_cp_method *method;
 
   // First max_locals bjvm_stack_values, then max_stack more
@@ -212,7 +264,7 @@ typedef struct bjvm_thread {
   bjvm_handle *handles;
   int handles_capacity;
 
-  // Null handle, for convenience
+  // Handle for null
   bjvm_handle null_handle;
 
   // Thread-local allocation buffer (objects are first created here)
@@ -245,7 +297,11 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
 void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference);
 
 bjvm_vm_options bjvm_default_vm_options();
+
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
+
+bjvm_vm_options *bjvm_default_vm_options_ptr();
+
 void bjvm_major_gc(bjvm_vm *vm);
 
 typedef struct {
@@ -288,9 +344,6 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 
 void bjvm_free_vm(bjvm_vm *vm);
 
-/**
- * Implementation details, but exposed for testing...
- */
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name);
@@ -301,16 +354,48 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         bool superclasses,
                                         bool superinterfaces);
 bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
+
+// Run the interpreter, getting stuck if we hit an asynchronous function. This
+// should only be used when you know that you're not going to be calling any
+// asynchronous functions. (e.g., initializing most JDK classes).
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
-int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
+
+typedef struct {
+  bjvm_thread *thread;
+  bjvm_stack_frame *frame;
+  bjvm_stack_value *result;
+  bjvm_interpreter_result_t status;
+} bjvm_async_run_ctx;
+
+// Get an asynchronous running context. The caller should repeatedly call
+// bjvm_async_run_step() until it returns true.
+bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
+                                          bjvm_cp_method *method,
+                                          bjvm_stack_value *args,
+                                          bjvm_stack_value *result);
+
+EMSCRIPTEN_KEEPALIVE
+bool bjvm_async_run_step(bjvm_async_run_ctx *ctx);
+
+void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx);
+
 void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
 
-int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
-                            bjvm_stack_value *result);
+// Continue execution of a thread.
+//
+// When popping frames off the stack, if the passed frame "final_frame" is
+// popped off, the result of that frame (if any) is placed in "result", and
+// either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
+// whether the frame completed abruptly.
+bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
+                                                  bjvm_stack_frame *final_frame,
+                                                  bjvm_stack_value *result);
+bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
+                                                bjvm_classdesc *classdesc);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);

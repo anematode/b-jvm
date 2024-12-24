@@ -240,33 +240,6 @@ TEST_CASE("parse_field_descriptor valid cases") {
   free_field_descriptor(java_lang_String);
 }
 
-int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
-                   size_t *len) {
-  const char **classpath = (const char **)param;
-  std::vector<std::string> paths{"jre8/"};
-  for (int i = 0; classpath && classpath[i]; ++i) {
-    paths.emplace_back(classpath[i]);
-  }
-  for (const auto &path : paths) {
-    std::string file = path + std::string(filename.chars, filename.len);
-    try {
-      auto file_data_ = ReadFile(file);
-      if (file_data_.has_value()) {
-        auto file_data = file_data_.value();
-
-        auto *data = (uint8_t *)malloc(file_data.size());
-        memcpy(data, file_data.data(), file_data.size());
-        *bytes = data;
-        *len = file_data.size();
-        return 0;
-      }
-    } catch (const std::runtime_error &e) {
-    }
-  }
-
-  return -1;
-}
-
 TEST_CASE("VM initialization") { CreateTestVM(true); }
 
 struct TestCaseResult {
@@ -489,5 +462,5 @@ TEST_CASE("Array creation doesn't induce <clinit>") {
 }
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/circularity/", true);
+  auto result = run_test_case("test_files/playground/", false);
 }
