@@ -2293,16 +2293,33 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
     // Need to wrap arguments in handles
 
     bjvm_handle *target_handle = bjvm_make_handle(thread, target);
-    bjvm_value *native_args =
-        make_handles_array(thread, info->method_descriptor,
-                           frame->values + frame->stack_depth - args + 1);
+    bjvm_value *native_args;
+    if (frame->state < INVOKE_STATE_MADE_FRAME) {
+      frame->native_state = nullptr;
+      native_args = frame->native_args =
+          make_handles_array(thread, info->method_descriptor,
+                             frame->values + frame->stack_depth - args + 1);
+    } else {
+      native_args = frame->native_args;
+    }
 
     bjvm_native_callback *handle = method->native_handle;
-    if (handle->is_async)
-      UNREACHABLE();
-    invoked_result = ((bjvm_sync_native_callback)handle->ptr)(
-        thread, target_handle, native_args, args - 1);
-    frame->stack_depth -= args;
+    if (!handle->is_async) {
+      invoked_result = ((bjvm_sync_native_callback)handle->ptr)(
+          thread, target_handle, native_args, args - 1);
+    } else {
+      bjvm_interpreter_result_t status =
+          ((bjvm_async_native_callback)handle->ptr)(
+              thread, target_handle, native_args, args - 1, &invoked_result,
+              &frame->native_state);
+      if (status >= BJVM_INTERP_RESULT_INT) {
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        bjvm_drop_handle(thread, target_handle);
+        return status;
+      }
+    }
+
+    frame->state = INVOKE_STATE_ENTRY;
 
     bjvm_drop_handle(thread, target_handle);
     drop_handles_array(thread, info->method_descriptor, native_args);
@@ -2328,10 +2345,10 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
     }
 
     frame->state = INVOKE_STATE_ENTRY;
-
     invoked_result = frame->result_of_next;
-    frame->stack_depth -= args;
   }
+
+  frame->stack_depth -= args;
 
   if (method->parsed_descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
     checked_push(frame, invoked_result);
