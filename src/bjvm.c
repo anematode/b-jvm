@@ -1527,48 +1527,84 @@ bool is_error(bjvm_classdesc *d) {
          (d->super_class && is_error(d->super_class->classdesc));
 }
 
+bjvm_attribute *find_attribute(bjvm_attribute *attrs, int attrc,
+                               bjvm_attribute_kind kind) {
+  for (int i = 0; i < attrc; ++i)
+    if (attrs[i].kind == kind)
+      return attrs + i;
+  return nullptr;
+}
+
 // During initialisation, we need to set the value of static final fields
 // if they are provided in the class file.
 //
-// Returns true if an OOM occurred.
-bool initialize_constant_value_fields(bjvm_thread *thread, bjvm_classdesc *classdesc) {
+// Returns true if an OOM occurred when initializing string fields.
+bool initialize_constant_value_fields(bjvm_thread *thread,
+                                      bjvm_classdesc *classdesc) {
   for (int i = 0; i < classdesc->fields_count; ++i) {
     bjvm_cp_field *field = classdesc->fields + i;
     if (field->access_flags & BJVM_ACCESS_STATIC &&
         field->access_flags & BJVM_ACCESS_FINAL) {
-      // Scan attributes for ConstantValue
-      for (int j = 0; j < field->attributes_count; ++j) {
-        bjvm_attribute *attr = field->attributes + j;
-        if (attr->kind == BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE) {
-          void* p = classdesc->static_fields + field->byte_offset;
-          bjvm_cp_entry *ent = attr->constant_value;
-          switch (ent->kind) {
-          case BJVM_CP_KIND_INTEGER:
-            store_stack_value(p, (bjvm_stack_value){.i = (int)ent->integral.value}, BJVM_TYPE_KIND_INT);
-            break;
-          case BJVM_CP_KIND_FLOAT:
-            store_stack_value(p, (bjvm_stack_value){.f = (float)ent->floating.value}, BJVM_TYPE_KIND_FLOAT);
-            break;
-          case BJVM_CP_KIND_LONG:
-            store_stack_value(p, (bjvm_stack_value){.l = ent->integral.value}, BJVM_TYPE_KIND_LONG);
-            break;
-          case BJVM_CP_KIND_DOUBLE:
-            store_stack_value(p, (bjvm_stack_value){.d = ent->floating.value}, BJVM_TYPE_KIND_DOUBLE);
-            break;
-          case BJVM_CP_KIND_STRING:
-            bjvm_obj_header *str = bjvm_intern_string(thread, ent->string.chars);
-            if (!str)
-              return true;
-            store_stack_value(p, (bjvm_stack_value){.obj = str}, BJVM_TYPE_KIND_REFERENCE);
-            break;
-          default:
-            UNREACHABLE();  // should have been audited at parse time
-          }
-        }
+      bjvm_attribute *attr =
+          find_attribute(field->attributes, field->attributes_count,
+                         BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE);
+      if (!attr)
+        continue;
+      void *p = classdesc->static_fields + field->byte_offset;
+      bjvm_cp_entry *ent = attr->constant_value;
+      switch (ent->kind) {
+      case BJVM_CP_KIND_INTEGER:
+        store_stack_value(p, (bjvm_stack_value){.i = (int)ent->integral.value},
+                          BJVM_TYPE_KIND_INT);
+        break;
+      case BJVM_CP_KIND_FLOAT:
+        store_stack_value(p,
+                          (bjvm_stack_value){.f = (float)ent->floating.value},
+                          BJVM_TYPE_KIND_FLOAT);
+        break;
+      case BJVM_CP_KIND_LONG:
+        store_stack_value(p, (bjvm_stack_value){.l = ent->integral.value},
+                          BJVM_TYPE_KIND_LONG);
+        break;
+      case BJVM_CP_KIND_DOUBLE:
+        store_stack_value(p, (bjvm_stack_value){.d = ent->floating.value},
+                          BJVM_TYPE_KIND_DOUBLE);
+        break;
+      case BJVM_CP_KIND_STRING:
+        bjvm_obj_header *str = bjvm_intern_string(thread, ent->string.chars);
+        if (!str)
+          return true;
+        store_stack_value(p, (bjvm_stack_value){.obj = str},
+                          BJVM_TYPE_KIND_REFERENCE);
+        break;
+      default:
+        UNREACHABLE(); // should have been audited at parse time
       }
     }
   }
   return false;
+}
+
+// Wrap the currently propagating exception in an ExceptionInInitializerError
+// and raise it.
+void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
+  bjvm_handle *exc = bjvm_make_handle(thread, thread->current_exception);
+  bjvm_classdesc *EIIE = bootstrap_class_create(
+      thread, STR("java/lang/ExceptionInInitializerError"));
+  bjvm_initialize_class(thread, EIIE);
+  bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
+  bjvm_cp_method *ctor = bjvm_easy_method_lookup(
+      EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
+  thread->current_exception = nullptr; // clear exception
+  int error = bjvm_thread_run(
+      thread, ctor, (bjvm_stack_value[]){{.obj = eiie->obj}, {.obj = exc->obj}},
+      nullptr);
+  if (!error) {
+    assert(eiie->obj);
+    bjvm_raise_exception_object(thread, eiie->obj);
+  }
+  bjvm_drop_handle(thread, eiie);
+  bjvm_drop_handle(thread, exc);
 }
 
 // Call <clinit> on the class, if it hasn't already been called.
@@ -1604,28 +1640,8 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
                                                    STR("()V"), false, false);
   if (clinit) {
     failed_to_init = bjvm_thread_run(thread, clinit, nullptr, nullptr);
-    if (failed_to_init) {
-      if (!is_error(thread->current_exception->descriptor)) {
-        // Wrap the exception in an ExceptionInInitializerError. (We don't do
-        // so if the exception subclasses Error.)
-        // Old McDonald had a farm...
-        bjvm_classdesc *EIIE = bootstrap_class_create(
-            thread, STR("java/lang/ExceptionInInitializerError"));
-        bjvm_initialize_class(thread, EIIE);
-        bjvm_cp_method *ctor = bjvm_easy_method_lookup(
-            EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
-        bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
-        bjvm_obj_header *exc = thread->current_exception;
-        thread->current_exception = nullptr; // clear exception
-        int error = bjvm_thread_run(
-            thread, ctor,
-            (bjvm_stack_value[]){{.obj = eiie->obj}, {.obj = exc}}, nullptr);
-        if (!error) {
-          assert(eiie->obj);
-          bjvm_raise_exception_object(thread, eiie->obj);
-        }
-        bjvm_drop_handle(thread, eiie);
-      }
+    if (failed_to_init && !is_error(thread->current_exception->descriptor)) {
+      wrap_in_exception_in_initializer_error(thread);
     }
   }
 
@@ -1633,17 +1649,6 @@ done:
   classdesc->state =
       failed_to_init ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
   return failed_to_init;
-}
-
-#define checked_pop(frame)                                                     \
-  ({                                                                           \
-    assert(frame->stack_depth > 0);                                            \
-    frame->values[--frame->stack_depth];                                       \
-  })
-
-void checked_push(bjvm_stack_frame *frame, bjvm_stack_value value) {
-  assert(frame->stack_depth < frame->max_stack);
-  frame->values[frame->stack_depth++] = value;
 }
 
 int32_t java_idiv(int32_t a, int32_t b) {
@@ -2063,6 +2068,17 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
     new_frame->values[new_frame->max_stack + j] =
         old_frame->values[old_frame->stack_depth - args + i];
   }
+}
+
+#define checked_pop(frame)                                                     \
+  ({                                                                           \
+    assert(frame->stack_depth > 0);                                            \
+    frame->values[--frame->stack_depth];                                       \
+  })
+
+void checked_push(bjvm_stack_frame *frame, bjvm_stack_value value) {
+  assert(frame->stack_depth < frame->max_stack);
+  frame->values[frame->stack_depth++] = value;
 }
 
 bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(

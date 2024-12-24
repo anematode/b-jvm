@@ -19,11 +19,12 @@ class Main {
         try {
             try {
                 new Egg();
-            } catch (RuntimeException e) {
+            } catch (RuntimeException e) { // should have been wrapped in another exception
                 System.out.println("Should not run");
             }
         } catch (ExceptionInInitializerError e) {
             System.out.println("Egg");
+            assert(e.getCause().getClass() == RuntimeException.class);
         }
 
         try {
