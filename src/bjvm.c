@@ -1521,6 +1521,12 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   return result;
 }
 
+// Returns true if the class descriptor is a subclass of java.lang.Error.
+bool is_error(bjvm_classdesc *d) {
+  return utf8_equals(hslc(d->name), "java/lang/Error") ||
+    (d->super_class && is_error(d->super_class->classdesc));
+}
+
 // Call <clinit> on the class, if it hasn't already been called.
 bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc) {
@@ -1540,15 +1546,38 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
 
   classdesc->state = BJVM_CD_STATE_INITIALIZED;
 
+  // TODO initialize supers
+
   bjvm_cp_method *clinit = bjvm_easy_method_lookup(classdesc, STR("<clinit>"),
                                                    STR("()V"), false, false);
-  int error = 0;
+  int failed_to_init = 0;
   if (clinit) {
-    error = bjvm_thread_run(thread, clinit, nullptr, nullptr);
+    failed_to_init = bjvm_thread_run(thread, clinit, nullptr, nullptr);
+    if (failed_to_init) {
+      if (!is_error(thread->current_exception->descriptor)) {
+        // Wrap the exception in an ExceptionInInitializerError. (We don't do
+        // so if the exception subclasses Error.)
+        // Old McDonald had a farm...
+        bjvm_classdesc *EIIE = bootstrap_class_create(
+            thread, STR("java/lang/ExceptionInInitializerError"));
+        bjvm_initialize_class(thread, EIIE);
+        bjvm_cp_method *ctor = bjvm_easy_method_lookup(
+            EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
+        bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
+        bjvm_obj_header *exc = thread->current_exception;
+        thread->current_exception = nullptr; // clear exception
+        int error = bjvm_thread_run(thread, ctor, (bjvm_stack_value[]){{.obj = eiie->obj}, {.obj = exc}}, nullptr);
+        if (!error) {
+          assert(eiie->obj);
+          bjvm_raise_exception_object(thread, eiie->obj);
+        }
+        bjvm_drop_handle(thread, eiie);
+      }
+    }
   }
   classdesc->state =
-      error ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
-  return error;
+      failed_to_init ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
+  return failed_to_init;
 }
 
 #define checked_pop(frame)                                                     \
@@ -3777,6 +3806,7 @@ done:;
 
   if (thread->current_exception != nullptr) {
     bjvm_attribute_exception_table *table = method->code->exception_table;
+    status = BJVM_INTERP_RESULT_EXC;
     if (table) {
       int pc = frame->program_counter;
       for (int i = 0; i < table->entries_count; ++i) {

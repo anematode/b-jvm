@@ -1558,7 +1558,7 @@ int cmp_ints(const void *a, const void *b) {
 
 void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *analy) {
   if (analy->blocks) return;
-  // First, record all branch targets. We're doing exception handling in C
+  // First, record all branch targets. We're doing all exception handling in C
   // so it's ok if we don't analyze exception handlers.
   int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
   int tc = 0;

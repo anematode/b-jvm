@@ -466,6 +466,13 @@ TEST_CASE("Simple OutOfMemoryError") {
   REQUIRE(result.stdout_.find("OutOfMemoryError") != std::string::npos);
 }
 
+TEST_CASE("Exceptions in <clinit>") {
+  auto result = run_test_case("test_files/eiie/", true);
+  REQUIRE(result.stdout_ == R"(Egg
+Chicken
+)");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }
