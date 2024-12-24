@@ -1968,7 +1968,7 @@ bjvm_invokevirtual_signature_polymorphic(
   case BJVM_MH_KIND_INVOKE_STATIC: {
     bjvm_cp_method *method = name->vmtarget;
     assert(method);
-    bjvm_stack_value result;
+    bjvm_stack_value result = value_null();
     bjvm_stack_frame *new_frame = bjvm_push_frame(thread, method);
     pass_args_to_frame(new_frame, frame, method->parsed_descriptor->args_count,
                        method->parsed_descriptor, true);
@@ -2148,7 +2148,7 @@ bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       }
 
       int err = bjvm_bytecode_interpret(thread, invoked_frame, &frame->result_of_next);
-      if (err == BJVM_INTERP_RESULT_INT) {
+      if (err != BJVM_INTERP_RESULT_OK) {
         frame->state = INVOKE_STATE_MADE_FRAME;
         return err;
       }
@@ -2228,7 +2228,8 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       pass_args_to_frame(invoked_frame, frame, args, method->parsed_descriptor,
                          true);
       int err = bjvm_bytecode_interpret(thread, invoked_frame, &frame->result_of_next);
-      if (err == BJVM_INTERP_RESULT_INT) {
+      if (err != BJVM_INTERP_RESULT_OK) {
+        frame->state = INVOKE_STATE_MADE_FRAME;
         return err;
       }
     }
@@ -2431,7 +2432,8 @@ bjvm_invokedynamic(bjvm_thread *thread, bjvm_stack_frame *frame,
   return status;
 }
 
-bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
+bjvm_interpreter_result_t
+bjvm_bytecode_interpret(bjvm_thread *thread,
   bjvm_stack_frame *final_frame, bjvm_stack_value *result) {
 
   bjvm_interpreter_result_t interp_status = BJVM_INTERP_RESULT_OK;
@@ -3061,14 +3063,14 @@ interpret_frame:
     bjvm_insn_lreturn:
     bjvm_insn_freturn:
     bjvm_insn_ireturn: {
-      if (!result) {
-        // Look at the frame before and store it there
-        if (thread->frames_count > 1) {
-          bjvm_stack_frame *prev_frame = thread->frames[thread->frames_count - 2];
-          prev_frame->result_of_next = checked_pop(frame);
-        }
-      } else {
-        *result = checked_pop(frame);
+      // Look at the frame before and store it there
+      bjvm_stack_value r = checked_pop(frame);
+      if (thread->frames_count > 1) {
+        bjvm_stack_frame *prev_frame = thread->frames[thread->frames_count - 2];
+        prev_frame->result_of_next = r;
+      }
+      if (result) {
+        *result = r;
       }
       goto done;
     }
@@ -3671,6 +3673,7 @@ done:;
             frame->values[0] =
                 (bjvm_stack_value){.obj = thread->current_exception};
             thread->current_exception = nullptr;
+            interp_status = BJVM_INTERP_RESULT_OK;
 
             goto interpret_frame;
           }

@@ -183,6 +183,7 @@ typedef struct {
 
   // When an inner frame completes, the result is stored here (by default)
   bjvm_stack_value result_of_next;
+  int padding;
 
   bjvm_cp_method *method;
 
