@@ -22,7 +22,9 @@ static inline bjvm_obj_header *AllocateObject(bjvm_thread *thread,
                                               size_t data_size) {
   bjvm_obj_header *obj =
       bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
-  obj->mark_word = ObjNextHashCode();
-  obj->descriptor = descriptor;
+  if (obj) {
+    obj->mark_word = ObjNextHashCode();
+    obj->descriptor = descriptor;
+  }
   return obj;
 }

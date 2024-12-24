@@ -190,6 +190,8 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
   bjvm_obj_header *result = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/reflect/Field")),
       fields);
+  if (!result)
+    return value_null();
   struct bjvm_native_Field **data = ArrayData(result);
   for (int i = 0, j = 0; i < class->fields_count; ++i) {
     bjvm_cp_field *field = class->fields + i;

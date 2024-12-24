@@ -461,6 +461,11 @@ TEST_CASE("Array creation doesn't induce <clinit>") {
   REQUIRE(result.stdout_ == "Hey :)\n");
 }
 
+TEST_CASE("Simple OutOfMemoryError") {
+  auto result = run_test_case("test_files/out_of_memory/", true);
+  REQUIRE(result.stdout_.find("OutOfMemoryError") != std::string::npos);
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

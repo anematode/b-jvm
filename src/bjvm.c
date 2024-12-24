@@ -450,6 +450,9 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
 
   bjvm_handle *field_mirror =
       bjvm_make_handle(thread, new_object(thread, reflect_Field));
+  if (!field_mirror->obj) {
+    return;
+  }
 
 #define F ((struct bjvm_native_Field *)field_mirror->obj)
   field->reflection_field = (void *)F;
@@ -680,7 +683,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 21;
+  options.heap_size = 1 << 18;
   return options;
 }
 
@@ -694,6 +697,8 @@ static void _free_classdesc(void *cd) {
   bjvm_classdesc *classdesc = cd;
   classdesc->dtor(classdesc);
 }
+
+#define OOM_SLOP_BYTES (1 << 12)
 
 bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   bjvm_vm *vm = calloc(1, sizeof(bjvm_vm));
@@ -712,6 +717,7 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   vm->heap = aligned_alloc(4096, options.heap_size);
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
+  vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
 
   vm->write_stdout = options.write_stdout;
   vm->write_stderr = options.write_stderr;
@@ -809,6 +815,15 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->handles_capacity = HANDLES_CAPACITY;
 
   bjvm_classdesc *desc;
+
+  // Pre-allocate OOM and stack overflow errors
+  desc = bootstrap_class_create(thr, STR("java/lang/OutOfMemoryError"));
+  bjvm_initialize_class(thr, desc);
+  thr->out_of_mem_error = new_object(thr, desc);
+
+  desc = bootstrap_class_create(thr, STR("java/lang/StackOverflowError"));
+  bjvm_initialize_class(thr, desc);
+  thr->stack_overflow_error = new_object(thr, desc);
 
   // Link (but don't initialize) java.lang.Class immediately
   auto thing = STR("java/lang/Class");
@@ -1459,6 +1474,27 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   return 0;
 }
 
+void bjvm_out_of_memory(bjvm_thread *thread) {
+  bjvm_vm *vm = thread->vm;
+  thread->current_exception = nullptr;
+  if (vm->heap_capacity == vm->true_heap_capacity) {
+    // We're currently calling fillInStackTrace on the OOM instance, just
+    // shut up
+    return;
+  }
+
+  // temporarily expand the valid heap so that we can allocate the OOM error and
+  // its constituents
+  size_t original_capacity = vm->heap_capacity;
+  vm->heap_capacity = vm->true_heap_capacity;
+
+  bjvm_obj_header *oom = thread->out_of_mem_error;
+  // TODO call fillInStackTrace
+  bjvm_raise_exception_object(thread, oom);
+
+  vm->heap_capacity = original_capacity;
+}
+
 void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = (bytes + 7) & ~7;
@@ -1468,10 +1504,10 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
          vm->heap_capacity);
 #endif
   if (vm->heap_used + bytes > vm->heap_capacity) {
-    bjvm_major_gc(thread->vm); // LOL
+    bjvm_major_gc(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {
-      // Out of memory
-      UNREACHABLE();
+      bjvm_out_of_memory(thread);
+      return nullptr;
     }
   }
   void *result = vm->heap + vm->heap_used;
@@ -1776,8 +1812,10 @@ bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   assert(classdesc->state >= BJVM_CD_STATE_LINKED);
   bjvm_obj_header *obj =
       bump_allocate(thread, classdesc->data_bytes + sizeof(bjvm_obj_header));
-  obj->descriptor = classdesc;
-  obj->mark_word = ObjNextHashCode();
+  if (obj) {
+    obj->descriptor = classdesc;
+    obj->mark_word = ObjNextHashCode();
+  }
   return obj;
 }
 
@@ -1846,7 +1884,8 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
       bootstrap_class_create(thread, STR("java/lang/Class"));
   struct bjvm_native_Class *class_mirror = classdesc->mirror =
       (void *)new_object(thread, java_lang_Class);
-  class_mirror->reflected_class = classdesc;
+  if (class_mirror)
+    class_mirror->reflected_class = classdesc;
 
   return class_mirror;
 }
@@ -3414,6 +3453,8 @@ interpret_frame:
         goto done;
       // Create an instance of the class
       bjvm_obj_header *obj = new_object(thread, info->classdesc);
+      if (!obj)
+        goto done;
       checked_push(frame, (bjvm_stack_value){.obj = obj});
       NEXT_INSN;
     }
@@ -3902,8 +3943,8 @@ void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
   }
 
   // Preallocated exceptions
-  PUSH_ROOT(&thr->out_of_mem_exception);
-  PUSH_ROOT(&thr->stack_overflow_exception);
+  PUSH_ROOT(&thr->out_of_mem_error);
+  PUSH_ROOT(&thr->stack_overflow_error);
 
   free(bitset_list);
 }
@@ -3955,7 +3996,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
 int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
-  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->heap_capacity;
+  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->true_heap_capacity;
 }
 
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
@@ -4104,8 +4145,8 @@ void bjvm_major_gc(bjvm_vm *vm) {
       malloc(ctx.objs_count * sizeof(bjvm_obj_header *));
 
   // For now, create a new heap of the same size
-  uint8_t *new_heap = aligned_alloc(4096, vm->heap_capacity),
-          *end = new_heap + vm->heap_capacity;
+  uint8_t *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
+          *end = new_heap + vm->true_heap_capacity;
   uint8_t *write_ptr = new_heap;
 
   // Copy object by object

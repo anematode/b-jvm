@@ -126,7 +126,8 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
 
   bjvm_obj_header *array =
       AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
-  *ArrayLength(array) = count;
+  if (array)
+    *ArrayLength(array) = count;
 
   return array;
 }
@@ -142,7 +143,8 @@ static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
 
   bjvm_obj_header *array = AllocateObject(
       thread, array_desc, kArrayHeaderSize + count * sizeof(bjvm_obj_header *));
-  *ArrayLength(array) = count;
+  if (array)
+    *ArrayLength(array) = count;
 
   return array;
 }

@@ -44,12 +44,16 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   ++i;
   bjvm_handle *stack_trace = bjvm_make_handle(
       thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
-
+  if (!stack_trace->obj) // Failed to allocate
+    return value_null();
   for (int j = 0; i >= 0; --i, ++j) {
     bjvm_stack_frame *frame = thread->frames[i];
     // Create the stack trace element
     bjvm_handle *e =
         bjvm_make_handle(thread, new_object(thread, StackTraceElement));
+    if (!e->obj) // Failed to allocate StackTraceElement
+      goto cleanup;
+
 #define E ((struct bjvm_native_StackTraceElement *)e->obj)
     int line =
         bjvm_get_line_number(frame->method->code, frame->program_counter);
@@ -64,6 +68,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     bjvm_drop_handle(thread, e);
   }
 
+cleanup:
   *backtrace_object(obj->obj) = stack_trace->obj;
   bjvm_drop_handle(thread, stack_trace);
 

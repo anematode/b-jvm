@@ -182,6 +182,11 @@ typedef struct bjvm_vm {
   // which is the alignment of BJVM objects.
   size_t heap_used;
   size_t heap_capacity;
+
+  // This capacity is used solely when handling an OutOfMemoryError, because
+  // fillInStackTrace allocates stuff. The reserved space is a constant in
+  // bjvm.c.
+  size_t true_heap_capacity;
 } bjvm_vm;
 
 typedef struct {
@@ -242,9 +247,9 @@ typedef struct bjvm_thread {
   // Also pointer one past the end of the last stack frame
   uint32_t frame_buffer_used;
 
-  // Pre-allocated out-of-memory and stack overflow exceptions
-  bjvm_obj_header *out_of_mem_exception;
-  bjvm_obj_header *stack_overflow_exception;
+  // Pre-allocated out-of-memory and stack overflow errors
+  bjvm_obj_header *out_of_mem_error;
+  bjvm_obj_header *stack_overflow_error;
 
   // Pointers into the frame_buffer
   bjvm_stack_frame **frames;
