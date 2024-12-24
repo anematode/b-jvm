@@ -1527,12 +1527,58 @@ bool is_error(bjvm_classdesc *d) {
          (d->super_class && is_error(d->super_class->classdesc));
 }
 
+// During initialisation, we need to set the value of static final fields
+// if they are provided in the class file.
+//
+// Returns true if an OOM occurred.
+bool initialize_constant_value_fields(bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  for (int i = 0; i < classdesc->fields_count; ++i) {
+    bjvm_cp_field *field = classdesc->fields + i;
+    if (field->access_flags & BJVM_ACCESS_STATIC &&
+        field->access_flags & BJVM_ACCESS_FINAL) {
+      // Scan attributes for ConstantValue
+      for (int j = 0; j < field->attributes_count; ++j) {
+        bjvm_attribute *attr = field->attributes + j;
+        if (attr->kind == BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE) {
+          void* p = classdesc->static_fields + field->byte_offset;
+          bjvm_cp_entry *ent = attr->constant_value;
+          switch (ent->kind) {
+          case BJVM_CP_KIND_INTEGER:
+            store_stack_value(p, (bjvm_stack_value){.i = (int)ent->integral.value}, BJVM_TYPE_KIND_INT);
+            break;
+          case BJVM_CP_KIND_FLOAT:
+            store_stack_value(p, (bjvm_stack_value){.f = (float)ent->floating.value}, BJVM_TYPE_KIND_FLOAT);
+            break;
+          case BJVM_CP_KIND_LONG:
+            store_stack_value(p, (bjvm_stack_value){.l = ent->integral.value}, BJVM_TYPE_KIND_LONG);
+            break;
+          case BJVM_CP_KIND_DOUBLE:
+            store_stack_value(p, (bjvm_stack_value){.d = ent->floating.value}, BJVM_TYPE_KIND_DOUBLE);
+            break;
+          case BJVM_CP_KIND_STRING:
+            bjvm_obj_header *str = bjvm_intern_string(thread, ent->string.chars);
+            if (!str)
+              return true;
+            store_stack_value(p, (bjvm_stack_value){.obj = str}, BJVM_TYPE_KIND_REFERENCE);
+            break;
+          default:
+            UNREACHABLE();  // should have been audited at parse time
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Call <clinit> on the class, if it hasn't already been called.
 bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc) {
   assert(classdesc);
-  if (classdesc->state == BJVM_CD_STATE_INITIALIZED) {
-    // Class is already initialized.
+  if (classdesc->state >= BJVM_CD_STATE_INITIALIZING) {
+    // Class is already initialized, or currently being initialized.
+    // TODO In a multithreaded model, we would need to wait for the other
+    // thread to finish initializing the class.
     return BJVM_INTERP_RESULT_OK;
   }
 
@@ -1544,13 +1590,18 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
     }
   }
 
-  classdesc->state = BJVM_CD_STATE_INITIALIZED;
+  classdesc->state = BJVM_CD_STATE_INITIALIZING;
+  int failed_to_init = 0;
 
   // TODO initialize supers
 
+  if (initialize_constant_value_fields(thread, classdesc)) {
+    failed_to_init = -1;
+    goto done;
+  }
+
   bjvm_cp_method *clinit = bjvm_easy_method_lookup(classdesc, STR("<clinit>"),
                                                    STR("()V"), false, false);
-  int failed_to_init = 0;
   if (clinit) {
     failed_to_init = bjvm_thread_run(thread, clinit, nullptr, nullptr);
     if (failed_to_init) {
@@ -1577,6 +1628,8 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
       }
     }
   }
+
+done:
   classdesc->state =
       failed_to_init ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
   return failed_to_init;

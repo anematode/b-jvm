@@ -473,6 +473,11 @@ Chicken
 )");
 }
 
+TEST_CASE("ConstantValue initialisation") {
+  auto result = run_test_case("test_files/constant_value/", true);
+  REQUIRE(result.stdout_ == "2147483647\n");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

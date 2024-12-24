@@ -223,7 +223,8 @@ typedef enum {
   BJVM_CD_STATE_LINKAGE_ERROR = 0,
   BJVM_CD_STATE_LOADED = 1,
   BJVM_CD_STATE_LINKED = 2,
-  BJVM_CD_STATE_INITIALIZED = 3,
+  BJVM_CD_STATE_INITIALIZING = 3,
+  BJVM_CD_STATE_INITIALIZED = 4
 } bjvm_classdesc_state;
 
 typedef struct bjvm_classdesc bjvm_classdesc;
