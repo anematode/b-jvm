@@ -290,11 +290,6 @@ bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
  */
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method);
 
-void pass_args_to_frame(bjvm_stack_frame *new_frame,
-                        bjvm_stack_frame *old_frame, int args,
-                        const bjvm_method_descriptor *descriptor,
-                        bool is_static);
-
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
  * check.

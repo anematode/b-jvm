@@ -37,7 +37,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToStatic,
             : load_stack_value(&args[i], kind);
   }
   bjvm_stack_value result;
-  bjvm_stack_value *store_in = &result;
-  bjvm_bytecode_interpret(thread, new_frame, store_in);
+  bjvm_bytecode_interpret(thread, new_frame, &result);
   return result;
 }

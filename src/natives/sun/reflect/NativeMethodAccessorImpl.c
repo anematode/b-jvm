@@ -19,18 +19,10 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
   }
 
   // TODO unbox arguments
-
-  bjvm_stack_frame *frame = bjvm_push_frame(thread, method);
-  for (int i = 0, j = 0; i < arg_i; i++) {
-    frame->values[frame->max_stack + j] = assembled[i];
-  }
   bjvm_stack_value result;
-
   assert(method->code);
-  bjvm_bytecode_interpret(thread, frame, &result);
-  bjvm_pop_frame(thread, frame);
-
-  printf("CALLED INVOKE, got result %p\n", result.obj);
+  // TODO make this native async
+  bjvm_thread_run(thread, method, assembled, &result);
 
   return result;
 }

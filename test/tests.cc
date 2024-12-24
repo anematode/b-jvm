@@ -423,6 +423,33 @@ variable passed in
 )");
 }
 
+TEST_CASE("Advanced lambda") {
+  std::string expected = R"(10 + 5 = 15
+Sum of numbers: 15
+1
+2
+3
+4
+5
+Incremented: 2
+Incremented: 4
+Incremented: 6
+Incremented: 8
+Incremented: 10
+Sum of lots of numbers: 499500
+Cow value: 15
+)";
+  for (int i = 0; i < 10; ++i)
+    expected += expected;
+  auto result = run_test_case("test_files/advanced_lambda/", true);
+  //REQUIRE(result.stdout_.length() == expected.length());
+  REQUIRE(result.stdout_ == expected);
+
+  BENCHMARK("Advanced lambda benchmark") {
+    auto result = run_test_case("test_files/advanced_lambda/", true);
+  };
+}
+
 TEST_CASE("Class<?> implementation") {
   auto result = run_test_case("test_files/reflection_class/", true);
   REQUIRE(result.stdout_ ==
