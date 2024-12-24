@@ -1524,7 +1524,7 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
 // Returns true if the class descriptor is a subclass of java.lang.Error.
 bool is_error(bjvm_classdesc *d) {
   return utf8_equals(hslc(d->name), "java/lang/Error") ||
-    (d->super_class && is_error(d->super_class->classdesc));
+         (d->super_class && is_error(d->super_class->classdesc));
 }
 
 // Call <clinit> on the class, if it hasn't already been called.
@@ -1566,7 +1566,9 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
         bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
         bjvm_obj_header *exc = thread->current_exception;
         thread->current_exception = nullptr; // clear exception
-        int error = bjvm_thread_run(thread, ctor, (bjvm_stack_value[]){{.obj = eiie->obj}, {.obj = exc}}, nullptr);
+        int error = bjvm_thread_run(
+            thread, ctor,
+            (bjvm_stack_value[]){{.obj = eiie->obj}, {.obj = exc}}, nullptr);
         if (!error) {
           assert(eiie->obj);
           bjvm_raise_exception_object(thread, eiie->obj);
@@ -4029,7 +4031,8 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
 int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
-  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->true_heap_capacity;
+  return (uintptr_t)field - (uintptr_t)ctx->vm->heap <
+         ctx->vm->true_heap_capacity;
 }
 
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,

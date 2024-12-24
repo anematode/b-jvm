@@ -573,11 +573,10 @@ bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->base_kind);
 }
 
-void write_kinds_to_bitset(
-    const bjvm_analy_stack_state *inferred_stack, int offset,
-    bjvm_compressed_bitset *bjvm_compressed_bitset,
-    bjvm_type_kind test
-    ) {
+void write_kinds_to_bitset(const bjvm_analy_stack_state *inferred_stack,
+                           int offset,
+                           bjvm_compressed_bitset *bjvm_compressed_bitset,
+                           bjvm_type_kind test) {
   for (int i = 0; i < inferred_stack->entries_count; ++i) {
     if (inferred_stack->entries[i] == test)
       bjvm_test_set_compressed_bitset(bjvm_compressed_bitset, offset + i);
@@ -1428,7 +1427,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
 
   analy->insn_count = code->insn_count;
   for (int i = 0; i < 5; ++i) {
-    analy->insn_index_to_kinds[i] = calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
+    analy->insn_index_to_kinds[i] =
+        calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
   }
   analy->blocks = nullptr;
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
@@ -1510,12 +1510,13 @@ done:
     for (int j = 0; j < 5; ++j) {
       bjvm_type_kind order[5] = {BJVM_TYPE_KIND_REFERENCE, BJVM_TYPE_KIND_INT,
                                  BJVM_TYPE_KIND_FLOAT, BJVM_TYPE_KIND_DOUBLE,
-        BJVM_TYPE_KIND_LONG};
+                                 BJVM_TYPE_KIND_LONG};
       bjvm_compressed_bitset *bitset = analy->insn_index_to_kinds[j] + i;
       *bitset = bjvm_init_compressed_bitset(code->max_stack + code->max_locals);
 
       write_kinds_to_bitset(&inferred_stacks[i], 0, bitset, order[j]);
-      write_kinds_to_bitset(&inferred_locals[i], code->max_stack, bitset, order[j]);
+      write_kinds_to_bitset(&inferred_locals[i], code->max_stack, bitset,
+                            order[j]);
     }
 
     free(inferred_stacks[i].entries);
@@ -1552,24 +1553,25 @@ void push_bb_branch(bjvm_basic_block *current, uint32_t index) {
   *VECTOR_PUSH(current->next, current->next_count, current->next_cap) = index;
 }
 
-int cmp_ints(const void *a, const void *b) {
-  return *(int *)a - *(int *)b;
-}
+int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
 
-void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *analy) {
-  if (analy->blocks) return;
+void scan_basic_blocks(const bjvm_attribute_code *code,
+                       bjvm_code_analysis *analy) {
+  if (analy->blocks)
+    return;
   // First, record all branch targets. We're doing all exception handling in C
   // so it's ok if we don't analyze exception handlers.
   int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
   int tc = 0;
-  ts[tc++] = 0;  // mark entry point
+  ts[tc++] = 0; // mark entry point
   for (int i = 0; i < code->insn_count; ++i) {
     const bjvm_bytecode_insn *insn = code->code + i;
     if (insn->kind >= bjvm_insn_goto && insn->kind <= bjvm_insn_ifnull) {
       ts[tc++] = insn->index;
       if (insn->kind != bjvm_insn_goto)
-        ts[tc++] = i + 1;  // fallthrough
-    } else if (insn->kind == bjvm_insn_tableswitch || insn->kind == bjvm_insn_lookupswitch) {
+        ts[tc++] = i + 1; // fallthrough
+    } else if (insn->kind == bjvm_insn_tableswitch ||
+               insn->kind == bjvm_insn_lookupswitch) {
       const struct bjvm_bc_tableswitch_data *tsd = &insn->tableswitch;
       // Layout is the same -- dw about it
       ts[tc++] = tsd->default_target;
@@ -1580,17 +1582,17 @@ void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *anal
   // Then, sort, remove duplicates and create basic block entries for each
   qsort(ts, tc, sizeof(int), cmp_ints);
   int block_count = 0;
-  for (int i = 0; i < tc; ++i)  // remove dups
+  for (int i = 0; i < tc; ++i) // remove dups
     ts[block_count += ts[block_count] != ts[i]] = ts[i];
   bjvm_basic_block *bs = analy->blocks =
-    calloc(++block_count, sizeof(bjvm_basic_block));
+      calloc(++block_count, sizeof(bjvm_basic_block));
   for (int i = 0; i < block_count; ++i) {
     bs[i].start_index = ts[i];
     bs[i].start = code->code + ts[i];
     bs[i].my_index = i;
   }
-#define FIND_TARGET_BLOCK(index) \
-  ((int*)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts)
+#define FIND_TARGET_BLOCK(index)                                               \
+  ((int *)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts)
   // Then, record edges between bbs. (This assumes no unreachable code, which
   // was checked in analyze_method_code_segment.)
   for (int block_i = 0; block_i < block_count - 1; ++block_i) {
@@ -1600,7 +1602,8 @@ void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *anal
       push_bb_branch(b, FIND_TARGET_BLOCK(last->index));
       if (last->kind == bjvm_insn_goto)
         continue;
-    } else if (last->kind == bjvm_insn_tableswitch || last->kind == bjvm_insn_lookupswitch) {
+    } else if (last->kind == bjvm_insn_tableswitch ||
+               last->kind == bjvm_insn_lookupswitch) {
       const struct bjvm_bc_tableswitch_data *tsd = &last->tableswitch;
       push_bb_branch(b, FIND_TARGET_BLOCK(tsd->default_target));
       for (int i = 0; i < tsd->targets_count; ++i)
