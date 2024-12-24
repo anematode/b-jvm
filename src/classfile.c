@@ -1804,7 +1804,8 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
       ent->end_insn = end_pc == code_length
                           ? code_length
                           : convert_pc_to_insn(end_pc, pc_to_insn, code_length);
-      ent->handler_pc = convert_pc_to_insn(handler_pc, pc_to_insn, code_length);
+      ent->handler_insn =
+          convert_pc_to_insn(handler_pc, pc_to_insn, code_length);
       ent->catch_type =
           catch_type == 0
               ? nullptr

@@ -4,11 +4,13 @@
 #include <stdlib.h>
 
 bool utf8_equals(const bjvm_utf8 entry, const char *str) {
-  return entry.len == (int)strlen(str) && memcmp(entry.chars, str, entry.len) == 0;
+  return entry.len == (int)strlen(str) &&
+         memcmp(entry.chars, str, entry.len) == 0;
 }
 
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right) {
-  return left.len == right.len && memcmp(left.chars, right.chars, left.len) == 0;
+  return left.len == right.len &&
+         memcmp(left.chars, right.chars, left.len) == 0;
 }
 
 int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,

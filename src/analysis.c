@@ -631,6 +631,10 @@ fail:
   return -1;
 }
 
+struct edge {
+  int start, end;
+};
+
 struct method_analysis_ctx {
   const bjvm_attribute_code *code;
   bjvm_analy_stack_state stack, stack_before, locals;
@@ -641,8 +645,11 @@ struct method_analysis_ctx {
   int *branch_q;
   int branch_count;
   char *insn_error;
-
   heap_string *error;
+
+  struct edge *edges;
+  int edges_count;
+  int edges_cap;
 };
 
 // Pop a value from the analysis stack and return it.
@@ -681,7 +688,8 @@ struct method_analysis_ctx {
 // Remap the index to the new local variable index after unwidening.
 #define SWIZZLE_LOCAL(index) index = ctx->locals_swizzle[index];
 
-int push_branch_target(struct method_analysis_ctx *ctx, uint32_t target) {
+int push_branch_target(struct method_analysis_ctx *ctx, uint32_t curr,
+                       uint32_t target) {
   assert((int)target < ctx->code->insn_count);
   if (ctx->inferred_stacks[target].entries) {
     if ((ctx->insn_error = expect_analy_stack_states_equal(
@@ -692,6 +700,9 @@ int push_branch_target(struct method_analysis_ctx *ctx, uint32_t target) {
     copy_analy_stack_state(ctx->stack, &ctx->inferred_stacks[target]);
     ctx->inferred_stacks[target].from_jump_target = true;
     ctx->branch_q[ctx->branch_count++] = target;
+
+    *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
+        (struct edge){.start = curr, .end = target};
   }
   return 0;
 }
@@ -1096,26 +1107,26 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   }
   case bjvm_insn_dstore: {
     POP(DOUBLE)
-    SET_LOCAL(insn->index, DOUBLE)
     SWIZZLE_LOCAL(insn->index)
+    SET_LOCAL(insn->index, DOUBLE)
     break;
   }
   case bjvm_insn_fstore: {
     POP(FLOAT)
-    SET_LOCAL(insn->index, FLOAT)
     SWIZZLE_LOCAL(insn->index)
+    SET_LOCAL(insn->index, FLOAT)
     break;
   }
   case bjvm_insn_istore: {
     POP(INT)
-    SET_LOCAL(insn->index, INT)
     SWIZZLE_LOCAL(insn->index)
+    SET_LOCAL(insn->index, INT)
     break;
   }
   case bjvm_insn_lstore: {
     POP(LONG)
-    SET_LOCAL(insn->index, LONG)
     SWIZZLE_LOCAL(insn->index)
+    SET_LOCAL(insn->index, LONG)
     break;
   }
   case bjvm_insn_aload: {
@@ -1125,12 +1136,12 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   }
   case bjvm_insn_astore: {
     POP(REFERENCE)
-    SET_LOCAL(insn->index, REFERENCE)
     SWIZZLE_LOCAL(insn->index)
+    SET_LOCAL(insn->index, REFERENCE)
     break;
   }
   case bjvm_insn_goto: {
-    if (push_branch_target(ctx, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->index))
       return -1;
     ctx->stack_terminated = true;
     break;
@@ -1142,7 +1153,8 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_if_acmpeq:
   case bjvm_insn_if_acmpne: {
     POP(REFERENCE)
-    POP(REFERENCE) if (push_branch_target(ctx, insn->index)) return -1;
+    POP(REFERENCE)
+    if (push_branch_target(ctx, insn_index, insn->index)) return -1;
     break;
   }
   case bjvm_insn_if_icmpeq:
@@ -1160,14 +1172,14 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_ifgt:
   case bjvm_insn_ifle: {
     POP(INT)
-    if (push_branch_target(ctx, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->index))
       return -1;
     break;
   }
   case bjvm_insn_ifnonnull:
   case bjvm_insn_ifnull: {
     POP(REFERENCE)
-    if (push_branch_target(ctx, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->index))
       return -1;
     break;
   }
@@ -1193,20 +1205,20 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   }
   case bjvm_insn_tableswitch: {
     POP(INT)
-    if (push_branch_target(ctx, insn->tableswitch.default_target))
+    if (push_branch_target(ctx, insn_index, insn->tableswitch.default_target))
       return -1;
     for (int i = 0; i < insn->tableswitch.targets_count; ++i)
-      if (push_branch_target(ctx, insn->tableswitch.targets[i]))
+      if (push_branch_target(ctx, insn_index, insn->tableswitch.targets[i]))
         return -1;
     ctx->stack_terminated = true;
     break;
   }
   case bjvm_insn_lookupswitch: {
     POP(INT)
-    if (push_branch_target(ctx, insn->lookupswitch.default_target))
+    if (push_branch_target(ctx, insn_index, insn->lookupswitch.default_target))
       return -1;
     for (int i = 0; i < insn->lookupswitch.targets_count; ++i)
-      if (push_branch_target(ctx, insn->lookupswitch.targets[i]))
+      if (push_branch_target(ctx, insn_index, insn->lookupswitch.targets[i]))
         return -1;
     ctx->stack_terminated = true;
     break;
@@ -1239,6 +1251,118 @@ error:;
   free(context);
   free(ctx->insn_error);
   return -1;
+}
+
+bool filter_locals(bjvm_analy_stack_state *s1,
+                   const bjvm_analy_stack_state *s2) {
+  assert(s1->entries_count == s2->entries_count);
+  bool changed = false;
+  for (int i = 0; i < s1->entries_count; ++i) {
+    if (s1->entries[i] != BJVM_TYPE_KIND_VOID &&
+        s1->entries[i] != s2->entries[i]) {
+      s1->entries[i] = BJVM_TYPE_KIND_VOID;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+bool insn_changes_locals_kinds(bjvm_bytecode_insn *insn) {
+  switch (insn->kind) {
+  case bjvm_insn_dstore:
+  case bjvm_insn_fstore:
+  case bjvm_insn_istore:
+  case bjvm_insn_lstore:
+  case bjvm_insn_astore:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool gross_quadratic_algorithm_to_refine_local_references(
+    struct method_analysis_ctx *ctx) {
+  bool any_changed = false;
+
+  // Iterate over edges and intersect the target locals with the source locals.
+  // No branching instruction changes the locals state, so this is easy enough
+  // to write out
+  for (int i = 0; i < ctx->edges_count; ++i) {
+    struct edge edge = ctx->edges[i];
+    bool changed = filter_locals(ctx->inferred_locals + edge.end,
+                                 ctx->inferred_locals + edge.start);
+    any_changed = any_changed || changed;
+  }
+
+  // Now iterate over instructions and refine the locals state
+  bool stack_terminated = true;
+  for (int i = 0; i < ctx->code->insn_count; ++i) {
+    bjvm_bytecode_insn *insn = ctx->code->code + i;
+    if (stack_terminated) {
+      copy_analy_stack_state(ctx->inferred_locals[i], &ctx->locals);
+      stack_terminated = false;
+    } else {
+      filter_locals(ctx->inferred_locals + i, &ctx->locals);
+    }
+
+    switch (insn->kind) {
+    case bjvm_insn_goto:
+    case bjvm_insn_athrow:
+    case bjvm_insn_areturn:
+    case bjvm_insn_dreturn:
+    case bjvm_insn_freturn:
+    case bjvm_insn_ireturn:
+    case bjvm_insn_lreturn:
+    case bjvm_insn_return:
+    case bjvm_insn_jsr:
+    case bjvm_insn_ret:
+    case bjvm_insn_tableswitch:
+    case bjvm_insn_lookupswitch:
+      stack_terminated = true;
+      break;
+    case bjvm_insn_astore:
+      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_REFERENCE;
+      break;
+    case bjvm_insn_dstore:
+      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_DOUBLE;
+      break;
+    case bjvm_insn_fstore:
+      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_FLOAT;
+      break;
+    case bjvm_insn_istore:
+      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_INT;
+      break;
+    case bjvm_insn_lstore:
+      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_LONG;
+      break;
+    default:
+      break;
+    }
+  }
+
+  return any_changed;
+}
+
+void add_exception_edges(struct method_analysis_ctx *ctx) {
+  // Add sufficient edges between instructions and accessible exception handlers
+  // such that the locals filtration works correctly when jumping to handlers.
+  bjvm_attribute_exception_table *exc = ctx->code->exception_table;
+  if (!exc)
+    return;
+
+  for (int i = 0; i < exc->entries_count; ++i) {
+    // Scan instructions in [start_pc, end_pc). For any instruction changing
+    // the locals state, add an edge from the instruction after to the handler.
+    bjvm_exception_table_entry ent = exc->entries[i];
+    *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
+        (struct edge){.start = ent.start_insn, .end = ent.handler_insn};
+    for (int j = ent.start_insn; j < ent.end_insn - 1; ++j) {
+      if (insn_changes_locals_kinds(ctx->code->code + j)) {
+        *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
+            (struct edge){.start = j + 1, .end = ent.handler_insn};
+      }
+    }
+  }
 }
 
 /**
@@ -1287,8 +1411,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   if (code->exception_table) {
     for (int i = 0; i < code->exception_table->entries_count; ++i) {
       bjvm_exception_table_entry *ent = code->exception_table->entries + i;
-      if (!inferred_stacks[ent->handler_pc].entries) {
-        bjvm_analy_stack_state *target = inferred_stacks + ent->handler_pc;
+      if (!inferred_stacks[ent->handler_insn].entries) {
+        bjvm_analy_stack_state *target = inferred_stacks + ent->handler_insn;
         copy_analy_stack_state(ctx.stack, target);
         target->is_exc_handler = true;
         target->exc_handler_start = ent->start_insn;
@@ -1314,8 +1438,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
 
       if (inferred_locals[i].is_exc_handler) {
         // At exception handlers, use the local variable table of the start of
-        // the exception block. Later we'll properly validate this by taking
-        // the intersection of all types.
+        // the exception block. Later we'll intersect this down.
         copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start],
                                &ctx.locals);
         copy_analy_stack_state(ctx.locals, this_locals);
@@ -1358,6 +1481,12 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
     }
   }
 
+  add_exception_edges(&ctx);
+
+  // Gross quadratic algorithm to refine local references
+  while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
+    ;
+
   // Check that all entries have been filled
   for (int i = 0; i < code->insn_count; ++i) {
     if (!inferred_stacks[i].entries) {
@@ -1389,6 +1518,7 @@ done:
   free(ctx.locals.entries);
   free(ctx.stack_before.entries);
   free(ctx.locals_swizzle);
+  free(ctx.edges);
   free(inferred_stacks);
   free(inferred_locals);
 

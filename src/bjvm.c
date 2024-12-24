@@ -1,8 +1,17 @@
 #define AGGRESSIVE_DEBUG 0
 
+// Cache invokestatic resolutions.
 #define CACHE_INVOKESTATIC 1
+// Cache invokevirtual, invokespecial, and invokeinterface resolutions.
 #define CACHE_INVOKENONSTATIC 1
+// If set, the interpreter will use a goto per instruction to jump to the next
+// instruction. This messes up the debug dumps but can lead to slightly better
+// performance because the branch predictor has more information about pairs
+// of instructions which tend to follow another.
 #define ONE_GOTO_PER_INSN 1
+// Skip the memset(...) call to clear each frame's locals/stack. This messes
+// up the debug dumps, but makes setting up frames faster.
+#define SKIP_CLEARING_FRAME 0
 
 #include <assert.h>
 #include <limits.h>
@@ -96,16 +105,18 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
 
   bjvm_stack_frame *frame =
       (bjvm_stack_frame *)(thread->frame_buffer + thread->frame_buffer_used);
-  // For now, this is required: the reference bitset isn't precise enough to
-  // not mistakenly scan non-references as references.
+
+#if !SKIP_CLEARING_FRAME
   memset(frame, 0, total);
+#endif
+
   thread->frame_buffer_used += total;
   *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) =
       frame;
-  frame->max_locals = code->max_locals;
-  frame->max_stack = code->max_stack;
-  frame->program_counter = 0;
   frame->stack_depth = 0;
+  frame->program_counter = 0;
+  frame->max_stack = code->max_stack;
+  frame->max_locals = code->max_locals;
   frame->method = method;
 
   return frame;
@@ -2575,7 +2586,7 @@ start:
 #define JMP_INSN continue
 #endif
 
-    do {
+    switch (0) {
     bjvm_insn_nop:
       NEXT_INSN;
     bjvm_insn_aaload: {
@@ -3559,7 +3570,7 @@ start:
     bjvm_insn_ret:
       UNREACHABLE("bjvm_insn_ret");
       NEXT_INSN;
-    } while (false);
+    }
 
     frame->program_counter++;
   }
@@ -3580,7 +3591,7 @@ done:;
           if (!ent.catch_type ||
               bjvm_instanceof(thread->current_exception->descriptor,
                               ent.catch_type->classdesc)) {
-            frame->program_counter = ent.handler_pc;
+            frame->program_counter = ent.handler_insn;
             frame->stack_depth = 1;
             frame->values[0] =
                 (bjvm_stack_value){.obj = thread->current_exception};
@@ -3705,6 +3716,36 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
   }
 }
 
+void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
+  int *bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
+
+  PUSH_ROOT(&thr->thread_obj);
+  PUSH_ROOT(&thr->current_exception);
+
+  for (int frame_i = 0; frame_i < thr->frames_count; ++frame_i) {
+    bjvm_stack_frame *frame = thr->frames[frame_i];
+    bjvm_code_analysis *analy = frame->method->code_analysis;
+    bjvm_compressed_bitset refs =
+        analy->insn_index_to_references[frame->program_counter];
+    bitset_list = bjvm_list_compressed_bitset_bits(refs, bitset_list,
+                                                   &bs_list_len, &bs_list_cap);
+    for (int i = 0; i < bs_list_len; ++i) {
+      PUSH_ROOT(&frame->values[bitset_list[i]].obj);
+    }
+  }
+
+  // Non-null local handles
+  for (int i = 0; i < thr->handles_capacity; ++i) {
+    PUSH_ROOT(&thr->handles[i].obj);
+  }
+
+  // Preallocated exceptions
+  PUSH_ROOT(&thr->out_of_mem_exception);
+  PUSH_ROOT(&thr->stack_overflow_exception);
+
+  free(bitset_list);
+}
+
 void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
@@ -3735,25 +3776,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   // Stack and local variables on active threads
   for (int thread_i = 0; thread_i < vm->active_thread_count; ++thread_i) {
     bjvm_thread *thr = vm->active_threads[thread_i];
-    PUSH_ROOT(&thr->thread_obj);
-    PUSH_ROOT(&thr->current_exception);
-
-    for (int frame_i = 0; frame_i < thr->frames_count; ++frame_i) {
-      bjvm_stack_frame *frame = thr->frames[frame_i];
-      bjvm_code_analysis *analy = frame->method->code_analysis;
-      bjvm_compressed_bitset refs =
-          analy->insn_index_to_references[frame->program_counter];
-      bitset_list = bjvm_list_compressed_bitset_bits(
-          refs, bitset_list, &bs_list_len, &bs_list_cap);
-      for (int i = 0; i < bs_list_len; ++i) {
-        PUSH_ROOT(&frame->values[bitset_list[i]].obj);
-      }
-    }
-
-    // Non-null local handles
-    for (int i = 0; i < thr->handles_capacity; ++i) {
-      PUSH_ROOT(&thr->handles[i].obj);
-    }
+    push_thread_roots(ctx, thr);
   }
 
   free(bitset_list);

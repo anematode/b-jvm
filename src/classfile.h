@@ -406,7 +406,7 @@ typedef struct bjvm_method_descriptor {
 typedef struct {
   int start_insn;
   int end_insn;
-  int handler_pc;
+  int handler_insn;
   bjvm_cp_class_info *catch_type;
 } bjvm_exception_table_entry;
 

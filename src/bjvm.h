@@ -169,9 +169,9 @@ typedef struct {
 
 typedef struct {
   uint16_t program_counter; // in instruction indices
+  uint16_t stack_depth;
   uint16_t max_stack;
   uint16_t max_locals;
-  uint16_t stack_depth;
 
   bjvm_cp_method *method;
 
@@ -189,6 +189,10 @@ typedef struct bjvm_thread {
   uint32_t frame_buffer_capacity;
   // Also pointer one past the end of the last stack frame
   uint32_t frame_buffer_used;
+
+  // Pre-allocated out-of-memory and stack overflow exceptions
+  bjvm_obj_header *out_of_mem_exception;
+  bjvm_obj_header *stack_overflow_exception;
 
   // Pointers into the frame_buffer
   bjvm_stack_frame **frames;

@@ -124,7 +124,7 @@ typedef struct {
 } bjvm_js_insn;
 
 typedef struct {
-  char* code;
+  char *code;
   int code_length;
   int current_indent;
 } bjvm_js_assembler;
