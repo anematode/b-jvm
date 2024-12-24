@@ -2073,8 +2073,7 @@ void drop_handles_array(bjvm_thread *thread, bjvm_method_descriptor *called,
 
 enum {
   INVOKE_STATE_ENTRY = 0,
-  // The invoked frame was already created, and if this function is being
-  // called again, then the result was placed in
+  // The invoked frame was already created and the result has been written
   INVOKE_STATE_MADE_FRAME = 2,
 };
 
@@ -2198,6 +2197,7 @@ bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       if (err != BJVM_INTERP_RESULT_OK) {
         if (err == BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_MADE_FRAME;
+
         return err;
       }
     }
