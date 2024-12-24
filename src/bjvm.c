@@ -4010,7 +4010,8 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
 int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
-  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->true_heap_capacity;
+  return (uintptr_t)field - (uintptr_t)ctx->vm->heap <
+         ctx->vm->true_heap_capacity;
 }
 
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,

@@ -89,8 +89,7 @@ void fill_mn_with_field(bjvm_thread *thread, bjvm_handle *mn,
 }
 
 void fill_mn_with_method(bjvm_thread *thread, bjvm_handle *mn,
-                         bjvm_cp_method *method,
-                         bool dynamic_dispatch) {
+                         bjvm_cp_method *method, bool dynamic_dispatch) {
   assert(method);
   bjvm_classdesc *search_on = method->my_class;
   if (utf8_equals(method->name, "<init>")) {
@@ -242,8 +241,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
     bjvm_cp_method *m = *bjvm_unmirror_method(target);
     fill_mn_with_method(thread, mn, m, true);
     M->flags |= (m->access_flags & BJVM_ACCESS_STATIC)
-                     ? BJVM_MH_KIND_INVOKE_STATIC << 24
-                     : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
+                    ? BJVM_MH_KIND_INVOKE_STATIC << 24
+                    : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
     fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), true);
     M->flags |= BJVM_MH_KIND_NEW_INVOKE_SPECIAL << 24;
@@ -251,8 +250,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
     bjvm_cp_field *field = *bjvm_unmirror_field(target);
     fill_mn_with_field(thread, mn, field);
     M->flags |= (field->access_flags & BJVM_ACCESS_STATIC)
-                     ? BJVM_MH_KIND_GET_STATIC << 24
-                     : BJVM_MH_KIND_GET_FIELD << 24;
+                    ? BJVM_MH_KIND_GET_STATIC << 24
+                    : BJVM_MH_KIND_GET_FIELD << 24;
   } else {
     UNREACHABLE();
   }
