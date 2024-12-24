@@ -573,11 +573,13 @@ bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
   return kind_to_representable_kind(field->base_kind);
 }
 
-void write_references_to_bitset(
+void write_kinds_to_bitset(
     const bjvm_analy_stack_state *inferred_stack, int offset,
-    bjvm_compressed_bitset *bjvm_compressed_bitset) {
+    bjvm_compressed_bitset *bjvm_compressed_bitset,
+    bjvm_type_kind test
+    ) {
   for (int i = 0; i < inferred_stack->entries_count; ++i) {
-    if (inferred_stack->entries[i] == BJVM_TYPE_KIND_REFERENCE)
+    if (inferred_stack->entries[i] == test)
       bjvm_test_set_compressed_bitset(bjvm_compressed_bitset, offset + i);
   }
 }
@@ -1395,8 +1397,6 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_analy_stack_state *inferred_locals = ctx.inferred_locals =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
-  bjvm_compressed_bitset *insn_index_to_references =
-      calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
   uint16_t *insn_index_to_stack_depth =
       calloc(code->insn_count, sizeof(uint16_t));
 
@@ -1427,7 +1427,10 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       malloc(sizeof(bjvm_code_analysis));
 
   analy->insn_count = code->insn_count;
-  analy->insn_index_to_references = insn_index_to_references;
+  for (int i = 0; i < 5; ++i) {
+    analy->insn_index_to_kinds[i] = calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
+  }
+
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
 
   ctx.branch_q = calloc(code->max_formal_pc, sizeof(int));
@@ -1505,11 +1508,16 @@ done:
   for (int i = 0; i < code->insn_count; ++i) {
     insn_index_to_stack_depth[i] = inferred_stacks[i].entries_count;
 
-    bjvm_compressed_bitset *bitset = insn_index_to_references + i;
-    *bitset = bjvm_init_compressed_bitset(code->max_stack + code->max_locals);
+    for (int j = 0; j < 5; ++j) {
+      bjvm_type_kind order[5] = {BJVM_TYPE_KIND_REFERENCE, BJVM_TYPE_KIND_INT,
+                                 BJVM_TYPE_KIND_FLOAT, BJVM_TYPE_KIND_DOUBLE,
+        BJVM_TYPE_KIND_LONG};
+      bjvm_compressed_bitset *bitset = analy->insn_index_to_kinds[j] + i;
+      *bitset = bjvm_init_compressed_bitset(code->max_stack + code->max_locals);
 
-    write_references_to_bitset(&inferred_stacks[i], 0, bitset);
-    write_references_to_bitset(&inferred_locals[i], code->max_stack, bitset);
+      write_kinds_to_bitset(&inferred_stacks[i], 0, bitset, order[j]);
+      write_kinds_to_bitset(&inferred_locals[i], code->max_stack, bitset, order[j]);
+    }
 
     free(inferred_stacks[i].entries);
     free(inferred_locals[i].entries);

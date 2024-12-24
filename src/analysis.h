@@ -14,7 +14,18 @@
 // table at each program counter, and store a bitset of which stack/local
 // variables are references, so that the GC can follow them.
 typedef struct {
-  bjvm_compressed_bitset *insn_index_to_references;
+  union {
+    struct {
+      bjvm_compressed_bitset *insn_index_to_references;
+      bjvm_compressed_bitset *insn_index_to_ints;
+      bjvm_compressed_bitset *insn_index_to_floats;
+      bjvm_compressed_bitset *insn_index_to_doubles;
+      bjvm_compressed_bitset *insn_index_to_longs;
+    };
+
+    bjvm_compressed_bitset *insn_index_to_kinds[5];
+  };
+
   uint16_t *insn_index_to_stack_depth;
   int insn_count;
 } bjvm_code_analysis;

@@ -209,17 +209,18 @@ void free_method_descriptor(void *descriptor_) {
   free(descriptor);
 }
 
-void free_code_analysis(bjvm_code_analysis *code_analysis) {
-  if (!code_analysis)
+void free_code_analysis(bjvm_code_analysis *analy) {
+  if (!analy)
     return;
-  if (code_analysis->insn_index_to_references) {
-    fflush(stdout);
-    for (int i = 0; i < code_analysis->insn_count; ++i)
-      bjvm_free_compressed_bitset(code_analysis->insn_index_to_references[i]);
-    free(code_analysis->insn_index_to_references);
+  if (analy->insn_index_to_references) {
+    for (int j = 0; j < 5; ++j) {
+      for (int i = 0; i < analy->insn_count; ++i)
+        bjvm_free_compressed_bitset(analy->insn_index_to_kinds[j][i]);
+      free(analy->insn_index_to_kinds[j]);
+    }
   }
-  free(code_analysis->insn_index_to_stack_depth);
-  free(code_analysis);
+  free(analy->insn_index_to_stack_depth);
+  free(analy);
 }
 
 void free_method(bjvm_cp_method *method) {

@@ -1324,20 +1324,17 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 }
 
 int bjvm_link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  bjvm_classdesc_state st = BJVM_CD_STATE_LINKED;
   int status = bjvm_link_class(thread, classdesc->base_component);
   if (status) {
-    // TODO mark all arrays of this class as fucked up
-    UNREACHABLE();
+    st = BJVM_CD_STATE_LINKAGE_ERROR;
   }
-
   // Link all higher dimensional components
-  bjvm_classdesc *boi = classdesc->base_component;
-  while (boi->array_type) {
-    boi = boi->array_type;
-    boi->state = BJVM_CD_STATE_LINKED;
+  bjvm_classdesc *a = classdesc->base_component;
+  while (a->array_type) {
+    a = a->array_type;
+    a->state = st;
   }
-
-  classdesc->state = classdesc->base_component->state;
   return status;
 }
 
@@ -1381,42 +1378,37 @@ int allocate_field(int *current, bjvm_type_kind kind) {
   return result;
 }
 
+// Link the class.
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   assert(classdesc);
-  if (classdesc->state != BJVM_CD_STATE_LOADED) // already linked
+  if (classdesc->state != BJVM_CD_STATE_LOADED) {
     return 0;
-
+  }
   if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
     assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
     return bjvm_link_array_class(thread, classdesc);
   }
-
   // Link superclasses
   if (classdesc->super_class) {
     int status = bjvm_link_class(thread, classdesc->super_class->classdesc);
     if (status) {
-      // TODO raise VerifyError
       classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
       return status;
     }
   }
-
   // Link superinterfaces
   for (int i = 0; i < classdesc->interfaces_count; ++i) {
     int status = bjvm_link_class(thread, classdesc->interfaces[i]->classdesc);
     if (status) {
-      // TODO raise VerifyError
       classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
       return status;
     }
   }
-
   classdesc->state = BJVM_CD_STATE_LINKED;
-  // Link all array types
+  // Link the corresponding array type(s)
   if (classdesc->array_type) {
     bjvm_link_array_class(thread, classdesc->array_type);
   }
-
   // Analyze/rewrite all methods
   for (int method_i = 0; method_i < classdesc->methods_count; ++method_i) {
     bjvm_cp_method *method = classdesc->methods + method_i;
@@ -1424,16 +1416,17 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       heap_string error_str;
       int result = bjvm_analyze_method_code_segment(method, &error_str);
       if (result != 0) {
-        // TODO raise VerifyError
         classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
         printf("Error analyzing method %.*s: %.*s\n", method->name.len,
                method->name.chars, error_str.len, error_str.chars);
+        // TODO raise VerifyError
         UNREACHABLE();
       }
     }
   }
 
-  int imp_padding = (int)(uintptr_t)bjvm_hash_table_lookup(
+  // Padding for VM fields (e.g., internal fields used for Reflection)
+  int padding = (int)(uintptr_t)bjvm_hash_table_lookup(
       &thread->vm->class_padding, classdesc->name.chars, classdesc->name.len);
 
   // Assign memory locations to all static/non-static fields
@@ -1441,7 +1434,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       classdesc->super_class ? classdesc->super_class->classdesc : NULL;
   int static_offset = 0,
       nonstatic_offset = super ? super->data_bytes : sizeof(bjvm_obj_header);
-  nonstatic_offset += imp_padding;
+  nonstatic_offset += padding;
   for (int field_i = 0; field_i < classdesc->fields_count; ++field_i) {
     bjvm_cp_field *field = classdesc->fields + field_i;
     bjvm_type_kind kind = field_to_kind(&field->parsed_descriptor);
@@ -1528,12 +1521,15 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   return result;
 }
 
+// Call <clinit> on the class, if it hasn't already been called.
 bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc) {
   assert(classdesc);
   if (classdesc->state == BJVM_CD_STATE_INITIALIZED) {
+    // Class is already initialized.
     return BJVM_INTERP_RESULT_OK;
   }
+
   if (classdesc->state != BJVM_CD_STATE_LINKED) {
     int error = bjvm_link_class(thread, classdesc);
     if (error) {
@@ -4010,8 +4006,7 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
 uint64_t REACHABLE_BIT = 1ULL << 33;
 
 int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
-  return (uintptr_t)field - (uintptr_t)ctx->vm->heap <
-         ctx->vm->true_heap_capacity;
+  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->true_heap_capacity;
 }
 
 void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
