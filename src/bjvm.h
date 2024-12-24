@@ -65,9 +65,30 @@ static inline bjvm_stack_value value_null() {
 
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
-typedef bjvm_stack_value (*bjvm_native_callback)(bjvm_thread *vm,
+typedef enum {
+  // Execution of the frame completed successfully and it has been removed
+  // from the execution stack.
+  BJVM_INTERP_RESULT_OK,
+  // An exception was thrown and the frame completed abruptly, so
+  // thread->current_exception is set.
+  BJVM_INTERP_RESULT_EXC,
+  // An interrupt occurred and the interpreter should be called again at some
+  // point. e.g. an asynchronous JS function was initiated.
+  BJVM_INTERP_RESULT_INT
+} bjvm_interpreter_result_t;
+
+typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
                                                  bjvm_handle *obj,
                                                  bjvm_value *args, int argc);
+typedef bjvm_interpreter_result_t (*bjvm_async_native_callback)(
+  bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
+  bjvm_stack_value *result, void** state);
+
+typedef struct {
+  bool is_async;
+  // either bjvm_sync_native_callback or bjvm_async_native_callback
+  void *ptr;
+} bjvm_native_callback;
 
 // represents a native method somewhere in this binary
 typedef struct {
@@ -176,17 +197,19 @@ typedef struct {
   uint16_t stack_depth;
   uint16_t max_stack;
   uint16_t max_locals;
-
-  // initialized to 0 on frame creation, but used by various intermediate
-  // functions for interruption purposes
+  // initialized to 0 on frame creation, but used by the currently executing
+  // instruction to enable partial completions due to interruption. All
+  // invoke* instructions use this field.
   int state;
-
-  // When an inner frame completes, the result is stored here (by default)
+  // Used by invoke* instructions: native state passed into the async native
+  void *native_state;
+  // Used by invoke* instructions: handles passed into the native method
+  bjvm_value *native_args;
+  // When an inner frame completes, the result is stored here. (The top-level
+  // frame doesn't have its result stored anywhere.)
   bjvm_stack_value result_of_next;
-  int padding;
-
+  // The method associated with this frame
   bjvm_cp_method *method;
-
   // First max_locals bjvm_stack_values, then max_stack more
   bjvm_stack_value values[];
 } bjvm_stack_frame;
@@ -319,18 +342,6 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
-
-typedef enum {
-  // Execution of the frame completed successfully and it has been removed
-  // from the execution stack.
-  BJVM_INTERP_RESULT_OK,
-  // An exception was thrown and the frame completed abruptly, so
-  // thread->current_exception is set.
-  BJVM_INTERP_RESULT_EXC,
-  // An interrupt occurred and the interpreter should be called again at some
-  // point. e.g. an asynchronous JS function was initiated.
-  BJVM_INTERP_RESULT_INT
-} bjvm_interpreter_result_t;
 
 // Continue execution of a thread.
 //

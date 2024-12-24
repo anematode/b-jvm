@@ -1219,7 +1219,7 @@ bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread,
 
         if (utf8_equals_utf8(method->name, entry->name) &&
             utf8_equals_utf8(method->descriptor, entry->descriptor)) {
-          method->native_handle = entry->callback;
+          method->native_handle = &entry->callback;
           break;
         }
       }
@@ -2030,7 +2030,7 @@ enum {
   INVOKE_STATE_ENTRY = 0,
   // The invoked frame was already created, and if this function is being
   // called again, then the result was placed in
-  INVOKE_STATE_MADE_FRAME = 1,
+  INVOKE_STATE_MADE_FRAME = 2,
 };
 
 // Implementation of invokespecial/invokeinterface/invokevirtual.
@@ -2129,9 +2129,11 @@ bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
         make_handles_array(thread, info->method_descriptor,
                            frame->values + frame->stack_depth - args + 1);
 
-    // TODO async natives
-    invoked_result = ((bjvm_native_callback)method->native_handle)(
-        thread, target_handle, native_args, args - 1);
+    bjvm_native_callback *handle = method->native_handle;
+    if (handle->is_async)
+      UNREACHABLE();
+    invoked_result = ((bjvm_sync_native_callback)handle->ptr)
+      (thread, target_handle, native_args, args - 1);
     frame->stack_depth -= args;
 
     bjvm_drop_handle(thread, target_handle);
@@ -2210,14 +2212,33 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       return BJVM_INTERP_RESULT_EXC;
     }
 
-    bjvm_value *native_args =
-        make_handles_array(thread, info->method_descriptor,
-                           frame->values + frame->stack_depth - args);
+    bjvm_value *native_args;
+    if (frame->state < INVOKE_STATE_MADE_FRAME) {
+      frame->native_state = nullptr;
+      native_args = frame->native_args = make_handles_array(thread, info->method_descriptor,
+                         frame->values + frame->stack_depth - args);
+    } else {
+      assert(frame->native_args);
+      native_args = frame->native_args;
+    }
+    frame->state = INVOKE_STATE_MADE_FRAME;
 
-    invoked_result = ((bjvm_native_callback)method->native_handle)(
-        thread, nullptr, native_args, args);
+    bjvm_native_callback *handle = method->native_handle;
+    if (!handle->is_async) {
+      invoked_result = ((bjvm_sync_native_callback)handle->ptr)(
+          thread, nullptr, native_args, args);
+    } else {
+      bjvm_interpreter_result_t status = ((bjvm_async_native_callback)handle->ptr)(
+          thread, nullptr, native_args, args, &invoked_result, &frame->native_state);
+      if (status == BJVM_INTERP_RESULT_INT) {
+        return status;
+      }
+    }
 
-    drop_handles_array(thread, info->method_descriptor, native_args);
+    frame->state = INVOKE_STATE_ENTRY;
+
+    drop_handles_array(thread, info->method_descriptor, frame->native_args);
+    frame->native_args = nullptr;
 
     frame->stack_depth -= args;
     if (thread->current_exception)
