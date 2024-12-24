@@ -438,6 +438,8 @@ typedef struct {
 } bjvm_attribute_method_parameters;
 
 struct bjvm_bc_tableswitch_data {
+  // Note: If changing this, make sure the layout of the first three fields
+  // is the same as bjvm_bc_lookupswitch_data.
   int default_target;
   int *targets;
   int targets_count;
@@ -446,6 +448,8 @@ struct bjvm_bc_tableswitch_data {
 };
 
 struct bjvm_bc_lookupswitch_data {
+  // Note: If changing this, make sure the layout of the first three fields
+  // is the same as bjvm_bc_tableswitch_data.
   int default_target;
   int *targets;
   int targets_count;

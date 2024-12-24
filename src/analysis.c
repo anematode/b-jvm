@@ -1534,13 +1534,84 @@ done:
   return result;
 }
 
-typedef struct bjvm_basic_block {
-  bjvm_bytecode_insn *insn;
-  int insn_count;
+void free_code_analysis(bjvm_code_analysis *analy) {
+  if (!analy)
+    return;
+  if (analy->insn_index_to_references) {
+    for (int j = 0; j < 5; ++j) {
+      for (int i = 0; i < analy->insn_count; ++i)
+        bjvm_free_compressed_bitset(analy->insn_index_to_kinds[j][i]);
+      free(analy->insn_index_to_kinds[j]);
+    }
+  }
+  free(analy->blocks);
+  free(analy->insn_index_to_stack_depth);
+  free(analy);
+}
 
-  struct bjvm_basic_block **next;
-  int next_count;
-} bjvm_basic_block;
+void push_bb_branch(bjvm_basic_block *current, uint32_t index) {
+  *VECTOR_PUSH(current->next, current->next_count, current->next_cap) = index;
+}
+
+int cmp_ints(const void *a, const void *b) {
+  return *(int *)a - *(int *)b;
+}
+
+void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *analy) {
+  if (analy->blocks) return;
+  // First, record all branch targets. We're doing exception handling in C
+  // so it's ok if we don't analyze exception handlers.
+  int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
+  int tc = 0;
+  ts[tc++] = 0;  // mark entry point
+  for (int i = 0; i < code->insn_count; ++i) {
+    const bjvm_bytecode_insn *insn = code->code + i;
+    if (insn->kind >= bjvm_insn_goto && insn->kind <= bjvm_insn_ifnull) {
+      ts[tc++] = insn->index;
+      if (insn->kind != bjvm_insn_goto)
+        ts[tc++] = i + 1;  // fallthrough
+    } else if (insn->kind == bjvm_insn_tableswitch || insn->kind == bjvm_insn_lookupswitch) {
+      const struct bjvm_bc_tableswitch_data *tsd = &insn->tableswitch;
+      // Layout is the same -- dw about it
+      ts[tc++] = tsd->default_target;
+      memcpy(ts + tc, tsd->targets, tsd->targets_count * sizeof(int));
+      tc += tsd->targets_count;
+    }
+  }
+  // Then, sort, remove duplicates and create basic block entries for each
+  qsort(ts, tc, sizeof(int), cmp_ints);
+  int block_count = 0;
+  for (int i = 0; i < tc; ++i)  // remove dups
+    ts[block_count += ts[block_count] != ts[i]] = ts[i];
+  bjvm_basic_block *bs = analy->blocks =
+    calloc(++block_count, sizeof(bjvm_basic_block));
+  for (int i = 0; i < block_count; ++i) {
+    bs[i].start_index = ts[i];
+    bs[i].start = code->code + ts[i];
+    bs[i].my_index = i;
+  }
+#define FIND_TARGET_BLOCK(index) \
+  (bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts)
+  // Then, record edges between bbs. (This assumes no unreachable code, which
+  // was checked in analyze_method_code_segment.)
+  for (int block_i = 0; block_i < block_count - 1; ++block_i) {
+    bjvm_basic_block *b = bs + block_i;
+    const bjvm_bytecode_insn *last = (b + 1)->start - 1;
+    if (last->kind >= bjvm_insn_goto && last->kind <= bjvm_insn_ifnull) {
+      push_bb_branch(b, FIND_TARGET_BLOCK(last->index));
+      if (last->kind == bjvm_insn_goto)
+        continue;
+    } else if (last->kind == bjvm_insn_tableswitch || last->kind == bjvm_insn_lookupswitch) {
+      const struct bjvm_bc_tableswitch_data *tsd = &last->tableswitch;
+      push_bb_branch(b, FIND_TARGET_BLOCK(tsd->default_target));
+      for (int i = 0; i < tsd->targets_count; ++i)
+        push_bb_branch(b, FIND_TARGET_BLOCK(tsd->targets[i]));
+      continue;
+    }
+    push_bb_branch(b, block_i + 1);
+  }
+  free(ts);
+}
 
 // We try to recover the control-flow structure of the original Java source. In
 // general, we can have labeled loops, fallthroughs, etc.; so this problem is

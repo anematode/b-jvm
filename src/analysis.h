@@ -7,6 +7,18 @@
 
 #include "classfile.h"
 
+typedef struct bjvm_basic_block {
+  int my_index;
+
+  const bjvm_bytecode_insn *start;  // non-owned
+  int start_index;
+  int insn_count;
+
+  uint32_t *next;
+  int next_count;
+  int next_cap;
+} bjvm_basic_block;
+
 // Result of the analysis of a code segment. During analysis, stack operations
 // on longs/doubles are simplified as if they only took up one stack slot (e.g.,
 // pop2 on a double becomes a pop, while pop2 on two ints stays as a pop2).
@@ -28,6 +40,10 @@ typedef struct {
 
   uint16_t *insn_index_to_stack_depth;
   int insn_count;
+
+  // block 0 = entry point
+  bjvm_basic_block *blocks;
+  int block_count;
 } bjvm_code_analysis;
 
 typedef bjvm_type_kind bjvm_analy_stack_entry;
@@ -55,5 +71,9 @@ typedef struct {
  */
 int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
                                      heap_string *error);
+
+void free_code_analysis(bjvm_code_analysis *analy);
+void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *analy);
+
 
 #endif // BJVM_ANALYSIS_H
