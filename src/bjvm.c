@@ -1817,14 +1817,7 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
 }
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  assert(classdesc->state >= BJVM_CD_STATE_LINKED);
-  bjvm_obj_header *obj =
-      bump_allocate(thread, classdesc->data_bytes + sizeof(bjvm_obj_header));
-  if (obj) {
-    obj->descriptor = classdesc;
-    obj->mark_word = ObjNextHashCode();
-  }
-  return obj;
+  return AllocateObject(thread, classdesc, classdesc->data_bytes);
 }
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,

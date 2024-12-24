@@ -1430,9 +1430,8 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
   for (int i = 0; i < 5; ++i) {
     analy->insn_index_to_kinds[i] = calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
   }
-
+  analy->blocks = nullptr;
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
-
   ctx.branch_q = calloc(code->max_formal_pc, sizeof(int));
 
   for (int i = 0; i < code->insn_count; ++i) {
@@ -1591,7 +1590,7 @@ void scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *anal
     bs[i].my_index = i;
   }
 #define FIND_TARGET_BLOCK(index) \
-  (bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts)
+  ((int*)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts)
   // Then, record edges between bbs. (This assumes no unreachable code, which
   // was checked in analyze_method_code_segment.)
   for (int block_i = 0; block_i < block_count - 1; ++block_i) {
