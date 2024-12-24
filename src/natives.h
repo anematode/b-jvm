@@ -25,15 +25,14 @@ extern bjvm_native_t *bjvm_natives;
           [[maybe_unused]] bjvm_handle *obj,                                   \
           [[maybe_unused]] bjvm_value *args, [[maybe_unused]] int argc)
 
-#define DECLARE_ASYNC_NATIVE_CALLBACK(class_name_, method_name_, modifier)           \
-static bjvm_interpreter_result_t                                                     \
-bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
-[[maybe_unused]] bjvm_thread *thread,                                \
-[[maybe_unused]] bjvm_handle *obj,                                   \
-[[maybe_unused]] bjvm_value *args, \
-[[maybe_unused]] int argc, \
-[[maybe_unused]] bjvm_stack_value *result, \
-[[maybe_unused]] void** sm_state)
+#define DECLARE_ASYNC_NATIVE_CALLBACK(class_name_, method_name_, modifier)     \
+  static bjvm_interpreter_result_t                                             \
+      bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
+          [[maybe_unused]] bjvm_thread *thread,                                \
+          [[maybe_unused]] bjvm_handle *obj,                                   \
+          [[maybe_unused]] bjvm_value *args, [[maybe_unused]] int argc,        \
+          [[maybe_unused]] bjvm_stack_value *result,                           \
+          [[maybe_unused]] void **sm_state)
 
 #define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,            \
                            method_descriptor_, modifier, async)                \
@@ -49,25 +48,26 @@ bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
         .class_path = STR(package_path "/" #class_name_),                      \
         .method_name = STR(#method_name_),                                     \
         .method_descriptor = STR(method_descriptor_),                          \
-        .callback = { async,                                                  \
-            &bjvm_native_##class_name_##_##method_name_##_cb##modifier} };       \
+        .callback = {                                                          \
+            async,                                                             \
+            &bjvm_native_##class_name_##_##method_name_##_cb##modifier}};      \
   }
 
-#define DECLARE_NATIVE0(DECLARE, package_path, class_name_, method_name_,               \
+#define DECLARE_NATIVE0(DECLARE, package_path, class_name_, method_name_,      \
                         method_descriptor_, modifier, async)                   \
-  DECLARE(class_name_, method_name_, modifier);                \
+  DECLARE(class_name_, method_name_, modifier);                                \
   DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,                  \
                      method_descriptor_, modifier, async);                     \
   DECLARE(class_name_, method_name_, modifier)
 
 #define DECLARE_NATIVE(package_path, class_name_, method_name_,                \
                        method_descriptor_)                                     \
-  DECLARE_NATIVE0(DECLARE_NATIVE_CALLBACK, package_path, class_name_, method_name_, method_descriptor_, \
-                  __COUNTER__, false)
+  DECLARE_NATIVE0(DECLARE_NATIVE_CALLBACK, package_path, class_name_,          \
+                  method_name_, method_descriptor_, __COUNTER__, false)
 
 #define DECLARE_ASYNC_NATIVE(package_path, class_name_, method_name_,          \
-                       method_descriptor_)                                     \
-    DECLARE_NATIVE0(DECLARE_ASYNC_NATIVE_CALLBACK, package_path, class_name_, method_name_, method_descriptor_, \
-    __COUNTER__, true)
+                             method_descriptor_)                               \
+  DECLARE_NATIVE0(DECLARE_ASYNC_NATIVE_CALLBACK, package_path, class_name_,    \
+                  method_name_, method_descriptor_, __COUNTER__, true)
 
 #endif // BJVM_NATIVES_H

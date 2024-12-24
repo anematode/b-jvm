@@ -46,9 +46,11 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
 
-add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now
-target_link_libraries(bjvm_main PRIVATE bjvm)
-set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
+if (EMSCRIPTEN)
+    add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now
+    target_link_libraries(bjvm_main PRIVATE bjvm)
+    set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
+endif()
 
 if (NOT APPLE)
     set_target_properties(bjvm PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/natives_table.ld)

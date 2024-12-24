@@ -24,9 +24,8 @@ typedef struct bjvm_thread bjvm_thread;
 typedef struct bjvm_obj_header bjvm_obj_header;
 
 #ifndef EMSCRIPTEN_KEEPALIVE
-#define EMSCRIPTEN_KEEPALIVE   // used to allow access from JS
+#define EMSCRIPTEN_KEEPALIVE // used to allow access from JS
 #endif
-
 
 /**
  * For simplicity, we always store local variables/stack variables as 64 bits,
@@ -87,11 +86,12 @@ typedef enum {
 } bjvm_interpreter_result_t;
 
 typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
-                                                 bjvm_handle *obj,
-                                                 bjvm_value *args, int argc);
+                                                      bjvm_handle *obj,
+                                                      bjvm_value *args,
+                                                      int argc);
 typedef bjvm_interpreter_result_t (*bjvm_async_native_callback)(
-  bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
-  bjvm_stack_value *result, void** sm_state);
+    bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
+    bjvm_stack_value *result, void **sm_state);
 
 typedef struct {
   bool is_async;
@@ -300,7 +300,7 @@ bjvm_vm_options bjvm_default_vm_options();
 
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
 
-bjvm_vm_options* bjvm_default_vm_options_ptr();
+bjvm_vm_options *bjvm_default_vm_options_ptr();
 
 void bjvm_major_gc(bjvm_vm *vm);
 
@@ -370,8 +370,10 @@ typedef struct {
 
 // Get an asynchronous running context. The caller should repeatedly call
 // bjvm_async_run_step() until it returns true.
-bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread, bjvm_cp_method *method,
-                    bjvm_stack_value *args, bjvm_stack_value *result);
+bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
+                                          bjvm_cp_method *method,
+                                          bjvm_stack_value *args,
+                                          bjvm_stack_value *result);
 
 EMSCRIPTEN_KEEPALIVE
 bool bjvm_async_run_step(bjvm_async_run_ctx *ctx);
@@ -390,9 +392,10 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
-  bjvm_stack_frame *final_frame, bjvm_stack_value *result);
-bjvm_interpreter_result_t bjvm_initialize_class(
-    bjvm_thread *thread, bjvm_classdesc *classdesc);
+                                                  bjvm_stack_frame *final_frame,
+                                                  bjvm_stack_value *result);
+bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
+                                                bjvm_classdesc *classdesc);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);

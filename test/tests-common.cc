@@ -143,7 +143,7 @@ int preregister_all_classes(bjvm_vm *vm) {
 }
 
 int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
-                          size_t *len) {
+                   size_t *len) {
   const char **classpath = (const char **)param;
   const char **classpath_end = classpath;
 
