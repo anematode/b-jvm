@@ -683,7 +683,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 18;
+  options.heap_size = 1 << 21;
   return options;
 }
 
@@ -1329,6 +1329,14 @@ int bjvm_link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
     // TODO mark all arrays of this class as fucked up
     UNREACHABLE();
   }
+
+  // Link all higher dimensional components
+  bjvm_classdesc *boi = classdesc->base_component;
+  while (boi->array_type) {
+    boi = boi->array_type;
+    boi->state = BJVM_CD_STATE_LINKED;
+  }
+
   classdesc->state = classdesc->base_component->state;
   return status;
 }
@@ -1404,6 +1412,10 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   }
 
   classdesc->state = BJVM_CD_STATE_LINKED;
+  // Link all array types
+  if (classdesc->array_type) {
+    bjvm_link_array_class(thread, classdesc->array_type);
+  }
 
   // Analyze/rewrite all methods
   for (int method_i = 0; method_i < classdesc->methods_count; ++method_i) {
@@ -2152,7 +2164,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
     bjvm_classdesc *lookup_on = insn->ic2 =
         insn->kind == bjvm_insn_invokespecial ? info->class_info->classdesc
                                               : target->descriptor;
-
+    assert(lookup_on);
     if (lookup_on->state != BJVM_CD_STATE_INITIALIZED) {
       bjvm_interpreter_result_t status =
           bjvm_initialize_class(thread, lookup_on);
@@ -2368,6 +2380,8 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame,
   int error = bjvm_resolve_class(thread, multianewarray->entry);
   if (error)
     return -1;
+
+  bjvm_link_class(thread, multianewarray->entry->classdesc);
 
   int dim_sizes[kArrayMaxDimensions];
   for (int i = 0; i < dims; ++i) {
@@ -3386,7 +3400,7 @@ interpret_frame:
       if (error)
         goto done;
       assert(info->classdesc);
-
+      bjvm_link_class(thread, info->classdesc);
       if (count < 0) {
         bjvm_negative_array_size_exception(thread, count);
         goto done;

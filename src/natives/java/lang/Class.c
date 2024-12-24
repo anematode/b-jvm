@@ -258,6 +258,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
   // Then create the array
   bjvm_classdesc *Method =
       bootstrap_class_create(thread, STR("java/lang/reflect/Method"));
+  bjvm_link_class(thread, Method);
   bjvm_obj_header *result = CreateObjectArray1D(thread, Method, methods);
   struct bjvm_native_Method **data = ArrayData(result);
   for (int i = 0, j = 0; i < class->methods_count; ++i) {

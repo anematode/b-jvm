@@ -72,50 +72,52 @@ heap_string unparse_method_type(const struct bjvm_native_MethodType *mt) {
   return make_heap_str_from(desc);
 }
 
-void fill_mn_with_field(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
+#define M ((struct bjvm_native_MemberName *)mn->obj)
+
+void fill_mn_with_field(bjvm_thread *thread, bjvm_handle *mn,
                         bjvm_cp_field *field) {
   bjvm_classdesc *search_on = field->my_class;
   bjvm_reflect_initialize_field(thread, search_on, field);
-  mn->vmindex = field->byte_offset; // field offset
-  mn->flags |= field->access_flags;
-  mn->flags |= MN_IS_FIELD;
+  M->vmindex = field->byte_offset; // field offset
+  M->flags |= field->access_flags;
+  M->flags |= MN_IS_FIELD;
   bjvm_classdesc *field_cd =
       load_class_of_field_descriptor(thread, field->descriptor);
-  mn->vmtarget = field;
-  mn->type = (void *)bjvm_get_class_mirror(thread, field_cd);
-  mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
+  M->vmtarget = field;
+  M->type = (void *)bjvm_get_class_mirror(thread, field_cd);
+  M->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
-void fill_mn_with_method(bjvm_thread *thread, struct bjvm_native_MemberName *mn,
-                         bjvm_cp_method *method, bool is_static,
+void fill_mn_with_method(bjvm_thread *thread, bjvm_handle *mn,
+                         bjvm_cp_method *method,
                          bool dynamic_dispatch) {
   assert(method);
   bjvm_classdesc *search_on = method->my_class;
   if (utf8_equals(method->name, "<init>")) {
     bjvm_reflect_initialize_constructor(thread, search_on, method);
-    mn->flags |= MN_IS_CONSTRUCTOR;
+    M->flags |= MN_IS_CONSTRUCTOR;
   } else {
     bjvm_reflect_initialize_method(thread, search_on, method);
-    mn->flags |= MN_IS_METHOD;
+    M->flags |= MN_IS_METHOD;
   }
 
-  mn->vmtarget = method;
-  mn->vmindex =
+  M->vmtarget = method;
+  M->vmindex =
       dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
-  mn->flags |= method->access_flags;
+  M->flags |= method->access_flags;
   if (!method->is_signature_polymorphic)
-    mn->type = bjvm_intern_string(thread, method->descriptor);
-  mn->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
+    M->type = bjvm_intern_string(thread, method->descriptor);
+  M->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
-bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
+bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   heap_string search_for =
-      mn->name ? read_string_to_utf8(mn->name) : make_heap_str(0);
+      M->name ? read_string_to_utf8(M->name) : make_heap_str(0);
   bjvm_classdesc *search_on =
-      ((struct bjvm_native_Class *)mn->clazz)->reflected_class;
+      ((struct bjvm_native_Class *)M->clazz)->reflected_class;
 
-  bjvm_method_handle_kind kind = unpack_mn_kind(mn); // TODO validate
-  mn->flags &= (int)0xFF000000U;
+  bjvm_method_handle_kind kind = unpack_mn_kind(M); // TODO validate
+  M->flags &= (int)0xFF000000U;
   bool is_static = false, dynamic_dispatch = true, found = false;
 
   switch (kind) {
@@ -125,7 +127,7 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_GET_FIELD:
   case BJVM_MH_KIND_PUT_FIELD:
-    bjvm_classdesc *field_type = bjvm_unmirror_class(mn->type);
+    bjvm_classdesc *field_type = bjvm_unmirror_class(M->type);
     INIT_STACK_STRING(field_str, 1000);
     bjvm_utf8 field_desc =
         unparse_classdesc_to_field_descriptor(field_str, field_type);
@@ -146,19 +148,19 @@ bool resolve_mn(bjvm_thread *thread, struct bjvm_native_MemberName *mn) {
     [[fallthrough]];
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_INTERFACE:
-    struct bjvm_native_MethodType *mt = (void *)mn->type;
+    struct bjvm_native_MethodType *mt = (void *)M->type;
     heap_string descriptor = unparse_method_type(mt);
     bjvm_cp_method *method = bjvm_easy_method_lookup(
         search_on, hslc(search_for), hslc(descriptor), true, false);
     free_heap_str(descriptor);
 
     if (!method) {
-      mn->type = nullptr;
+      M->type = nullptr;
       break;
     }
 
     found = true;
-    fill_mn_with_method(thread, mn, method, is_static, dynamic_dispatch);
+    fill_mn_with_method(thread, mn, method, dynamic_dispatch);
     break;
   default:
     UNREACHABLE();
@@ -174,7 +176,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   assert(argc == 2);
 
   struct bjvm_native_Class *caller = (void *)args[1].handle->obj;
-  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
+  bjvm_handle *mn = (void *)args[0].handle;
 
   bool found = resolve_mn(thread, mn);
   (void)found;
@@ -185,7 +187,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
     return value_null();
   }
 
-  return (bjvm_stack_value){.obj = (void *)mn};
+  return (bjvm_stack_value){.obj = (void *)mn->obj};
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
@@ -232,29 +234,29 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
                "(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V") {
-  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
+  bjvm_handle *mn = args[0].handle;
   bjvm_obj_header *target = args[1].handle->obj;
 
   bjvm_utf8 s = hslc(target->descriptor->name);
   if (utf8_equals(s, "java/lang/reflect/Method")) {
     bjvm_cp_method *m = *bjvm_unmirror_method(target);
-    fill_mn_with_method(thread, mn, m, false, true);
-    mn->flags |= (m->access_flags & BJVM_ACCESS_STATIC)
+    fill_mn_with_method(thread, mn, m, true);
+    M->flags |= (m->access_flags & BJVM_ACCESS_STATIC)
                      ? BJVM_MH_KIND_INVOKE_STATIC << 24
                      : BJVM_MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
-    fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), false, true);
-    mn->flags |= BJVM_MH_KIND_NEW_INVOKE_SPECIAL << 24;
+    fill_mn_with_method(thread, mn, *bjvm_unmirror_ctor(target), true);
+    M->flags |= BJVM_MH_KIND_NEW_INVOKE_SPECIAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Field")) {
     bjvm_cp_field *field = *bjvm_unmirror_field(target);
     fill_mn_with_field(thread, mn, field);
-    mn->flags |= (field->access_flags & BJVM_ACCESS_STATIC)
+    M->flags |= (field->access_flags & BJVM_ACCESS_STATIC)
                      ? BJVM_MH_KIND_GET_STATIC << 24
                      : BJVM_MH_KIND_GET_FIELD << 24;
   } else {
     UNREACHABLE();
   }
-  mn->resolution = nullptr;
+  M->resolution = nullptr;
   return value_null();
 }
 
