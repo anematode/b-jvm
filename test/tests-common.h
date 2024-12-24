@@ -18,6 +18,8 @@ using std::optional;
 using std::vector;
 
 namespace Bjvm::Tests {
+int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+                          size_t *len);
     std::unique_ptr<bjvm_vm, void(*)(bjvm_vm*)> CreateTestVM(bool preregister = false,
                                                              bjvm_vm_options options = bjvm_default_vm_options(),
                                                              const char** classpath = nullptr);

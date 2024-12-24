@@ -12,6 +12,10 @@
 #include "classfile.h"
 #include "util.h"
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,9 +23,10 @@ extern "C" {
 typedef struct bjvm_thread bjvm_thread;
 typedef struct bjvm_obj_header bjvm_obj_header;
 
-#ifndef _Nullable
-#define _Nullable   // for documentation purposes
+#ifndef EMSCRIPTEN_KEEPALIVE
+#define EMSCRIPTEN_KEEPALIVE   // used to allow access from JS
 #endif
+
 
 /**
  * For simplicity, we always store local variables/stack variables as 64 bits,
@@ -67,7 +72,7 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
 typedef enum {
   // Execution of the frame completed successfully and it has been removed
-  // from the execution stack.
+  // from the stack.
   BJVM_INTERP_RESULT_OK,
   // An exception was thrown and the frame completed abruptly, so
   // thread->current_exception is set.
@@ -196,11 +201,18 @@ typedef struct {
   size_t heap_size;
 } bjvm_vm_options;
 
+// Frames are aligned to 8 bytes, the natural alignment of a stack value.
+// Layout:
+//             -> stack grows this way
+// ┌──────────┬───────────────────────────────┬───────────────────────────────┐
+// │ metadata │ max_stack * bjvm_stack_value  │ max_locals * bjvm_stack_value │
+// └──────────┴───────────────────────────────┴───────────────────────────────┘
 typedef struct {
   uint16_t program_counter; // in instruction indices
   uint16_t stack_depth;
   uint16_t max_stack;
   uint16_t max_locals;
+
   // initialized to 0 on frame creation, but used by the currently executing
   // instruction to enable partial completions due to interruption. All
   // invoke* instructions use this field.
@@ -214,6 +226,7 @@ typedef struct {
   bjvm_stack_value result_of_next;
   // The method associated with this frame
   bjvm_cp_method *method;
+
   // First max_locals bjvm_stack_values, then max_stack more
   bjvm_stack_value values[];
 } bjvm_stack_frame;
@@ -251,7 +264,7 @@ typedef struct bjvm_thread {
   bjvm_handle *handles;
   int handles_capacity;
 
-  // Null handle, for convenience
+  // Handle for null
   bjvm_handle null_handle;
 
   // Thread-local allocation buffer (objects are first created here)
@@ -284,7 +297,11 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
 void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference);
 
 bjvm_vm_options bjvm_default_vm_options();
+
 bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
+
+bjvm_vm_options* bjvm_default_vm_options_ptr();
+
 void bjvm_major_gc(bjvm_vm *vm);
 
 typedef struct {
@@ -327,9 +344,6 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 
 void bjvm_free_vm(bjvm_vm *vm);
 
-/**
- * Implementation details, but exposed for testing...
- */
 void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name);
@@ -347,6 +361,23 @@ bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
 
+typedef struct {
+  bjvm_thread *thread;
+  bjvm_stack_frame *frame;
+  bjvm_stack_value *result;
+  bjvm_interpreter_result_t status;
+} bjvm_async_run_ctx;
+
+// Get an asynchronous running context. The caller should repeatedly call
+// bjvm_async_run_step() until it returns true.
+bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread, bjvm_cp_method *method,
+                    bjvm_stack_value *args, bjvm_stack_value *result);
+
+EMSCRIPTEN_KEEPALIVE
+bool bjvm_async_run_step(bjvm_async_run_ctx *ctx);
+
+void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx);
+
 void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
@@ -359,7 +390,7 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
-  bjvm_stack_frame _Nullable *final_frame, bjvm_stack_value _Nullable *result);
+  bjvm_stack_frame *final_frame, bjvm_stack_value *result);
 bjvm_interpreter_result_t bjvm_initialize_class(
     bjvm_thread *thread, bjvm_classdesc *classdesc);
 

@@ -684,12 +684,18 @@ bjvm_vm_options bjvm_default_vm_options() {
   return options;
 }
 
+bjvm_vm_options *bjvm_default_vm_options_ptr() {
+  bjvm_vm_options *options = malloc(sizeof(bjvm_vm_options));
+  *options = bjvm_default_vm_options();
+  return options;
+}
+
 static void _free_classdesc(void *cd) {
   bjvm_classdesc *classdesc = cd;
   classdesc->dtor(classdesc);
 }
 
-bjvm_vm *bjvm_create_vm(bjvm_vm_options options) {
+bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   bjvm_vm *vm = calloc(1, sizeof(bjvm_vm));
 
   vm->load_classfile = options.load_classfile;
@@ -1154,6 +1160,12 @@ bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread,
   int read_status =
       bjvm_vm_read_classfile(vm, filename, (const uint8_t **)&bytes, &cf_len);
   if (read_status) {
+    // If the file is ClassNotFoundException, abort to avoid stack overflow
+    if (utf8_equals(chars, "java/lang/ClassNotFoundException")) {
+      printf("Could not find class %.*s\n", fmt_slice(chars));
+      abort();
+    }
+
     int i = 0;
     for (; i < chars.len; ++i)
       filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
@@ -1488,9 +1500,7 @@ bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
                                                    STR("()V"), false, false);
   int error = 0;
   if (clinit) {
-    bjvm_stack_frame *frame = bjvm_push_frame(thread, clinit);
-    bjvm_stack_value result;
-    error = bjvm_bytecode_interpret(thread, frame, &result);
+    error = bjvm_thread_run(thread, clinit, nullptr, nullptr);
   }
   classdesc->state =
       error ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
@@ -1601,31 +1611,56 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
   return result;
 }
 
-// Immediately run the method, ignoring all attempts at interrupting.
-int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
+bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result) {
   assert(method);
-  bjvm_stack_frame *frame = bjvm_push_frame(thread, method);
-  if (!frame)
-    return -1;
+  bjvm_async_run_ctx *ctx = malloc(sizeof(bjvm_async_run_ctx));
 
-  int object_argument = !(method->access_flags & BJVM_ACCESS_STATIC);
-  for (int i = 0; i < method->parsed_descriptor->args_count + object_argument;
-       ++i) {
-    frame->values[frame->max_stack + i] = args[i];
+  ctx->thread = thread;
+  ctx->frame = bjvm_push_frame(thread, method);
+  ctx->result = result;
+  ctx->status = BJVM_INTERP_RESULT_EXC;
+  if (!ctx->frame)  // failed to allocate a frame
+    return ctx;
+  ctx->status = BJVM_INTERP_RESULT_INT;
+  int nonstatic = !(method->access_flags & BJVM_ACCESS_STATIC);
+  for (int i = 0; i < method->parsed_descriptor->args_count + nonstatic; ++i) {
+    ctx->frame->values[ctx->frame->max_stack + i] = args[i];
   }
-  // Async functions will get stuck here trying to interrupt vv
-  bjvm_interpreter_result_t status;
-  while ((status = bjvm_bytecode_interpret(thread, frame, result)) == BJVM_INTERP_RESULT_INT) {
-    printf("Propagated up to interrupt point!\n");
+  return ctx;
+}
+
+bool bjvm_async_run_step(bjvm_async_run_ctx *ctx) {
+  if (ctx->status < BJVM_INTERP_RESULT_INT) {
+    return true;  // done
   }
-  if (status == BJVM_INTERP_RESULT_MANDATORY_INT) {
-    bjvm_raise_exception(thread,
-      STR("java/lang/InternalError"),
-      STR("Attempted to execute an async function while in bjvm_thread_run"));
-    return -1;
+  ctx->status = bjvm_bytecode_interpret(ctx->thread, ctx->frame, ctx->result);
+  return ctx->status < BJVM_INTERP_RESULT_INT;
+}
+
+void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx) {
+  free(ctx);
+}
+
+int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
+                    bjvm_stack_value *args, bjvm_stack_value *result) {
+  bjvm_async_run_ctx *ctx = bjvm_thread_async_run(thread, method, args, result);
+  int ret;
+  while (!bjvm_async_run_step(ctx)) {
+    if (ctx->status == BJVM_INTERP_RESULT_MANDATORY_INT) {
+      bjvm_raise_exception(thread,
+        STR("java/lang/InternalError"),
+        STR("Attempted to execute an async function while in bjvm_thread_run"));
+      ret = -1;
+      goto done;
+    }
   }
-  return status == BJVM_INTERP_RESULT_OK;
+  assert(ctx->status < BJVM_INTERP_RESULT_INT);
+  ret = -(ctx->status == BJVM_INTERP_RESULT_EXC);
+
+done:
+  bjvm_free_async_run_ctx(ctx);
+  return ret;
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
@@ -2161,10 +2196,13 @@ bjvm_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
 
       int err = bjvm_bytecode_interpret(thread, invoked_frame, &frame->result_of_next);
       if (err != BJVM_INTERP_RESULT_OK) {
-        frame->state = INVOKE_STATE_MADE_FRAME;
+        if (err == BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_MADE_FRAME;
         return err;
       }
     }
+
+    frame->state = INVOKE_STATE_ENTRY;
 
     invoked_result = frame->result_of_next;
     frame->stack_depth -= args;
@@ -2231,7 +2269,6 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       assert(frame->native_args);
       native_args = frame->native_args;
     }
-    frame->state = INVOKE_STATE_MADE_FRAME;
 
     bjvm_native_callback *handle = method->native_handle;
     if (!handle->is_async) {
@@ -2241,6 +2278,7 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
       bjvm_interpreter_result_t status = ((bjvm_async_native_callback)handle->ptr)(
           thread, nullptr, native_args, args, &invoked_result, &frame->native_state);
       if (status >= BJVM_INTERP_RESULT_INT) {
+        frame->state = INVOKE_STATE_MADE_FRAME;
         return status;
       }
     }
@@ -2260,10 +2298,13 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
                          true);
       int err = bjvm_bytecode_interpret(thread, invoked_frame, &frame->result_of_next);
       if (err != BJVM_INTERP_RESULT_OK) {
-        frame->state = INVOKE_STATE_MADE_FRAME;
+        if (err == BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_MADE_FRAME;
         return err;
       }
     }
+
+    frame->state = INVOKE_STATE_ENTRY;
 
     invoked_result = frame->result_of_next;
     frame->stack_depth -= args;

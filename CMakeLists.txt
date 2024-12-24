@@ -19,7 +19,7 @@ FetchContent_MakeAvailable(Catch2)
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "-O2 -fexceptions -fwasm-exceptions -Wall -Wextra -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
     set(CMAKE_CXX_FLAGS "-O2 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
-    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=10000000 -fsanitize=undefined -s ALLOW_MEMORY_GROWTH=1")
+    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main','_set_up']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=10000000 -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\", \"cwrap\"' -Wl,--whole-archive")
 elseif (APPLE)
     set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
     set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
@@ -35,17 +35,18 @@ if (FALSE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (TRUE)
+if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
+
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
 
-add_executable(bjvm_main src/bin/main.c)
+add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now
 target_link_libraries(bjvm_main PRIVATE bjvm)
 set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
