@@ -73,8 +73,12 @@ typedef enum {
   // thread->current_exception is set.
   BJVM_INTERP_RESULT_EXC,
   // An interrupt occurred and the interpreter should be called again at some
-  // point. e.g. an asynchronous JS function was initiated.
-  BJVM_INTERP_RESULT_INT
+  // point. e.g. an interrupt for thread-switching purposes.
+  BJVM_INTERP_RESULT_INT,
+  // An interrupt occurred and the interpreter should be called again at some
+  // point, AND calling this function again without executing something else
+  // is a logical error. e.g. an interrupt of a JS async function
+  BJVM_INTERP_RESULT_MANDATORY_INT
 } bjvm_interpreter_result_t;
 
 typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
@@ -82,7 +86,7 @@ typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
                                                  bjvm_value *args, int argc);
 typedef bjvm_interpreter_result_t (*bjvm_async_native_callback)(
   bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
-  bjvm_stack_value *result, void** state);
+  bjvm_stack_value *result, void** sm_state);
 
 typedef struct {
   bool is_async;
@@ -336,8 +340,13 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         bool superclasses,
                                         bool superinterfaces);
 bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
+
+// Run the interpreter, getting stuck if we hit an asynchronous function. This
+// should only be used when you know that you're not going to be calling any
+// asynchronous functions. (e.g., initializing most JDK classes).
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
+
 void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,

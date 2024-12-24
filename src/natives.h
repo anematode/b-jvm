@@ -33,7 +33,7 @@ bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
 [[maybe_unused]] bjvm_value *args, \
 [[maybe_unused]] int argc, \
 [[maybe_unused]] bjvm_stack_value *result, \
-[[maybe_unused]] void** state)
+[[maybe_unused]] void** sm_state)
 
 #define DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,            \
                            method_descriptor_, modifier, async)                \

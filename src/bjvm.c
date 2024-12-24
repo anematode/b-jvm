@@ -1601,11 +1601,10 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
   return result;
 }
 
-// Run the interpreter, getting stuck if we hit an asynchronous function
+// Immediately run the method, ignoring all attempts at interrupting.
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result) {
   assert(method);
-
   bjvm_stack_frame *frame = bjvm_push_frame(thread, method);
   if (!frame)
     return -1;
@@ -1615,8 +1614,18 @@ int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
        ++i) {
     frame->values[frame->max_stack + i] = args[i];
   }
-  while (bjvm_bytecode_interpret(thread, frame, result) == BJVM_INTERP_RESULT_INT);
-  return 0;
+  // Async functions will get stuck here trying to interrupt vv
+  bjvm_interpreter_result_t status;
+  while ((status = bjvm_bytecode_interpret(thread, frame, result)) == BJVM_INTERP_RESULT_INT) {
+    printf("Propagated up to interrupt point!\n");
+  }
+  if (status == BJVM_INTERP_RESULT_MANDATORY_INT) {
+    bjvm_raise_exception(thread,
+      STR("java/lang/InternalError"),
+      STR("Attempted to execute an async function while in bjvm_thread_run"));
+    return -1;
+  }
+  return status == BJVM_INTERP_RESULT_OK;
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
@@ -2006,6 +2015,7 @@ bjvm_value *make_handles_array(bjvm_thread *thread,
   for (int i = 0; i < argc; ++i) {
     // For each argument, if it's a reference, wrap it in a handle; otherwise
     // just memcpy it over since the representations of primitives are the same
+    // between bjvm_stack_value and bjvm_value
     if (field_to_kind(calling->args + i) == BJVM_TYPE_KIND_REFERENCE) {
       result[i].handle = bjvm_make_handle(thread, stack_args[i].obj);
     } else {
@@ -2230,7 +2240,7 @@ bjvm_invokestatic(bjvm_thread *thread, bjvm_stack_frame *frame,
     } else {
       bjvm_interpreter_result_t status = ((bjvm_async_native_callback)handle->ptr)(
           thread, nullptr, native_args, args, &invoked_result, &frame->native_state);
-      if (status == BJVM_INTERP_RESULT_INT) {
+      if (status >= BJVM_INTERP_RESULT_INT) {
         return status;
       }
     }
@@ -2457,11 +2467,11 @@ bjvm_interpreter_result_t
 bjvm_bytecode_interpret(bjvm_thread *thread,
   bjvm_stack_frame *final_frame, bjvm_stack_value *result) {
 
-  bjvm_interpreter_result_t interp_status = BJVM_INTERP_RESULT_OK;
+  bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
 
   // Go to the top-most frame on the execution stack and set things up.
 get_top_frame:
-  if (thread->frames_count == 0) return interp_status;
+  if (thread->frames_count == 0) return status;
 
   bjvm_stack_frame *frame = *(thread->frames + thread->frames_count - 1);
 
@@ -3342,8 +3352,8 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_invokedynamic: {
-      interp_status = bjvm_invokedynamic(thread, frame, insn);
-      if (interp_status != BJVM_INTERP_RESULT_OK)
+      status = bjvm_invokedynamic(thread, frame, insn);
+      if (status != BJVM_INTERP_RESULT_OK)
         goto done;
       NEXT_INSN;
     }
@@ -3437,8 +3447,8 @@ interpret_frame:
     bjvm_insn_invokespecial:
     bjvm_insn_invokeinterface:
     bjvm_insn_invokevirtual: {
-      interp_status = bjvm_invokenonstatic(thread, frame, insn);
-      if (interp_status != BJVM_INTERP_RESULT_OK) {
+      status = bjvm_invokenonstatic(thread, frame, insn);
+      if (status != BJVM_INTERP_RESULT_OK) {
         // If an interrupt occurs, then there will be some new frames on the
         // stack beyond the current ones. Once interpret is called again, those
         // frames will ultimately resolve and bjvm_invokenonstatic will be
@@ -3449,8 +3459,8 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_invokestatic: {
-      interp_status = bjvm_invokestatic(thread, frame, insn);
-      if (interp_status != BJVM_INTERP_RESULT_OK) {
+      status = bjvm_invokestatic(thread, frame, insn);
+      if (status != BJVM_INTERP_RESULT_OK) {
         goto done;
       }
       NEXT_INSN;
@@ -3671,8 +3681,8 @@ interpret_frame:
   }
 
 done:;
-  if (interp_status == BJVM_INTERP_RESULT_INT)
-    return interp_status;
+  if (status >= BJVM_INTERP_RESULT_INT)
+    return status;
 
   if (thread->current_exception != nullptr) {
     bjvm_attribute_exception_table *table = method->code->exception_table;
@@ -3694,7 +3704,7 @@ done:;
             frame->values[0] =
                 (bjvm_stack_value){.obj = thread->current_exception};
             thread->current_exception = nullptr;
-            interp_status = BJVM_INTERP_RESULT_OK;
+            status = BJVM_INTERP_RESULT_OK;
 
             goto interpret_frame;
           }
@@ -3706,7 +3716,7 @@ done:;
   if (frame == final_frame) {
     bjvm_pop_frame(thread, frame);
     return thread->current_exception != nullptr ? BJVM_INTERP_RESULT_EXC
-                                                : interp_status;
+                                                : status;
   }
 
   // If there is a previous frame to go to, go to it

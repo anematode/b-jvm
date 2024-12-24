@@ -132,9 +132,9 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
 }
 
 DECLARE_ASYNC_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
-  if (*state == nullptr) {
+  if (*sm_state == nullptr) {
     printf("Interrupted!\n");
-    *state = (void*)1;
+    *sm_state = (void*)1;
     return BJVM_INTERP_RESULT_INT;
   }
 
