@@ -20,7 +20,6 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToVirtual,
   }
   bjvm_stack_value result;
   bjvm_bytecode_interpret(thread, new_frame, &result);
-  bjvm_pop_frame(thread, new_frame);
   return result;
 }
 
@@ -39,6 +38,5 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToStatic,
   }
   bjvm_stack_value result;
   bjvm_bytecode_interpret(thread, new_frame, &result);
-  bjvm_pop_frame(thread, new_frame);
   return result;
 }

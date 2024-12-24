@@ -19,6 +19,10 @@ extern "C" {
 typedef struct bjvm_thread bjvm_thread;
 typedef struct bjvm_obj_header bjvm_obj_header;
 
+#ifndef _Nullable
+#define _Nullable   // for documentation purposes
+#endif
+
 /**
  * For simplicity, we always store local variables/stack variables as 64 bits,
  * and only use part of them in the case of integer or float (or, in 32-bit
@@ -173,6 +177,13 @@ typedef struct {
   uint16_t max_stack;
   uint16_t max_locals;
 
+  // initialized to 0 on frame creation, but used by various intermediate
+  // functions for interruption purposes
+  int state;
+
+  // When an inner frame completes, the result is stored here (by default)
+  bjvm_stack_value result_of_next;
+
   bjvm_cp_method *method;
 
   // First max_locals bjvm_stack_values, then max_stack more
@@ -303,14 +314,33 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
 bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
 int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
-int bjvm_initialize_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
 
-int bjvm_bytecode_interpret(bjvm_thread *thread, bjvm_stack_frame *frame,
-                            bjvm_stack_value *result);
+typedef enum {
+  // Execution of the frame completed successfully and it has been removed
+  // from the execution stack.
+  BJVM_INTERP_RESULT_OK,
+  // An exception was thrown and the frame completed abruptly, so
+  // thread->current_exception is set.
+  BJVM_INTERP_RESULT_EXC,
+  // An interrupt occurred and the interpreter should be called again at some
+  // point. e.g. an asynchronous JS function was initiated.
+  BJVM_INTERP_RESULT_INT
+} bjvm_interpreter_result_t;
+
+// Continue execution of a thread.
+//
+// When popping frames off the stack, if the passed frame "final_frame" is
+// popped off, the result of that frame (if any) is placed in "result", and
+// either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
+// whether the frame completed abruptly.
+bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
+  bjvm_stack_frame _Nullable *final_frame, bjvm_stack_value _Nullable *result);
+bjvm_interpreter_result_t bjvm_initialize_class(
+    bjvm_thread *thread, bjvm_classdesc *classdesc);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
