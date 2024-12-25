@@ -3,7 +3,19 @@ import java.math.RoundingMode;
 
 public class Main {
     public static void main(String[] args) {
-        BigDecimalTest.testBigDecimalOperations();
+        long p = 0;
+        for (int i = 0; i < 100; ++i)
+            p += testOperation();
+        System.out.println(p);
+    }
+
+    static int testOperation() {
+        int a = 0;
+        for (int i = 0; i < 1000; ++i) {
+            a += i;
+        }
+        System.out.println("Bailing out!");
+        return a;
     }
 }
 
@@ -12,10 +24,5 @@ class BigDecimalTest {
         throw new RuntimeException("HI");
     }
 
-    static void testBigDecimalOperations() {
-        for (int i = 0; i < 20; ++i) {
-            System.out.println("Hello from Java!");
-            System.setOut(System.out);
-        }
-    }
+
 }

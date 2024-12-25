@@ -18,6 +18,7 @@
 #include "analysis.h"
 #include "classfile.h"
 #include "util.h"
+#include "wasm_jit.h"
 
 static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   switch (kind) {
@@ -213,6 +214,7 @@ void free_method(bjvm_cp_method *method) {
   for (int i = 0; i < method->attributes_count; ++i)
     bjvm_free_attribute(&method->attributes[i]);
   free_code_analysis(method->code_analysis);
+  free_wasm_compiled_method(method->compiled_method);
   free_method_descriptor(method->parsed_descriptor);
   free(method->attributes);
 }

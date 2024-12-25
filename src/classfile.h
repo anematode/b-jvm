@@ -581,6 +581,15 @@ typedef struct bjvm_cp_method {
   struct bjvm_native_Constructor *reflection_ctor;
   struct bjvm_native_Method *reflection_method;
   struct bjvm_native_MethodType *method_type_obj;
+
+  // Rough number of times this method has been called. Used for JIT heuristics.
+  // Not at all exact because of interrupts.
+  int call_count;
+
+  // JIT-compiled method
+  void *compiled_method; // bjvm_wasm_compiled_method*
+  // Already tried and failed
+  bool failed_jit;
 } bjvm_cp_method;
 
 typedef struct bjvm_cp_field {

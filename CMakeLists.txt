@@ -15,14 +15,22 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+FetchContent_Declare(
+        Binaryen
+        GIT_REPOSITORY https://github.com/WebAssembly/binaryen.git
+        GIT_TAG version_121
+)
+
+FetchContent_MakeAvailable(binaryen)
+
 # If doing emscripten
 if (EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "-O2 -fexceptions -fwasm-exceptions -Wall -Wextra -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
-    set(CMAKE_CXX_FLAGS "-O2 -fexceptions -fwasm-exceptions -Wall -gsource-map -Wpedantic -fno-strict-aliasing -Wbad-function-cast -Wcast-function-type")
-    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_main','_set_up']\" -s TOTAL_MEMORY=2048MB -sSTACK_SIZE=10000000 -s ALLOW_MEMORY_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\", \"cwrap\"' -Wl,--whole-archive")
+    set(CMAKE_C_FLAGS "-O1 -Wall -Wextra -Wpedantic")
+    set(CMAKE_CXX_FLAGS "-O1 -Wall -Wpedantic")
+    set(EmscriptenFlags "-sERROR_ON_WASM_CHANGES_AFTER_LINK -sWASM_BIGINT -O1 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"wasmTable\"'")
 elseif (APPLE)
-    set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
-    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
+    set(CMAKE_C_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
+    set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
     set(EmscriptenFlags "")
 else ()
     set(CMAKE_C_FLAGS "-O3 -Wall -Wextra -g -fsanitize=address,undefined -march=native -fno-strict-aliasing -lm")
@@ -30,12 +38,12 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (FALSE)
+if (RELEASE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (TRUE)
+if (FALSE AND NOT RELEASE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
@@ -45,6 +53,8 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
+target_include_directories(bjvm PRIVATE "${binaryen_SOURCE_DIR}/src")
+target_link_libraries(bjvm PRIVATE binaryen)
 
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now

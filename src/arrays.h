@@ -5,12 +5,12 @@
 #ifndef BJVM_ARRAYS_H
 #define BJVM_ARRAYS_H
 
+#include "bjvm.h"
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "bjvm.h"
-#include <stdint.h>
 
 #define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 

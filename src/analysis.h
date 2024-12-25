@@ -28,6 +28,7 @@ typedef struct bjvm_basic_block {
 typedef struct {
   union {
     struct {
+      // wasm jit depends on the order here
       bjvm_compressed_bitset *insn_index_to_references;
       bjvm_compressed_bitset *insn_index_to_ints;
       bjvm_compressed_bitset *insn_index_to_floats;
@@ -73,7 +74,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
                                      heap_string *error);
 
 void free_code_analysis(bjvm_code_analysis *analy);
-void scan_basic_blocks(const bjvm_attribute_code *code,
+void bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                        bjvm_code_analysis *analy);
 
 #endif // BJVM_ANALYSIS_H

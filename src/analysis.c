@@ -1555,7 +1555,7 @@ void push_bb_branch(bjvm_basic_block *current, uint32_t index) {
 
 int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
 
-void scan_basic_blocks(const bjvm_attribute_code *code,
+void bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                        bjvm_code_analysis *analy) {
   if (analy->blocks)
     return;
@@ -1573,7 +1573,7 @@ void scan_basic_blocks(const bjvm_attribute_code *code,
     } else if (insn->kind == bjvm_insn_tableswitch ||
                insn->kind == bjvm_insn_lookupswitch) {
       const struct bjvm_bc_tableswitch_data *tsd = &insn->tableswitch;
-      // Layout is the same -- dw about it
+      // Layout is the same between tableswitch and lookupswitch, so ok
       ts[tc++] = tsd->default_target;
       memcpy(ts + tc, tsd->targets, tsd->targets_count * sizeof(int));
       tc += tsd->targets_count;
@@ -1586,9 +1586,11 @@ void scan_basic_blocks(const bjvm_attribute_code *code,
     ts[block_count += ts[block_count] != ts[i]] = ts[i];
   bjvm_basic_block *bs = analy->blocks =
       calloc(++block_count, sizeof(bjvm_basic_block));
+  analy->block_count = block_count;
   for (int i = 0; i < block_count; ++i) {
     bs[i].start_index = ts[i];
     bs[i].start = code->code + ts[i];
+    bs[i].insn_count = i + 1 < block_count ? ts[i + 1] - ts[i] : code->insn_count - ts[i];
     bs[i].my_index = i;
   }
 #define FIND_TARGET_BLOCK(index)                                               \

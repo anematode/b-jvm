@@ -31,6 +31,7 @@
 #include "objects.h"
 #include "strings.h"
 #include "util.h"
+#include "wasm_jit.h"
 
 struct file_entry {
   size_t len;
@@ -2668,9 +2669,46 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
   return status;
 }
 
+int bjvm_run_as_wasm(bjvm_thread *thread,
+  bjvm_stack_frame *final_frame,
+  bjvm_stack_value *result,
+  bjvm_interpreter_result_t *interp_result) {
+  bjvm_cp_method *m = final_frame->method;
+
+  if (!m->compiled_method) {
+    m->compiled_method = bjvm_wasm_jit_compile(thread, m);
+    if (!m->compiled_method) {
+      m->failed_jit = true;
+      return 1;
+    }
+  }
+
+  *interp_result = ((bjvm_wasm_jit_compiled_method*)m->compiled_method)->fn
+    ((intptr_t)thread, (intptr_t)final_frame, (intptr_t)result);
+  if (*interp_result != BJVM_INTERP_RESULT_INT) {
+    bjvm_pop_frame(thread, final_frame);
+  }
+
+  return 0;
+}
+
+int should_attempt_to_jit(bjvm_cp_method *method) {
+  return method->call_count > 10 && !method->failed_jit && utf8_equals(method->name, "testOperation");
+}
+
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
                                                   bjvm_stack_frame *final_frame,
                                                   bjvm_stack_value *result) {
+  if (final_frame == thread->frames[thread->frames_count - 1] &&
+      final_frame->program_counter == 0 &&
+      should_attempt_to_jit(final_frame->method)) {
+    bjvm_interpreter_result_t interp_result;
+    int failed_to_compile = bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
+    if (!failed_to_compile) {
+      return interp_result;
+    }
+    printf("Continuing...\n");
+  }
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
 
@@ -2682,6 +2720,7 @@ get_top_frame:
   bjvm_stack_frame *frame = *(thread->frames + thread->frames_count - 1);
 
   bjvm_cp_method *method = frame->method;
+  method->call_count++;
   bjvm_bytecode_insn *code = method->code->code;
 
   if (thread->current_exception)
