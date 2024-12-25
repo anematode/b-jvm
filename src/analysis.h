@@ -74,7 +74,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
                                      heap_string *error);
 
 void free_code_analysis(bjvm_code_analysis *analy);
-void bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
-                       bjvm_code_analysis *analy);
+int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
+                           bjvm_code_analysis *analy);
 
 #endif // BJVM_ANALYSIS_H

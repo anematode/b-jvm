@@ -1555,10 +1555,10 @@ void push_bb_branch(bjvm_basic_block *current, uint32_t index) {
 
 int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
 
-void bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
-                       bjvm_code_analysis *analy) {
+int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
+                           bjvm_code_analysis *analy) {
   if (analy->blocks)
-    return;
+    return 0; // already done
   // First, record all branch targets. We're doing all exception handling in C
   // so it's ok if we don't analyze exception handlers.
   int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
@@ -1615,6 +1615,21 @@ void bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
     push_bb_branch(b, block_i + 1);
   }
   free(ts);
+  return 0;
+#undef FIND_TARGET_BLOCK
+}
+
+void dominator_dfs(bjvm_basic_block *blocks, int *preorder, int blockc, int i) {
+
+}
+
+// The classic Lengauer-Tarjan algorithm for dominator computation
+void bjvm_compute_dominators(bjvm_code_analysis *analy) {
+  assert(analy->blocks);
+  int block_count = analy->block_count;
+  int *preorder = malloc(block_count * sizeof(int));
+  memset(preorder, -1, block_count * sizeof(int));
+  dominator_dfs(analy->blocks, preorder, analy->block_count, 0);
 }
 
 // We try to recover the control-flow structure of the original Java source. In

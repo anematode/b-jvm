@@ -213,6 +213,8 @@ typedef struct {
 // │ metadata │ max_stack * bjvm_stack_value  │ max_locals * bjvm_stack_value │
 // └──────────┴───────────────────────────────┴───────────────────────────────┘
 typedef struct {
+  // Don't change these types w/o changing the respective stores in
+  // wasm_jit.c > spill or load code
   uint16_t program_counter; // in instruction indices
   uint16_t stack_depth;
   uint16_t max_stack;

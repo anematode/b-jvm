@@ -185,12 +185,19 @@ BinaryenExpressionRef spill_or_load_code(bjvm_wasm_compile_ctx *ctx, int pc, boo
 
   // Make block of all the spill/load instructions
   if (!do_load) {
-    // Set thread->program_counter to pc
+    // Set thread->program_counter to pc and thread->stack_depth to the stack depth
     BinaryenExpressionRef frame = BinaryenLocalGet(ctx->module, FRAME_PARAM, BinaryenTypeInt32());
     BinaryenExpressionRef pc_const = BinaryenConst(ctx->module, BinaryenLiteralInt32(pc));
-    BinaryenExpressionRef store = BinaryenStore(ctx->module, 4, offsetof(bjvm_stack_frame, program_counter), 0,
+    BinaryenExpressionRef store = BinaryenStore(ctx->module, sizeof(uint16_t), offsetof(bjvm_stack_frame, program_counter), 0,
       frame, pc_const, BinaryenTypeInt32(), "0");
     *VECTOR_PUSH(result, result_count, result_cap) = store;
+
+    int sd = ctx->analysis->insn_index_to_stack_depth[pc];
+    BinaryenExpressionRef pc_depth = BinaryenConst(ctx->module, BinaryenLiteralInt32(sd));
+    BinaryenExpressionRef store_depth = BinaryenStore(ctx->module, 4, offsetof(bjvm_stack_frame, stack_depth), 0,
+      frame, pc_depth, BinaryenTypeInt32(), "0");
+
+    *VECTOR_PUSH(result, result_count, result_cap) = store_depth;
     *VECTOR_PUSH(result, result_count, result_cap) = BinaryenReturn(ctx->module, BinaryenConst(ctx->module, BinaryenLiteralInt32(return_value)));
   }
 
@@ -201,6 +208,11 @@ BinaryenExpressionRef spill_or_load_code(bjvm_wasm_compile_ctx *ctx, int pc, boo
 EMSCRIPTEN_KEEPALIVE
 void *wasm_runtime_new_array(bjvm_thread *thread, bjvm_classdesc *classdesc, int count) {
   return CreateObjectArray1D(thread, classdesc, count);
+}
+
+EMSCRIPTEN_KEEPALIVE
+void *wasm_runtime_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
+
 }
 
 EMSCRIPTEN_KEEPALIVE

@@ -37,9 +37,7 @@ extern "C" {
 #define VECTOR_PUSH(vector, vector_count, vector_cap)                          \
   ({                                                                           \
     if ((vector_count) >= (vector_cap)) {                                      \
-      int new_cap;                                                             \
-      int overflow = __builtin_mul_overflow((vector_cap), 2, &new_cap);        \
-      assert(!overflow);                                                       \
+      int new_cap = vector_cap * 2;                                            \
       if (new_cap < 2)                                                         \
         new_cap = 2;                                                           \
       void *next = realloc(vector, new_cap * sizeof(*vector));                 \
