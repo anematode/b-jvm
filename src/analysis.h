@@ -17,6 +17,13 @@ typedef struct bjvm_basic_block {
   uint32_t *next;
   int next_count;
   int next_cap;
+
+  uint32_t *prev;
+  int prev_count;
+  int prev_cap;
+
+  // Immediate dominator of this block
+  uint32_t idom;
 } bjvm_basic_block;
 
 // Result of the analysis of a code segment. During analysis, stack operations
@@ -76,5 +83,6 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
 void free_code_analysis(bjvm_code_analysis *analy);
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy);
+void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
 
 #endif // BJVM_ANALYSIS_H

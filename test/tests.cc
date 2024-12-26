@@ -505,6 +505,15 @@ TEST_CASE("ConstantValue initialisation") {
   REQUIRE(result.stdout_ == "2147483647\n");
 }
 
+TEST_CASE("Deranged CFG") {
+  auto result = run_test_case("test_files/cfg_fuck/", true);
+  auto expected = ReadFile("test_files/cfg_fuck/reference.txt").value();
+  std::string as_string;
+  for (int i = 0; i < expected.size(); ++i)
+    as_string.push_back(expected.at(i));
+  REQUIRE(result.stdout_ == as_string);
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
 }

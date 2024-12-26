@@ -38,9 +38,9 @@ extern "C" {
   ({                                                                           \
     if (__builtin_expect((vector_count) >= (vector_cap), 0)) {                 \
       int new_cap = vector_cap * 2 + 1;                                        \
-      void *next = realloc(vector, new_cap * sizeof(*vector));                 \
+      void *_next = realloc(vector, new_cap * sizeof(*vector));                \
       (vector_cap) = new_cap;                                                  \
-      vector = next;                                                           \
+      vector = _next;                                                          \
     }                                                                          \
     &vector[(vector_count)++];                                                 \
   })
