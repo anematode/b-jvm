@@ -14,9 +14,9 @@
 #include <unordered_map>
 
 #include "../src/adt.h"
+#include "../src/analysis.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
-#include "../src/analysis.h"
 #include "../src/wasm_jit.h"
 #include "tests-common.h"
 
@@ -444,7 +444,7 @@ Cow value: 15
   for (int i = 0; i < 10; ++i)
     expected += expected;
   auto result = run_test_case("test_files/advanced_lambda/", true);
-  //REQUIRE(result.stdout_.length() == expected.length());
+  // REQUIRE(result.stdout_.length() == expected.length());
   REQUIRE(result.stdout_ == expected);
 
   BENCHMARK("Advanced lambda benchmark") {
@@ -526,34 +526,28 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   REQUIRE(utf8_equals(m->name, "main"));
 
   bjvm_analyze_method_code(m, nullptr);
-  auto *analy = (bjvm_code_analysis*) m->code_analysis;
+  auto *analy = (bjvm_code_analysis *)m->code_analysis;
   bjvm_scan_basic_blocks(m->code, analy);
   bjvm_compute_dominator_tree(analy);
 
-  std::vector<std::pair<int, int>> doms = {
-    { 1, 0 },
-    { 2, 1},
-    { 3, 2},
-    {4, 3},
-    {5, 4},
-    {6, 5},
-    {7, 6},
-    {8, 6},
-    {9, 6},
-    {10, 6},
-    {11, 6},
-    {12, 6},
-    {13, 6},
-    {14, 5},
-    {15, 14},
-    {16, 14},
-    {17, 16},
-    {18, 5},
-    {19, 4},
-    {20, 4},
-    {21, 20},
-    {22, 1}
+  BENCHMARK("analyze method code") { bjvm_analyze_method_code(m, nullptr); };
+
+  BENCHMARK("scan basic blocks") {
+    free(analy->blocks);
+    analy->blocks = nullptr;
+    bjvm_scan_basic_blocks(m->code, analy);
   };
+
+  BENCHMARK("compute dominator tree") {
+    analy->dominator_tree_computed = false;
+    bjvm_compute_dominator_tree(analy);
+  };
+
+  std::vector<std::pair<int, int>> doms = {
+      {1, 0},  {2, 1},  {3, 2},   {4, 3},   {5, 4},   {6, 5},
+      {7, 6},  {8, 6},  {9, 6},   {10, 6},  {11, 6},  {12, 6},
+      {13, 6}, {14, 5}, {15, 14}, {16, 14}, {17, 16}, {18, 5},
+      {19, 4}, {20, 4}, {21, 20}, {22, 1}};
 
   for (auto [a, b] : doms) {
     REQUIRE(analy->blocks[a].idom == b);
@@ -568,5 +562,5 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 }
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/playground/", false);
+  // auto result = run_test_case("test_files/playground/", false);
 }

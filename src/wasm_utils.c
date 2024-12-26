@@ -13,27 +13,30 @@ enum {
 #define MODULE_ALLOCATION_SIZE_BYTES (1 << 16)
 
 #ifndef EMSCRIPTEN
-#define EMSCRIPTEN_KEEPALIVE  // so that it compiles on non-emscripten
+#define EMSCRIPTEN_KEEPALIVE // so that it compiles on non-emscripten
 #endif
 
-static void* module_malloc(bjvm_wasm_module *module, int size) {
+static void *module_malloc(bjvm_wasm_module *module, int size) {
   if (size > MODULE_ALLOCATION_SIZE_BYTES) {
     // Too big for an arena allocation, just make a new mf
     if (module->arenas_count) {
-      char* last_arena = module->arenas[module->arenas_count - 1];
-      *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) = last_arena;
+      char *last_arena = module->arenas[module->arenas_count - 1];
+      *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) =
+          last_arena;
       return module->arenas[module->arenas_count - 2] = malloc(size);
     }
-    return *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_count) = malloc(size);
+    return *VECTOR_PUSH(module->arenas, module->arenas_count,
+                        module->arenas_count) = malloc(size);
   }
   if (module->last_arena_used + size < MODULE_ALLOCATION_SIZE_BYTES) {
-    char* last_arena = module->arenas[module->arenas_count - 1];
-    char* result = last_arena + module->last_arena_used;
+    char *last_arena = module->arenas[module->arenas_count - 1];
+    char *result = last_arena + module->last_arena_used;
     module->last_arena_used += size;
     return result;
   }
-  char* new_arena = malloc(MODULE_ALLOCATION_SIZE_BYTES);
-  *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) = new_arena;
+  char *new_arena = malloc(MODULE_ALLOCATION_SIZE_BYTES);
+  *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) =
+      new_arena;
   module->last_arena_used = size;
   // align to 8 bytes
   if (size % 8) {
@@ -42,25 +45,27 @@ static void* module_malloc(bjvm_wasm_module *module, int size) {
   return new_arena;
 }
 
-static void* module_calloc(bjvm_wasm_module *module, int size) {
-  char* result = module_malloc(module, size);
+static void *module_calloc(bjvm_wasm_module *module, int size) {
+  char *result = module_malloc(module, size);
   memset(result, 0, size);
   return result;
 }
 
 // TODO use
-static void* module_copy(bjvm_wasm_module *module, const void* src, int size) {
-  void* dest = module_malloc(module, size);
+static void *module_copy(bjvm_wasm_module *module, const void *src, int size) {
+  void *dest = module_malloc(module, size);
   memcpy(dest, src, size);
   return dest;
 }
 
 static bjvm_wasm_type from_basic_type(bjvm_wasm_value_type kind) {
-  return (bjvm_wasm_type) { .val = (uintptr_t)kind };
+  return (bjvm_wasm_type){.val = (uintptr_t)kind};
 }
 
-static bjvm_wasm_expression *module_expr(bjvm_wasm_module *module, bjvm_wasm_expr_kind kind) {
-  bjvm_wasm_expression *result = module_calloc(module, sizeof(bjvm_wasm_expression));
+static bjvm_wasm_expression *module_expr(bjvm_wasm_module *module,
+                                         bjvm_wasm_expr_kind kind) {
+  bjvm_wasm_expression *result =
+      module_calloc(module, sizeof(bjvm_wasm_expression));
   result->kind = kind;
   result->expr_type = from_basic_type(BJVM_WASM_TYPE_KIND_INFER);
   return result;
@@ -73,7 +78,7 @@ void write_byte(bjvm_bytevector *ctx, int byte) {
 }
 
 // Write the bytes to the serialization context
-void write_slice(bjvm_bytevector *ctx, const uint8_t* bytes, size_t len) {
+void write_slice(bjvm_bytevector *ctx, const uint8_t *bytes, size_t len) {
   size_t new_length = ctx->bytes_len + len;
   if (new_length > ctx->bytes_cap) {
     size_t new_cap = ctx->bytes_cap * 2;
@@ -160,27 +165,30 @@ void bjvm_wasm_writeint(bjvm_bytevector *ctx, int64_t value) {
   write_byte(ctx, byte);
 }
 
-bjvm_wasm_module * bjvm_wasm_module_create() {
+bjvm_wasm_module *bjvm_wasm_module_create() {
   bjvm_wasm_module *module = calloc(1, sizeof(bjvm_wasm_module));
   module->last_arena_used = INT_MAX / 2;
   return module;
 }
 
 static uint32_t register_function_type(bjvm_wasm_module *module,
-  bjvm_wasm_type params, bjvm_wasm_type results) {
-  bjvm_wasm_ser_function_type search = { params, results };
+                                       bjvm_wasm_type params,
+                                       bjvm_wasm_type results) {
+  bjvm_wasm_ser_function_type search = {params, results};
   // Search function types for an existing one. Since we intern types we can
   // compare by value
   for (int i = 0; i < module->fn_types_count; ++i) {
-    if (memcmp(module->fn_types + i, &search, sizeof(bjvm_wasm_ser_function_type)) == 0)
+    if (memcmp(module->fn_types + i, &search,
+               sizeof(bjvm_wasm_ser_function_type)) == 0)
       return i;
   }
 
-  *VECTOR_PUSH(module->fn_types, module->fn_types_count, module->fn_types_cap) = search;
+  *VECTOR_PUSH(module->fn_types, module->fn_types_count, module->fn_types_cap) =
+      search;
   return module->fn_types_count - 1;
 }
 
-void write_tuple_type(bjvm_bytevector * result, bjvm_wasm_type params) {
+void write_tuple_type(bjvm_bytevector *result, bjvm_wasm_type params) {
   bjvm_wasm_tuple_type *tuple = bjvm_wasm_get_tuple_type(params);
   if (tuple) {
     bjvm_wasm_writeuint(result, tuple->types_len);
@@ -200,11 +208,11 @@ void write_tuple_type(bjvm_bytevector * result, bjvm_wasm_type params) {
 
 void serialize_typesection(bjvm_bytevector *result, bjvm_wasm_module *module) {
   write_byte(result, SECTION_ID_TYPE);
-  bjvm_bytevector sect = { nullptr };
+  bjvm_bytevector sect = {nullptr};
   bjvm_wasm_writeuint(&sect, module->fn_types_count);
   for (int i = 0; i < module->fn_types_count; ++i) {
     bjvm_wasm_ser_function_type *fn_type = module->fn_types + i;
-    write_byte(&sect, 0x60);  // function type
+    write_byte(&sect, 0x60); // function type
     write_tuple_type(&sect, fn_type->params);
     write_tuple_type(&sect, fn_type->results);
   }
@@ -213,9 +221,10 @@ void serialize_typesection(bjvm_bytevector *result, bjvm_wasm_module *module) {
   free(sect.bytes);
 }
 
-void serialize_functionsection(bjvm_bytevector *result, bjvm_wasm_module *module) {
+void serialize_functionsection(bjvm_bytevector *result,
+                               bjvm_wasm_module *module) {
   write_byte(result, SECTION_ID_FUNCTION);
-  bjvm_bytevector sect = { nullptr };
+  bjvm_bytevector sect = {nullptr};
   bjvm_wasm_writeuint(&sect, module->function_count);
   for (int i = 0; i < module->function_count; ++i) {
     bjvm_wasm_function *fn = module->functions[i];
@@ -228,18 +237,19 @@ void serialize_functionsection(bjvm_bytevector *result, bjvm_wasm_module *module
   free(sect.bytes);
 }
 
-void serialize_importsection(bjvm_bytevector *result, bjvm_wasm_module * module) {
-  const int PREDEFINED_IMPORT_COUNT = 1;  // memory
+void serialize_importsection(bjvm_bytevector *result,
+                             bjvm_wasm_module *module) {
+  const int PREDEFINED_IMPORT_COUNT = 1; // memory
   write_byte(result, SECTION_ID_IMPORT);
 
-  bjvm_bytevector sect = { nullptr };
+  bjvm_bytevector sect = {nullptr};
   bjvm_wasm_writeuint(&sect, module->import_count + PREDEFINED_IMPORT_COUNT);
   // Predefined imports
   write_string(&sect, "env");
   write_string(&sect, "memory");
   write_byte(&sect, BJVM_WASM_IMPORT_KIND_MEMORY); // memory
-  write_byte(&sect, 0x00); // flags
-  bjvm_wasm_writeuint(&sect, 1); // initial
+  write_byte(&sect, 0x00);                         // flags
+  bjvm_wasm_writeuint(&sect, 1);                   // initial
   for (int i = 0; i < module->import_count; ++i) {
     bjvm_wasm_import *import = module->imports + i;
     write_string(&sect, import->module);
@@ -262,17 +272,19 @@ typedef struct expression_ser_ctx {
   struct expression_ser_ctx *prev_block_ctx;
 } expression_ser_ctx;
 
-uint32_t walk_to_find_label(expression_ser_ctx *ctx, bjvm_wasm_expression *break_to) {
+uint32_t walk_to_find_label(expression_ser_ctx *ctx,
+                            bjvm_wasm_expression *break_to) {
   uint32_t i = 0;
   while (ctx && ctx->associated_block != break_to) {
     ++i;
     ctx = ctx->prev_block_ctx;
   }
-  assert(ctx);  // if this fails, we're trying to break to a non-enclosing block
+  assert(ctx); // if this fails, we're trying to break to a non-enclosing block
   return i;
 }
 
-void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body, bjvm_wasm_expression *expr) {
+void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
+                          bjvm_wasm_expression *expr) {
   switch (expr->kind) {
   case BJVM_WASM_EXPR_KIND_DROP:
     write_byte(body, 0x1A);
@@ -361,7 +373,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body, bjvm_w
     serialize_expression(ctx, body, expr->unary_op.arg);
     bjvm_wasm_unary_op_kind op = expr->unary_op.op;
     if (op > 0xff)
-      write_byte(body, 0xFC);  // extended opcode
+      write_byte(body, 0xFC); // extended opcode
     write_byte(body, op & 0xff);
     break;
   }
@@ -383,13 +395,13 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body, bjvm_w
     for (int i = 0; i < expr->block.list.expr_count; ++i) {
       serialize_expression(&new_ctx, body, expr->block.list.exprs[i]);
     }
-    write_byte(body, 0x0B);  // end block
+    write_byte(body, 0x0B); // end block
     break;
   }
   case BJVM_WASM_EXPR_KIND_IF: {
     serialize_expression(ctx, body, expr->if_.condition);
     write_byte(body, 0x04);
-    write_byte(body, 0x40);  // TODO add block types
+    write_byte(body, 0x40); // TODO add block types
     expression_ser_ctx new_ctx = *ctx;
     new_ctx.associated_block = expr;
     new_ctx.prev_block_ctx = ctx;
@@ -398,7 +410,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body, bjvm_w
       write_byte(body, 0x05);
       serialize_expression(&new_ctx, body, expr->if_.false_expr);
     }
-    write_byte(body, 0x0B);  // end if
+    write_byte(body, 0x0B); // end if
     break;
   }
   case BJVM_WASM_EXPR_KIND_BR: {
@@ -425,8 +437,9 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body, bjvm_w
   }
 }
 
-void write_compressed_locals(bjvm_bytevector *body, const bjvm_wasm_tuple_type *locals) {
-  bjvm_bytevector types = { nullptr };
+void write_compressed_locals(bjvm_bytevector *body,
+                             const bjvm_wasm_tuple_type *locals) {
+  bjvm_bytevector types = {nullptr};
   int count = 0;
   if (locals) {
     int i = 1, j = 0;
@@ -448,19 +461,23 @@ void write_compressed_locals(bjvm_bytevector *body, const bjvm_wasm_tuple_type *
   free(types.bytes);
 }
 
-void serialize_function_locals_and_code(bjvm_bytevector *body, bjvm_wasm_module *module, bjvm_wasm_function *function) {
+void serialize_function_locals_and_code(bjvm_bytevector *body,
+                                        bjvm_wasm_module *module,
+                                        bjvm_wasm_function *function) {
   // Locals first
-  const bjvm_wasm_tuple_type *locals = bjvm_wasm_get_tuple_type(function->locals);
+  const bjvm_wasm_tuple_type *locals =
+      bjvm_wasm_get_tuple_type(function->locals);
   write_compressed_locals(body, locals);
   // Now write the expression
-  expression_ser_ctx ctx = { module };
+  expression_ser_ctx ctx = {module};
   ctx.enclosing = function;
   serialize_expression(&ctx, body, function->body);
   // End function
   write_byte(body, 0x0B);
 }
 
-void serialize_codesection(bjvm_bytevector *code_section, bjvm_wasm_module *module) {
+void serialize_codesection(bjvm_bytevector *code_section,
+                           bjvm_wasm_module *module) {
   write_byte(code_section, 0x0A);
   bjvm_bytevector body = {nullptr};
   bjvm_wasm_writeuint(&body, module->function_count);
@@ -478,7 +495,7 @@ void serialize_codesection(bjvm_bytevector *code_section, bjvm_wasm_module *modu
 
 void serialize_exportsection(bjvm_bytevector *rest, bjvm_wasm_module *module) {
   write_byte(rest, 0x07);
-  bjvm_bytevector sect = { nullptr };
+  bjvm_bytevector sect = {nullptr};
   int export_count = 0;
   for (int i = 0; i < module->function_count; ++i) {
     if (module->functions[i]->exported)
@@ -489,7 +506,7 @@ void serialize_exportsection(bjvm_bytevector *rest, bjvm_wasm_module *module) {
     bjvm_wasm_function *fn = module->functions[i];
     if (fn->exported) {
       write_string(&sect, fn->name);
-      write_byte(&sect, 0x00);  // func
+      write_byte(&sect, 0x00); // func
       bjvm_wasm_writeuint(&sect, fn->my_index);
     }
   }
@@ -498,17 +515,16 @@ void serialize_exportsection(bjvm_bytevector *rest, bjvm_wasm_module *module) {
   free(sect.bytes);
 }
 
-bjvm_bytevector
-bjvm_wasm_module_serialize(bjvm_wasm_module *module) {
+bjvm_bytevector bjvm_wasm_module_serialize(bjvm_wasm_module *module) {
   const char *WASM_MAGIC = "\0asm";
   bjvm_bytevector result = {nullptr};
   write_byte(&result, WASM_MAGIC[0]);
   write_byte(&result, WASM_MAGIC[1]);
   write_byte(&result, WASM_MAGIC[2]);
   write_byte(&result, WASM_MAGIC[3]);
-  write_u32(&result, 1);  // version
+  write_u32(&result, 1); // version
 
-  bjvm_bytevector rest = { nullptr };
+  bjvm_bytevector rest = {nullptr};
   serialize_importsection(&rest, module);
   serialize_functionsection(&rest, module);
   // serialize_tablesection(&rest, module);
@@ -540,27 +556,31 @@ void bjvm_wasm_module_destroy(bjvm_wasm_module *module) {
 }
 
 bjvm_wasm_type bjvm_wasm_make_tuple(bjvm_wasm_module *module,
-    bjvm_wasm_value_type *components, int length) {
+                                    bjvm_wasm_value_type *components,
+                                    int length) {
   // Search for an existing tuple type
   for (int i = 0; i < module->result_types_count; ++i) {
     bjvm_wasm_tuple_type *tuple = module->interned_result_types[i];
     if (tuple->types_len != length)
       continue;
-    if (memcmp(tuple->types, components, length * sizeof(bjvm_wasm_value_type)) == 0)
-      return (bjvm_wasm_type) { .val = (uintptr_t)tuple };
+    if (memcmp(tuple->types, components,
+               length * sizeof(bjvm_wasm_value_type)) == 0)
+      return (bjvm_wasm_type){.val = (uintptr_t)tuple};
   }
-  bjvm_wasm_tuple_type *tuple = module_malloc(module,
-    sizeof(bjvm_wasm_tuple_type) + length * sizeof(bjvm_wasm_value_type));
+  bjvm_wasm_tuple_type *tuple =
+      module_malloc(module, sizeof(bjvm_wasm_tuple_type) +
+                                length * sizeof(bjvm_wasm_value_type));
   tuple->types_len = length;
   memcpy(tuple->types, components, length * sizeof(bjvm_wasm_value_type));
-  *VECTOR_PUSH(module->interned_result_types, module->result_types_count, module->result_types_cap) = tuple;
-  return (bjvm_wasm_type) { .val = (uintptr_t)tuple };
+  *VECTOR_PUSH(module->interned_result_types, module->result_types_count,
+               module->result_types_cap) = tuple;
+  return (bjvm_wasm_type){.val = (uintptr_t)tuple};
 }
 
 bjvm_wasm_tuple_type *bjvm_wasm_get_tuple_type(bjvm_wasm_type type) {
   if (type.val < 255)
     return nullptr;
-  return (void*)type.val;
+  return (void *)type.val;
 }
 
 bjvm_wasm_value_type bjvm_wasm_get_basic_type(bjvm_wasm_type type) {
@@ -569,53 +589,52 @@ bjvm_wasm_value_type bjvm_wasm_get_basic_type(bjvm_wasm_type type) {
 }
 
 void bjvm_wasm_export_function(bjvm_wasm_module *module,
-    bjvm_wasm_function *fn) {
+                               bjvm_wasm_function *fn) {
   fn->exported = true;
 }
 
-const char * bjvm_wasm_copy_string(bjvm_wasm_module *module,
-                                       const char *str) {
-  char* result = module_malloc(module, strlen(str) + 1);
+const char *bjvm_wasm_copy_string(bjvm_wasm_module *module, const char *str) {
+  char *result = module_malloc(module, strlen(str) + 1);
   strcpy(result, str);
   return result;
 }
 
-bjvm_wasm_function * bjvm_wasm_add_function(bjvm_wasm_module *module,
-  bjvm_wasm_type params, bjvm_wasm_type results,
-  bjvm_wasm_type locals, bjvm_wasm_expression *body, const char *name) {
+bjvm_wasm_function *
+bjvm_wasm_add_function(bjvm_wasm_module *module, bjvm_wasm_type params,
+                       bjvm_wasm_type results, bjvm_wasm_type locals,
+                       bjvm_wasm_expression *body, const char *name) {
   bjvm_wasm_function *fn = module_calloc(module, sizeof(bjvm_wasm_function));
   fn->params = params;
   fn->results = results;
   fn->locals = locals;
   fn->body = body;
   fn->name = bjvm_wasm_copy_string(module, name);
-  *VECTOR_PUSH(module->functions, module->function_count, module->function_cap) = fn;
+  *VECTOR_PUSH(module->functions, module->function_count,
+               module->function_cap) = fn;
   return fn;
 }
 
 static bjvm_wasm_value_type char_to_basic_type(char a) {
   switch (a) {
   case 'd':
-  return BJVM_WASM_TYPE_KIND_FLOAT64;
+    return BJVM_WASM_TYPE_KIND_FLOAT64;
   case 'i':
-  return BJVM_WASM_TYPE_KIND_INT32;
+    return BJVM_WASM_TYPE_KIND_INT32;
   case 'j':
-  return BJVM_WASM_TYPE_KIND_INT64;
+    return BJVM_WASM_TYPE_KIND_INT64;
   case 'f':
-  return BJVM_WASM_TYPE_KIND_FLOAT32;
+    return BJVM_WASM_TYPE_KIND_FLOAT32;
   case 'v':
-  return BJVM_WASM_TYPE_KIND_VOID;
+    return BJVM_WASM_TYPE_KIND_VOID;
   default:
     UNREACHABLE();
   }
 }
 
-bjvm_wasm_function *bjvm_wasm_import_runtime_function_impl(
-    bjvm_wasm_module *module,
-    const char *c_name,
-    const char *params,
-    const char *result,
-    void* dummy) {
+bjvm_wasm_function *
+bjvm_wasm_import_runtime_function_impl(bjvm_wasm_module *module,
+                                       const char *c_name, const char *params,
+                                       const char *result, void *dummy) {
   (void)dummy;
 
   bjvm_wasm_function *fn = module_calloc(module, sizeof(bjvm_wasm_function));
@@ -630,111 +649,127 @@ bjvm_wasm_function *bjvm_wasm_import_runtime_function_impl(
   fn->locals = bjvm_wasm_void();
   const char *name_cpy = bjvm_wasm_copy_string(module, c_name);
   fn->name = name_cpy;
-  bjvm_wasm_import *import = VECTOR_PUSH(module->imports, module->import_count, module->import_cap);
+  bjvm_wasm_import *import =
+      VECTOR_PUSH(module->imports, module->import_count, module->import_cap);
   import->module = "env";
   import->name = name_cpy;
-  import->func = (bjvm_wasm_func_import) {
-    .type = register_function_type(module, fn->params, fn->results),
-    .associated = fn,
+  import->func = (bjvm_wasm_func_import){
+      .type = register_function_type(module, fn->params, fn->results),
+      .associated = fn,
   };
   return fn;
 }
-bjvm_wasm_expression *bjvm_wasm_f32_const(bjvm_wasm_module *module, float value) {
+bjvm_wasm_expression *bjvm_wasm_f32_const(bjvm_wasm_module *module,
+                                          float value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x43;
   memcpy(result->literal.bytes, &value, 4);
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_f64_const(bjvm_wasm_module *module, double value) {
+bjvm_wasm_expression *bjvm_wasm_f64_const(bjvm_wasm_module *module,
+                                          double value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x44;
   memcpy(result->literal.bytes, &value, 8);
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_i32_const(bjvm_wasm_module *module, int32_t value) {
+bjvm_wasm_expression *bjvm_wasm_i32_const(bjvm_wasm_module *module,
+                                          int32_t value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x41;
   memcpy(result->literal.bytes, &value, 4);
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module, int64_t value) {
+bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module,
+                                          int64_t value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x42;
   memcpy(result->literal.bytes, &value, 8);
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module, uint32_t index, bjvm_wasm_type kind) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_GET_LOCAL);
+bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module,
+                                          uint32_t index, bjvm_wasm_type kind) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_GET_LOCAL);
   result->local_get = index;
   result->expr_type = kind;
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module, uint32_t index, bjvm_wasm_expression *value) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_SET_LOCAL);
-  result->local_set = (bjvm_wasm_local_set_expression) {
-    .local_index = index,
-    .value = value
-  };
+bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module,
+                                          uint32_t index,
+                                          bjvm_wasm_expression *value) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_SET_LOCAL);
+  result->local_set =
+      (bjvm_wasm_local_set_expression){.local_index = index, .value = value};
   result->expr_type = bjvm_wasm_void();
   return result;
 }
 
 bjvm_wasm_expression *bjvm_wasm_binop(bjvm_wasm_module *module,
-                                           bjvm_wasm_binary_op_kind op, bjvm_wasm_expression *left,
-                                           bjvm_wasm_expression *right) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_BINARY_OP);
-  result->binary_op = (bjvm_wasm_binary_expression) {
-    .op = op,
-    .left = left,
-    .right = right,
+                                      bjvm_wasm_binary_op_kind op,
+                                      bjvm_wasm_expression *left,
+                                      bjvm_wasm_expression *right) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_BINARY_OP);
+  result->binary_op = (bjvm_wasm_binary_expression){
+      .op = op,
+      .left = left,
+      .right = right,
   };
   return result;
 }
 
 bjvm_wasm_expression *bjvm_wasm_select(bjvm_wasm_module *module,
-                                         bjvm_wasm_expression *condition,
-                                         bjvm_wasm_expression *true_expr,
-                                         bjvm_wasm_expression *false_expr) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_SELECT);
-  result->select = (bjvm_wasm_select_expression) {
-    .condition = condition,
-    .true_expr = true_expr,
-    .false_expr = false_expr,
+                                       bjvm_wasm_expression *condition,
+                                       bjvm_wasm_expression *true_expr,
+                                       bjvm_wasm_expression *false_expr) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_SELECT);
+  result->select = (bjvm_wasm_select_expression){
+      .condition = condition,
+      .true_expr = true_expr,
+      .false_expr = false_expr,
   };
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_block_impl(bjvm_wasm_module * module, bjvm_wasm_expression **exprs, int expr_count,
-                         bjvm_wasm_type type, bool is_loop) {
+bjvm_wasm_expression *bjvm_wasm_block_impl(bjvm_wasm_module *module,
+                                           bjvm_wasm_expression **exprs,
+                                           int expr_count, bjvm_wasm_type type,
+                                           bool is_loop) {
   // Create a block expression
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_BLOCK);
-  result->block = (bjvm_wasm_block_expression) {
-    .list = (bjvm_wasm_expression_list) {
-      .exprs = module_copy(module, exprs, sizeof(bjvm_wasm_expression*) * expr_count),
-      .expr_count = expr_count,
-    },
-    .is_loop = is_loop
-  };
+  result->block = (bjvm_wasm_block_expression){
+      .list =
+          (bjvm_wasm_expression_list){
+              .exprs = module_copy(module, exprs,
+                                   sizeof(bjvm_wasm_expression *) * expr_count),
+              .expr_count = expr_count,
+          },
+      .is_loop = is_loop};
   result->expr_type = type;
   return result;
 }
 
 bjvm_wasm_expression *bjvm_wasm_block(bjvm_wasm_module *module,
-                                       bjvm_wasm_expression **exprs, int expr_count, bjvm_wasm_type type) {
+                                      bjvm_wasm_expression **exprs,
+                                      int expr_count, bjvm_wasm_type type) {
   return bjvm_wasm_block_impl(module, exprs, expr_count, type, false);
 }
 
-bjvm_wasm_expression * bjvm_wasm_br(bjvm_wasm_module *module,
-    bjvm_wasm_expression *condition, bjvm_wasm_expression *break_to) {
+bjvm_wasm_expression *bjvm_wasm_br(bjvm_wasm_module *module,
+                                   bjvm_wasm_expression *condition,
+                                   bjvm_wasm_expression *break_to) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_BR);
-  result->br = (bjvm_wasm_br_expression) {
-    .condition = condition,
-    .break_to = break_to,
+  result->br = (bjvm_wasm_br_expression){
+      .condition = condition,
+      .break_to = break_to,
   };
   return result;
 }
@@ -744,8 +779,9 @@ bjvm_wasm_expression *bjvm_wasm_call(bjvm_wasm_module *module,
                                      bjvm_wasm_expression **args,
                                      int arg_count) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CALL);
-  bjvm_wasm_expression **cpy = module_copy(module, args, sizeof(bjvm_wasm_expression) * arg_count);
-  result->call = (bjvm_wasm_call_expression) {
+  bjvm_wasm_expression **cpy =
+      module_copy(module, args, sizeof(bjvm_wasm_expression) * arg_count);
+  result->call = (bjvm_wasm_call_expression){
       .to_call = fn,
       .args = cpy,
       .arg_count = arg_count,
@@ -753,12 +789,16 @@ bjvm_wasm_expression *bjvm_wasm_call(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_call_indirect(bjvm_wasm_module *module,
-    int table_index, bjvm_wasm_expression *index, bjvm_wasm_expression **args,
-    int arg_count) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CALL_INDIRECT);
-  bjvm_wasm_expression **cpy = module_copy(module, args, sizeof(bjvm_wasm_expression) * arg_count);
-  result->call_indirect = (bjvm_wasm_call_indirect_expression) {
+bjvm_wasm_expression *bjvm_wasm_call_indirect(bjvm_wasm_module *module,
+                                              int table_index,
+                                              bjvm_wasm_expression *index,
+                                              bjvm_wasm_expression **args,
+                                              int arg_count) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_CALL_INDIRECT);
+  bjvm_wasm_expression **cpy =
+      module_copy(module, args, sizeof(bjvm_wasm_expression) * arg_count);
+  result->call_indirect = (bjvm_wasm_call_indirect_expression){
       .table_index = table_index,
       .index = index,
       .args = cpy,
@@ -767,11 +807,12 @@ bjvm_wasm_expression * bjvm_wasm_call_indirect(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_load(bjvm_wasm_module *module,
-    bjvm_wasm_load_op_kind op, bjvm_wasm_expression *addr, int align,
-    int offset) {
+bjvm_wasm_expression *bjvm_wasm_load(bjvm_wasm_module *module,
+                                     bjvm_wasm_load_op_kind op,
+                                     bjvm_wasm_expression *addr, int align,
+                                     int offset) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_LOAD);
-  result->load = (bjvm_wasm_load_expression) {
+  result->load = (bjvm_wasm_load_expression){
       .op = op,
       .addr = addr,
       .align = align,
@@ -781,11 +822,13 @@ bjvm_wasm_expression * bjvm_wasm_load(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_store(bjvm_wasm_module *module,
-    bjvm_wasm_store_op_kind op, bjvm_wasm_expression *addr,
-    bjvm_wasm_expression *value, int align, int offset) {
+bjvm_wasm_expression *bjvm_wasm_store(bjvm_wasm_module *module,
+                                      bjvm_wasm_store_op_kind op,
+                                      bjvm_wasm_expression *addr,
+                                      bjvm_wasm_expression *value, int align,
+                                      int offset) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_STORE);
-  result->store = (bjvm_wasm_store_expression) {
+  result->store = (bjvm_wasm_store_expression){
       .op = op,
       .addr = addr,
       .value = value,
@@ -795,11 +838,13 @@ bjvm_wasm_expression * bjvm_wasm_store(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_if_else(bjvm_wasm_module *module,
-    bjvm_wasm_expression *cond, bjvm_wasm_expression *true_expr,
-    bjvm_wasm_expression *false_expr, bjvm_wasm_type type) {
+bjvm_wasm_expression *bjvm_wasm_if_else(bjvm_wasm_module *module,
+                                        bjvm_wasm_expression *cond,
+                                        bjvm_wasm_expression *true_expr,
+                                        bjvm_wasm_expression *false_expr,
+                                        bjvm_wasm_type type) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_IF);
-  result->if_ = (bjvm_wasm_if_expression) {
+  result->if_ = (bjvm_wasm_if_expression){
       .condition = cond,
       .true_expr = true_expr,
       .false_expr = false_expr,
@@ -808,9 +853,10 @@ bjvm_wasm_expression * bjvm_wasm_if_else(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_return(bjvm_wasm_module *module,
-                                        bjvm_wasm_expression *expr) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_RETURN);
+bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
+                                       bjvm_wasm_expression *expr) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_RETURN);
   result->return_expr = expr;
   return result;
 }
@@ -827,10 +873,11 @@ bjvm_wasm_store_op_kind bjvm_wasm_get_store_op(bjvm_wasm_type type) {
 
 EMSCRIPTEN_KEEPALIVE
 void bjvm_wasm_push_export(bjvm_wasm_instantiation_result *result,
-  const char *name, void *exported_func) {
+                           const char *name, void *exported_func) {
   bjvm_wasm_instantiation_export *exp =
-    *VECTOR_PUSH(result->exports, result->export_count, result->export_cap);
-  exp->name = make_heap_str_from((bjvm_utf8){.chars = (char*)name, .len = strlen(name)});
+      *VECTOR_PUSH(result->exports, result->export_count, result->export_cap);
+  exp->name = make_heap_str_from(
+      (bjvm_utf8){.chars = (char *)name, .len = strlen(name)});
   exp->export_ = exported_func;
 }
 
@@ -840,51 +887,56 @@ void bjvm_free_wasm_instantiation_result(
   for (int i = 0; i < result->export_count; ++i) {
     free_heap_str(result->exports[i]->name);
 #ifdef EMSCRIPTEN
-    EM_ASM_({
-      removeFunction(wasmTable.get($0));
-    }, (intptr_t)result->exports[i]->export_);
+    EM_ASM_(
+        { removeFunction(wasmTable.get($0)); },
+        (intptr_t)result->exports[i]->export_);
 #endif
   }
   free(result);
 }
 
-bjvm_wasm_instantiation_result * bjvm_wasm_instantiate_module(
-    bjvm_wasm_module *module) {
-  bjvm_wasm_instantiation_result *result = calloc(1, sizeof(bjvm_wasm_instantiation_result));
+bjvm_wasm_instantiation_result *
+bjvm_wasm_instantiate_module(bjvm_wasm_module *module) {
+  bjvm_wasm_instantiation_result *result =
+      calloc(1, sizeof(bjvm_wasm_instantiation_result));
 #ifndef EMSCRIPTEN
   result->status = BJVM_WASM_INSTANTIATION_FAIL;
   return result;
-#else  // EMSCRIPTEN
+#else // EMSCRIPTEN
   // Serialize the module
   bjvm_bytevector serialized = bjvm_wasm_module_serialize(module);
-  int success = EM_ASM_INT({
-      try {
-        var module = new WebAssembly.Module(HEAPU8.subarray($1, $2));
-        var instance = new WebAssembly.Instance(module, {
-          env: {
-            memory: wasmMemory,
-            raise_npe: wasmExports["wasm_runtime_raise_npe"],
-            raise_oob: wasmExports["wasm_runtime_raise_array_index_oob"],
-            new_array: wasmExports["wasm_runtime_new_array"],
-            new_object: wasmExports["wasm_runtime_new_object"]
-          }
-        });
-        return addFunction(instance.exports.run, 'iiii');
-      } catch (e) {
-        console.log(e);
-        return 0;
-      }
-    }, (uintptr_t)result.binary, (uintptr_t)(result.binary + result.binaryBytes));
+  int success = EM_ASM_INT(
+      {
+        try {
+          var module = new WebAssembly.Module(HEAPU8.subarray($1, $2));
+          var instance = new WebAssembly.Instance(module, {
+            env : {
+              memory : wasmMemory,
+              raise_npe : wasmExports["wasm_runtime_raise_npe"],
+              raise_oob : wasmExports["wasm_runtime_raise_array_index_oob"],
+              new_array : wasmExports["wasm_runtime_new_array"],
+              new_object : wasmExports["wasm_runtime_new_object"]
+            }
+          });
+          return addFunction(instance.exports.run, 'iiii');
+        } catch (e) {
+          console.log(e);
+          return 0;
+        }
+      },
+      (uintptr_t)result.binary,
+      (uintptr_t)(result.binary + result.binaryBytes));
 #endif
 }
 
 bjvm_wasm_expression *bjvm_wasm_unop(bjvm_wasm_module *module,
-                                          bjvm_wasm_unary_op_kind op,
-                                          bjvm_wasm_expression *expr) {
-  bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_UNARY_OP);
-  result->unary_op = (bjvm_wasm_unary_expression) {
-    .op = op,
-    .arg = expr,
+                                     bjvm_wasm_unary_op_kind op,
+                                     bjvm_wasm_expression *expr) {
+  bjvm_wasm_expression *result =
+      module_expr(module, BJVM_WASM_EXPR_KIND_UNARY_OP);
+  result->unary_op = (bjvm_wasm_unary_expression){
+      .op = op,
+      .arg = expr,
   };
   return result;
 }

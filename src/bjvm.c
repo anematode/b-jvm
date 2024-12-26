@@ -156,7 +156,7 @@ void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
   assert(thr->frames_count > 0);
   bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
   if (!(reference == nullptr || reference == frame)) {
-    *(char*)1 = 0;
+    *(char *)1 = 0;
   }
   assert(reference == nullptr || reference == frame);
   thr->frames_count--;
@@ -977,8 +977,8 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   assert(MethodHandleNatives);
   bjvm_initialize_class(thread, MethodHandleNatives);
 
-  bjvm_handle *ptypes =
-    bjvm_make_handle(thread, CreateObjectArray1D(thread, Class, method->args_count));
+  bjvm_handle *ptypes = bjvm_make_handle(
+      thread, CreateObjectArray1D(thread, Class, method->args_count));
 
   for (int i = 0; i < method->args_count; ++i) {
     INIT_STACK_STRING(name, 1000);
@@ -2065,8 +2065,8 @@ void pass_args_to_frame(bjvm_stack_frame *new_frame,
                         const bjvm_stack_frame *old_frame, int args) {
   assert(new_frame->max_locals >= args);
   memcpy(new_frame->values + new_frame->max_stack,
-    old_frame->values + old_frame->stack_depth - args,
-    args * sizeof(bjvm_stack_value));
+         old_frame->values + old_frame->stack_depth - args,
+         args * sizeof(bjvm_stack_value));
 }
 
 #define checked_pop(frame)                                                     \
@@ -2127,7 +2127,7 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
         thread, asType,
         (bjvm_stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}},
         &result);
-    if (status != BJVM_INTERP_RESULT_OK)  // asType failed
+    if (status != BJVM_INTERP_RESULT_OK) // asType failed
       return status;
     mh = (void *)result.obj;
   }
@@ -2159,8 +2159,10 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
     bjvm_stack_value result;
     if (frame->state < INVOKE_STATE_MADE_FRAME) {
       bjvm_stack_frame *new_frame = bjvm_push_frame(thread, method);
-      pass_args_to_frame(new_frame, frame, method->parsed_descriptor->args_count);
-      bjvm_interpreter_result_t status = bjvm_bytecode_interpret(thread, new_frame, &result);
+      pass_args_to_frame(new_frame, frame,
+                         method->parsed_descriptor->args_count);
+      bjvm_interpreter_result_t status =
+          bjvm_bytecode_interpret(thread, new_frame, &result);
       if (status != BJVM_INTERP_RESULT_OK) {
         if (status == BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_MADE_FRAME;
@@ -2669,10 +2671,9 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
   return status;
 }
 
-int bjvm_run_as_wasm(bjvm_thread *thread,
-  bjvm_stack_frame *final_frame,
-  bjvm_stack_value *result,
-  bjvm_interpreter_result_t *interp_result) {
+int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
+                     bjvm_stack_value *result,
+                     bjvm_interpreter_result_t *interp_result) {
   bjvm_cp_method *m = final_frame->method;
 
   if (!m->compiled_method) {
@@ -2683,8 +2684,9 @@ int bjvm_run_as_wasm(bjvm_thread *thread,
     }
   }
 
-  *interp_result = ((bjvm_wasm_jit_compiled_method*)m->compiled_method)->fn
-    ((intptr_t)thread, (intptr_t)final_frame, (intptr_t)result);
+  *interp_result =
+      ((bjvm_wasm_jit_compiled_method *)m->compiled_method)
+          ->fn((intptr_t)thread, (intptr_t)final_frame, (intptr_t)result);
   if (*interp_result != BJVM_INTERP_RESULT_INT) {
     bjvm_pop_frame(thread, final_frame);
   }
@@ -2693,7 +2695,8 @@ int bjvm_run_as_wasm(bjvm_thread *thread,
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 10 && !method->failed_jit && utf8_equals(method->name, "testOperation");
+  return method->call_count > 10 && !method->failed_jit &&
+         utf8_equals(method->name, "testOperation");
 }
 
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
@@ -2703,7 +2706,8 @@ bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
       final_frame->program_counter == 0 &&
       should_attempt_to_jit(final_frame->method)) {
     bjvm_interpreter_result_t interp_result;
-    int failed_to_compile = bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
+    int failed_to_compile =
+        bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
     if (!failed_to_compile) {
       return interp_result;
     }
@@ -2742,7 +2746,9 @@ interpret_frame:
     printf("Insn: %s\n", insn_to_string(insn, frame->program_counter));
     printf("Method: %.*s in class %.*s (%.*s:%d)\n", fmt_slice(method->name),
            fmt_slice(method->my_class->name),
-           fmt_slice(method->my_class->source_file ? method->my_class->source_file->name : null_str()),
+           fmt_slice(method->my_class->source_file
+                         ? method->my_class->source_file->name
+                         : null_str()),
            bjvm_get_line_number(method->code, frame->program_counter));
     printf("FRAME:\n");
     dump_frame(stdout, frame);

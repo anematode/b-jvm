@@ -5,9 +5,9 @@
 #ifndef JIT_H
 #define JIT_H
 
-#include <stdlib.h>
 #include "bjvm.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,11 +21,12 @@ typedef struct {
   // WebAssembly.instantiateAsync)
   bool ready;
   // Dynamically added function pointer
-  bjvm_interpreter_result_t (*fn)(intptr_t thread, intptr_t frame, intptr_t result);
+  bjvm_interpreter_result_t (*fn)(intptr_t thread, intptr_t frame,
+                                  intptr_t result);
 } bjvm_wasm_jit_compiled_method;
 
-bjvm_wasm_jit_compiled_method* bjvm_wasm_jit_compile(bjvm_thread *thread,
-                                                     const bjvm_cp_method* method);
+bjvm_wasm_jit_compiled_method *
+bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method);
 void free_wasm_compiled_method(void *compiled_method);
 
 void bjvm_translate();

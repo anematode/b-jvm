@@ -1374,13 +1374,11 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
  * place to make longs/doubles one stack value wide, writing the analysis into
  * analysis, and returning an error string upon some sort of error.
  */
-int bjvm_analyze_method_code(bjvm_cp_method *method,
-                                     heap_string *error) {
+int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   bjvm_attribute_code *code = method->code;
   if (!code) {
     return 0;
   }
-
   struct method_analysis_ctx ctx = {code};
 
   // Swizzle local entries so that the first n arguments correspond to the first
@@ -1489,7 +1487,6 @@ int bjvm_analyze_method_code(bjvm_cp_method *method,
 
   add_exception_edges(&ctx);
 
-  // Gross quadratic algorithm to refine local references
   while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
     ;
 
@@ -1558,11 +1555,15 @@ void free_code_analysis(bjvm_code_analysis *analy) {
 }
 
 static void push_bb_branch(bjvm_basic_block *current, bjvm_basic_block *next) {
-  *VECTOR_PUSH(current->next, current->next_count, current->next_cap) = next->my_index;
-  *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) = current->my_index;
+  *VECTOR_PUSH(current->next, current->next_count, current->next_cap) =
+      next->my_index;
+  *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) =
+      current->my_index;
 }
 
-static int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
+static int cmp_ints(const void *a, const void *b) {
+  return *(int *)a - *(int *)b;
+}
 
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy) {
@@ -1600,11 +1601,12 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
   for (int i = 0; i < block_count; ++i) {
     bs[i].start_index = ts[i];
     bs[i].start = code->code + ts[i];
-    bs[i].insn_count = i + 1 < block_count ? ts[i + 1] - ts[i] : code->insn_count - ts[i];
+    bs[i].insn_count =
+        i + 1 < block_count ? ts[i + 1] - ts[i] : code->insn_count - ts[i];
     bs[i].my_index = i;
   }
 #define FIND_TARGET_BLOCK(index)                                               \
-  &bs[(int*)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
+  &bs[(int *)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
   // Then, record edges between bbs. (This assumes no unreachable code, which
   // was checked in analyze_method_code_segment.)
   for (int block_i = 0; block_i < block_count - 1; ++block_i) {
@@ -1634,15 +1636,15 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
 #undef FIND_TARGET_BLOCK
 }
 
-static void get_preorder(const bjvm_basic_block *block,
-  int *block_to_pre, int* preorder, int *parent, int *clock) {
+static void get_preorder(const bjvm_basic_block *block, int *block_to_pre,
+                         int *preorder, int *parent, int *clock) {
   preorder[*clock] = block->my_index;
   block_to_pre[block->my_index] = (*clock)++;
   for (int j = 0; j < block->next_count; ++j) {
     if (block_to_pre[block->next[j]] == -1) {
       parent[block->next[j]] = block->my_index;
-      get_preorder(block - block->my_index + block->next[j],
-        block_to_pre, preorder, parent, clock);
+      get_preorder(block - block->my_index + block->next[j], block_to_pre,
+                   preorder, parent, clock);
     }
   }
 }
@@ -1653,7 +1655,8 @@ typedef struct {
   int cap;
 } dominated_list_t;
 
-static void idom_dfs(bjvm_basic_block *block, int* visited, dominated_list_t *idoms, uint32_t *clock) {
+static void idom_dfs(bjvm_basic_block *block, int *visited,
+                     dominated_list_t *idoms, uint32_t *clock) {
   block->idom_pre = (*clock)++;
   visited[block->my_index] = 1;
   dominated_list_t *dlist = idoms + block->my_index;
@@ -1663,7 +1666,6 @@ static void idom_dfs(bjvm_basic_block *block, int* visited, dominated_list_t *id
       idom_dfs(block + next - block->my_index, visited, idoms, clock);
   }
   block->idom_post = (*clock)++;
-  printf("pre/post for block %d: %d/%d\n", block->my_index, block->idom_pre, block->idom_post);
 }
 
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
@@ -1694,12 +1696,12 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   for (int preorder_i = block_count - 1; preorder_i >= 1; --preorder_i) {
     int i = pre_to_block[preorder_i];
     bjvm_basic_block *b = analy->blocks + i;
-    int sd = INT_MAX;  // preorder, not block #
+    int sd = INT_MAX; // preorder, not block #
     // Go through predecessor blocks in any order
     for (int prev_i = 0; prev_i < b->prev_count; ++prev_i) {
       int prev = b->prev[prev_i];
       if (block_to_pre[prev] < preorder_i) {
-        if (block_to_pre[prev] < sd)  // prev is a better candidate for semidom
+        if (block_to_pre[prev] < sd) // prev is a better candidate for semidom
           sd = block_to_pre[prev];
       } else {
         // Get the root in F using union find with path compression
@@ -1741,7 +1743,8 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     dominates[i].count = 0;
   for (int preorder_i = 1; preorder_i < block_count; ++preorder_i) {
     int i = pre_to_block[preorder_i];
-    int idom = analy->blocks[i].idom = i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
+    int idom = analy->blocks[i].idom =
+        i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
     dominated_list_t *sdlist = dominates + idom;
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
   }
@@ -1751,7 +1754,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   free(semidom);
   free(reldom);
   // Now compute a DFS tree on the immediate dominator tree (still need a
-  // "visited" array because it's a multigraph)
+  // "visited" array because there are duplicate edges)
   uint32_t clock = 1;
   // Re-use F as the visited array
   memset(F, 0, block_count * sizeof(int));
@@ -1763,13 +1766,14 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
 }
 
 bool bjvm_query_dominance(const bjvm_basic_block *dominator,
-                         const bjvm_basic_block *dominated) {
+                          const bjvm_basic_block *dominated) {
   assert(dominator->idom_pre != 0 && "dominator tree not computed");
-  return (dominator->idom_pre <= dominated->idom_pre &&
-         dominator->idom_post >= dominated->idom_post);
+  return dominator->idom_pre <= dominated->idom_pre &&
+         dominator->idom_post >= dominated->idom_post;
 }
 
-static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i, int *visited) {
+static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
+                                      int *visited) {
   bjvm_basic_block *b = analy->blocks + i;
   visited[i] = 1;
   for (int j = 0; j < b->next_count; ++j) {

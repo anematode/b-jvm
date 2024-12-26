@@ -93,8 +93,7 @@ typedef struct {
  * <br/>
  * Returns -1 if an error occurred, and writes the error message into error.
  */
-int bjvm_analyze_method_code(bjvm_cp_method *method,
-                                     heap_string *error);
+int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error);
 void free_code_analysis(bjvm_code_analysis *analy);
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy);
@@ -102,7 +101,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
 void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis);
 // Returns true iff dominator dominates dominated. dom dom dom.
 bool bjvm_query_dominance(const bjvm_basic_block *dominator,
-                       const bjvm_basic_block *dominated);
+                          const bjvm_basic_block *dominated);
 // Try to reduce the CFG and mark the edges/blocks accordingly.
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
 
