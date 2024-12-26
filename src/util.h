@@ -36,12 +36,9 @@ extern "C" {
 
 #define VECTOR_PUSH(vector, vector_count, vector_cap)                          \
   ({                                                                           \
-    if ((vector_count) >= (vector_cap)) {                                      \
-      int new_cap = vector_cap * 2;                                            \
-      if (new_cap < 2)                                                         \
-        new_cap = 2;                                                           \
+    if (__builtin_expect((vector_count) >= (vector_cap), 0)) {                 \
+      int new_cap = vector_cap * 2 + 1;                                        \
       void *next = realloc(vector, new_cap * sizeof(*vector));                 \
-      assert(next);                                                            \
       (vector_cap) = new_cap;                                                  \
       vector = next;                                                           \
     }                                                                          \

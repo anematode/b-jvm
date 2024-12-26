@@ -274,6 +274,11 @@ typedef struct bjvm_thread {
   // Handle for null
   bjvm_handle null_handle;
 
+  // At least one JIT compiled method is on the stack, so certain stack
+  // scanning operations (e.g., GC) are unsound; a mandatory interrupt should
+  // be raised before continuing
+  bool stack_unsound;
+
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
