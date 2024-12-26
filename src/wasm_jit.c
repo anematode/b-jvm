@@ -35,7 +35,7 @@ typedef struct {
   int *val_to_local_map;
   int next_local;
 
-  bjvm_wasm_type *wvars;
+  bjvm_wasm_value_type *wvars;
   int wvars_count;
   int wvars_cap;
 
@@ -88,7 +88,7 @@ int jvm_stack_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   int *l = &ctx->val_to_local_map[i];
   if (*l == -1) {
     *VECTOR_PUSH(ctx->wvars, ctx->wvars_count, ctx->wvars_cap) =
-        jvm_type_to_wasm_kind(kind);
+        jvm_type_to_wasm_kind(kind).val;
     *l = ctx->next_local++;
   }
   return *l;
@@ -203,7 +203,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
   }
 
   expression block =
-      bjvm_wasm_block(ctx->module, result, result_count, bjvm_wasm_void());
+      bjvm_wasm_block(ctx->module, result, result_count, bjvm_wasm_void(), false);
   return block;
 }
 
@@ -522,7 +522,46 @@ bjvm_wasm_expression *thread(compile_ctx *ctx) {
   return bjvm_wasm_local_get(ctx->module, THREAD_PARAM, bjvm_wasm_int32());
 }
 
-int wasm_compile_block(compile_ctx *ctx, const bjvm_basic_block *bb) {
+typedef struct {
+  int start, end;
+} loop_range_t;
+
+typedef struct {
+  // these future blocks requested a wasm block to begin here, so that
+  // forward edges can be implemented with a br or br_if
+  int *requested;
+  int count;
+  int cap;
+} bb_creations_t;
+
+typedef struct {
+  // block_i -> new order
+  int *topo;
+  // block_i that's a loop header -> range of blocks in the topo sort to wrap
+  // in a loop header so that backward edges can enjoy themselves
+  loop_range_t *loop_ranges;
+  // Mapping from topological # to the blocks (also in topo #) which requested
+  // a block begin here.
+  bb_creations_t *creations;
+  // Mapping from topological block index to a loop bjvm_wasm_expression such
+  // that backward edges should continue to this loop block.
+  bjvm_wasm_expression **loop_headers;
+  // Mapping from topological block index to a block bjvm_wasm_expression such
+  // that forward edges should break out of this block.
+  bjvm_wasm_expression **block_ends;
+  // Now implementation stuffs
+  int current;
+  int topo_i;
+  int loop_depth;
+  // For each block in topological indexing, the number of loops that contain
+  // it.
+  int *loop_depths;
+  int *visited, *incoming_count;
+  int blockc;
+} topo_ctx;
+
+// Each basic block compiles into a WASM block with epsilon type transition
+static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_ctx *topo) {
   expression *results = nullptr;
   int result_count = 0, result_cap = 0;
 
@@ -878,8 +917,16 @@ int wasm_compile_block(compile_ctx *ctx, const bjvm_basic_block *bb) {
     case bjvm_insn_astore:
       PUSH_EXPR = wasm_lower_local_load_store(ctx, insn, sd);
       break;
-    case bjvm_insn_goto:
-    case bjvm_insn_jsr:
+    case bjvm_insn_goto: {
+      int next = topo->topo[bb->next[0]];
+      if (next != topo->topo_i + 1) {
+        expression be = topo->block_ends[next];
+        printf("%p\n", be);
+        assert(be);
+        PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, be);
+      }
+      break;
+    }
     case bjvm_insn_if_acmpeq:
     case bjvm_insn_if_acmpne:
     case bjvm_insn_if_icmpeq:
@@ -895,11 +942,63 @@ int wasm_compile_block(compile_ctx *ctx, const bjvm_basic_block *bb) {
     case bjvm_insn_ifgt:
     case bjvm_insn_ifle:
     case bjvm_insn_ifnonnull:
-    case bjvm_insn_ifnull:
+    case bjvm_insn_ifnull: {
+       int op_kinds[] = {
+        BJVM_WASM_OP_KIND_I32_EQ, // if_acmpeq
+        BJVM_WASM_OP_KIND_I32_NE, // if_acmpne
+        BJVM_WASM_OP_KIND_I32_EQ, // if_icmpeq
+        BJVM_WASM_OP_KIND_I32_NE, // if_icmpne
+        BJVM_WASM_OP_KIND_I32_LT_S, // if_icmplt
+        BJVM_WASM_OP_KIND_I32_GE_S, // if_icmpge
+        BJVM_WASM_OP_KIND_I32_GT_S, // if_icmpgt
+        BJVM_WASM_OP_KIND_I32_LE_S, // if_icmple
+        BJVM_WASM_OP_KIND_I32_EQ, // ifeq
+        BJVM_WASM_OP_KIND_I32_NE, // ifne
+        BJVM_WASM_OP_KIND_I32_LT_S, // iflt
+        BJVM_WASM_OP_KIND_I32_GE_S, // ifge
+        BJVM_WASM_OP_KIND_I32_GT_S, // ifgt
+        BJVM_WASM_OP_KIND_I32_LE_S, // ifle
+        BJVM_WASM_OP_KIND_I32_NE, // ifnonnull
+        BJVM_WASM_OP_KIND_I32_EQ // ifnull
+      };
+
+      int taken = topo->topo[bb->next[0]];
+      int not_taken = topo->topo[bb->next[1]];
+
+      // We are going to emit either a br_if/br combo or just a br_if. If the
+      // taken path is a fallthrough, negate the condition and switch.
+      bjvm_insn_code_kind kind = insn->kind;
+      if (taken == topo->topo_i + 1) {
+        int tmp = taken;
+        taken = not_taken;
+        not_taken = tmp;
+        // I've ordered them so that this works out
+        kind = (kind - 1) ^ 1 + 1;
+      }
+
+      // Emit the br_if for the taken branch
+      expression taken_block = topo->block_ends[taken];
+      if (taken != topo->topo_i + 1) {
+        // still could be true in the case of a cursed if*
+        bool is_binary = kind <= bjvm_insn_if_icmple;
+        expression lhs = get_stack_value(ctx, sd - 1 - is_binary, BJVM_TYPE_KIND_INT);
+        expression rhs = is_binary ? get_stack_value(ctx, sd - 2, BJVM_TYPE_KIND_INT) : bjvm_wasm_i32_const(ctx->module, 0);
+        expression cond = bjvm_wasm_binop(ctx->module, op_kinds[kind - bjvm_insn_if_acmpeq], lhs, rhs);
+        expression br_if = bjvm_wasm_br(ctx->module, cond, taken_block);
+        PUSH_EXPR = br_if;
+      }
+      if (not_taken != topo->topo_i + 1) {
+        // Emit the br for the not taken branch
+        expression not_taken_block = topo->block_ends[not_taken];
+        PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, not_taken_block);
+      }
+      break;
+    }
     case bjvm_insn_tableswitch:
     case bjvm_insn_lookupswitch:
     case bjvm_insn_ret:
-      goto done; // will be handled in the next pass
+    case bjvm_insn_jsr:
+      goto unimplemented;
     case bjvm_insn_iconst: {
       expression value =
           bjvm_wasm_i32_const(ctx->module, (int)insn->integer_imm);
@@ -962,54 +1061,14 @@ int wasm_compile_block(compile_ctx *ctx, const bjvm_basic_block *bb) {
 
 done:
 
-  PUSH_EXPR = nullptr; // make space for a final branch
-
   // Create a block with the expressions
   expression block =
-      bjvm_wasm_block(ctx->module, results, result_count, bjvm_wasm_void());
+      bjvm_wasm_block(ctx->module, results, result_count, bjvm_wasm_void(), false);
   ctx->wasm_blocks[bb->my_index] = block;
 
   free(results);
-  return 0;
+  return block;
 }
-
-typedef struct {
-  int start, end;
-} loop_range_t;
-
-typedef struct {
-  // these future blocks requested a wasm block to begin here, so that
-  // forward edges can be implemented with a br or br_if
-  int *requested;
-  int count;
-  int cap;
-} bb_creations_t;
-
-typedef struct {
-  // block_i -> new order
-  int *topo;
-  // block_i that's a loop header -> range of blocks in the topo sort to wrap
-  // in a loop header so that backward edges can enjoy themselves
-  loop_range_t *loop_ranges;
-  // Mapping from topological # to the blocks (also in topo #) which requested
-  // a block begin here.
-  bb_creations_t *creations;
-  // Mapping from topological block index to a loop bjvm_wasm_expression such
-  // that backward edges should continue to this loop block.
-  bjvm_wasm_expression **loop_headers;
-  // Mapping from topological block index to a block bjvm_wasm_expression such
-  // that forward edges should break out of this block.
-  bjvm_wasm_expression **block_ends;
-  // Now implementation stuffs
-  int current;
-  int topo_i;
-  int loop_depth;
-  // For each block in topological indexing, the number of loops that contain
-  // it.
-  int *loop_depths;
-  int *visited, *incoming_count;
-  int blockc;
-} topo_ctx;
 
 void topo_dfs(bjvm_code_analysis *analy, topo_ctx *ctx) {
   // Visit edges from the current node to next nodes. If all incoming edges of a
@@ -1017,6 +1076,7 @@ void topo_dfs(bjvm_code_analysis *analy, topo_ctx *ctx) {
   // result array, and is ripe for DFS enjoyment.
   int current = ctx->current;
   ctx->visited[current] = 1;
+  ctx->topo[ctx->topo_i] = current;
   ctx->loop_depths[ctx->topo_i] = ctx->loop_depth;
   assert(ctx->incoming_count[current] == 0);
   bjvm_basic_block *b = analy->blocks + ctx->current;
@@ -1032,7 +1092,8 @@ void topo_dfs(bjvm_code_analysis *analy, topo_ctx *ctx) {
             !ctx->visited[next]) {
           assert(ctx->incoming_count[next] != 0);
           if (ctx->incoming_count[next] == 1) {
-            ctx->topo[ctx->topo_i++] = ctx->current = next;
+            ctx->topo_i++;
+            ctx->current = next;
             --ctx->incoming_count[next];
             ctx->loop_depth++;
             topo_dfs(analy, ctx);
@@ -1054,7 +1115,8 @@ void topo_dfs(bjvm_code_analysis *analy, topo_ctx *ctx) {
     if (ctx->visited[next])
       continue;
     if (--ctx->incoming_count[next] == 0) {
-      ctx->topo[ctx->topo_i++] = ctx->current = next;
+      ctx->topo_i++;
+      ctx->current = next;
       topo_dfs(analy, ctx);
     }
   }
@@ -1078,6 +1140,7 @@ void find_block_insertion_points(bjvm_code_analysis *analy, topo_ctx *ctx) {
   // For each block, find the earliest block (in the topological sort) which
   // branches to that block, which is NOT the block itself or its immediate
   // predecessor in the sort.
+  // Print the topo sort
   for (int i = 0; i < analy->block_count; ++i) {
     bjvm_basic_block *b = analy->blocks + i;
     int earliest = -1;
@@ -1086,6 +1149,7 @@ void find_block_insertion_points(bjvm_code_analysis *analy, topo_ctx *ctx) {
       if (ctx->topo[prev] < i - 1)
         earliest = ctx->topo[prev];
     }
+    printf("Block %d requested at %d\n", i, earliest);
     // Then walk backwards until the stack depth is the same. This is where
     // we'll put the block.
     if (earliest != -1) {
@@ -1093,9 +1157,10 @@ void find_block_insertion_points(bjvm_code_analysis *analy, topo_ctx *ctx) {
         earliest--;
         assert(earliest >= 0);
       }
+      printf("Block %d requested at %d\n", i, earliest);
+      bb_creations_t *creations = ctx->creations + earliest;
+      *VECTOR_PUSH(creations->requested, creations->count, creations->cap) = i;
     }
-    bb_creations_t *creations = ctx->creations + earliest;
-    *VECTOR_PUSH(creations->requested, creations->count, creations->cap) = i;
   }
 }
 
@@ -1116,15 +1181,33 @@ topo_ctx restricted_topo_sort(bjvm_code_analysis *analy) {
     for (int j = 0; j < b->next_count; ++j)
       ctx.incoming_count[b->next[j]] += !b->is_backedge[j];
   }
+  // Print incoming count
+  for (int i = 0; i < analy->block_count; ++i)
+    printf("%d ", ctx.incoming_count[i]);
+  printf("\n");
+
   topo_dfs(analy, &ctx);
+  // Print topo sort
+  for (int i = 0; i < analy->block_count; ++i)
+    printf("%d ", ctx.topo[i]);
+  printf("\n");
   find_block_insertion_points(analy, &ctx);
   return ctx;
 }
 
-static bjvm_wasm_expression *recurse(bjvm_code_analysis *analy,
-                                     topo_ctx *topo) {
-  // This function returns blocks and loop expressions. When we hit a bb
-  // which has wasm block and/or loop headers, we recurse into building those.
+typedef struct {
+  expression ref;
+  // Wasm block started here
+  int started_at;
+  // Once we get to this basic block, close the wasm block and push the
+  // expression to the stack
+  int close_at;
+  // Whether to emit a (loop) for this block
+  bool is_loop;
+} inchoate_expression;
+
+static int cmp_ints(const void *a, const void *b) {
+  return *(int *)b - *(int *)a;
 }
 
 bjvm_wasm_jit_compiled_method *
@@ -1172,18 +1255,101 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
   // just before the target block, so that mfs who try to target it can enjoy
   // themselves.
   topo_ctx topo = restricted_topo_sort(analy);
-  topo.topo_i = 0;
-  expression final = recurse(analy, &topo);
 
-  if (final == nullptr) {
-    goto error;
+  inchoate_expression *expr_stack = nullptr;
+  int stack_count = 0, stack_cap = 0;
+  // Push an initial boi
+  *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
+    bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), false)
+  };
+  // Close it when we're all done
+  expr_stack[0].close_at = analy->block_count;
+  for (topo.topo_i = 0; topo.topo_i <= analy->block_count; ++topo.topo_i) {
+    // First close off any blocks as appropriate
+    for (int i = stack_count - 1; i >= 0; --i) {
+      inchoate_expression *ie = expr_stack + i;
+      if (ie->close_at == topo.topo_i) {
+        // Take expressions i + 1 through stack_count - 1 inclusive and
+        // make them the contents of the block
+        expression *exprs = malloc((stack_count - i - 1) * sizeof(expression));
+        for (int j = i + 1; j < stack_count; ++j)
+          exprs[j - i - 1] = expr_stack[j].ref;
+        bjvm_wasm_update_block(ctx.module, ie->ref, exprs,
+                               stack_count - i - 1,
+                               bjvm_wasm_void(), ie->is_loop);
+        free(exprs);
+        // Update the handles for blocks and loops to break to
+        if (topo.topo_i < analy->block_count)
+          topo.block_ends[topo.topo_i] = nullptr;
+        if (ie->is_loop)
+          topo.loop_headers[ie->started_at] = nullptr;
+        ie->close_at = -1;
+        stack_count = i + 1;
+      }
+    }
+    // Done pushing expressions
+    if (topo.topo_i == analy->block_count)
+      break;
+
+    // Then create (block)s and (loop)s as appropriate. First create blocks
+    // in reverse order of the topological order of their targets. So, if
+    // at the current block we are to initiate blocks ending at block with
+    // topo indices 9, 12, and 13, push the block for 13 first.
+
+    // Blocks
+    bb_creations_t *creations = topo.creations + topo.topo_i;
+    qsort(creations->requested, creations->count, sizeof(int), cmp_ints);
+
+    for (int i = 0; i < creations->count; ++i) {
+      int block_i = creations->requested[i];
+      expression block = bjvm_wasm_block(ctx.module, nullptr, 0,
+                                         bjvm_wasm_void(), false);
+      *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
+        block, topo.topo_i, block_i, false
+      };
+    }
+
+    // Loop header
+    int start = topo.loop_ranges[topo.topo_i].start;
+    int end = topo.loop_ranges[topo.topo_i].end;
+    if (end != 0) {
+      expression loop = bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), true);
+      *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
+        loop, start, end, true
+      };
+    }
+
+    int block_i = topo.topo[topo.topo_i];
+    bjvm_basic_block *bb = analy->blocks + block_i;
+    expression expr = compile_bb(&ctx, bb, &topo);
+    if (!expr) {
+      goto error;
+    }
+    *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
+      expr, topo.topo_i, -1, false
+    };
   }
+
+  expression body = expr_stack[0].ref;
+  free(expr_stack);
 
   add_runtime_imports(&ctx);
 
-  *VECTOR_PUSH(ctx.wvars, ctx.wvars_count, ctx.wvars_cap) = bjvm_wasm_int32();
-  ok = 1;
+  // Add a function whose expression is the first expression on the stack
+  bjvm_wasm_type params = bjvm_wasm_string_to_tuple(ctx.module, "iii");
+  bjvm_wasm_type locals = bjvm_wasm_make_tuple(ctx.module,
+    ctx.wvars, ctx.wvars_count);
+  bjvm_wasm_function *fn = bjvm_wasm_add_function(ctx.module, params, bjvm_wasm_int32(), locals, body, "run");
+  bjvm_wasm_export_function(ctx.module, fn);
 
+  bjvm_bytevector result = bjvm_wasm_module_serialize(ctx.module);
+
+  // For now, write it to a file called test.wasm
+  FILE *f = fopen("test.wasm", "wb");
+  fwrite(result.bytes, 1, result.bytes_len, f);
+  fclose(f);
+
+  return nullptr;
 error:
   bjvm_wasm_jit_compiled_method *compiled_method = nullptr;
   if (ok) {

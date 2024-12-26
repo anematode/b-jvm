@@ -1776,6 +1776,7 @@ static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
                                       int *visited) {
   bjvm_basic_block *b = analy->blocks + i;
   visited[i] = 1;
+  printf("Visiting %d\n", i);
   for (int j = 0; j < b->next_count; ++j) {
     int next = b->next[j];
     if (b->is_backedge[j])
@@ -1784,9 +1785,15 @@ static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
       if (forward_edges_form_a_cycle(analy, next, visited))
         return 1;
     } else {
-      return visited[next] == 1;
+      if (visited[next] == 1) {
+        printf("Cycle detected %d -> %d\n", i, next);
+      }
+      if (visited[next] == 1) {
+        return 1;
+      }
     }
   }
+  printf("Finished visiting %d\n", i);
   visited[i] = 2;
   return 0;
 }
@@ -1794,9 +1801,11 @@ static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy) {
   // mark back-edges
   for (int i = 0; i < analy->block_count; ++i) {
-    bjvm_basic_block *b = analy->blocks + i;
-    for (int j = 0; j < b->next_count; ++j)
-      b->is_backedge[j] = bjvm_query_dominance(b, analy->blocks + b->next[j]);
+    bjvm_basic_block *b = analy->blocks + i, *next;
+    for (int j = 0; j < b->next_count; ++j) {
+      next = analy->blocks + b->next[j];
+      b->is_backedge[j] = bjvm_query_dominance(next, b);
+    }
   }
 
   int *visited = calloc(analy->block_count, sizeof(int));

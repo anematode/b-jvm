@@ -472,6 +472,9 @@ bjvm_wasm_add_function(bjvm_wasm_module *module, bjvm_wasm_type params,
 void bjvm_wasm_export_function(bjvm_wasm_module *module,
                                bjvm_wasm_function *fn);
 
+bjvm_wasm_type bjvm_wasm_string_to_tuple(bjvm_wasm_module *module,
+                                         const char *str);
+
 bjvm_wasm_function *
 bjvm_wasm_import_runtime_function_impl(bjvm_wasm_module *module,
                                        const char *c_name,
@@ -509,7 +512,12 @@ bjvm_wasm_expression *bjvm_wasm_select(bjvm_wasm_module *module,
                                        bjvm_wasm_expression *false_expr);
 bjvm_wasm_expression *bjvm_wasm_block(bjvm_wasm_module *module,
                                       bjvm_wasm_expression **exprs,
-                                      int expr_count, bjvm_wasm_type type);
+                                      int expr_count, bjvm_wasm_type type, bool is_loop);
+bjvm_wasm_expression *bjvm_wasm_update_block(bjvm_wasm_module *module,
+                                         bjvm_wasm_expression *existing_block,
+                                         bjvm_wasm_expression **exprs,
+                                         int expr_count, bjvm_wasm_type type,
+                                         bool is_loop);
 bjvm_wasm_expression *bjvm_wasm_br(bjvm_wasm_module *module,
                                    bjvm_wasm_expression *condition,
                                    bjvm_wasm_expression *break_to);

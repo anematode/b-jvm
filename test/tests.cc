@@ -556,7 +556,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   int result = bjvm_attempt_reduce_cfg(analy);
   REQUIRE(result == 0);
 
-  // auto *result = bjvm_wasm_jit_compile(nullptr, m);
+  auto *b = bjvm_wasm_jit_compile(nullptr, m);
 
   bjvm_free_classfile(desc);
 }
