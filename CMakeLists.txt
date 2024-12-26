@@ -15,14 +15,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-FetchContent_Declare(
-        Binaryen
-        GIT_REPOSITORY https://github.com/WebAssembly/binaryen.git
-        GIT_TAG version_121
-)
-
-FetchContent_MakeAvailable(binaryen)
-
 # If doing emscripten
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wpedantic")
@@ -53,8 +45,6 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
-target_include_directories(bjvm PRIVATE "${binaryen_SOURCE_DIR}/src")
-target_link_libraries(bjvm PRIVATE binaryen)
 
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now

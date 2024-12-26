@@ -1,6 +1,7 @@
+// Java bytecode analysis, rewriting (to make longs/doubles take up one local
+// or stack slot), and mild verification.
 //
-// Created by alec on 12/18/24.
-//
+// Long term I'd like this to be a full verifier, fuzzed against HotSpot.
 
 #include <assert.h>
 #include <stdlib.h>
@@ -1369,11 +1370,11 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
 }
 
 /**
- * Analyze the method's code segment if it exists, rewriting instructions in
+ * Analyze the method's code attribute if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
  * analysis, and returning an error string upon some sort of error.
  */
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+int bjvm_analyze_method_code(bjvm_cp_method *method,
                                      heap_string *error) {
   bjvm_attribute_code *code = method->code;
   if (!code) {
@@ -1427,6 +1428,7 @@ int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
       malloc(sizeof(bjvm_code_analysis));
 
   analy->insn_count = code->insn_count;
+  analy->dominator_tree_computed = false;
   for (int i = 0; i < 5; ++i) {
     analy->insn_index_to_kinds[i] =
         calloc(code->insn_count, sizeof(bjvm_compressed_bitset));
@@ -1547,6 +1549,7 @@ void free_code_analysis(bjvm_code_analysis *analy) {
   }
   for (int i = 0; i < analy->block_count; ++i) {
     free(analy->blocks[i].next);
+    free(analy->blocks[i].is_backedge);
     free(analy->blocks[i].prev);
   }
   free(analy->blocks);
@@ -1621,6 +1624,11 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
     }
     push_bb_branch(b, &analy->blocks[block_i + 1]);
   }
+  // Create some auxiliary data
+  for (int block_i = 0; block_i < block_count; ++block_i) {
+    bjvm_basic_block *b = bs + block_i;
+    b->is_backedge = calloc(b->next_count, sizeof(bool));
+  }
   free(ts);
   return 0;
 #undef FIND_TARGET_BLOCK
@@ -1643,19 +1651,27 @@ typedef struct {
   int *list;
   int count;
   int cap;
-} semidominated_list_t;
+} dominated_list_t;
 
-static void idom_dfs(bjvm_basic_block *block, int* visited, uint32_t *clock) {
+static void idom_dfs(bjvm_basic_block *block, int* visited, dominated_list_t *idoms, uint32_t *clock) {
   block->idom_pre = (*clock)++;
-  for (int i = 0; i < block->next_count; ++i)
-    if (!visited[block->next[i]]++)
-      idom_dfs(block - block->my_index + block->next[i], visited, clock);
+  visited[block->my_index] = 1;
+  dominated_list_t *dlist = idoms + block->my_index;
+  for (int i = 0; i < dlist->count; ++i) {
+    int next = dlist->list[i];
+    if (!visited[next])
+      idom_dfs(block + next - block->my_index, visited, idoms, clock);
+  }
   block->idom_post = (*clock)++;
+  printf("pre/post for block %d: %d/%d\n", block->my_index, block->idom_pre, block->idom_post);
 }
 
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   assert(analy->blocks);
+  if (analy->dominator_tree_computed)
+    return;
+  analy->dominator_tree_computed = true;
   int block_count = analy->block_count;
   // block # -> pre-order #
   int *block_to_pre = malloc(block_count * sizeof(int));
@@ -1673,7 +1689,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // semidom[j] is the semi-dominator of j
   int *semidom = calloc(block_count, sizeof(int));
   // semidominates[i] is the set of blocks that i semi-dominates
-  semidominated_list_t *semidominates = calloc(block_count, sizeof(semidominated_list_t));
+  dominated_list_t *dominates = calloc(block_count, sizeof(dominated_list_t));
   // Go through all non-entry blocks in reverse pre-order
   for (int preorder_i = block_count - 1; preorder_i >= 1; --preorder_i) {
     int i = pre_to_block[preorder_i];
@@ -1699,14 +1715,14 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
       }
     }
     semidom[i] = pre_to_block[sd];
-    semidominated_list_t *sdlist = semidominates + pre_to_block[sd];
+    dominated_list_t *sdlist = dominates + pre_to_block[sd];
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
     F[i] = parent[i];
   }
   // Compute relative dominators
   int *reldom = calloc(block_count, sizeof(int));
   for (int i = 1; i < block_count; ++i) {
-    semidominated_list_t *sdlist = semidominates + i;
+    dominated_list_t *sdlist = dominates + i;
     for (int list_i = 0; list_i < sdlist->count; ++list_i) {
       int w = sdlist->list[list_i], walk = w, min = INT_MAX;
       assert(semidom[w] == i);
@@ -1721,24 +1737,68 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     }
   }
   // Now, we can compute the immediate dominators
+  for (int i = 0; i < block_count; ++i)
+    dominates[i].count = 0;
   for (int preorder_i = 1; preorder_i < block_count; ++preorder_i) {
     int i = pre_to_block[preorder_i];
-    analy->blocks[i].idom = i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
+    int idom = analy->blocks[i].idom = i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
+    dominated_list_t *sdlist = dominates + idom;
+    *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
   }
   free(block_to_pre);
   free(pre_to_block);
   free(parent);
   free(semidom);
-  for (int i = 0; i < block_count; ++i)
-    free(semidominates[i].list);
-  free(semidominates);
   free(reldom);
   // Now compute a DFS tree on the immediate dominator tree (still need a
   // "visited" array because it's a multigraph)
-  uint32_t clock = 0;
+  uint32_t clock = 1;
+  // Re-use F as the visited array
   memset(F, 0, block_count * sizeof(int));
-  idom_dfs(analy->blocks, F, &clock);
+  idom_dfs(analy->blocks, F, dominates, &clock);
   free(F);
+  for (int i = 0; i < block_count; ++i)
+    free(dominates[i].list);
+  free(dominates);
+}
+
+bool bjvm_query_dominance(const bjvm_basic_block *dominator,
+                         const bjvm_basic_block *dominated) {
+  assert(dominator->idom_pre != 0 && "dominator tree not computed");
+  return (dominator->idom_pre <= dominated->idom_pre &&
+         dominator->idom_post >= dominated->idom_post);
+}
+
+static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i, int *visited) {
+  bjvm_basic_block *b = analy->blocks + i;
+  visited[i] = 1;
+  for (int j = 0; j < b->next_count; ++j) {
+    int next = b->next[j];
+    if (b->is_backedge[j])
+      continue;
+    if (visited[next] == 0) {
+      if (forward_edges_form_a_cycle(analy, next, visited))
+        return 1;
+    } else {
+      return visited[next] == 1;
+    }
+  }
+  visited[i] = 2;
+  return 0;
+}
+
+int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy) {
+  // mark back-edges
+  for (int i = 0; i < analy->block_count; ++i) {
+    bjvm_basic_block *b = analy->blocks + i;
+    for (int j = 0; j < b->next_count; ++j)
+      b->is_backedge[j] = bjvm_query_dominance(b, analy->blocks + b->next[j]);
+  }
+
+  int *visited = calloc(analy->block_count, sizeof(int));
+  int fail = forward_edges_form_a_cycle(analy, 0, visited);
+  free(visited);
+  return fail;
 }
 
 void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis) {

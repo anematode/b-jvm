@@ -1414,7 +1414,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
     bjvm_cp_method *method = classdesc->methods + method_i;
     if (method->code) {
       heap_string error_str;
-      int result = bjvm_analyze_method_code_segment(method, &error_str);
+      int result = bjvm_analyze_method_code(method, &error_str);
       if (result != 0) {
         classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
         printf("Error analyzing method %.*s: %.*s\n", method->name.len,

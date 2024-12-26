@@ -18,9 +18,6 @@ TEST_CASE("write leb128 signed", "[wasm]") {
   const uint8_t expected[4] = {0x00, 0xC0, 0xBB, 0x78};
   bjvm_wasm_writeint(&ctx, 0);
   bjvm_wasm_writeint(&ctx, -123456);
-  for (int i = 0; i < ctx.bytes_len; ++i) {
-    printf("%02X ", ctx.bytes[i]);
-  }
   REQUIRE(ctx.bytes_len == 4);
   REQUIRE(memcmp(ctx.bytes, expected, 4) == 0);
   free(ctx.bytes);
@@ -37,10 +34,16 @@ TEST_CASE("Simple module", "[wasm]") {
     bjvm_wasm_i32_const(module, 1),
     bjvm_wasm_i32_const(module, 2));
 
+  bjvm_wasm_expression *ifelse = bjvm_wasm_if_else(
+    module,
+    bjvm_wasm_unop(module, BJVM_WASM_OP_KIND_I32_EQZ, bjvm_wasm_local_get(module, 0, bjvm_wasm_int32())),
+    bjvm_wasm_i32_const(module, 2),
+    body, bjvm_wasm_int32());
+
   bjvm_wasm_type locals = bjvm_wasm_make_tuple(module,
     (bjvm_wasm_value_type[]){BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_TYPE_KIND_INT32}, 2);
 
-  bjvm_wasm_function *fn = bjvm_wasm_add_function(module, params, bjvm_wasm_int32(), locals, body, "add");
+  bjvm_wasm_function *fn = bjvm_wasm_add_function(module, params, bjvm_wasm_int32(), locals, ifelse, "add");
   bjvm_wasm_export_function(module, fn);
 
   bjvm_bytevector serialized = bjvm_wasm_module_serialize(module);

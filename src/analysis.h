@@ -18,8 +18,12 @@ typedef struct bjvm_basic_block {
   int start_index;
   int insn_count;
 
-  // May contain duplicates in the presence of a switch or cursed if*
+  // May contain duplicates in the presence of a switch or cursed if*.
+  // The order of branches is guaranteed for convenience. For if instructions,
+  // the TAKEN branch is first, and the FALLTHROUGH branch is second. For
+  // lookupswitch and tableswitch, the default branch is last.
   uint32_t *next;
+  uint8_t *is_backedge;
   int next_count;
   int next_cap;
 
@@ -32,6 +36,8 @@ typedef struct bjvm_basic_block {
   uint32_t idom;
   // Pre- and postorder in the immediate dominator tree
   uint32_t idom_pre, idom_post;
+  // Whether this block is the target of a backedge
+  bool is_loop_header;
 } bjvm_basic_block;
 
 // Result of the analysis of a code segment. During analysis, stack operations
@@ -60,6 +66,8 @@ typedef struct {
   // block 0 = entry point
   bjvm_basic_block *blocks;
   int block_count;
+
+  bool dominator_tree_computed;
 } bjvm_code_analysis;
 
 typedef bjvm_type_kind bjvm_analy_stack_entry;
@@ -85,14 +93,18 @@ typedef struct {
  * <br/>
  * Returns -1 if an error occurred, and writes the error message into error.
  */
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
+int bjvm_analyze_method_code(bjvm_cp_method *method,
                                      heap_string *error);
-
 void free_code_analysis(bjvm_code_analysis *analy);
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy);
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
 void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis);
+// Returns true iff dominator dominates dominated. dom dom dom.
+bool bjvm_query_dominance(const bjvm_basic_block *dominator,
+                       const bjvm_basic_block *dominated);
+// Try to reduce the CFG and mark the edges/blocks accordingly.
+int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
 
 #ifdef __cplusplus
 }

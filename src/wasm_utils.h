@@ -14,11 +14,12 @@ extern "C" {
 typedef enum {
   BJVM_WASM_TYPE_KIND_VOID,
   BJVM_WASM_TYPE_KIND_INT32 = 0x7F,
+  BJVM_WASM_TYPE_KIND_INT64 = 0x7E,
   BJVM_WASM_TYPE_KIND_FLOAT32 = 0x7D,
   BJVM_WASM_TYPE_KIND_FLOAT64 = 0x7C,
-  BJVM_WASM_TYPE_KIND_INT64 = 0x7E,
 
-  // during serialization, we'll replace this with the correct type
+  // during serialization, we'll replace this with the correct type from
+  // context (todo)
   BJVM_WASM_TYPE_KIND_INFER
 } bjvm_wasm_value_type;
 
@@ -97,10 +98,30 @@ typedef enum {
   BJVM_WASM_OP_KIND_F64_SQRT    = 0x9F,
 
   BJVM_WASM_OP_KIND_I32_WRAP_I64 = 0xA7,
+  BJVM_WASM_OP_KIND_I32_TRUNC_S_F32 = 0xA8,
+  BJVM_WASM_OP_KIND_I32_TRUNC_S_F64 = 0xAA,
+  BJVM_WASM_OP_KIND_I64_TRUNC_S_F32 = 0xAE,
+  BJVM_WASM_OP_KIND_I64_TRUNC_S_F64 = 0xB0,
+  BJVM_WASM_OP_KIND_F32_CONVERT_S_I32 = 0xB2,
+  BJVM_WASM_OP_KIND_F32_CONVERT_S_I64 = 0xB4,
+  BJVM_WASM_OP_KIND_F32_DEMOTE_F64 = 0xB6,
+  BJVM_WASM_OP_KIND_F64_CONVERT_S_I32 = 0xB7,
+  BJVM_WASM_OP_KIND_F64_CONVERT_S_I64 = 0xB9,
+  BJVM_WASM_OP_KIND_F64_PROMOTE_F32 = 0xBB,
+
+  // Used by Double.doubleToRawLongBits and friends
+  BJVM_WASM_OP_KIND_I32_REINTERPRET_F32 = 0xBC,
+  BJVM_WASM_OP_KIND_I64_REINTERPRET_F64 = 0xBD,
+  BJVM_WASM_OP_KIND_F32_REINTERPRET_I32 = 0xBE,
+  BJVM_WASM_OP_KIND_F64_REINTERPRET_I64 = 0xBF,
+
+  BJVM_WASM_OP_KIND_I32_EXTEND_S_I8 = 0xC0,
+  BJVM_WASM_OP_KIND_I32_EXTEND_S_I16 = 0xC1,
+
   BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F32_S = 0xFC00,
-  BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F32_U = 0xFC01,
   BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F64_S = 0xFC02,
-  BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F64_U = 0xFC03,
+  BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F32_S = 0xFC03,
+  BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F64_S = 0xFC05,
   BJVM_WASM_OP_KIND_I64_EXTEND_S_I32 = 0xFC0C,
   BJVM_WASM_OP_KIND_I64_EXTEND_U_I32 = 0xFC0D,
 } bjvm_wasm_unary_op_kind;
@@ -273,9 +294,7 @@ typedef struct bjvm_wasm_function bjvm_wasm_function;
 typedef struct {
   bjvm_wasm_expression *condition;  // may be null
   bjvm_wasm_expression *expr;
-
   bjvm_wasm_function *to_call;
-
   bjvm_wasm_expression **args;
   int arg_count;
 } bjvm_wasm_call_expression;
@@ -289,9 +308,8 @@ typedef struct {
 } bjvm_wasm_call_indirect_expression;
 
 typedef struct {
-  bjvm_wasm_expression *exprs;
+  bjvm_wasm_expression **exprs;
   int expr_count;
-  int expr_cap;
 } bjvm_wasm_expression_list;
 
 // Used for both (block ...) and (loop ...)
@@ -465,7 +483,7 @@ bjvm_wasm_expression *bjvm_wasm_i32_const(bjvm_wasm_module *module, int value);
 bjvm_wasm_expression *bjvm_wasm_f32_const(bjvm_wasm_module *module, float value);
 bjvm_wasm_expression *bjvm_wasm_f64_const(bjvm_wasm_module *module, double value);
 bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module, int64_t value);
-bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module, uint32_t index);
+bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module, uint32_t index, bjvm_wasm_type kind);
 bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module, uint32_t index, bjvm_wasm_expression *value);
 bjvm_wasm_expression *bjvm_wasm_unop(bjvm_wasm_module *module,
     bjvm_wasm_unary_op_kind op, bjvm_wasm_expression *expr);
@@ -474,9 +492,19 @@ bjvm_wasm_expression *bjvm_wasm_binop(
     bjvm_wasm_binary_op_kind op,
     bjvm_wasm_expression *left,
     bjvm_wasm_expression *right);
+bjvm_wasm_expression *bjvm_wasm_select(bjvm_wasm_module *module,
+                                       bjvm_wasm_expression *condition,
+                                       bjvm_wasm_expression *true_expr,
+                                       bjvm_wasm_expression *false_expr);
 bjvm_wasm_expression *bjvm_wasm_block(
     bjvm_wasm_module *module,
-    bjvm_wasm_expression *exprs, int expr_count);
+    bjvm_wasm_expression **exprs,
+    int expr_count,
+    bjvm_wasm_type type);
+bjvm_wasm_expression *bjvm_wasm_br(
+    bjvm_wasm_module *module,
+    bjvm_wasm_expression *condition,
+    bjvm_wasm_expression *break_to);
 bjvm_wasm_expression *bjvm_wasm_call(
   bjvm_wasm_module *module,
   bjvm_wasm_function *fn,
@@ -501,7 +529,15 @@ bjvm_wasm_expression *bjvm_wasm_store(
     bjvm_wasm_expression *value,
     int align,
     int offset);
+bjvm_wasm_expression *bjvm_wasm_if_else(
+  bjvm_wasm_module *module,
+  bjvm_wasm_expression *cond,
+  bjvm_wasm_expression *true_expr,
+  bjvm_wasm_expression *false_expr,
+  bjvm_wasm_type type);
 bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module, bjvm_wasm_expression *expr);
+bjvm_wasm_load_op_kind bjvm_wasm_get_load_op(bjvm_wasm_type type);
+bjvm_wasm_store_op_kind bjvm_wasm_get_store_op(bjvm_wasm_type type);
 
 typedef enum {
   BJVM_WASM_INSTANTIATION_SUCCESS,

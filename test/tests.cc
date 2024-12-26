@@ -16,8 +16,9 @@
 #include "../src/adt.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
-#include "tests-common.h"
 #include "../src/analysis.h"
+#include "../src/wasm_jit.h"
+#include "tests-common.h"
 
 #include <numeric>
 
@@ -524,7 +525,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_cp_method *m = desc.methods + 4;
   REQUIRE(utf8_equals(m->name, "main"));
 
-  bjvm_analyze_method_code_segment(m, nullptr);
+  bjvm_analyze_method_code(m, nullptr);
   auto *analy = (bjvm_code_analysis*) m->code_analysis;
   bjvm_scan_basic_blocks(m->code, analy);
   bjvm_compute_dominator_tree(analy);
@@ -557,6 +558,11 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   for (auto [a, b] : doms) {
     REQUIRE(analy->blocks[a].idom == b);
   }
+
+  int result = bjvm_attempt_reduce_cfg(analy);
+  REQUIRE(result == 0);
+
+  // auto *result = bjvm_wasm_jit_compile(nullptr, m);
 
   bjvm_free_classfile(desc);
 }

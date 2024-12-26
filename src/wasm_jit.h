@@ -9,6 +9,10 @@
 #include "bjvm.h"
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
   // Used to pass the compiled binary into JS to be instantiated
   void *data;
@@ -25,5 +29,9 @@ bjvm_wasm_jit_compiled_method* bjvm_wasm_jit_compile(bjvm_thread *thread,
 void free_wasm_compiled_method(void *compiled_method);
 
 void bjvm_translate();
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // JIT_H
