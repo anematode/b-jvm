@@ -1545,20 +1545,25 @@ void free_code_analysis(bjvm_code_analysis *analy) {
       free(analy->insn_index_to_kinds[j]);
     }
   }
+  for (int i = 0; i < analy->block_count; ++i) {
+    free(analy->blocks[i].next);
+    free(analy->blocks[i].prev);
+  }
   free(analy->blocks);
   free(analy->insn_index_to_stack_depth);
   free(analy);
 }
 
-void push_bb_branch(bjvm_basic_block *current, bjvm_basic_block *next) {
+static void push_bb_branch(bjvm_basic_block *current, bjvm_basic_block *next) {
   *VECTOR_PUSH(current->next, current->next_count, current->next_cap) = next->my_index;
   *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) = current->my_index;
 }
 
-int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
+static int cmp_ints(const void *a, const void *b) { return *(int *)a - *(int *)b; }
 
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy) {
+  assert(analy);
   if (analy->blocks)
     return 0; // already done
   // First, record all branch targets. We're doing all exception handling in C
@@ -1596,7 +1601,7 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
     bs[i].my_index = i;
   }
 #define FIND_TARGET_BLOCK(index)                                               \
-  bsearch(&index, ts, block_count, sizeof(int), cmp_ints)
+  &bs[(int*)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
   // Then, record edges between bbs. (This assumes no unreachable code, which
   // was checked in analyze_method_code_segment.)
   for (int block_i = 0; block_i < block_count - 1; ++block_i) {
@@ -1628,7 +1633,8 @@ static void get_preorder(const bjvm_basic_block *block,
   for (int j = 0; j < block->next_count; ++j) {
     if (block_to_pre[block->next[j]] == -1) {
       parent[block->next[j]] = block->my_index;
-      get_preorder(block + block->next[j], block_to_pre, preorder, parent, clock);
+      get_preorder(block - block->my_index + block->next[j],
+        block_to_pre, preorder, parent, clock);
     }
   }
 }
@@ -1639,6 +1645,14 @@ typedef struct {
   int cap;
 } semidominated_list_t;
 
+static void idom_dfs(bjvm_basic_block *block, int* visited, uint32_t *clock) {
+  block->idom_pre = (*clock)++;
+  for (int i = 0; i < block->next_count; ++i)
+    if (!visited[block->next[i]]++)
+      idom_dfs(block - block->my_index + block->next[i], visited, clock);
+  block->idom_post = (*clock)++;
+}
+
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   assert(analy->blocks);
@@ -1646,30 +1660,31 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // block # -> pre-order #
   int *block_to_pre = malloc(block_count * sizeof(int));
   // pre-order # -> block #
-  int *preorder = malloc(block_count * sizeof(int));
+  int *pre_to_block = malloc(block_count * sizeof(int));
   // block # -> block #
   int *parent = malloc(block_count * sizeof(int));
   memset(block_to_pre, -1, block_count * sizeof(int));
   int counter = 0;
-  get_preorder(analy->blocks, block_to_pre, preorder, parent, &counter);
+  get_preorder(analy->blocks, block_to_pre, pre_to_block, parent, &counter);
   // Initialize a forest, subset of the DFS tree, F[i] = i initially
   int *F = malloc(block_count * sizeof(int));
-  for (int i = 1; i < block_count; ++i)
+  for (int i = 0; i < block_count; ++i)
     F[i] = i;
   // semidom[j] is the semi-dominator of j
   int *semidom = calloc(block_count, sizeof(int));
   // semidominates[i] is the set of blocks that i semi-dominates
   semidominated_list_t *semidominates = calloc(block_count, sizeof(semidominated_list_t));
   // Go through all non-entry blocks in reverse pre-order
-  for (int i = block_count - 1; i >= 1; --i) {
-    bjvm_basic_block *b = analy->blocks + preorder[i];
-    int sd = INT_MAX;
+  for (int preorder_i = block_count - 1; preorder_i >= 1; --preorder_i) {
+    int i = pre_to_block[preorder_i];
+    bjvm_basic_block *b = analy->blocks + i;
+    int sd = INT_MAX;  // preorder, not block #
     // Go through predecessor blocks in any order
     for (int prev_i = 0; prev_i < b->prev_count; ++prev_i) {
       int prev = b->prev[prev_i];
-      if (block_to_pre[prev] < i) {
+      if (block_to_pre[prev] < preorder_i) {
         if (block_to_pre[prev] < sd)  // prev is a better candidate for semidom
-          sd = prev;
+          sd = block_to_pre[prev];
       } else {
         // Get the root in F using union find with path compression
         int root = prev;
@@ -1677,53 +1692,66 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
           root = F[root] = F[F[root]];
         // Walk the preorder from prev to root, and update sd
         do {
-          if (semidom[prev] < sd)
-            sd = semidom[prev];
+          if (block_to_pre[semidom[prev]] < sd)
+            sd = block_to_pre[semidom[prev]];
           prev = parent[prev];
         } while (prev != root);
       }
     }
-    semidom[i] = sd;
-    semidominated_list_t *sdlist = semidominates + sd;
+    semidom[i] = pre_to_block[sd];
+    semidominated_list_t *sdlist = semidominates + pre_to_block[sd];
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
     F[i] = parent[i];
   }
-  // ???
-  int *sdbar = calloc(block_count, sizeof(int));
-  for (int i = 1; i < block_count; ++i)
-    sdbar[i] = INT_MAX;
+  // Compute relative dominators
+  int *reldom = calloc(block_count, sizeof(int));
   for (int i = 1; i < block_count; ++i) {
     semidominated_list_t *sdlist = semidominates + i;
-    for (int j = 0; j < sdlist->count; ++j) {
-      int w = sdlist->list[j];
+    for (int list_i = 0; list_i < sdlist->count; ++list_i) {
+      int w = sdlist->list[list_i], walk = w, min = INT_MAX;
       assert(semidom[w] == i);
-      // Walk from w to i and record sdbar[w]
-      int u = w;
-      do {
-        if (semidom[u] < sdbar[w])
-          sdbar[w] = semidom[u];
-        u = parent[u];
-      } while (u != i);
+      // Walk from w to i and record the minimizer of the semidominator value
+      while (walk != i) {
+        if (block_to_pre[walk] < min) {
+          min = block_to_pre[walk];
+          reldom[w] = walk;
+        }
+        walk = parent[walk];
+      }
     }
   }
   // Now, we can compute the immediate dominators
-  for (int i = 1; i < block_count; ++i) {
-    if (i == sdbar[i])
-      analy->blocks[i].idom = semidom[i];
-    else
-      analy->blocks[i].idom = analy->blocks[sdbar[i]].idom;
+  for (int preorder_i = 1; preorder_i < block_count; ++preorder_i) {
+    int i = pre_to_block[preorder_i];
+    analy->blocks[i].idom = i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
   }
   free(block_to_pre);
-  free(preorder);
+  free(pre_to_block);
   free(parent);
-  free(F);
   free(semidom);
   for (int i = 0; i < block_count; ++i)
     free(semidominates[i].list);
   free(semidominates);
-  free(sdbar);
+  free(reldom);
+  // Now compute a DFS tree on the immediate dominator tree (still need a
+  // "visited" array because it's a multigraph)
+  uint32_t clock = 0;
+  memset(F, 0, block_count * sizeof(int));
+  idom_dfs(analy->blocks, F, &clock);
+  free(F);
 }
 
-// We try to recover the control-flow structure of the original Java source. In
-// general, we can have labeled loops, fallthroughs, etc.; so this problem is
-// not exactly straightforward....
+void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis) {
+  fprintf(out, "digraph cfg {\n");
+  for (int i = 0; i < analysis->block_count; i++) {
+    bjvm_basic_block *b = &analysis->blocks[i];
+    fprintf(out, "    %d [label=\"Block %d\"];\n", b->my_index, b->my_index);
+  }
+  for (int i = 0; i < analysis->block_count; i++) {
+    bjvm_basic_block *b = &analysis->blocks[i];
+    for (int j = 0; j < b->next_count; j++) {
+      fprintf(out, "    %d -> %u;\n", b->my_index, b->next[j]);
+    }
+  }
+  fprintf(out, "}\n");
+}

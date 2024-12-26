@@ -2204,6 +2204,8 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   free_on_format_error(&ctx, cf->methods);
 
   cf->bootstrap_methods = nullptr;
+  cf->indy_insns = nullptr;
+  cf->indy_insns_count = 0;
 
   bool in_MethodHandle =
       utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle");

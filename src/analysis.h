@@ -7,6 +7,10 @@
 
 #include "classfile.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct bjvm_basic_block {
   int my_index;
 
@@ -14,16 +18,20 @@ typedef struct bjvm_basic_block {
   int start_index;
   int insn_count;
 
+  // May contain duplicates in the presence of a switch or cursed if*
   uint32_t *next;
   int next_count;
   int next_cap;
 
+  // May contain duplicates in the presence of a switch or cursed if*
   uint32_t *prev;
   int prev_count;
   int prev_cap;
 
   // Immediate dominator of this block
   uint32_t idom;
+  // Pre- and postorder in the immediate dominator tree
+  uint32_t idom_pre, idom_post;
 } bjvm_basic_block;
 
 // Result of the analysis of a code segment. During analysis, stack operations
@@ -84,5 +92,10 @@ void free_code_analysis(bjvm_code_analysis *analy);
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy);
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
+void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // BJVM_ANALYSIS_H
