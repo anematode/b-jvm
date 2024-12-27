@@ -5,20 +5,23 @@ public class Main {
     static int p = 10;
     public static void main(String[] args) {
         long p = 0;
-        for (int i = 0; i < 100000; ++i) {
-            testOperation();
+        for (int i = 0; i < 50; ++i) {
+        System.out.println(divWord(280633750, -569676998));
         }
-        System.out.println(p);
     }
 
-    static int testOperation() {
-        long a = 10;
-        long b = 20;
-        if (b < 15L) {
-            p += 1;
-        }
-        return p;
-    }
+    final static long LONG_MASK = 0xffffffffL;
+
+    static long divWord(long n, int d) {
+       int r = 280633750;
+       int q = 0;
+       long dLong = 3725290298L;
+       while (r >= dLong) {
+           r -= dLong;
+           q++;
+       }
+       return dLong;
+   }
 }
 
 class BigDecimalTest {

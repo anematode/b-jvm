@@ -30,7 +30,7 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (FALSE)
+if (TRUE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()

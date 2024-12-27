@@ -12,7 +12,7 @@
 #include <inttypes.h>
 #include <limits.h>
 
-const char *insn_code_name(bjvm_insn_code_kind code) {
+const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
   switch (code) {
   case bjvm_insn_aaload:
     return "aaload";
@@ -431,7 +431,7 @@ char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
 
   write += snprintf(write, sizeof(buf), "%04d = pc %04d: ", insn_index,
                     insn->original_pc);
-  write += snprintf(write, end - write, "%s ", insn_code_name(insn->kind));
+  write += snprintf(write, end - write, "%s ", bjvm_insn_code_name(insn->kind));
 
   if (insn->kind <= bjvm_insn_swap) {
     // no operands
@@ -610,13 +610,13 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   locals->entries_cap = locals->entries_count = max_locals;
   for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
-    locals->entries[j] = field_to_kind(&arg);
+    int swizzled = i + !is_static;
+    locals->entries[swizzled] = field_to_kind(&arg);
     // map nth local to nth argument if static, n+1th if nonstatic
-    (*locals_swizzle)[j] = i + !is_static;
+    (*locals_swizzle)[j] = swizzled;
     if (bjvm_is_field_wide(arg)) {
       if (++j >= max_locals)
         goto fail;
-      locals->entries[j] = BJVM_TYPE_KIND_VOID;
     }
   }
   if (i != desc->args_count)
@@ -689,7 +689,18 @@ struct method_analysis_ctx {
     ctx->locals.entries[index] = BJVM_TYPE_KIND_##kind;                        \
   }
 // Remap the index to the new local variable index after unwidening.
-#define SWIZZLE_LOCAL(index) index = ctx->locals_swizzle[index];
+#define SWIZZLE_LOCAL(index) \
+  { \
+  if (index >= ctx->code->max_locals) \
+    goto local_overflow; \
+  index = ctx->locals_swizzle[index];  \
+}
+
+#define CHECK_LOCAL(index, kind)                                               \
+  {                                                                            \
+    if (ctx->locals.entries[index] != BJVM_TYPE_KIND_##kind)                   \
+      goto local_type_mismatch;                                                \
+  }
 
 int push_branch_target(struct method_analysis_ctx *ctx, uint32_t curr,
                        uint32_t target) {
@@ -1091,21 +1102,25 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_dload: {
     PUSH(DOUBLE)
     SWIZZLE_LOCAL(insn->index)
+    CHECK_LOCAL(insn->index, DOUBLE)
     break;
   }
   case bjvm_insn_fload: {
     PUSH(FLOAT)
     SWIZZLE_LOCAL(insn->index)
+    CHECK_LOCAL(insn->index, FLOAT)
     break;
   }
   case bjvm_insn_iload: {
     PUSH(INT)
     SWIZZLE_LOCAL(insn->index)
+    CHECK_LOCAL(insn->index, INT)
     break;
   }
   case bjvm_insn_lload: {
     PUSH(LONG)
     SWIZZLE_LOCAL(insn->index)
+    CHECK_LOCAL(insn->index, LONG)
     break;
   }
   case bjvm_insn_dstore: {
@@ -1135,6 +1150,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_aload: {
     PUSH(REFERENCE)
     SWIZZLE_LOCAL(insn->index)
+    CHECK_LOCAL(insn->index, REFERENCE)
     break;
   }
   case bjvm_insn_astore: {
@@ -1231,6 +1247,9 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
 
   return 0; // ok
 
+local_type_mismatch:
+  ctx->insn_error = strdup("Local type mismatch:");
+  goto error;
 local_overflow:
   ctx->insn_error = strdup("Local overflow:");
   goto error;
@@ -1246,10 +1265,11 @@ error:;
   *ctx->error = make_heap_str(50000);
   char *insn_str = insn_to_string(insn, insn_index);
   char *stack_str = print_analy_stack_state(&ctx->stack_before);
+  char *locals_str = print_analy_stack_state(&ctx->locals);
   char *context = code_attribute_to_string(ctx->code);
   bprintf(hslc(*ctx->error),
-          "%s\nInstruction: %s\nStack preceding insn: %s\nContext: %s\n",
-          ctx->insn_error, insn_str, stack_str, context);
+          "%s\nInstruction: %s\nStack preceding insn: %s\nLocals state: %s\nContext:\n%s\n",
+          ctx->insn_error, insn_str, stack_str, locals_str, context);
   free(insn_str);
   free(stack_str);
   free(context);
@@ -1612,9 +1632,9 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
   &bs[(int *)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
   // Then, record edges between bbs. (This assumes no unreachable code, which
   // was checked in analyze_method_code_segment.)
-  for (int block_i = 0; block_i < block_count - 1; ++block_i) {
+  for (int block_i = 0; block_i < block_count; ++block_i) {
     bjvm_basic_block *b = bs + block_i;
-    const bjvm_bytecode_insn *last = (b + 1)->start - 1;
+    const bjvm_bytecode_insn *last = b->start + b->insn_count - 1;
     if (last->kind >= bjvm_insn_goto && last->kind <= bjvm_insn_ifnull) {
       push_bb_branch(b, FIND_TARGET_BLOCK(last->index));
       if (last->kind == bjvm_insn_goto)
@@ -1627,7 +1647,8 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
         push_bb_branch(b, FIND_TARGET_BLOCK(tsd->targets[i]));
       continue;
     }
-    push_bb_branch(b, &analy->blocks[block_i + 1]);
+    if (block_i + 1 < block_count)
+      push_bb_branch(b, &analy->blocks[block_i + 1]);
   }
   // Create some auxiliary data
   for (int block_i = 0; block_i < block_count; ++block_i) {

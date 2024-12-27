@@ -124,6 +124,26 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
   return frame;
 }
 
+const char *infer_type(bjvm_code_analysis* analysis, int insn, int index) {
+  bjvm_compressed_bitset refs = analysis->insn_index_to_references[insn],
+  ints = analysis->insn_index_to_ints[insn],
+  floats = analysis->insn_index_to_floats[insn],
+  doubles = analysis->insn_index_to_doubles[insn],
+  longs = analysis->insn_index_to_longs[insn];
+  if (bjvm_test_compressed_bitset(refs, index)) {
+    return "ref";
+  } else if (bjvm_test_compressed_bitset(ints, index)) {
+    return "int";
+  } else if (bjvm_test_compressed_bitset(floats, index)) {
+    return "float";
+  } else if (bjvm_test_compressed_bitset(doubles, index)) {
+    return "double";
+  } else if (bjvm_test_compressed_bitset(longs, index)) {
+    return "long";
+  }
+  return "void";
+}
+
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   char buf[5000] = {0}, *write = buf, *end = buf + sizeof(buf);
 
@@ -134,7 +154,8 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 
   for (int i = 0; i < frame->stack_depth; ++i) {
     bjvm_stack_value value = frame->values[i];
-    const char *is_ref = bjvm_test_compressed_bitset(refs, i) ? "<ref>" : "";
+    const char *is_ref = infer_type(frame->method->code_analysis,
+                                    frame->program_counter, i);
     write +=
         snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n",
                  i, value.obj, value.i, is_ref);
@@ -142,8 +163,8 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 
   for (int i = 0; i < frame->max_locals; ++i) {
     bjvm_stack_value value = frame->values[i + frame->max_stack];
-    const char *is_ref =
-        bjvm_test_compressed_bitset(refs, i + frame->max_stack) ? "<ref>" : "";
+    const char *is_ref = infer_type(frame->method->code_analysis,
+                                    frame->program_counter, i + frame->max_stack);
     write +=
         snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n",
                  i, value.obj, value.i, is_ref);
@@ -227,11 +248,6 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
                                    const bjvm_utf8 method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);
-
-bjvm_stack_value unimplemented_native(bjvm_thread *, bjvm_obj_header *,
-                                      bjvm_stack_value *, int) {
-  return value_null();
-}
 
 // Raise an UnsatisfiedLinkError relating to the given method.
 void bjvm_unsatisfied_link_error(bjvm_thread *thread,
@@ -2687,7 +2703,7 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
 
   if (!m->compiled_method) {
     m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
-    if (((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
+    if (!m->compiled_method || ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
         BJVM_WASM_INSTANTIATION_SUCCESS) {
       m->failed_jit = true;
       return 1;
@@ -2711,16 +2727,23 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 10 && !method->failed_jit; // && utf8_equals(method->name, "testOperation");
+  return method->call_count > 10 &&
+    method->code->insn_count > 10 &&
+    !method->failed_jit; // && utf8_equals(method->name, "testOperation");
 }
 
+int w = 0, n = 0;
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
                                                   bjvm_stack_frame *final_frame,
                                                   bjvm_stack_value *result) {
+
   if (final_frame == thread->frames[thread->frames_count - 1] &&
       final_frame->program_counter == 0 &&
       should_attempt_to_jit(final_frame->method)) {
     bjvm_interpreter_result_t interp_result;
+    /*printf("Running method %.*s on %.*s as WASM\n",
+           fmt_slice(final_frame->method->name), fmt_slice(final_frame->method->my_class->name));
+    dump_frame(stdout, final_frame);*/
 #if AGGRESSIVE_DEBUG
     printf("Running method %.*s as WASM\n",
            fmt_slice(final_frame->method->name));
@@ -2728,12 +2751,16 @@ bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
     int failed_to_compile =
         bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
     if (!failed_to_compile) {
+      w++;
       return interp_result;
     }
 #if AGGRESSIVE_DEBUG
     printf("Continuing...\n");
 #endif
   }
+  n++;
+  printf("Method: %.*s, n: %d, w: %d\n", fmt_slice(final_frame->method->name), n, w);
+  //printf("n: %d, w: %d\n", n, w);
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
 

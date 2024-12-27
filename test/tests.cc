@@ -516,6 +516,12 @@ TEST_CASE("Deranged CFG") {
   REQUIRE(result.stdout_ == as_string);
 }
 
+TEST_CASE("Analysis") {
+  // TODO check that all code analysis functions succeed across all JDK
+  // functions
+}
+
+
 TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_classdesc desc;
   auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();
@@ -558,7 +564,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 
   bjvm_cp_method *m2 = desc.methods + 5;
   bjvm_analyze_method_code(m2, nullptr);
-  auto *b = bjvm_wasm_jit_compile(nullptr, m2);
+  auto *b = bjvm_wasm_jit_compile(nullptr, m2, false);
 
   bjvm_free_classfile(desc);
 }

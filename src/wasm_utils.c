@@ -365,9 +365,9 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
   }
   case BJVM_WASM_EXPR_KIND_SELECT:
     // (select (condition) (true_expr) (false_expr))
-    serialize_expression(ctx, body, expr->select.condition);
     serialize_expression(ctx, body, expr->select.true_expr);
     serialize_expression(ctx, body, expr->select.false_expr);
+    serialize_expression(ctx, body, expr->select.condition);
     write_byte(body, 0x1B);
     break;
   case BJVM_WASM_EXPR_KIND_GET_LOCAL: {
@@ -456,7 +456,7 @@ void write_compressed_locals(bjvm_bytevector *body,
                              const bjvm_wasm_tuple_type *locals) {
   bjvm_bytevector types = {nullptr};
   int count = 0;
-  if (locals) {
+  if (locals && locals->types_len) {
     int i = 1, j = 0;
     for (; i < locals->types_len; ++i) {
       if (locals->types[i] != locals->types[i - 1]) {
@@ -933,7 +933,7 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
           let count = 0;
           for (var exp in instance.exports)
             count++;
-          require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm", slice);
+          //require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm", slice);
           return addFunction(instance.exports.run, 'iiii');
         } catch (e) {
           // Exit Node.js
@@ -946,7 +946,6 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
       (intptr_t)serialized.bytes,
       (intptr_t)(serialized.bytes + serialized.bytes_len),
       (intptr_t)debug_name);
-
   if (ptr) {
     result->status = BJVM_WASM_INSTANTIATION_SUCCESS;
     result->run = (void*)ptr;

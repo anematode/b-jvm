@@ -11,6 +11,7 @@ bjvm.onRuntimeInitialized = function() {
     function main() {
         while (!bjvm.ccall("bjvm_async_run_step", "number", ["number"], [ptr])) {
         }
+        bjvm.ccall("print_error", "number", ["number"], [ptr]);
     }
 
     main();

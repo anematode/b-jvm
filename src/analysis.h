@@ -114,6 +114,7 @@ bool bjvm_query_dominance(const bjvm_basic_block *dominator,
                           const bjvm_basic_block *dominated);
 // Try to reduce the CFG and mark the edges/blocks accordingly.
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
+const char *bjvm_insn_code_name(bjvm_insn_code_kind code);
 
 #ifdef __cplusplus
 }

@@ -145,7 +145,6 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
     expression frame =
         bjvm_wasm_local_get(ctx->module, FRAME_PARAM, bjvm_wasm_int32());
     int offset = values_start + slot * value_size;
-
     bjvm_wasm_type wkind;
     bjvm_type_kind kind;
     bjvm_wasm_load_op_kind load_op;
@@ -175,6 +174,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
       continue;
     }
 
+    //printf("Loading at offset %d with kind %d\n", offset, kind);
     int wasm_local = jvm_stack_to_wasm_local(ctx, slot, kind);
     if (do_load) {
       // (local.set wasm_local (i32.load (i32.add frame (i32.const offset))))
@@ -208,6 +208,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
 
   expression block =
       bjvm_wasm_block(ctx->module, result, result_count, bjvm_wasm_void(), false);
+  free(result);
   return block;
 }
 
@@ -737,7 +738,7 @@ bjvm_wasm_expression *wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_in
   return nullptr;
 }
 
-const int MAX_PC_TO_EMIT = 1;
+const int MAX_PC_TO_EMIT = 10000;
 
 // Each basic block compiles into a WASM block with epsilon type transition
 static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_ctx *topo, bool debug) {
@@ -775,9 +776,10 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     if (debug && pc > MAX_PC_TO_EMIT) {
       goto unimplemented;
     }
-    const bjvm_bytecode_insn *insn = bb->start + i;
 
+    const bjvm_bytecode_insn *insn = bb->start + i;
     int sd = stack_depths[pc];
+
     switch (insn->kind) {
     case bjvm_insn_dload:
     case bjvm_insn_fload:
@@ -791,6 +793,18 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     case bjvm_insn_astore:
       PUSH_EXPR = wasm_lower_local_load_store(ctx, insn, sd);
       break;
+    case bjvm_insn_dreturn:
+    case bjvm_insn_freturn:
+    case bjvm_insn_ireturn:
+    case bjvm_insn_lreturn:
+    case bjvm_insn_areturn:
+    {
+      PUSH_EXPR = wasm_lower_return(ctx, insn, pc, sd);
+      PUSH_EXPR = bjvm_wasm_return(
+          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK));
+      outgoing_edges_processed = true;
+      break;
+    }
     case bjvm_insn_nop:
       --expr_i;
       continue;
@@ -866,18 +880,6 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_DOUBLE, F64_MUL);
     case bjvm_insn_dneg:
       CONVERSION_OP(BJVM_TYPE_KIND_DOUBLE, BJVM_TYPE_KIND_DOUBLE, F64_NEG);
-    case bjvm_insn_dreturn:
-    case bjvm_insn_freturn:
-    case bjvm_insn_ireturn:
-    case bjvm_insn_lreturn:
-    case bjvm_insn_areturn:
-    {
-      PUSH_EXPR = wasm_lower_return(ctx, insn, pc, sd);
-      PUSH_EXPR = bjvm_wasm_return(
-          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK));
-      outgoing_edges_processed = true;
-      break;
-    }
     case bjvm_insn_dsub:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_DOUBLE, F64_SUB);
     case bjvm_insn_dup:
@@ -1048,10 +1050,12 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2, inspect_value_type(ctx, pc, sd - 1));
       break;
     }
+#if 0
     case bjvm_insn_anewarray: {
       PUSH_EXPR = wasm_lower_anewarray(ctx, insn, sd);
       break;
     }
+#endif
     case bjvm_insn_checkcast: {
       goto unimplemented;
       // PUSH_EXPR = wasm_lower_checkcast(ctx, insn, sd);
@@ -1084,9 +1088,15 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       break;
     }
     case bjvm_insn_goto: {
+      int next = topo->block_to_topo[bb->next[0]];
+      if (next != topo->topo_i + 1) {
+        expression be = next < topo->topo_i + 1 ? topo->loop_headers[next] : topo->block_ends[next];
+        assert(be);
+        PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, be);
+      }
+      outgoing_edges_processed = true;
       break;
     }
-#if 0
     case bjvm_insn_invokespecial:
     case bjvm_insn_invokestatic:
     case bjvm_insn_invokevirtual:
@@ -1221,7 +1231,6 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       // PUSH_EXPR = wasm_lower_newarray(ctx, insn, sd);
       break;
     }
-#endif
     case bjvm_insn_fcmpl:
     case bjvm_insn_fcmpg:
     case bjvm_insn_frem: // deprecated
@@ -1237,7 +1246,10 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
 
   if (0) {
   unimplemented:
-    // Spill the stack
+    fprintf(stderr, "Rejecting JIT because of unimplemented instruction %s\n",
+           bjvm_insn_code_name(bb->start[i].kind));
+    free(results);
+    return nullptr;
     PUSH_EXPR =
         spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT);
   } else if (!outgoing_edges_processed && bb->next_count) {
@@ -1353,6 +1365,7 @@ topo_ctx make_topo_sort_ctx(bjvm_code_analysis *analy) {
   // relative to a DFS on the original CFG, to guarantee that the final
   // topological sort respects the forward edges in the original graph.
   topo_walk_idom(analy, &ctx);
+  assert(ctx.topo_i == analy->block_count);
   find_block_insertion_points(analy, &ctx);
   return ctx;
 }
@@ -1374,6 +1387,7 @@ static int cmp_ints_reverse(const void *a, const void *b) {
 
 bjvm_wasm_instantiation_result *
 bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool debug) {
+  bjvm_wasm_instantiation_result *wasm = nullptr;
   // printf("Requesting compile for method %.*s with signature %.*s\n", fmt_slice(method->name), fmt_slice(method->descriptor));
 
   // Resulting signature and (roughly) behavior is same as
@@ -1383,7 +1397,6 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool de
   // The key difference is that the frame MUST be the topmost frame, and this
   // must be the first invocation, whereas in the interpreter, we can interpret
   // things after an interrupt.
-  int ok = 0;
   assert(method->code);
   bjvm_scan_basic_blocks(method->code, method->code_analysis);
   bjvm_compute_dominator_tree(method->code_analysis);
@@ -1510,7 +1523,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool de
   bjvm_wasm_export_function(ctx.module, fn);
 
   bjvm_bytevector result = bjvm_wasm_module_serialize(ctx.module);
-  bjvm_wasm_instantiation_result *wasm = bjvm_wasm_instantiate_module(ctx.module, method->name.chars);
+  wasm = bjvm_wasm_instantiate_module(ctx.module, method->name.chars);
   if (wasm->status != BJVM_WASM_INSTANTIATION_SUCCESS) {
     //printf("Error instantiating module for method %.*s\n", fmt_slice(method->name));
   } else {
