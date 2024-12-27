@@ -556,11 +556,13 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   int result = bjvm_attempt_reduce_cfg(analy);
   REQUIRE(result == 0);
 
-  auto *b = bjvm_wasm_jit_compile(nullptr, m);
+  bjvm_cp_method *m2 = desc.methods + 5;
+  bjvm_analyze_method_code(m2, nullptr);
+  auto *b = bjvm_wasm_jit_compile(nullptr, m2);
 
   bjvm_free_classfile(desc);
 }
 
 TEST_CASE("Playground") {
-  // auto result = run_test_case("test_files/playground/", false);
+  auto result = run_test_case("test_files/playground/", false);
 }

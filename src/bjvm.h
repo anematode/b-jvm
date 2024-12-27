@@ -423,6 +423,9 @@ bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
 int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                          const bjvm_utf8 exception_string);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
+void bjvm_array_index_oob_exception(bjvm_thread *thread, int index,
+                                  int length);
+void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
 
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,
@@ -477,7 +480,7 @@ static inline int sizeof_type_kind(bjvm_type_kind kind) {
 
 bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread,
                                          bjvm_type_kind prim_kind);
-void *bump_allocate(bjvm_thread *thread, size_t bytes);
+void *bump_allocate(bjvm_thread *thread, size_t bytes, bool attempt_Gc);
 
 #ifdef __cplusplus
 }

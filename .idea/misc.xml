@@ -10,6 +10,9 @@
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
   <component name="CidrRootsConfiguration">
     <excludeRoots>
+      <file path="$PROJECT_DIR$/build" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-clang-18" />
+      <file path="$PROJECT_DIR$/cmake-build-debug-llvm19" />
       <file path="$PROJECT_DIR$/test/jre8" />
       <file path="$PROJECT_DIR$/test/lib" />
     </excludeRoots>

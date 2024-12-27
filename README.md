@@ -25,7 +25,7 @@ Common abbreviations:
 - Full implementation of the JVM spec (including esoteric things like classfile verification)
 - Java 17 support (starting with Java 8)
 - Reasonably fast (geomean within factor of 10 of HotSpot in memory and CPU usage across benchmarks)
-- JIT compilation to JavaScript
+- JIT compilation to WebAssembly
 - Interruptable execution
 - Dynamic class loading
 - Mild JNI compatibility

@@ -2,20 +2,22 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public class Main {
+    static int p = 10;
     public static void main(String[] args) {
         long p = 0;
-        for (int i = 0; i < 10000; ++i)
-            p += testOperation();
+        for (int i = 0; i < 100000; ++i) {
+            testOperation();
+        }
         System.out.println(p);
     }
 
     static int testOperation() {
-        int a = 0;
-        for (int i = 0; i < 100000; ++i) {
-            a += i;
+        long a = 10;
+        long b = 20;
+        if (b < 15L) {
+            p += 1;
         }
-        System.out.println("Bailing out!");
-        return a;
+        return p;
     }
 }
 

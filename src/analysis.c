@@ -389,8 +389,8 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   }
   case BJVM_CP_KIND_FIELD_REF: {
     char *class_name =
-        class_info_entry_to_string(ent->fieldref_info.class_info);
-    char *field_name = name_and_type_entry_to_string(ent->fieldref_info.nat);
+        class_info_entry_to_string(ent->field.class_info);
+    char *field_name = name_and_type_entry_to_string(ent->field.nat);
 
     snprintf(result, sizeof(result), "FieldRef: %s.%s", class_name, field_name);
     free(class_name);
@@ -400,8 +400,8 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
     char *class_name =
-        class_info_entry_to_string(ent->fieldref_info.class_info);
-    char *field_name = name_and_type_entry_to_string(ent->fieldref_info.nat);
+        class_info_entry_to_string(ent->field.class_info);
+    char *field_name = name_and_type_entry_to_string(ent->field.nat);
     snprintf(result, sizeof(result), "%s: %s; %s",
              ent->kind == BJVM_CP_KIND_METHOD_REF ? "MethodRef"
                                                   : "InterfaceMethodRef",
@@ -1015,7 +1015,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     bjvm_field_descriptor *field =
         bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
                             "getstatic/getfield argument")
-            ->fieldref_info.parsed_descriptor;
+            ->field.parsed_descriptor;
     PUSH_KIND(field_to_kind(field));
     break;
   }
@@ -1544,12 +1544,15 @@ void free_code_analysis(bjvm_code_analysis *analy) {
       free(analy->insn_index_to_kinds[j]);
     }
   }
-  for (int i = 0; i < analy->block_count; ++i) {
-    free(analy->blocks[i].next);
-    free(analy->blocks[i].is_backedge);
-    free(analy->blocks[i].prev);
+  if (analy->blocks) {
+    for (int i = 0; i < analy->block_count; ++i) {
+      free(analy->blocks[i].next);
+      free(analy->blocks[i].is_backedge);
+      free(analy->blocks[i].prev);
+      free(analy->blocks[i].idominates.list);
+    }
+    free(analy->blocks);
   }
-  free(analy->blocks);
   free(analy->insn_index_to_stack_depth);
   free(analy);
 }
@@ -1636,40 +1639,36 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
 #undef FIND_TARGET_BLOCK
 }
 
-static void get_preorder(const bjvm_basic_block *block, int *block_to_pre,
-                         int *preorder, int *parent, int *clock) {
-  preorder[*clock] = block->my_index;
-  block_to_pre[block->my_index] = (*clock)++;
+static void get_dfs_tree(bjvm_basic_block *block, int *block_to_pre,
+                         int *preorder, int *parent, int *preorder_clock,
+                         int *postorder_clock) {
+  preorder[*preorder_clock] = block->my_index;
+  block_to_pre[block->my_index] = block->dfs_pre = (*preorder_clock)++;
   for (int j = 0; j < block->next_count; ++j) {
     if (block_to_pre[block->next[j]] == -1) {
       parent[block->next[j]] = block->my_index;
-      get_preorder(block - block->my_index + block->next[j], block_to_pre,
-                   preorder, parent, clock);
+      get_dfs_tree(block - block->my_index + block->next[j], block_to_pre,
+                   preorder, parent, preorder_clock, postorder_clock);
     }
   }
+  block->dfs_post = (*postorder_clock)++;
 }
 
-typedef struct {
-  int *list;
-  int count;
-  int cap;
-} dominated_list_t;
-
-static void idom_dfs(bjvm_basic_block *block, int *visited,
-                     dominated_list_t *idoms, uint32_t *clock) {
+static void idom_dfs(bjvm_basic_block *block, int *visited, uint32_t *clock) {
   block->idom_pre = (*clock)++;
   visited[block->my_index] = 1;
-  dominated_list_t *dlist = idoms + block->my_index;
+  bjvm_dominated_list_t *dlist = &block->idominates;
   for (int i = 0; i < dlist->count; ++i) {
     int next = dlist->list[i];
     if (!visited[next])
-      idom_dfs(block + next - block->my_index, visited, idoms, clock);
+      idom_dfs(block + next - block->my_index, visited, clock);
   }
   block->idom_post = (*clock)++;
 }
 
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
+  // bjvm_dump_cfg_to_graphviz(stderr, analy);
   assert(analy->blocks);
   if (analy->dominator_tree_computed)
     return;
@@ -1682,16 +1681,14 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // block # -> block #
   int *parent = malloc(block_count * sizeof(int));
   memset(block_to_pre, -1, block_count * sizeof(int));
-  int counter = 0;
-  get_preorder(analy->blocks, block_to_pre, pre_to_block, parent, &counter);
+  int pre = 0, post = 0;
+  get_dfs_tree(analy->blocks, block_to_pre, pre_to_block, parent, &pre, &post);
   // Initialize a forest, subset of the DFS tree, F[i] = i initially
   int *F = malloc(block_count * sizeof(int));
   for (int i = 0; i < block_count; ++i)
     F[i] = i;
   // semidom[j] is the semi-dominator of j
   int *semidom = calloc(block_count, sizeof(int));
-  // semidominates[i] is the set of blocks that i semi-dominates
-  dominated_list_t *dominates = calloc(block_count, sizeof(dominated_list_t));
   // Go through all non-entry blocks in reverse pre-order
   for (int preorder_i = block_count - 1; preorder_i >= 1; --preorder_i) {
     int i = pre_to_block[preorder_i];
@@ -1700,6 +1697,8 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     // Go through predecessor blocks in any order
     for (int prev_i = 0; prev_i < b->prev_count; ++prev_i) {
       int prev = b->prev[prev_i];
+      if (prev == i)
+        continue;
       if (block_to_pre[prev] < preorder_i) {
         if (block_to_pre[prev] < sd) // prev is a better candidate for semidom
           sd = block_to_pre[prev];
@@ -1717,14 +1716,14 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
       }
     }
     semidom[i] = pre_to_block[sd];
-    dominated_list_t *sdlist = dominates + pre_to_block[sd];
+    bjvm_dominated_list_t *sdlist = &analy->blocks[pre_to_block[sd]].idominates;
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
     F[i] = parent[i];
   }
   // Compute relative dominators
   int *reldom = calloc(block_count, sizeof(int));
   for (int i = 1; i < block_count; ++i) {
-    dominated_list_t *sdlist = dominates + i;
+    bjvm_dominated_list_t *sdlist = &analy->blocks[i].idominates;
     for (int list_i = 0; list_i < sdlist->count; ++list_i) {
       int w = sdlist->list[list_i], walk = w, min = INT_MAX;
       assert(semidom[w] == i);
@@ -1740,12 +1739,12 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   }
   // Now, we can compute the immediate dominators
   for (int i = 0; i < block_count; ++i)
-    dominates[i].count = 0;
+    analy->blocks[i].idominates.count = 0;
   for (int preorder_i = 1; preorder_i < block_count; ++preorder_i) {
     int i = pre_to_block[preorder_i];
     int idom = analy->blocks[i].idom =
         i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
-    dominated_list_t *sdlist = dominates + idom;
+    bjvm_dominated_list_t *sdlist = &analy->blocks[idom].idominates;
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
   }
   free(block_to_pre);
@@ -1758,11 +1757,8 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   uint32_t clock = 1;
   // Re-use F as the visited array
   memset(F, 0, block_count * sizeof(int));
-  idom_dfs(analy->blocks, F, dominates, &clock);
+  idom_dfs(analy->blocks, F, &clock);
   free(F);
-  for (int i = 0; i < block_count; ++i)
-    free(dominates[i].list);
-  free(dominates);
 }
 
 bool bjvm_query_dominance(const bjvm_basic_block *dominator,
@@ -1776,7 +1772,6 @@ static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
                                       int *visited) {
   bjvm_basic_block *b = analy->blocks + i;
   visited[i] = 1;
-  printf("Visiting %d\n", i);
   for (int j = 0; j < b->next_count; ++j) {
     int next = b->next[j];
     if (b->is_backedge[j])
@@ -1786,14 +1781,10 @@ static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
         return 1;
     } else {
       if (visited[next] == 1) {
-        printf("Cycle detected %d -> %d\n", i, next);
-      }
-      if (visited[next] == 1) {
         return 1;
       }
     }
   }
-  printf("Finished visiting %d\n", i);
   visited[i] = 2;
   return 0;
 }
@@ -1805,6 +1796,7 @@ int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy) {
     for (int j = 0; j < b->next_count; ++j) {
       next = analy->blocks + b->next[j];
       b->is_backedge[j] = bjvm_query_dominance(next, b);
+      next->is_loop_header |= b->is_backedge[j];
     }
   }
 

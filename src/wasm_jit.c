@@ -6,6 +6,8 @@
 #include "objects.h"
 #include "wasm_utils.h"
 
+#include <limits.h>
+
 #define expression bjvm_wasm_expression *
 
 enum { THREAD_PARAM, FRAME_PARAM, RESULT_PARAM };
@@ -15,6 +17,8 @@ typedef struct {
   bjvm_wasm_function *new_array;
   bjvm_wasm_function *raise_npe;
   bjvm_wasm_function *raise_oob;
+  bjvm_wasm_function *push_frame;
+  bjvm_wasm_function *interpret_frame;
 } runtime_helpers;
 
 typedef struct {
@@ -44,7 +48,7 @@ typedef struct {
 
 #define WASM_TYPES_COUNT 4
 
-static bjvm_wasm_type jvm_type_to_wasm_kind(bjvm_type_kind kind) {
+static bjvm_wasm_type jvm_type_to_wasm(bjvm_type_kind kind) {
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
   case BJVM_TYPE_KIND_CHAR:
@@ -65,7 +69,7 @@ static bjvm_wasm_type jvm_type_to_wasm_kind(bjvm_type_kind kind) {
 }
 
 static int local_kind(bjvm_wasm_type ty) {
-  int result = ty.val - BJVM_WASM_TYPE_KIND_INT32;
+  int result = ty.val - BJVM_WASM_TYPE_KIND_FLOAT64;
   assert((unsigned)result < 4);
   return result;
 }
@@ -84,11 +88,11 @@ int sizeof_wasm_kind(bjvm_wasm_type kind) {
 }
 
 int jvm_stack_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
-  int i = index * WASM_TYPES_COUNT + local_kind(jvm_type_to_wasm_kind(kind));
+  int i = index * WASM_TYPES_COUNT + local_kind(jvm_type_to_wasm(kind));
   int *l = &ctx->val_to_local_map[i];
   if (*l == -1) {
     *VECTOR_PUSH(ctx->wvars, ctx->wvars_count, ctx->wvars_cap) =
-        jvm_type_to_wasm_kind(kind).val;
+        jvm_type_to_wasm(kind).val;
     *l = ctx->next_local++;
   }
   return *l;
@@ -101,7 +105,7 @@ int jvm_local_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
 expression get_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   return bjvm_wasm_local_get(ctx->module,
                              jvm_stack_to_wasm_local(ctx, index, kind),
-                             jvm_type_to_wasm_kind(kind));
+                             jvm_type_to_wasm(kind));
 }
 
 expression set_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
@@ -113,7 +117,7 @@ expression set_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
 expression get_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   return bjvm_wasm_local_get(ctx->module,
                              jvm_local_to_wasm_local(ctx, index, kind),
-                             jvm_type_to_wasm_kind(kind));
+                             jvm_type_to_wasm(kind));
 }
 
 expression set_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
@@ -208,17 +212,8 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
 }
 
 EMSCRIPTEN_KEEPALIVE
-void *wasm_runtime_new_array(bjvm_thread *thread, bjvm_classdesc *classdesc,
-                             int count) {
-  return CreateObjectArray1D(thread, classdesc, count);
-}
-
-EMSCRIPTEN_KEEPALIVE
-void *wasm_runtime_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {}
-
-EMSCRIPTEN_KEEPALIVE
 void *wasm_runtime_new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  return AllocateObject(thread, classdesc, classdesc->data_bytes);
+  return AllocateObject(thread, classdesc, classdesc->data_bytes, false);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -230,14 +225,29 @@ bjvm_interpreter_result_t wasm_runtime_raise_npe(bjvm_thread *thread) {
 EMSCRIPTEN_KEEPALIVE
 bjvm_interpreter_result_t
 wasm_runtime_raise_array_index_oob(bjvm_thread *thread, int index, int length) {
+  bjvm_array_index_oob_exception(thread, index, length);
   return BJVM_INTERP_RESULT_EXC;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bjvm_stack_frame *
+wasm_runtime_push_frame(bjvm_thread *thread, bjvm_bytecode_insn* insn) {
+  return nullptr;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
+                                               bjvm_classdesc *classdesc) {
+  if (count < 0)
+    return nullptr; // interrupt and raise NegativeArraySizeException
+  return CreateObjectArray1D(thread, classdesc, count, false);
 }
 
 void add_runtime_imports(compile_ctx *ctx) {
   ctx->runtime.new_object = bjvm_wasm_import_runtime_function(
       ctx->module, wasm_runtime_new_object, "ii", "i");
   ctx->runtime.new_array = bjvm_wasm_import_runtime_function(
-      ctx->module, wasm_runtime_new_array, "iii", "i");
+      ctx->module, wasm_runtime_make_object_array, "iii", "i");
   ctx->runtime.raise_npe = bjvm_wasm_import_runtime_function(
       ctx->module, wasm_runtime_raise_npe, "i", "i");
   ctx->runtime.raise_oob = bjvm_wasm_import_runtime_function(
@@ -291,17 +301,72 @@ bjvm_type_kind inspect_value_type(compile_ctx *ctx, int pc, int stack_i) {
   case 4:
     return BJVM_TYPE_KIND_LONG;
   default:
+    *(char*)1 = 0;
+    UNREACHABLE("No value found here");
+  }
+}
+
+bjvm_wasm_load_op_kind get_tk_load_op(bjvm_type_kind kind) {
+  switch (kind) {
+  case BJVM_TYPE_KIND_BOOLEAN:
+    return BJVM_WASM_OP_KIND_I32_LOAD8_U;
+  case BJVM_TYPE_KIND_CHAR:
+    return BJVM_WASM_OP_KIND_I32_LOAD16_U;
+  case BJVM_TYPE_KIND_FLOAT:
+    return BJVM_WASM_OP_KIND_F32_LOAD;
+  case BJVM_TYPE_KIND_DOUBLE:
+    return BJVM_WASM_OP_KIND_F64_LOAD;
+  case BJVM_TYPE_KIND_BYTE:
+    return BJVM_WASM_OP_KIND_I32_LOAD8_S;
+  case BJVM_TYPE_KIND_SHORT:
+    return BJVM_WASM_OP_KIND_I32_LOAD16_S;
+  case BJVM_TYPE_KIND_INT:
+  case BJVM_TYPE_KIND_REFERENCE:
+    return BJVM_WASM_OP_KIND_I32_LOAD;
+  case BJVM_TYPE_KIND_LONG:
+    return BJVM_WASM_OP_KIND_I64_LOAD;
+  default:
     UNREACHABLE();
   }
 }
 
-expression wasm_move_value(compile_ctx *ctx, int pc, int from, int to) {
-  bjvm_type_kind kind = inspect_value_type(ctx, pc, from);
+static bjvm_wasm_load_op_kind get_load_op(const bjvm_field_descriptor* field) {
+  bjvm_type_kind kind = field->dimensions ? BJVM_TYPE_KIND_REFERENCE : field->base_kind;
+  return get_tk_load_op(kind);
+}
 
+bjvm_wasm_store_op_kind get_tk_store_op(bjvm_type_kind kind) {
+  switch (kind) {
+  case BJVM_TYPE_KIND_BOOLEAN:
+  case BJVM_TYPE_KIND_BYTE:
+    return BJVM_WASM_OP_KIND_I32_STORE8;
+  case BJVM_TYPE_KIND_CHAR:
+  case BJVM_TYPE_KIND_SHORT:
+    return BJVM_WASM_OP_KIND_I32_STORE16;
+  case BJVM_TYPE_KIND_INT:
+  case BJVM_TYPE_KIND_REFERENCE:
+    return BJVM_WASM_OP_KIND_I32_STORE;
+  case BJVM_TYPE_KIND_FLOAT:
+    return BJVM_WASM_OP_KIND_F32_STORE;
+  case BJVM_TYPE_KIND_DOUBLE:
+    return BJVM_WASM_OP_KIND_F64_STORE;
+  case BJVM_TYPE_KIND_LONG:
+    return BJVM_WASM_OP_KIND_I64_STORE;
+  default:
+    UNREACHABLE();
+  }
+}
+
+static bjvm_wasm_store_op_kind get_store_op(const bjvm_field_descriptor* field) {
+  bjvm_type_kind kind = field->dimensions ? BJVM_TYPE_KIND_REFERENCE : field->base_kind;
+  return get_tk_store_op(kind);
+}
+
+expression wasm_move_value(compile_ctx *ctx, int pc, int from, int to, bjvm_type_kind kind) {
   return bjvm_wasm_local_set(
       ctx->module, jvm_stack_to_wasm_local(ctx, to, kind),
       bjvm_wasm_local_get(ctx->module, jvm_stack_to_wasm_local(ctx, from, kind),
-                          jvm_type_to_wasm_kind(kind)));
+                          jvm_type_to_wasm(kind)));
 }
 
 expression wasm_lower_array_load_store(compile_ctx *ctx,
@@ -379,15 +444,15 @@ expression wasm_lower_array_load_store(compile_ctx *ctx,
           bjvm_wasm_i32_const(ctx->module, sizeof_type_kind(component))));
 
   expression execute;
-  bjvm_wasm_type dtype = jvm_type_to_wasm_kind(component);
+  bjvm_wasm_type dtype = jvm_type_to_wasm(component);
 
   if (is_store) {
     // (<dtype>.store offset=kArrayDataOffset <addr>)
     expression value = get_stack_value(ctx, sd - 1, component);
-    execute = bjvm_wasm_store(ctx->module, BJVM_WASM_OP_KIND_I32_STORE, addr,
+    execute = bjvm_wasm_store(ctx->module, get_tk_store_op(component), addr,
                               value, 0, kArrayDataOffset);
   } else {
-    expression data = bjvm_wasm_load(ctx->module, BJVM_WASM_OP_KIND_I32_LOAD,
+    expression data = bjvm_wasm_load(ctx->module, get_tk_load_op(component),
                                      addr, 0, kArrayDataOffset);
     execute = set_stack_value(ctx, sd - 2, component, data);
   }
@@ -408,25 +473,19 @@ expression wasm_lower_array_load_store(compile_ctx *ctx,
   return load_store;
 }
 
-expression wasm_lower_icmp_lcmp(compile_ctx *ctx,
+expression wasm_lower_lcmp(compile_ctx *ctx,
                                 const bjvm_bytecode_insn *insn, int sd) {
-  bool is_long = insn->kind == bjvm_insn_lcmp;
-  bjvm_type_kind kind = is_long ? BJVM_TYPE_KIND_LONG : BJVM_TYPE_KIND_INT;
+  bjvm_type_kind kind = BJVM_TYPE_KIND_LONG;
 
-  expression zero = is_long ? bjvm_wasm_i64_const(ctx->module, 0)
-                            : bjvm_wasm_i32_const(ctx->module, 0);
-  expression one = is_long ? bjvm_wasm_i64_const(ctx->module, 1)
-                           : bjvm_wasm_i32_const(ctx->module, 1);
-  expression negative_one = is_long ? bjvm_wasm_i64_const(ctx->module, -1)
-                                    : bjvm_wasm_i32_const(ctx->module, -1);
+  expression zero = bjvm_wasm_i32_const(ctx->module, 0);
+  expression one = bjvm_wasm_i32_const(ctx->module, 1);
+  expression negative_one = bjvm_wasm_i32_const(ctx->module, -1);
 
   expression right = get_stack_value(ctx, sd - 1, kind);
   expression left = get_stack_value(ctx, sd - 2, kind);
 
-  bjvm_wasm_binary_op_kind gt = is_long ? BJVM_WASM_OP_KIND_I64_GT_S
-                                        : BJVM_WASM_OP_KIND_I32_GT_S,
-                           lt = is_long ? BJVM_WASM_OP_KIND_I64_LT_S
-                                        : BJVM_WASM_OP_KIND_I32_LT_S;
+  bjvm_wasm_binary_op_kind gt = BJVM_WASM_OP_KIND_I64_GT_S,
+                           lt = BJVM_WASM_OP_KIND_I64_LT_S;
 
   expression cmp_greater = bjvm_wasm_binop(ctx->module, gt, left, right);
   expression cmp_less = bjvm_wasm_binop(ctx->module, lt, left, right);
@@ -460,9 +519,11 @@ expression wasm_lower_local_load_store(compile_ctx *ctx,
 
   switch (insn->kind) {
   case bjvm_insn_istore:
+  case bjvm_insn_astore:
     is_store = true;
     [[fallthrough]];
   case bjvm_insn_iload:
+  case bjvm_insn_aload:
     kind = BJVM_TYPE_KIND_INT;
     break;
   case bjvm_insn_fstore:
@@ -512,7 +573,7 @@ expression wasm_lower_return(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
   bjvm_type_kind kind = inspect_value_type(ctx, pc, sd - 1);
   expression value = get_stack_value(ctx, sd - 1, kind);
   expression store = bjvm_wasm_store(
-      ctx->module, BJVM_WASM_OP_KIND_I32_STORE,
+      ctx->module, get_tk_store_op(kind),
       bjvm_wasm_local_get(ctx->module, RESULT_PARAM, bjvm_wasm_int32()), value,
       0, 0);
   return store;
@@ -535,11 +596,10 @@ typedef struct {
 } bb_creations_t;
 
 typedef struct {
-  // block_i -> new order
-  int *topo;
-  // block_i that's a loop header -> range of blocks in the topo sort to wrap
-  // in a loop header so that backward edges can enjoy themselves
-  loop_range_t *loop_ranges;
+  // new order -> block index
+  int *topo_to_block;
+  // block index -> new order
+  int *block_to_topo;
   // Mapping from topological # to the blocks (also in topo #) which requested
   // a block begin here.
   bb_creations_t *creations;
@@ -550,7 +610,7 @@ typedef struct {
   // that forward edges should break out of this block.
   bjvm_wasm_expression **block_ends;
   // Now implementation stuffs
-  int current;
+  int current_block_i;
   int topo_i;
   int loop_depth;
   // For each block in topological indexing, the number of loops that contain
@@ -560,8 +620,127 @@ typedef struct {
   int blockc;
 } topo_ctx;
 
+static bjvm_wasm_expression *exception_raised(bjvm_wasm_module * module) {
+  return bjvm_wasm_return(module, bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_EXC));
+}
+
+static bjvm_wasm_expression *interrupt(bjvm_wasm_module * module) {
+  return bjvm_wasm_return(module, bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_INT));
+}
+
+bjvm_wasm_expression *wasm_lower_anewarray(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+  bjvm_classdesc *classdesc = insn->cp->class_info.classdesc;
+  if (!classdesc)
+    return nullptr;
+
+  expression call_expr = bjvm_wasm_call(ctx->module, ctx->runtime.new_array,
+    (expression[]){
+      bjvm_wasm_local_get(ctx->module, THREAD_PARAM, bjvm_wasm_int32()),
+      get_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_INT),
+      bjvm_wasm_i32_const(ctx->module, (int)classdesc),
+    }, 3);
+  expression store_to_stack = set_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE, call_expr);
+  expression obj_is_null = bjvm_wasm_unop(ctx->module, BJVM_WASM_OP_KIND_I32_EQZ, get_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE));
+  // Null is returned if a GC is required or if NegativeArraySizeException is thrown
+  expression null_check = bjvm_wasm_if_else(ctx->module,
+    obj_is_null,
+    interrupt(ctx->module),
+    nullptr,
+    bjvm_wasm_int32());
+
+  return bjvm_wasm_block(ctx->module,
+    (expression[]){store_to_stack, null_check},
+    2, bjvm_wasm_void(), false);
+}
+
+// Lower getfield and putfield instructions, which set an instance field on an
+// object.
+bjvm_wasm_expression *wasm_lower_getfield_putfield(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+  // Get the object and value
+  bjvm_cp_field_info f = insn->cp->field;
+  if (!f.field) { // Not resolved yet
+    return nullptr;
+  }
+  bool is_putfield = insn->kind == bjvm_insn_putfield;
+  bjvm_field_descriptor *d = insn->cp->field.parsed_descriptor;
+  bjvm_type_kind field_kind = field_to_kind(d);
+  expression value_to_put = is_putfield ? get_stack_value(ctx, sd - 1, field_kind) : nullptr;
+  expression object_to_modify = get_stack_value(ctx, sd - 1 - is_putfield, BJVM_TYPE_KIND_REFERENCE);
+  expression null_check = bjvm_wasm_unop(ctx->module, BJVM_WASM_OP_KIND_I32_EQZ, object_to_modify);
+  expression raise_npe = wasm_raise_npe(ctx);
+  expression execute;
+  if (is_putfield) {
+    execute = bjvm_wasm_store(ctx->module, get_store_op(d),
+    object_to_modify, value_to_put, 0, f.field->byte_offset);
+  } else {
+    execute = bjvm_wasm_load(ctx->module, get_load_op(d),
+      object_to_modify, 0, f.field->byte_offset);
+    execute = set_stack_value(ctx, sd - 1, field_kind, execute);
+  }
+  bjvm_wasm_type result_type = is_putfield ? bjvm_wasm_void() : jvm_type_to_wasm(field_kind);
+  return bjvm_wasm_if_else(ctx->module, null_check, raise_npe, execute, result_type);
+}
+
+bjvm_wasm_expression * wasm_lower_getstatic_putstatic(compile_ctx * ctx, const bjvm_bytecode_insn * insn, int sd) {
+  bjvm_cp_field_info f = insn->cp->field;
+  if (!f.field) {
+    return nullptr;
+  }
+  bool is_putstatic = insn->kind == bjvm_insn_putstatic;
+  bjvm_field_descriptor *d = insn->cp->field.parsed_descriptor;
+  bjvm_type_kind field_kind = field_to_kind(d);
+  expression value_to_put = is_putstatic ? get_stack_value(ctx, sd - 1, field_kind) : nullptr;
+  expression execute;
+  void *field_addr = f.field->my_class->static_fields + f.field->byte_offset;
+  if (is_putstatic) {
+    execute = bjvm_wasm_store(ctx->module, get_store_op(d),
+    bjvm_wasm_i32_const(ctx->module, (int)field_addr), value_to_put, 0, 0);
+  } else {
+    execute = bjvm_wasm_load(ctx->module, get_load_op(d),
+    bjvm_wasm_i32_const(ctx->module, (int)field_addr), 0, 0);
+    execute = set_stack_value(ctx, sd, field_kind, execute);
+  }
+  return execute;
+}
+
+bjvm_wasm_expression * wasm_lower_ldc(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+  switch (insn->cp->kind) {
+  case BJVM_CP_KIND_INTEGER:
+      return set_stack_value(ctx, sd, BJVM_TYPE_KIND_INT,
+        bjvm_wasm_i32_const(ctx->module, (int)insn->cp->integral.value));
+  case BJVM_CP_KIND_FLOAT:
+    return set_stack_value(ctx, sd, BJVM_TYPE_KIND_FLOAT,
+      bjvm_wasm_f32_const(ctx->module, (float)insn->cp->floating.value));
+  case BJVM_CP_KIND_DOUBLE:
+    return set_stack_value(ctx, sd, BJVM_TYPE_KIND_DOUBLE,
+      bjvm_wasm_f64_const(ctx->module, insn->cp->floating.value));
+  case BJVM_CP_KIND_LONG:
+    return set_stack_value(ctx, sd, BJVM_TYPE_KIND_LONG,
+      bjvm_wasm_i64_const(ctx->module, insn->cp->integral.value));
+  default:
+    return nullptr;
+  }
+}
+
+bjvm_wasm_expression *wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+  // For now, just make an appropriate call to bjvm_push_frame and
+  // bjvm_bytecode_interpret. In particular, we push a frame, write the
+  // specified args to the frame, and call bjvm_bytecode_interpret. If it
+  // returns anything other than OK, we interrupt (we don't propagate the
+  // exception, because there could be a catch handler in the current compiled
+  // function).
+
+  // method = (call runtime_resolve_method <obj> <insn>)
+  // (call runtime_push_frame <thread> <method>)
+  // (call runtime_interpret <thread>)
+
+  return nullptr;
+}
+
+const int MAX_PC_TO_EMIT = 1;
+
 // Each basic block compiles into a WASM block with epsilon type transition
-static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_ctx *topo) {
+static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_ctx *topo, bool debug) {
   expression *results = nullptr;
   int result_count = 0, result_cap = 0;
 
@@ -588,14 +767,30 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
   }
 
   uint16_t *stack_depths = ctx->analysis->insn_index_to_stack_depth;
+  bool outgoing_edges_processed = false;
 
-  int expr_i = 0;
-  for (int i = 0, pc = bb->start_index; i < bb->insn_count;
+  int expr_i = 0, i = 0, pc = bb->start_index;
+  for (; i < bb->insn_count;
        ++i, ++pc, ++expr_i) {
+    if (debug && pc > MAX_PC_TO_EMIT) {
+      goto unimplemented;
+    }
     const bjvm_bytecode_insn *insn = bb->start + i;
 
     int sd = stack_depths[pc];
     switch (insn->kind) {
+    case bjvm_insn_dload:
+    case bjvm_insn_fload:
+    case bjvm_insn_iload:
+    case bjvm_insn_lload:
+    case bjvm_insn_dstore:
+    case bjvm_insn_fstore:
+    case bjvm_insn_istore:
+    case bjvm_insn_lstore:
+    case bjvm_insn_aload:
+    case bjvm_insn_astore:
+      PUSH_EXPR = wasm_lower_local_load_store(ctx, insn, sd);
+      break;
     case bjvm_insn_nop:
       --expr_i;
       continue;
@@ -623,8 +818,6 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
                                   bjvm_wasm_i32_const(ctx->module, 0));
       break;
     }
-    case bjvm_insn_areturn:
-      UNREACHABLE();
     case bjvm_insn_arraylength: {
       expression array = get_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_REFERENCE);
       expression nullcheck =
@@ -676,46 +869,49 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     case bjvm_insn_dreturn:
     case bjvm_insn_freturn:
     case bjvm_insn_ireturn:
-    case bjvm_insn_lreturn: {
+    case bjvm_insn_lreturn:
+    case bjvm_insn_areturn:
+    {
       PUSH_EXPR = wasm_lower_return(ctx, insn, pc, sd);
       PUSH_EXPR = bjvm_wasm_return(
           ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK));
+      outgoing_edges_processed = true;
       break;
     }
     case bjvm_insn_dsub:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_DOUBLE, F64_SUB);
     case bjvm_insn_dup:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd, inspect_value_type(ctx, pc, sd - 1));
       break;
     case bjvm_insn_dup_x1:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2, inspect_value_type(ctx, pc, sd - 2));
       break;
     case bjvm_insn_dup_x2:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 2);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 3);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 2, inspect_value_type(ctx, pc, sd - 3));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 3, inspect_value_type(ctx, pc, sd - 3));
       break;
     case bjvm_insn_dup2:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd, inspect_value_type(ctx, pc, sd - 2));
       break;
     case bjvm_insn_dup2_x1:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd + 1, sd - 3);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 1, inspect_value_type(ctx, pc, sd - 3));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd + 1, sd - 2, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 3, inspect_value_type(ctx, pc, sd - 1));
       break;
     case bjvm_insn_dup2_x2:
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 4, sd - 2);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 3);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd + 1, sd - 4);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd + 1, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 3, sd - 1, inspect_value_type(ctx, pc, sd - 3));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 4, sd - 2, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd + 1, sd - 3, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 4, inspect_value_type(ctx, pc, sd - 2));
       break;
     case bjvm_insn_f2d:
       CONVERSION_OP(BJVM_TYPE_KIND_FLOAT, BJVM_TYPE_KIND_DOUBLE,
@@ -765,8 +961,15 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_INT, I32_DIV_S);
     case bjvm_insn_imul:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_INT, I32_MUL);
-    case bjvm_insn_ineg:
-      BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_INT, I32_SUB);
+    case bjvm_insn_ineg: {
+      // no unary negation in wasm
+      expression zero = bjvm_wasm_i32_const(ctx->module, 0);
+      expression value = get_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_INT);
+      expression result = bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I32_SUB, zero, value);
+      expression store = set_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_INT, result);
+      PUSH_EXPR = store;
+      break;
+    }
     case bjvm_insn_ior:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_INT, I32_OR);
     case bjvm_insn_irem:
@@ -796,7 +999,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_AND);
     case bjvm_insn_lcmp: {
       // if a > b then 1, if a < b then -1, else 0
-      PUSH_EXPR = wasm_lower_icmp_lcmp(ctx, insn, sd);
+      PUSH_EXPR = wasm_lower_lcmp(ctx, insn, sd);
       break;
     }
     case bjvm_insn_ldiv:
@@ -804,8 +1007,15 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_DIV_S);
     case bjvm_insn_lmul:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_MUL);
-    case bjvm_insn_lneg:
-      CONVERSION_OP(BJVM_TYPE_KIND_LONG, BJVM_TYPE_KIND_LONG, I64_SUB);
+    case bjvm_insn_lneg: {
+      // no unary negation in wasm
+      expression zero = bjvm_wasm_i64_const(ctx->module, 0);
+      expression value = get_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_LONG);
+      expression result = bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I64_SUB, zero, value);
+      expression store = set_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_LONG, result);
+      PUSH_EXPR = store;
+      break;
+    }
     case bjvm_insn_lor:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_OR);
     case bjvm_insn_lrem:
@@ -820,7 +1030,6 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_SUB);
     case bjvm_insn_lxor:
       BIN_OP_SAME_TYPE(BJVM_TYPE_KIND_LONG, I64_XOR);
-      break;
     case bjvm_insn_pop:
     case bjvm_insn_pop2: {
       // nothing, just changes stack depth
@@ -834,14 +1043,13 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     }
     case bjvm_insn_swap: {
       // Woo-hoo
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1);
-      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2);
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 1, sd, inspect_value_type(ctx, pc, sd - 1));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd - 2, sd - 1, inspect_value_type(ctx, pc, sd - 2));
+      PUSH_EXPR = wasm_move_value(ctx, pc, sd, sd - 2, inspect_value_type(ctx, pc, sd - 1));
       break;
     }
     case bjvm_insn_anewarray: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_anewarray(ctx, insn, sd);
+      PUSH_EXPR = wasm_lower_anewarray(ctx, insn, sd);
       break;
     }
     case bjvm_insn_checkcast: {
@@ -849,14 +1057,12 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       // PUSH_EXPR = wasm_lower_checkcast(ctx, insn, sd);
       break;
     }
+    case bjvm_insn_putfield:
     case bjvm_insn_getfield: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_getfield(ctx, insn, sd, r);
-      break;
-    }
-    case bjvm_insn_getstatic: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_getstatic(ctx, insn, sd);
+      expression result = wasm_lower_getfield_putfield(ctx, insn, sd);
+      if (!result)
+        goto unimplemented;
+      PUSH_EXPR = result;
       break;
     }
     case bjvm_insn_instanceof: {
@@ -864,67 +1070,42 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       // PUSH_EXPR = wasm_lower_instanceof(ctx, insn, sd);
       break;
     }
-    case bjvm_insn_invokedynamic: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_invokedynamic(ctx, insn, sd);
-      break;
-    }
     case bjvm_insn_new: {
       goto unimplemented;
       // PUSH_EXPR = wasm_lower_new(ctx, insn, sd);
       break;
     }
-    case bjvm_insn_putfield: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_putfield(ctx, insn, sd);
+    case bjvm_insn_putstatic:
+    case bjvm_insn_getstatic: {
+      expression result = wasm_lower_getstatic_putstatic(ctx, insn, sd);
+      if (!result)
+        goto unimplemented;
+      PUSH_EXPR = result;
       break;
     }
-    case bjvm_insn_putstatic: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_putstatic(ctx, insn, sd);
+    case bjvm_insn_goto: {
       break;
     }
-    case bjvm_insn_invokevirtual: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_invokevirtual(ctx, insn, sd);
+#if 0
+    case bjvm_insn_invokespecial:
+    case bjvm_insn_invokestatic:
+    case bjvm_insn_invokevirtual:
+    case bjvm_insn_invokeinterface: {
+      expression result = wasm_lower_invoke(ctx, insn, sd);
+      if (!result)
+        goto unimplemented;
+      PUSH_EXPR = result;
       break;
     }
-    case bjvm_insn_invokespecial: {
+    case bjvm_insn_invokedynamic: {
       goto unimplemented;
-      // PUSH_EXPR = wasm_lower_invokespecial(ctx, insn, sd);
-      break;
-    }
-    case bjvm_insn_invokestatic: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_invokestatic(ctx, insn, sd);
-      break;
     }
     case bjvm_insn_ldc:
     case bjvm_insn_ldc2_w: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_ldc(ctx, insn, sd);
-      break;
-    }
-    case bjvm_insn_dload:
-    case bjvm_insn_fload:
-    case bjvm_insn_iload:
-    case bjvm_insn_lload:
-    case bjvm_insn_dstore:
-    case bjvm_insn_fstore:
-    case bjvm_insn_istore:
-    case bjvm_insn_lstore:
-    case bjvm_insn_aload:
-    case bjvm_insn_astore:
-      PUSH_EXPR = wasm_lower_local_load_store(ctx, insn, sd);
-      break;
-    case bjvm_insn_goto: {
-      int next = topo->topo[bb->next[0]];
-      if (next != topo->topo_i + 1) {
-        expression be = topo->block_ends[next];
-        printf("%p\n", be);
-        assert(be);
-        PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, be);
-      }
+      expression result = wasm_lower_ldc(ctx, insn, sd);
+      if (!result)
+        goto unimplemented;
+      PUSH_EXPR = result;
       break;
     }
     case bjvm_insn_if_acmpeq:
@@ -962,8 +1143,10 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
         BJVM_WASM_OP_KIND_I32_EQ // ifnull
       };
 
-      int taken = topo->topo[bb->next[0]];
-      int not_taken = topo->topo[bb->next[1]];
+      int taken = topo->block_to_topo[bb->next[0]];
+      int taken_is_backedge = bb->is_backedge[0];
+      int not_taken = topo->block_to_topo[bb->next[1]];
+      int not_taken_is_backedge = bb->is_backedge[1];
 
       // We are going to emit either a br_if/br combo or just a br_if. If the
       // taken path is a fallthrough, negate the condition and switch.
@@ -972,26 +1155,30 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
         int tmp = taken;
         taken = not_taken;
         not_taken = tmp;
+        tmp = not_taken_is_backedge;
+        not_taken_is_backedge = taken_is_backedge;
+        taken_is_backedge = tmp;
         // I've ordered them so that this works out
-        kind = (kind - 1) ^ 1 + 1;
+        kind = ((kind - 1) ^ 1) + 1;
       }
 
       // Emit the br_if for the taken branch
-      expression taken_block = topo->block_ends[taken];
+      expression taken_block = taken_is_backedge ? topo->loop_headers[taken] : topo->block_ends[taken];
       if (taken != topo->topo_i + 1) {
-        // still could be true in the case of a cursed if*
         bool is_binary = kind <= bjvm_insn_if_icmple;
+        expression rhs = is_binary ? get_stack_value(ctx, sd - 1, BJVM_TYPE_KIND_INT) : bjvm_wasm_i32_const(ctx->module, 0);
         expression lhs = get_stack_value(ctx, sd - 1 - is_binary, BJVM_TYPE_KIND_INT);
-        expression rhs = is_binary ? get_stack_value(ctx, sd - 2, BJVM_TYPE_KIND_INT) : bjvm_wasm_i32_const(ctx->module, 0);
-        expression cond = bjvm_wasm_binop(ctx->module, op_kinds[kind - bjvm_insn_if_acmpeq], lhs, rhs);
+        bjvm_wasm_binary_op_kind op = op_kinds[kind - bjvm_insn_if_acmpeq];
+        expression cond = bjvm_wasm_binop(ctx->module, op, lhs, rhs);
         expression br_if = bjvm_wasm_br(ctx->module, cond, taken_block);
         PUSH_EXPR = br_if;
       }
       if (not_taken != topo->topo_i + 1) {
         // Emit the br for the not taken branch
-        expression not_taken_block = topo->block_ends[not_taken];
+        expression not_taken_block = not_taken_is_backedge ? topo->loop_headers[not_taken] : topo->block_ends[not_taken];
         PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, not_taken_block);
       }
+      outgoing_edges_processed = true;
       break;
     }
     case bjvm_insn_tableswitch:
@@ -1022,12 +1209,6 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     }
     case bjvm_insn_iinc: {
       PUSH_EXPR = wasm_lower_iinc(ctx, insn, sd);
-
-      break;
-    }
-    case bjvm_insn_invokeinterface: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_invokeinterface(ctx, insn, sd);
       break;
     }
     case bjvm_insn_multianewarray: {
@@ -1040,6 +1221,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       // PUSH_EXPR = wasm_lower_newarray(ctx, insn, sd);
       break;
     }
+#endif
     case bjvm_insn_fcmpl:
     case bjvm_insn_fcmpg:
     case bjvm_insn_frem: // deprecated
@@ -1048,6 +1230,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     case bjvm_insn_dcmpl:
     case bjvm_insn_monitorenter:
     case bjvm_insn_monitorexit:
+    default:
       goto unimplemented;
     }
   }
@@ -1056,7 +1239,14 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
   unimplemented:
     // Spill the stack
     PUSH_EXPR =
-        spill_or_load_code(ctx, bb->start_index, false, BJVM_INTERP_RESULT_INT);
+        spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT);
+  } else if (!outgoing_edges_processed && bb->next_count) {
+    int next = topo->block_to_topo[bb->next[0]];
+    if (next != topo->topo_i + 1) {
+      expression be = next < topo->topo_i + 1 ? topo->loop_headers[next] : topo->block_ends[next];
+      assert(be);
+      PUSH_EXPR = bjvm_wasm_br(ctx->module, nullptr, be);
+    }
   }
 
 done:
@@ -1070,61 +1260,9 @@ done:
   return block;
 }
 
-void topo_dfs(bjvm_code_analysis *analy, topo_ctx *ctx) {
-  // Visit edges from the current node to next nodes. If all incoming edges of a
-  // successor are visited, then that successor should be pushed to the
-  // result array, and is ripe for DFS enjoyment.
-  int current = ctx->current;
-  ctx->visited[current] = 1;
-  ctx->topo[ctx->topo_i] = current;
-  ctx->loop_depths[ctx->topo_i] = ctx->loop_depth;
-  assert(ctx->incoming_count[current] == 0);
-  bjvm_basic_block *b = analy->blocks + ctx->current;
-  if (b->is_loop_header) {
-    int start = ctx->topo_i;
-    // Make sure to process dominated nodes first! (i.e., have a full for-loop
-    // pass where not a single dominated node is skipped)
-    while (true) {
-      bool all_dominated_visited = true;
-      for (int i = 0; i < b->next_count; ++i) {
-        int next = b->next[i];
-        if (bjvm_query_dominance(b, analy->blocks + next) &&
-            !ctx->visited[next]) {
-          assert(ctx->incoming_count[next] != 0);
-          if (ctx->incoming_count[next] == 1) {
-            ctx->topo_i++;
-            ctx->current = next;
-            --ctx->incoming_count[next];
-            ctx->loop_depth++;
-            topo_dfs(analy, ctx);
-            ctx->loop_depth--;
-          } else {
-            all_dominated_visited = false;
-          }
-        }
-      }
-      if (all_dominated_visited)
-        break;
-    }
-    ctx->loop_ranges[current].start = start;
-    ctx->loop_ranges[current].end = ctx->topo_i;
-  }
-
-  for (int i = 0; i < b->next_count; ++i) {
-    int next = b->next[i];
-    if (ctx->visited[next])
-      continue;
-    if (--ctx->incoming_count[next] == 0) {
-      ctx->topo_i++;
-      ctx->current = next;
-      topo_dfs(analy, ctx);
-    }
-  }
-}
-
 void free_topo_ctx(topo_ctx ctx) {
-  free(ctx.topo);
-  free(ctx.loop_ranges);
+  free(ctx.topo_to_block);
+  free(ctx.block_to_topo);
   free(ctx.visited);
   free(ctx.incoming_count);
   free(ctx.loop_depths);
@@ -1137,36 +1275,64 @@ void free_topo_ctx(topo_ctx ctx) {
 }
 
 void find_block_insertion_points(bjvm_code_analysis *analy, topo_ctx *ctx) {
-  // For each block, find the earliest block (in the topological sort) which
-  // branches to that block, which is NOT the block itself or its immediate
-  // predecessor in the sort.
-  // Print the topo sort
+  // For each bb, if there is a bb preceding it (in the topological sort)
+  // which branches to that bb, which is NOT its immediate predecessor in the
+  // sort, we need to introduce a wasm (block) to handle the branch. We place
+  // it at the point in the topo sort where the depth becomes equal to the
+  // depth of the topological predecessor of bb.
   for (int i = 0; i < analy->block_count; ++i) {
     bjvm_basic_block *b = analy->blocks + i;
-    int earliest = -1;
     for (int j = 0; j < b->prev_count; ++j) {
       int prev = b->prev[j];
-      if (ctx->topo[prev] < i - 1)
-        earliest = ctx->topo[prev];
-    }
-    printf("Block %d requested at %d\n", i, earliest);
-    // Then walk backwards until the stack depth is the same. This is where
-    // we'll put the block.
-    if (earliest != -1) {
-      while (ctx->loop_depths[earliest] != ctx->loop_depths[ctx->topo[i]]) {
-        earliest--;
-        assert(earliest >= 0);
-      }
-      printf("Block %d requested at %d\n", i, earliest);
-      bb_creations_t *creations = ctx->creations + earliest;
-      *VECTOR_PUSH(creations->requested, creations->count, creations->cap) = i;
+      if (ctx->block_to_topo[prev] >= ctx->block_to_topo[i] - 1)
+        continue;
+      bb_creations_t *creations = ctx->creations + ctx->block_to_topo[b->idom];
+      *VECTOR_PUSH(creations->requested, creations->count, creations->cap) = (ctx->block_to_topo[i] << 1) + 1;
+      break;
     }
   }
 }
 
-topo_ctx restricted_topo_sort(bjvm_code_analysis *analy) {
+void topo_walk_idom(bjvm_code_analysis *analy, topo_ctx *ctx) {
+  int current = ctx->current_block_i;
+  int start = ctx->topo_i;
+  ctx->visited[current] = 1;
+  ctx->block_to_topo[current] = ctx->topo_i;
+  ctx->topo_to_block[ctx->topo_i++] = current;
+  ctx->loop_depths[current] = ctx->loop_depth;
+  bjvm_basic_block *b = analy->blocks + current;
+  bool is_loop_header = b->is_loop_header;
+  // Sort successors by reverse post-order in the original DFS
+  bjvm_dominated_list_t idom = b->idominates;
+  int *sorted = calloc(idom.count, sizeof(int));
+  memcpy(sorted, idom.list, idom.count * sizeof(int));
+  for (int i = 1; i < idom.count; ++i) {
+    int j = i;
+    while (j > 0 && analy->blocks[sorted[j - 1]].dfs_post < analy->blocks[sorted[j]].dfs_post) {
+      int tmp = sorted[j];
+      sorted[j] = sorted[j - 1];
+      sorted[j - 1] = tmp;
+      j--;
+    }
+  }
+  // Recurse on the sorted successors
+  ctx->loop_depth += is_loop_header;
+  for (int i = 0; i < idom.count; ++i) {
+    int next = sorted[i];
+    ctx->current_block_i = next;
+    topo_walk_idom(analy, ctx);
+  }
+  ctx->loop_depth -= is_loop_header;
+  bb_creations_t *creations = ctx->creations + start;
+  if (is_loop_header)
+    *VECTOR_PUSH(creations->requested, creations->count, creations->cap) = ctx->topo_i << 1;
+  free(sorted);
+}
+
+topo_ctx make_topo_sort_ctx(bjvm_code_analysis *analy) {
   topo_ctx ctx;
-  ctx.topo = calloc(analy->block_count, sizeof(int));
+  ctx.topo_to_block = calloc(analy->block_count, sizeof(int));
+  ctx.block_to_topo = calloc(analy->block_count, sizeof(int));
   ctx.visited = calloc(analy->block_count, sizeof(int));
   ctx.incoming_count = calloc(analy->block_count, sizeof(int));
   ctx.loop_depths = calloc(analy->block_count, sizeof(int));
@@ -1174,30 +1340,26 @@ topo_ctx restricted_topo_sort(bjvm_code_analysis *analy) {
   ctx.block_ends = calloc(analy->block_count, sizeof(bjvm_wasm_expression *));
   ctx.loop_headers = calloc(analy->block_count, sizeof(bjvm_wasm_expression *));
   ctx.blockc = analy->block_count;
-  ctx.current = ctx.topo_i = ctx.loop_depth = 0;
-  ctx.loop_ranges = calloc(analy->block_count, sizeof(loop_range_t));
+  ctx.current_block_i = ctx.topo_i = ctx.loop_depth = 0;
   for (int i = 0; i < analy->block_count; ++i) {
     bjvm_basic_block *b = analy->blocks + i;
     for (int j = 0; j < b->next_count; ++j)
       ctx.incoming_count[b->next[j]] += !b->is_backedge[j];
   }
-  // Print incoming count
-  for (int i = 0; i < analy->block_count; ++i)
-    printf("%d ", ctx.incoming_count[i]);
-  printf("\n");
 
-  topo_dfs(analy, &ctx);
-  // Print topo sort
-  for (int i = 0; i < analy->block_count; ++i)
-    printf("%d ", ctx.topo[i]);
-  printf("\n");
+  // Perform a post-order traversal of the immediate dominator tree. Whenever
+  // reaching a loop header, output the loop header immediately, then everything
+  // in the subtree as one contiguous block. We output them in reverse postorder
+  // relative to a DFS on the original CFG, to guarantee that the final
+  // topological sort respects the forward edges in the original graph.
+  topo_walk_idom(analy, &ctx);
   find_block_insertion_points(analy, &ctx);
   return ctx;
 }
 
 typedef struct {
   expression ref;
-  // Wasm block started here
+  // Wasm block started here (in topological sort)
   int started_at;
   // Once we get to this basic block, close the wasm block and push the
   // expression to the stack
@@ -1206,12 +1368,14 @@ typedef struct {
   bool is_loop;
 } inchoate_expression;
 
-static int cmp_ints(const void *a, const void *b) {
+static int cmp_ints_reverse(const void *a, const void *b) {
   return *(int *)b - *(int *)a;
 }
 
-bjvm_wasm_jit_compiled_method *
-bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
+bjvm_wasm_instantiation_result *
+bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool debug) {
+  // printf("Requesting compile for method %.*s with signature %.*s\n", fmt_slice(method->name), fmt_slice(method->descriptor));
+
   // Resulting signature and (roughly) behavior is same as
   // bjvm_bytecode_interpret:
   // (bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_stack_value *result)
@@ -1249,21 +1413,30 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
   // Perform a topological sort using the DAG of forward edges, under the
   // constraint that loop headers must be immediately followed by all bbs
   // that they dominate, in some order. This is necessary to ensure that we
-  // can continue in the loops. We will wrap these bbs in a (loop) wasm block.
-  // Then for forward edges, we let consecutive blocks fall through (i.e.,
-  // place them consecutively), and otherwise place a (block) scope ending
-  // just before the target block, so that mfs who try to target it can enjoy
-  // themselves.
-  topo_ctx topo = restricted_topo_sort(analy);
+  // can continue in the loops. We will wrap these bbs in a "(loop)" wasm block.
+  // Then for forward edges, we let consecutive blocks fall through, and
+  // otherwise place a (block) scope ending just before the target block,
+  // so that bbs who try to target it can break to it.
+  topo_ctx topo = make_topo_sort_ctx(analy);
+
+  add_runtime_imports(&ctx);
 
   inchoate_expression *expr_stack = nullptr;
   int stack_count = 0, stack_cap = 0;
   // Push an initial boi
   *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
-    bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), false)
+    bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), false),
+    0,
+    analy->block_count,
+    false
   };
-  // Close it when we're all done
-  expr_stack[0].close_at = analy->block_count;
+  // Push a block to load stuff from the stack
+  *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
+    spill_or_load_code(&ctx, 0, true, BJVM_INTERP_RESULT_INT),
+    0,
+    -1,
+    false
+  };
   for (topo.topo_i = 0; topo.topo_i <= analy->block_count; ++topo.topo_i) {
     // First close off any blocks as appropriate
     for (int i = stack_count - 1; i >= 0; --i) {
@@ -1296,32 +1469,28 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
     // at the current block we are to initiate blocks ending at block with
     // topo indices 9, 12, and 13, push the block for 13 first.
 
-    // Blocks
+    // Blocks first
     bb_creations_t *creations = topo.creations + topo.topo_i;
-    qsort(creations->requested, creations->count, sizeof(int), cmp_ints);
-
+    qsort(creations->requested, creations->count, sizeof(int), cmp_ints_reverse);
     for (int i = 0; i < creations->count; ++i) {
       int block_i = creations->requested[i];
+      int is_loop = !(block_i & 1);
+      block_i >>= 1;
       expression block = bjvm_wasm_block(ctx.module, nullptr, 0,
-                                         bjvm_wasm_void(), false);
+                                         bjvm_wasm_void(), is_loop);
       *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
-        block, topo.topo_i, block_i, false
+        block, topo.topo_i, block_i, is_loop
       };
+      if (is_loop)
+        topo.loop_headers[topo.topo_i] = block;
+      else
+        topo.block_ends[block_i] = block;
     }
 
-    // Loop header
-    int start = topo.loop_ranges[topo.topo_i].start;
-    int end = topo.loop_ranges[topo.topo_i].end;
-    if (end != 0) {
-      expression loop = bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), true);
-      *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
-        loop, start, end, true
-      };
-    }
-
-    int block_i = topo.topo[topo.topo_i];
+    int block_i = topo.topo_to_block[topo.topo_i];
     bjvm_basic_block *bb = analy->blocks + block_i;
-    expression expr = compile_bb(&ctx, bb, &topo);
+    // debug = debug || utf8_equals(method->name, "abs");
+    expression expr = compile_bb(&ctx, bb, &topo, debug);
     if (!expr) {
       goto error;
     }
@@ -1333,8 +1502,6 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
   expression body = expr_stack[0].ref;
   free(expr_stack);
 
-  add_runtime_imports(&ctx);
-
   // Add a function whose expression is the first expression on the stack
   bjvm_wasm_type params = bjvm_wasm_string_to_tuple(ctx.module, "iii");
   bjvm_wasm_type locals = bjvm_wasm_make_tuple(ctx.module,
@@ -1343,55 +1510,23 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method) {
   bjvm_wasm_export_function(ctx.module, fn);
 
   bjvm_bytevector result = bjvm_wasm_module_serialize(ctx.module);
-
-  // For now, write it to a file called test.wasm
-  FILE *f = fopen("test.wasm", "wb");
-  fwrite(result.bytes, 1, result.bytes_len, f);
-  fclose(f);
-
-  return nullptr;
-error:
-  bjvm_wasm_jit_compiled_method *compiled_method = nullptr;
-  if (ok) {
-#ifdef EMSCRIPTEN
-    void *function_ptr = EM_ASM_PTR(
-        {
-          try {
-            var module = new WebAssembly.Module(HEAPU8.subarray($1, $2));
-            var instance = new WebAssembly.Instance(module, {
-              env : {
-                memory : wasmMemory,
-                raise_npe : wasmExports["wasm_runtime_raise_npe"],
-                raise_oob : wasmExports["wasm_runtime_raise_array_index_oob"],
-                new_array : wasmExports["wasm_runtime_new_array"],
-                new_object : wasmExports["wasm_runtime_new_object"]
-              }
-            });
-            return addFunction(instance.exports.run, 'iiii');
-          } catch (e) {
-            console.log(e);
-            return 0;
-          }
-        },
-        "iiii", (uintptr_t)result.binary,
-        (uintptr_t)(result.binary + result.binaryBytes));
-#else
-    void *function_ptr = nullptr;
-#endif
-
-    if (function_ptr != nullptr) {
-      compiled_method = calloc(1, sizeof(bjvm_wasm_jit_compiled_method));
-
-      printf("%p\n", function_ptr);
-
-      compiled_method->ready = true;
-      compiled_method->fn = function_ptr;
-    }
+  bjvm_wasm_instantiation_result *wasm = bjvm_wasm_instantiate_module(ctx.module, method->name.chars);
+  if (wasm->status != BJVM_WASM_INSTANTIATION_SUCCESS) {
+    //printf("Error instantiating module for method %.*s\n", fmt_slice(method->name));
+  } else {
+    //printf("Successfully compiled method %.*s on class %.*s \n", fmt_slice(method->name), fmt_slice(method->my_class->name));
   }
 
-  free_topo_ctx(topo);
+  free(result.bytes);
 
-  return compiled_method;
+error:
+  free_topo_ctx(topo);
+  free(ctx.val_to_local_map);
+  free(ctx.wasm_blocks);
+  free(ctx.wvars);
+  bjvm_wasm_module_free(ctx.module);
+
+  return wasm;
 }
 
 void free_wasm_compiled_method(void *p) {

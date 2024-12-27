@@ -13,10 +13,10 @@ extern "C" {
 
 typedef enum {
   BJVM_WASM_TYPE_KIND_VOID,
-  BJVM_WASM_TYPE_KIND_INT32 = 0x7F,
-  BJVM_WASM_TYPE_KIND_INT64 = 0x7E,
-  BJVM_WASM_TYPE_KIND_FLOAT32 = 0x7D,
   BJVM_WASM_TYPE_KIND_FLOAT64 = 0x7C,
+  BJVM_WASM_TYPE_KIND_FLOAT32 = 0x7D,
+  BJVM_WASM_TYPE_KIND_INT64 = 0x7E,
+  BJVM_WASM_TYPE_KIND_INT32 = 0x7F,
 
   // during serialization, we'll replace this with the correct type from
   // context (todo)
@@ -44,6 +44,7 @@ bjvm_wasm_type bjvm_wasm_int64();
 
 typedef enum {
   BJVM_WASM_EXPR_KIND_DROP,
+  BJVM_WASM_EXPR_KIND_UNREACHABLE,
   BJVM_WASM_EXPR_KIND_CONST,
   BJVM_WASM_EXPR_KIND_SELECT,
   BJVM_WASM_EXPR_KIND_GET_LOCAL,
@@ -101,6 +102,8 @@ typedef enum {
   BJVM_WASM_OP_KIND_I32_WRAP_I64 = 0xA7,
   BJVM_WASM_OP_KIND_I32_TRUNC_S_F32 = 0xA8,
   BJVM_WASM_OP_KIND_I32_TRUNC_S_F64 = 0xAA,
+  BJVM_WASM_OP_KIND_I64_EXTEND_S_I32 = 0xAC,
+  BJVM_WASM_OP_KIND_I64_EXTEND_U_I32 = 0xAD,
   BJVM_WASM_OP_KIND_I64_TRUNC_S_F32 = 0xAE,
   BJVM_WASM_OP_KIND_I64_TRUNC_S_F64 = 0xB0,
   BJVM_WASM_OP_KIND_F32_CONVERT_S_I32 = 0xB2,
@@ -122,9 +125,7 @@ typedef enum {
   BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F32_S = 0xFC00,
   BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F64_S = 0xFC02,
   BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F32_S = 0xFC03,
-  BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F64_S = 0xFC05,
-  BJVM_WASM_OP_KIND_I64_EXTEND_S_I32 = 0xFC0C,
-  BJVM_WASM_OP_KIND_I64_EXTEND_U_I32 = 0xFC0D,
+  BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F64_S = 0xFC05
 } bjvm_wasm_unary_op_kind;
 
 typedef enum {
@@ -453,7 +454,7 @@ void bjvm_wasm_writeint(bjvm_bytevector *ctx, int64_t value);
 bjvm_wasm_module *bjvm_wasm_module_create();
 // It is the caller's responsibility to free the returned bytevector.
 bjvm_bytevector bjvm_wasm_module_serialize(bjvm_wasm_module *module);
-void bjvm_wasm_module_destroy(bjvm_wasm_module *module);
+void bjvm_wasm_module_free(bjvm_wasm_module *module);
 
 // Make a result type out of the given components
 bjvm_wasm_type bjvm_wasm_make_tuple(bjvm_wasm_module *module,
@@ -499,6 +500,7 @@ bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module,
 bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module,
                                           uint32_t index,
                                           bjvm_wasm_expression *value);
+bjvm_wasm_expression *bjvm_wasm_unreachable(bjvm_wasm_module *module);
 bjvm_wasm_expression *bjvm_wasm_unop(bjvm_wasm_module *module,
                                      bjvm_wasm_unary_op_kind op,
                                      bjvm_wasm_expression *expr);
@@ -546,8 +548,6 @@ bjvm_wasm_expression *bjvm_wasm_if_else(bjvm_wasm_module *module,
                                         bjvm_wasm_type type);
 bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
                                        bjvm_wasm_expression *expr);
-bjvm_wasm_load_op_kind bjvm_wasm_get_load_op(bjvm_wasm_type type);
-bjvm_wasm_store_op_kind bjvm_wasm_get_store_op(bjvm_wasm_type type);
 
 typedef enum {
   BJVM_WASM_INSTANTIATION_SUCCESS,
@@ -566,15 +566,17 @@ typedef struct {
   bjvm_wasm_instantiation_status status;
   int js_promise;
 
-  bjvm_wasm_instantiation_export **exports;
+  bjvm_wasm_instantiation_export **exports;  // unused for now
   int export_count;
   int export_cap;
+
+  void *run;
 } bjvm_wasm_instantiation_result;
 
 void bjvm_free_wasm_instantiation_result(
     bjvm_wasm_instantiation_result *result);
 bjvm_wasm_instantiation_result *
-bjvm_wasm_instantiate_module(bjvm_wasm_module *module);
+bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name);
 
 #ifdef __cplusplus
 }

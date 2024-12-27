@@ -349,7 +349,7 @@ typedef struct bjvm_cp_entry {
     bjvm_cp_name_and_type name_and_type;
     bjvm_cp_class_info class_info;
 
-    bjvm_cp_field_info fieldref_info;
+    bjvm_cp_field_info field;
     bjvm_cp_method_info methodref;
     bjvm_cp_method_handle_info method_handle;
     bjvm_cp_method_type_info method_type;
@@ -587,7 +587,7 @@ typedef struct bjvm_cp_method {
   int call_count;
 
   // JIT-compiled method
-  void *compiled_method; // bjvm_wasm_compiled_method*
+  void *compiled_method; // bjvm_wasm_instantiation_result*
   // Already tried and failed
   bool failed_jit;
 } bjvm_cp_method;

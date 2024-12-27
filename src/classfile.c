@@ -66,7 +66,7 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
     free_heap_str(entry->utf8);
     break;
   case BJVM_CP_KIND_FIELD_REF: {
-    bjvm_field_descriptor *desc = entry->fieldref_info.parsed_descriptor;
+    bjvm_field_descriptor *desc = entry->field.parsed_descriptor;
     free_field_descriptor(*desc);
     free(desc);
     break;
@@ -469,7 +469,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     if (kind == CONSTANT_Fieldref) {
       return (bjvm_cp_entry){.kind = entry_kind,
-                             .fieldref_info = {.class_info = class_info,
+                             .field = {.class_info = class_info,
                                                .nat = name_and_type,
                                                .field = nullptr}};
     }
@@ -594,9 +594,9 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   switch (entry->kind) {
   case BJVM_CP_KIND_FIELD_REF: {
     bjvm_field_descriptor *parsed_descriptor = nullptr;
-    bjvm_cp_name_and_type *name_and_type = entry->fieldref_info.nat;
+    bjvm_cp_name_and_type *name_and_type = entry->field.nat;
 
-    entry->fieldref_info.parsed_descriptor = parsed_descriptor =
+    entry->field.parsed_descriptor = parsed_descriptor =
         calloc(1, sizeof(bjvm_field_descriptor));
     free_on_format_error(ctx, parsed_descriptor);
 

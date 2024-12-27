@@ -79,4 +79,11 @@ public class Main {
             System.out.println("bruh");
         }
     }
+
+    int hello(int a) {
+        if (a == 1) {
+            return a + 2;
+        }
+        return 0;
+    }
 }

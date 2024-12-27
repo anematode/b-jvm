@@ -293,7 +293,6 @@ void bjvm_array_index_oob_exception(bjvm_thread *thread, int index,
   INIT_STACK_STRING(complaint, 80);
   bprintf(complaint, "Index %d out of bounds for array of length %d", index,
           length);
-
   bjvm_raise_exception(thread, STR("java/lang/ArrayIndexOutOfBoundsException"),
                        complaint);
 }
@@ -397,7 +396,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   short *chars;
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
-  str->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_CHAR, len);
+  str->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_CHAR, len, true);
   memcpy(ArrayData(str->value), chars, len * sizeof(short));
   free(chars);
   return (void *)str;
@@ -475,7 +474,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
       const bjvm_attribute_runtime_visible_annotations a =
           field->attributes[i].runtime_visible_annotations;
       F->annotations =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length);
+          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
       memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
       break;
     }
@@ -523,7 +522,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   C->modifiers = method->access_flags;
   C->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      method->parsed_descriptor->args_count);
+      method->parsed_descriptor->args_count, true);
 
   for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
     INIT_STACK_STRING(desc, 1000);
@@ -553,7 +552,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 
   result->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      method->parsed_descriptor->args_count);
+      method->parsed_descriptor->args_count, true);
   struct bjvm_native_Class **types = (void *)ArrayData(result->parameterTypes);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
@@ -570,7 +569,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 
   // TODO parse and fill these in
   result->exceptionTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0);
+      thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0, true);
 }
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
@@ -978,7 +977,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   bjvm_initialize_class(thread, MethodHandleNatives);
 
   bjvm_handle *ptypes = bjvm_make_handle(
-      thread, CreateObjectArray1D(thread, Class, method->args_count));
+      thread, CreateObjectArray1D(thread, Class, method->args_count, true));
 
   for (int i = 0; i < method->args_count; ++i) {
     INIT_STACK_STRING(name, 1000);
@@ -1080,7 +1079,7 @@ struct bjvm_native_MethodType *resolve_mh_mt(bjvm_thread *thread,
   bjvm_classdesc *Class =
       bootstrap_class_create(thread, STR("java/lang/Class"));
   bjvm_handle *ptypes_array = bjvm_make_handle(
-      thread, CreateObjectArray1D(thread, Class, ptypes_count));
+      thread, CreateObjectArray1D(thread, Class, ptypes_count, true));
   for (int i = 0; i < ptypes_count; ++i) {
     *((bjvm_obj_header **)ArrayData(ptypes_array->obj) + i) =
         (void *)bjvm_get_class_mirror(thread, ptypes[i]);
@@ -1500,7 +1499,7 @@ void bjvm_out_of_memory(bjvm_thread *thread) {
   vm->heap_capacity = original_capacity;
 }
 
-void *bump_allocate(bjvm_thread *thread, size_t bytes) {
+void *bump_allocate(bjvm_thread *thread, size_t bytes, bool attempt_gc) {
   // round up to multiple of 8
   bytes = (bytes + 7) & ~7;
   bjvm_vm *vm = thread->vm;
@@ -1509,6 +1508,8 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
          vm->heap_capacity);
 #endif
   if (vm->heap_used + bytes > vm->heap_capacity) {
+    if (!attempt_gc)
+      return nullptr;
     bjvm_major_gc(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {
       bjvm_out_of_memory(thread);
@@ -1906,7 +1907,7 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
 }
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  return AllocateObject(thread, classdesc, classdesc->data_bytes);
+  return AllocateObject(thread, classdesc, classdesc->data_bytes, true);
 }
 
 bool bjvm_is_instanceof_name(const bjvm_obj_header *mirror,
@@ -2501,7 +2502,7 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame,
   }
 
   bjvm_obj_header *result =
-      CreateArray(thread, multianewarray->entry->classdesc, dim_sizes, dims);
+      CreateArray(thread, multianewarray->entry->classdesc, dim_sizes, dims, true);
   frame->stack_depth -= dims;
   checked_push(frame, (bjvm_stack_value){.obj = result});
   return 0;
@@ -2671,32 +2672,46 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
   return status;
 }
 
+int max_calls = 4251;
+
+EMSCRIPTEN_KEEPALIVE
+int set_max_calls(int calls) {
+  max_calls = calls;
+  return 0;
+}
+
 int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
                      bjvm_stack_value *result,
                      bjvm_interpreter_result_t *interp_result) {
   bjvm_cp_method *m = final_frame->method;
 
   if (!m->compiled_method) {
-    m->compiled_method = bjvm_wasm_jit_compile(thread, m);
-    if (!m->compiled_method) {
+    m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
+    if (((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
+        BJVM_WASM_INSTANTIATION_SUCCESS) {
       m->failed_jit = true;
       return 1;
     }
   }
 
-  *interp_result =
-      ((bjvm_wasm_jit_compiled_method *)m->compiled_method)
-          ->fn((intptr_t)thread, (intptr_t)final_frame, (intptr_t)result);
+  //printf("%d", max_calls);
+
+  if (max_calls-- < 0) {
+    //printf("Skipping call to method: %.*s\n", fmt_slice(m->name));
+    return 1;
+  }
+
+  int (*run)(bjvm_thread *, bjvm_stack_frame *, bjvm_stack_value *) =
+  ((bjvm_wasm_instantiation_result *)m->compiled_method)->run;
+  *interp_result = run(thread, final_frame, result);
   if (*interp_result != BJVM_INTERP_RESULT_INT) {
     bjvm_pop_frame(thread, final_frame);
   }
-
   return 0;
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 10 && !method->failed_jit &&
-         utf8_equals(method->name, "testOperation");
+  return method->call_count > 10 && !method->failed_jit; // && utf8_equals(method->name, "testOperation");
 }
 
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
@@ -2706,12 +2721,18 @@ bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
       final_frame->program_counter == 0 &&
       should_attempt_to_jit(final_frame->method)) {
     bjvm_interpreter_result_t interp_result;
+#if AGGRESSIVE_DEBUG
+    printf("Running method %.*s as WASM\n",
+           fmt_slice(final_frame->method->name));
+#endif
     int failed_to_compile =
         bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
     if (!failed_to_compile) {
       return interp_result;
     }
+#if AGGRESSIVE_DEBUG
     printf("Continuing...\n");
+#endif
   }
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
@@ -3558,7 +3579,7 @@ interpret_frame:
       }
 
       bjvm_obj_header *array =
-          CreateObjectArray1D(thread, info->classdesc, count);
+          CreateObjectArray1D(thread, info->classdesc, count, true);
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
       } else {
@@ -3633,7 +3654,7 @@ interpret_frame:
         bjvm_null_pointer_exception(thread);
         goto done;
       }
-      bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
+      bjvm_cp_field_info *field_info = &insn->cp->field;
       int error = bjvm_resolve_field(thread, field_info);
       if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
         INIT_STACK_STRING(complaint, 1000);
@@ -3660,10 +3681,9 @@ interpret_frame:
     }
     bjvm_insn_getstatic:
     bjvm_insn_putstatic: {
-      bjvm_cp_field_info *field_info = &insn->cp->fieldref_info;
+      bjvm_cp_field_info *field_info = &insn->cp->field;
       if (!field_info->field) {
         bjvm_cp_class_info *class = field_info->class_info;
-
         int error = bjvm_resolve_class(thread, class);
         if (error)
           goto done;
@@ -3890,7 +3910,7 @@ interpret_frame:
       }
 
       bjvm_obj_header *array =
-          CreatePrimitiveArray1D(thread, insn->array_type, count);
+          CreatePrimitiveArray1D(thread, insn->array_type, count, true);
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
       } else { // failed to create array

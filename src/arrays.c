@@ -116,7 +116,8 @@ bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
 
 static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
                                                   bjvm_type_kind array_type,
-                                                  int count) {
+                                                  int count,
+                                                  bool attempt_gc) {
   assert(count >= 0);
 
   int size = sizeof_type_kind(array_type);
@@ -125,7 +126,7 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
   assert(array_desc);
 
   bjvm_obj_header *array =
-      AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
+      AllocateObject(thread, array_desc, kArrayHeaderSize + count * size, attempt_gc);
   if (array)
     *ArrayLength(array) = count;
 
@@ -134,7 +135,8 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
 
 static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
                                                bjvm_classdesc *classdesc,
-                                               int count) {
+                                               int count,
+                                               bool attempt_gc) {
   assert(classdesc);
   assert(count >= 0);
 
@@ -142,7 +144,7 @@ static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
   assert(array_desc);
 
   bjvm_obj_header *array = AllocateObject(
-      thread, array_desc, kArrayHeaderSize + count * sizeof(bjvm_obj_header *));
+      thread, array_desc, kArrayHeaderSize + count * sizeof(bjvm_obj_header *), attempt_gc);
   if (array)
     *ArrayLength(array) = count;
 
@@ -150,26 +152,29 @@ static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
 }
 
 bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
-                             int const *dim_sizes, int total_dimensions) {
+                             int const *dim_sizes, int total_dimensions,
+                             bool attempt_gc) {
   assert(total_dimensions > 0);
 
   if (total_dimensions == 1) {
     switch (desc->kind) {
     case BJVM_CD_KIND_PRIMITIVE_ARRAY:
       return create_1d_primitive_array(thread, desc->primitive_component,
-                                       dim_sizes[0]);
+                                       dim_sizes[0], attempt_gc);
     case BJVM_CD_KIND_ORDINARY_ARRAY:
-      return create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
+      return create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0], attempt_gc);
     default:
       UNREACHABLE();
     }
   }
 
-  auto arr = create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
+  auto arr = create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0], attempt_gc);
 
   for (int i = 0; i < dim_sizes[0]; i++) {
     bjvm_obj_header *subarray = CreateArray(
-        thread, desc->one_fewer_dim, dim_sizes + 1, total_dimensions - 1);
+        thread, desc->one_fewer_dim, dim_sizes + 1, total_dimensions - 1, attempt_gc);
+    if (!subarray)
+      return nullptr;
     ReferenceArrayStore(arr, i, subarray);
   }
 

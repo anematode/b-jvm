@@ -11,6 +11,12 @@
 extern "C" {
 #endif
 
+typedef struct {
+  int *list;
+  int count;
+  int cap;
+} bjvm_dominated_list_t;
+
 typedef struct bjvm_basic_block {
   int my_index;
 
@@ -32,8 +38,12 @@ typedef struct bjvm_basic_block {
   int prev_count;
   int prev_cap;
 
+  // Pre- and postorder in a DFS on the original CFG
+  uint32_t dfs_pre, dfs_post;
   // Immediate dominator of this block
   uint32_t idom;
+  // Blocks that this block immediately dominates
+  bjvm_dominated_list_t idominates;
   // Pre- and postorder in the immediate dominator tree
   uint32_t idom_pre, idom_post;
   // Whether this block is the target of a backedge

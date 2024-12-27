@@ -59,6 +59,6 @@ TEST_CASE("Simple module", "[wasm]") {
   fwrite(serialized.bytes, 1, serialized.bytes_len, f);
   fclose(f);
 
-  bjvm_wasm_module_destroy(module);
+  bjvm_wasm_module_free(module);
   free(serialized.bytes);
 }
