@@ -21,7 +21,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
     free(bits.ptr.bits);
 }
 
-void push_bits(uint64_t bits, int offset, int **existing_buf, int *length,
+static void push_set_bits(uint64_t bits, int offset, int **existing_buf, int *length,
                int *capacity) {
   while (bits) {
     int shift = __builtin_ctzll(bits);
@@ -45,10 +45,10 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
                                       int *capacity) {
   *length = 0;
   if (bjvm_is_bitset_compressed(bits)) {
-    push_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
+    push_set_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
   } else {
     for (uint32_t i = 0; i < bits.ptr.size_words; ++i)
-      push_bits(bits.ptr.bits[i], (int)i << 6, &existing_buf, length, capacity);
+      push_set_bits(bits.ptr.bits[i], (int)i << 6, &existing_buf, length, capacity);
   }
   return existing_buf;
 }

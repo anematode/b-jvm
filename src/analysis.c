@@ -12,6 +12,21 @@
 #include <inttypes.h>
 #include <limits.h>
 
+typedef bjvm_type_kind bjvm_analy_stack_entry;
+
+// State of the stack (or local variable table) during analysis, indexed after
+// index swizzling (which occurs very early in our processing)
+typedef struct {
+  bjvm_analy_stack_entry *entries;
+  int entries_count;
+  int entries_cap;
+
+  bool from_jump_target;
+  bool is_exc_handler;
+
+  int exc_handler_start;
+} bjvm_analy_stack_state;
+
 const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
   switch (code) {
   case bjvm_insn_aaload:
@@ -425,74 +440,60 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   return strdup(result);
 }
 
-char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
-  char buf[4000];
-  char *write = buf, *end = write + sizeof(buf);
-
-  write += snprintf(write, sizeof(buf), "%04d = pc %04d: ", insn_index,
-                    insn->original_pc);
-  write += snprintf(write, end - write, "%s ", bjvm_insn_code_name(insn->kind));
-
+heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
+  heap_string result = make_heap_str(10);
+  int write = 0;
+  write = build_str(&result, write, "%04d = pc %04d: ", insn_index, insn->original_pc);
+  write = build_str(&result, write, "%s ", bjvm_insn_code_name(insn->kind));
   if (insn->kind <= bjvm_insn_swap) {
     // no operands
   } else if (insn->kind <= bjvm_insn_ldc2_w) {
     // indexes into constant pool
     char *cp_str = constant_pool_entry_to_string(insn->cp);
-    write += snprintf(write, end - write, "%s", cp_str);
+    write = build_str(&result, write, "%s", cp_str);
     free(cp_str);
   } else if (insn->kind <= bjvm_insn_astore) {
     // indexes into local variables
-    write += snprintf(write, end - write, "#%d", insn->index);
+    write = build_str(&result, write, "#%d", insn->index);
   } else if (insn->kind <= bjvm_insn_ifnull) {
     // indexes into the instruction array
-    write += snprintf(write, end - write, "-> inst %d", insn->index);
+    write = build_str(&result, write, "inst %d", insn->index);
   } else if (insn->kind == bjvm_insn_lconst || insn->kind == bjvm_insn_iconst) {
-    write += snprintf(write, end - write, "%" PRId64, insn->integer_imm);
+    write = build_str(&result, write, "%" PRId64, insn->integer_imm);
   } else if (insn->kind == bjvm_insn_dconst || insn->kind == bjvm_insn_fconst) {
-    write += snprintf(write, end - write, "%.15g", insn->f_imm);
+    write = build_str(&result, write, "%.15g", insn->f_imm);
   } else if (insn->kind == bjvm_insn_tableswitch) {
-    write += snprintf(write, end - write, "[ default -> %d",
+    write = build_str(&result, write, "[ default -> %d",
                       insn->tableswitch.default_target);
-    printf("TARGET COUNT: %d\n",
-           insn->tableswitch
-               .targets_count); // TODO figure out why snprintf is dumb
     for (int i = 0, j = insn->tableswitch.low;
          i < insn->tableswitch.targets_count; ++i, ++j) {
-      write += snprintf(write, end - write, ", %d -> %d", i,
+      write = build_str(&result, write, ", %d -> %d", j,
                         insn->tableswitch.targets[i]);
     }
-    write += snprintf(write, end - write, " ]");
+    write = build_str(&result, write, " ]");
   } else if (insn->kind == bjvm_insn_lookupswitch) {
-    write += snprintf(write, end - write, "[ default -> %d",
+    write = build_str(&result, write, "[ default -> %d",
                       insn->lookupswitch.default_target);
     for (int i = 0; i < insn->lookupswitch.targets_count; ++i) {
-      write +=
-          snprintf(write, end - write, ", %d -> %d", insn->lookupswitch.keys[i],
-                   insn->lookupswitch.targets[i]);
+      write = build_str(&result, write, ", %d -> %d", insn->lookupswitch.keys[i],
+                        insn->lookupswitch.targets[i]);
     }
-    write += snprintf(write, end - write, " ]");
+    write = build_str(&result, write, " ]");
   } else {
     // TODO
   }
-  return strdup(buf);
+  return result;
 }
 
-char *code_attribute_to_string(const bjvm_attribute_code *attrib) {
-  char **insns = malloc(attrib->insn_count * sizeof(char *));
+heap_string code_attribute_to_string(const bjvm_attribute_code *attrib) {
+  heap_string result = make_heap_str(1000);
+  int write = 0;
   size_t total_length = 0;
   for (int i = 0; i < attrib->insn_count; ++i) {
-    char *insn_str = insn_to_string(attrib->code + i, i);
-    insns[i] = insn_str;
-    total_length += strlen(insn_str) + 1;
+    heap_string insn_str = insn_to_string(attrib->code + i, i);
+    write = build_str(&result, write, "%.*s\n", fmt_slice(insn_str));
+    total_length += insn_str.len + 1;
   }
-  char *result = calloc(total_length + 1, 1), *write = result;
-  for (int i = 0; i < attrib->insn_count; ++i) {
-    write = stpcpy(write, insns[i]);
-    *write++ = '\n';
-    free(insns[i]);
-  }
-  free(insns);
-  *write = '\0';
   return result;
 }
 
@@ -649,7 +650,6 @@ struct method_analysis_ctx {
   int branch_count;
   char *insn_error;
   heap_string *error;
-
   struct edge *edges;
   int edges_count;
   int edges_cap;
@@ -1166,7 +1166,9 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     break;
   }
   case bjvm_insn_jsr: {
-    PUSH(INT)
+    PUSH(REFERENCE)
+    if (push_branch_target(ctx, insn_index, insn->index))
+      return -1;
     break;
   }
   case bjvm_insn_if_acmpeq:
@@ -1263,22 +1265,26 @@ stack_type_mismatch:
   ctx->insn_error = "Stack type mismatch:";
 error:;
   *ctx->error = make_heap_str(50000);
-  char *insn_str = insn_to_string(insn, insn_index);
+  heap_string insn_str = insn_to_string(insn, insn_index);
   char *stack_str = print_analy_stack_state(&ctx->stack_before);
   char *locals_str = print_analy_stack_state(&ctx->locals);
-  char *context = code_attribute_to_string(ctx->code);
+  heap_string context = code_attribute_to_string(ctx->code);
   bprintf(hslc(*ctx->error),
-          "%s\nInstruction: %s\nStack preceding insn: %s\nLocals state: %s\nContext:\n%s\n",
-          ctx->insn_error, insn_str, stack_str, locals_str, context);
-  free(insn_str);
+          "%s\nInstruction: %.*s\nStack preceding insn: %s\nLocals state: %s\nContext:\n%.*s\n",
+          ctx->insn_error, fmt_slice(insn_str), stack_str, locals_str, fmt_slice(context));
+  free_heap_str(insn_str);
   free(stack_str);
-  free(context);
+  free(locals_str);
+  free_heap_str(context);
   free(ctx->insn_error);
   return -1;
 }
 
 bool filter_locals(bjvm_analy_stack_state *s1,
                    const bjvm_analy_stack_state *s2) {
+  if (s1->entries_count != s2->entries_count) {
+    printf("%s\n%s\n", print_analy_stack_state(s1), print_analy_stack_state(s2));
+  }
   assert(s1->entries_count == s2->entries_count);
   bool changed = false;
   for (int i = 0; i < s1->entries_count; ++i) {
@@ -1374,6 +1380,15 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
   if (!exc)
     return;
 
+  // jsr edges
+  for (int i = 0; i < ctx->code->insn_count; ++i) {
+    bjvm_bytecode_insn *insn = ctx->code->code + i;
+    if (insn->kind == bjvm_insn_jsr) {
+      *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
+          (struct edge){.start = i, .end = insn->index};
+    }
+  }
+
   for (int i = 0; i < exc->entries_count; ++i) {
     // Scan instructions in [start_pc, end_pc). For any instruction changing
     // the locals state, add an edge from the instruction after to the handler.
@@ -1396,7 +1411,7 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
  */
 int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   bjvm_attribute_code *code = method->code;
-  if (!code) {
+  if (!code || method->code_analysis) {
     return 0;
   }
   struct method_analysis_ctx ctx = {code};
@@ -1459,7 +1474,6 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
     if (inferred_stacks[i].entries) {
       copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
       bjvm_analy_stack_state *this_locals = &inferred_locals[i];
-
       if (inferred_locals[i].is_exc_handler) {
         // At exception handlers, use the local variable table of the start of
         // the exception block. Later we'll intersect this down.
@@ -1467,11 +1481,9 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
                                &ctx.locals);
         copy_analy_stack_state(ctx.locals, this_locals);
       }
-
       inferred_stacks[i].from_jump_target = false;
       ctx.stack_terminated = false;
     }
-
     if (inferred_locals[i].entries) {
       copy_analy_stack_state(inferred_locals[i], &ctx.locals);
     }
@@ -1484,7 +1496,6 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
       if (ctx.branch_count == 0) {
         break;
       }
-
       i = ctx.branch_q[--ctx.branch_count];
       copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
       copy_analy_stack_state(inferred_locals[i], &ctx.locals);
@@ -1507,21 +1518,22 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
 
   add_exception_edges(&ctx);
 
-  while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
-    ;
-
   // Check that all entries have been filled
   for (int i = 0; i < code->insn_count; ++i) {
     if (!inferred_stacks[i].entries) {
-      char buf[1000], *write = buf, *end = buf + sizeof(buf);
-      write +=
-          snprintf(buf, 1000, "Unreachable code detected at instruction %d", i);
-      char *context = code_attribute_to_string(method->code);
-      write += snprintf(write, end - write, "\nContext: %s\n", context);
-      result = -1;
+      heap_string context = code_attribute_to_string(method->code);
+      heap_string unreachable_code_error = make_heap_str(context.len + 100);
+      bprintf(hslc(unreachable_code_error),
+                "Unreachable code detected at instruction %d\nContext:\n%.*s\n", i,
+                fmt_slice(context));
+      // TODO report
+      UNREACHABLE();
       break;
     }
   }
+
+  while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
+    ;
 
 done:
   for (int i = 0; i < code->insn_count; ++i) {
@@ -1580,21 +1592,33 @@ void free_code_analysis(bjvm_code_analysis *analy) {
 static void push_bb_branch(bjvm_basic_block *current, bjvm_basic_block *next) {
   *VECTOR_PUSH(current->next, current->next_count, current->next_cap) =
       next->my_index;
-  *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) =
-      current->my_index;
 }
 
 static int cmp_ints(const void *a, const void *b) {
   return *(int *)a - *(int *)b;
 }
 
+// Used to find which blocks are accessible from the entry without throwing
+// exceptions.
+void dfs_nothrow_accessible(bjvm_basic_block *bs, int i) {
+  bjvm_basic_block *b = bs + i;
+  if (b->nothrow_accessible)
+    return;
+  b->nothrow_accessible = true;
+  for (int j = 0; j < b->next_count; ++j)
+    dfs_nothrow_accessible(bs, b->next[j]);
+}
+
+// Scan basic blocks in the code. Code that is not accessible without throwing
+// an exception is DELETED because we're not handling exceptions at all in
+// JIT compiled code. (Once an exception is thrown in a method, it is
+// interpreted for the rest of its life.)
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy) {
   assert(analy);
   if (analy->blocks)
     return 0; // already done
-  // First, record all branch targets. We're doing all exception handling in C
-  // so it's ok if we don't analyze exception handlers.
+  // First, record all branch targets.
   int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
   int tc = 0;
   ts[tc++] = 0; // mark entry point
@@ -1618,9 +1642,7 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
   int block_count = 0;
   for (int i = 0; i < tc; ++i) // remove dups
     ts[block_count += ts[block_count] != ts[i]] = ts[i];
-  bjvm_basic_block *bs = analy->blocks =
-      calloc(++block_count, sizeof(bjvm_basic_block));
-  analy->block_count = block_count;
+  bjvm_basic_block *bs = calloc(++block_count, sizeof(bjvm_basic_block));
   for (int i = 0; i < block_count; ++i) {
     bs[i].start_index = ts[i];
     bs[i].start = code->code + ts[i];
@@ -1630,8 +1652,7 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
   }
 #define FIND_TARGET_BLOCK(index)                                               \
   &bs[(int *)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
-  // Then, record edges between bbs. (This assumes no unreachable code, which
-  // was checked in analyze_method_code_segment.)
+  // Then, record edges between bbs.
   for (int block_i = 0; block_i < block_count; ++block_i) {
     bjvm_basic_block *b = bs + block_i;
     const bjvm_bytecode_insn *last = b->start + b->insn_count - 1;
@@ -1648,13 +1669,37 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
       continue;
     }
     if (block_i + 1 < block_count)
-      push_bb_branch(b, &analy->blocks[block_i + 1]);
+      push_bb_branch(b, &bs[block_i + 1]);
   }
-  // Create some auxiliary data
+  // Record which blocks are nothrow-accessible from entry block.
+  dfs_nothrow_accessible(bs, 0);
+  // Delete inaccessible blocks and renumber the rest. (Reusing ts for this)
+  int j = 0;
+  for (int i = 0; i < block_count; ++i) {
+    if (bs[i].nothrow_accessible) {
+      bs[j] = bs[i];
+      ts[i] = j++;
+    } else {
+      free(bs[i].next);
+    }
+  }
+  // Renumber edges and add "prev" edges
+  block_count = j;
+  for (int block_i = 0; block_i < block_count; ++block_i) {
+    bjvm_basic_block *b = bs + block_i;
+    b->my_index = block_i;
+    for (int j = 0; j < b->next_count; ++j) {
+      bjvm_basic_block *next = bs + (b->next[j] = ts[b->next[j]]);
+      *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) = block_i;
+    }
+  }
+  // Create some auxiliary data for later analyses
   for (int block_i = 0; block_i < block_count; ++block_i) {
     bjvm_basic_block *b = bs + block_i;
     b->is_backedge = calloc(b->next_count, sizeof(bool));
   }
+  analy->block_count = block_count;
+  analy->blocks = bs;
   free(ts);
   return 0;
 #undef FIND_TARGET_BLOCK

@@ -26,15 +26,15 @@ typedef struct bjvm_basic_block {
 
   // May contain duplicates in the presence of a switch or cursed if*.
   // The order of branches is guaranteed for convenience. For if instructions,
-  // the TAKEN branch is first, and the FALLTHROUGH branch is second. For
+  // the TAKEN branch is FIRST, and the FALLTHROUGH branch is SECOND. For
   // lookupswitch and tableswitch, the default branch is last.
-  uint32_t *next;
+  int *next;
   uint8_t *is_backedge;
   int next_count;
   int next_cap;
 
   // May contain duplicates in the presence of a switch or cursed if*
-  uint32_t *prev;
+  int *prev;
   int prev_count;
   int prev_cap;
 
@@ -48,6 +48,8 @@ typedef struct bjvm_basic_block {
   uint32_t idom_pre, idom_post;
   // Whether this block is the target of a backedge
   bool is_loop_header;
+  // Whether we can get here in the method without an exception being thrown
+  bool nothrow_accessible;
 } bjvm_basic_block;
 
 // Result of the analysis of a code segment. During analysis, stack operations
@@ -79,22 +81,6 @@ typedef struct {
 
   bool dominator_tree_computed;
 } bjvm_code_analysis;
-
-typedef bjvm_type_kind bjvm_analy_stack_entry;
-
-// State of the stack (or local variable table) during analysis, indexed by
-// formal JVM semantics (i.e., long/double take up two slots, and the second
-// slot is unusable).
-typedef struct {
-  bjvm_analy_stack_entry *entries;
-  int entries_count;
-  int entries_cap;
-
-  bool from_jump_target;
-  bool is_exc_handler;
-
-  int exc_handler_start;
-} bjvm_analy_stack_state;
 
 /**
  * Analyze the method's code segment if it exists, rewriting instructions in

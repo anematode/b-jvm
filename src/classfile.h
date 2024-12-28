@@ -610,6 +610,7 @@ typedef struct bjvm_cp_field {
 
 typedef bjvm_utf8 cp_string;
 
+// Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
   bjvm_classdesc_state state;
@@ -665,7 +666,7 @@ typedef struct bjvm_classdesc {
   void (*dtor)(bjvm_classdesc *); // apoptosis
 } bjvm_classdesc;
 
-char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
+heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
 

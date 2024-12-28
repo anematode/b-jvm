@@ -24,12 +24,6 @@
 
 using namespace Bjvm::Tests;
 
-bool HasSuffix(std::string_view str, std::string_view suffix) {
-  // Credit: https://stackoverflow.com/a/20446239/13458117
-  return str.size() >= suffix.size() &&
-         str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
 double get_time() {
 #ifdef EMSCRIPTEN
   return emscripten_get_now();
@@ -40,7 +34,7 @@ double get_time() {
 #endif
 }
 
-TEST_CASE("ATest STR() macro") {
+TEST_CASE("Test STR() macro") {
   bjvm_utf8 utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
@@ -477,7 +471,37 @@ java.io.Serializable1537nullfalsetruetruetruetruetrue00nullfalsenull
 
 TEST_CASE("NPE") {
   auto result = run_test_case("test_files/npe/", true);
-  REQUIRE(result.stdout_ == "abcdefghijklmnop");
+  REQUIRE(result.stdout_ == "abcdefghijklmnopqr");
+}
+
+TEST_CASE("ArithmeticException") {
+  auto result = run_test_case("test_files/arithmetic_exception/", true);
+  REQUIRE(result.stdout_ == "abcd");
+}
+
+TEST_CASE("Numeric conversions") {
+  auto result = run_test_case("test_files/numerics/", true);
+  REQUIRE(result.stdout_ == R"(3.4028235E38 -> 2147483647
+1.4E-45 -> 0
+Infinity -> 2147483647
+-Infinity -> -2147483648
+NaN -> 0
+3.4028235E38 -> 9223372036854775807L
+1.4E-45 -> 0L
+Infinity -> 9223372036854775807L
+-Infinity -> -9223372036854775808L
+NaN -> 0L
+1.7976931348623157E308 -> 2147483647
+4.9E-324 -> 0
+Infinity -> 2147483647
+-Infinity -> -2147483648
+NaN -> 0
+1.7976931348623157E308 -> 9223372036854775807L
+4.9E-324 -> 0L
+Infinity -> 9223372036854775807L
+-Infinity -> -9223372036854775808L
+NaN -> 0L
+)");
 }
 
 TEST_CASE("ClassCircularityError") {
@@ -564,7 +588,6 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 
   bjvm_cp_method *m2 = desc.methods + 5;
   bjvm_analyze_method_code(m2, nullptr);
-  auto *b = bjvm_wasm_jit_compile(nullptr, m2, false);
 
   bjvm_free_classfile(desc);
 }

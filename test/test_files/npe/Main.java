@@ -109,5 +109,18 @@ public class Main {
         } catch (NullPointerException ex) {
             System.out.print("p");
         }
+
+        Object[] objectArray = null;
+        try {
+            System.out.print(objectArray[0]);
+        } catch (NullPointerException ex) {
+            System.out.print("q");
+        }
+
+        try {
+            objectArray[0] = new Object();
+        } catch (NullPointerException ex) {
+            System.out.print("r");
+        }
     }
 }

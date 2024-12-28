@@ -10,7 +10,9 @@ bjvm.onRuntimeInitialized = function() {
     const ptr = bjvm.ccall("set_up", "number", [], []);
     function main() {
         while (!bjvm.ccall("bjvm_async_run_step", "number", ["number"], [ptr])) {
+            console.log("Control returned");
         }
+        console.log("Done!");
         bjvm.ccall("print_error", "number", ["number"], [ptr]);
     }
 

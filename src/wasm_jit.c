@@ -18,7 +18,12 @@ typedef struct {
   bjvm_wasm_function *raise_npe;
   bjvm_wasm_function *raise_oob;
   bjvm_wasm_function *push_frame;
-  bjvm_wasm_function *interpret_frame;
+  bjvm_wasm_function *invokestatic;
+  bjvm_wasm_function *invokenonstatic;
+
+  uint32_t vm_local;
+  uint32_t heap_local;
+  uint32_t heap_used_local;
 } runtime_helpers;
 
 typedef struct {
@@ -27,7 +32,7 @@ typedef struct {
   // The basic blocks we are building
   expression *wasm_blocks;
 
-  // The method and (for convenience) its code and analysis
+  // The method and (for convenie) its code and analysis
   bjvm_cp_method *method;
   bjvm_attribute_code *code;
   bjvm_code_analysis *analysis;
@@ -87,13 +92,16 @@ int sizeof_wasm_kind(bjvm_wasm_type kind) {
   }
 }
 
+int add_local(compile_ctx * ctx, bjvm_wasm_type val) {
+  *VECTOR_PUSH(ctx->wvars, ctx->wvars_count, ctx->wvars_cap) = val.val;
+  return ctx->next_local++;
+}
+
 int jvm_stack_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   int i = index * WASM_TYPES_COUNT + local_kind(jvm_type_to_wasm(kind));
   int *l = &ctx->val_to_local_map[i];
   if (*l == -1) {
-    *VECTOR_PUSH(ctx->wvars, ctx->wvars_count, ctx->wvars_cap) =
-        jvm_type_to_wasm(kind).val;
-    *l = ctx->next_local++;
+    *l = add_local(ctx, jvm_type_to_wasm(kind));
   }
   return *l;
 }
@@ -129,7 +137,7 @@ expression set_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
 // Generate spill code that writes to stack->values at the appropriate location,
 // or load parameters from the stack at the function beginning.
 expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
-                              int return_value) {
+                              int return_value, int start, int end) {
   int values_start = offsetof(bjvm_stack_frame, values);
   int value_size = sizeof(bjvm_stack_value);
 
@@ -140,7 +148,10 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
   expression *result = nullptr;
   int result_count = 0, result_cap = 0;
 
-  for (int slot = 0; slot < ctx->code->max_locals + ctx->code->max_stack;
+  if (end == -1)
+    end = ctx->code->max_locals + ctx->code->max_stack;
+
+  for (int slot = start; slot < end;
        ++slot) {
     expression frame =
         bjvm_wasm_local_get(ctx->module, FRAME_PARAM, bjvm_wasm_int32());
@@ -174,7 +185,6 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
       continue;
     }
 
-    //printf("Loading at offset %d with kind %d\n", offset, kind);
     int wasm_local = jvm_stack_to_wasm_local(ctx, slot, kind);
     if (do_load) {
       // (local.set wasm_local (i32.load (i32.add frame (i32.const offset))))
@@ -202,8 +212,10 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
         ctx->module, BJVM_WASM_OP_KIND_I32_STORE, frame, pc_sd_const, 0,
         offsetof(bjvm_stack_frame, program_counter));
     *VECTOR_PUSH(result, result_count, result_cap) = store;
-    *VECTOR_PUSH(result, result_count, result_cap) = bjvm_wasm_return(
-        ctx->module, bjvm_wasm_i32_const(ctx->module, return_value));
+    if (return_value != -1) {
+      *VECTOR_PUSH(result, result_count, result_cap) = bjvm_wasm_return(
+          ctx->module, bjvm_wasm_i32_const(ctx->module, return_value));
+    }
   }
 
   expression block =
@@ -244,6 +256,23 @@ bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
   return CreateObjectArray1D(thread, classdesc, count, false);
 }
 
+EMSCRIPTEN_KEEPALIVE
+bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
+                                                  bjvm_stack_frame *frame,
+                                                  bjvm_bytecode_insn *insn) {
+  //printf("invokestatic called!\n");
+  return bjvm_invokestatic(thread, frame, insn);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bjvm_interpreter_result_t wasm_runtime_invokenonstatic(bjvm_thread *thread,
+                                                     bjvm_stack_frame *frame,
+                                                     bjvm_bytecode_insn *insn) {
+  //fprintf(stderr, "invokenonstatic called from method %.*s!\n", frame->method->name.len, frame->method->name.chars);
+  //dump_frame(stderr, frame);
+  return bjvm_invokenonstatic(thread, frame, insn);
+}
+
 void add_runtime_imports(compile_ctx *ctx) {
   ctx->runtime.new_object = bjvm_wasm_import_runtime_function(
       ctx->module, wasm_runtime_new_object, "ii", "i");
@@ -253,6 +282,14 @@ void add_runtime_imports(compile_ctx *ctx) {
       ctx->module, wasm_runtime_raise_npe, "i", "i");
   ctx->runtime.raise_oob = bjvm_wasm_import_runtime_function(
       ctx->module, wasm_runtime_raise_array_index_oob, "iii", "i");
+  ctx->runtime.invokestatic = bjvm_wasm_import_runtime_function(
+      ctx->module, wasm_runtime_invokestatic, "iii", "i");
+  ctx->runtime.invokenonstatic = bjvm_wasm_import_runtime_function(
+      ctx->module, wasm_runtime_invokenonstatic, "iii", "i");
+
+  ctx->runtime.heap_local = add_local(ctx, bjvm_wasm_int32());
+  ctx->runtime.vm_local = add_local(ctx, bjvm_wasm_int32());
+  ctx->runtime.heap_used_local = add_local(ctx, bjvm_wasm_int32());
 }
 
 #define PUSH_EXPR *VECTOR_PUSH(results, result_count, result_cap)
@@ -577,6 +614,7 @@ expression wasm_lower_return(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
       ctx->module, get_tk_store_op(kind),
       bjvm_wasm_local_get(ctx->module, RESULT_PARAM, bjvm_wasm_int32()), value,
       0, 0);
+  // Also write the value into the frame preceding the current frame
   return store;
 }
 
@@ -625,11 +663,11 @@ static bjvm_wasm_expression *exception_raised(bjvm_wasm_module * module) {
   return bjvm_wasm_return(module, bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_EXC));
 }
 
-static bjvm_wasm_expression *interrupt(bjvm_wasm_module * module) {
-  return bjvm_wasm_return(module, bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_INT));
+static bjvm_wasm_expression *interrupt(compile_ctx *ctx, int pc) {
+  return spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT, 0, -1);
 }
 
-bjvm_wasm_expression *wasm_lower_anewarray(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+bjvm_wasm_expression *wasm_lower_anewarray(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int pc, int sd) {
   bjvm_classdesc *classdesc = insn->cp->class_info.classdesc;
   if (!classdesc)
     return nullptr;
@@ -645,7 +683,7 @@ bjvm_wasm_expression *wasm_lower_anewarray(compile_ctx *ctx, const bjvm_bytecode
   // Null is returned if a GC is required or if NegativeArraySizeException is thrown
   expression null_check = bjvm_wasm_if_else(ctx->module,
     obj_is_null,
-    interrupt(ctx->module),
+    interrupt(ctx, pc),
     nullptr,
     bjvm_wasm_int32());
 
@@ -723,22 +761,87 @@ bjvm_wasm_expression * wasm_lower_ldc(compile_ctx *ctx, const bjvm_bytecode_insn
   }
 }
 
-bjvm_wasm_expression *wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
-  // For now, just make an appropriate call to bjvm_push_frame and
-  // bjvm_bytecode_interpret. In particular, we push a frame, write the
-  // specified args to the frame, and call bjvm_bytecode_interpret. If it
-  // returns anything other than OK, we interrupt (we don't propagate the
-  // exception, because there could be a catch handler in the current compiled
-  // function).
+expression wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int pc, int sd) {
+  // For now, we do everything in the runtime. Eventually we'll do something
+  // more clever.
+  int args = insn->cp->methodref.method_descriptor->args_count + (insn->kind != bjvm_insn_invokestatic);
 
-  // method = (call runtime_resolve_method <obj> <insn>)
-  // (call runtime_push_frame <thread> <method>)
-  // (call runtime_interpret <thread>)
+  // Spill the top n variables of the stack
+  expression spill = spill_or_load_code(ctx, pc, false, -1, 0, sd);
+  bjvm_wasm_function* target = insn->kind == bjvm_insn_invokestatic ? ctx->runtime.invokestatic :
+    ctx->runtime.invokenonstatic;
+  expression call = bjvm_wasm_call(ctx->module, target,
+      (expression[]){
+        bjvm_wasm_local_get(ctx->module, THREAD_PARAM, bjvm_wasm_int32()),
+        bjvm_wasm_local_get(ctx->module, FRAME_PARAM, bjvm_wasm_int32()),
+        bjvm_wasm_i32_const(ctx->module, (int)insn),
+      }, 3);
 
-  return nullptr;
+  // If an interrupt or exception was raised, interrupt
+  expression interrupt_check = bjvm_wasm_if_else(ctx->module,
+  bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I32_NE, call, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK)),
+  interrupt(ctx, pc),
+  nullptr,
+  bjvm_wasm_int32());
+
+  // Now load in the return value
+  bool is_void = insn->cp->methodref.method_descriptor->return_type.base_kind == BJVM_TYPE_KIND_VOID;
+  expression load;
+  if (!is_void)
+    load = spill_or_load_code(ctx, pc + 1, true, -1, sd - args, sd - args + 1);
+  expression sequence = bjvm_wasm_block(ctx->module,
+    (expression[]){
+      spill,
+      interrupt_check,
+      load,
+    }, 2 + !is_void, bjvm_wasm_void(), false);
+
+  return sequence;
 }
 
-const int MAX_PC_TO_EMIT = 10000;
+const int MAX_PC_TO_EMIT = 256;
+
+bjvm_wasm_expression *wasm_lower_new(compile_ctx *ctx, const bjvm_bytecode_insn *insn, int sd) {
+  bjvm_classdesc *class = insn->cp->class_info.classdesc;
+  if (!class) {
+    return nullptr;
+  }
+  int reserve_bytes = insn->cp->class_info.classdesc->data_bytes;
+  // round up to 8 bytes
+  reserve_bytes = (reserve_bytes + 7) & ~7;
+
+  expression load_vm_ptr = bjvm_wasm_load(ctx->module, BJVM_WASM_OP_KIND_I32_LOAD,
+    bjvm_wasm_local_get(ctx->module, THREAD_PARAM, bjvm_wasm_int32()), 0, offsetof(bjvm_thread, vm));
+  load_vm_ptr = bjvm_wasm_local_set(ctx->module, ctx->runtime.vm_local, load_vm_ptr);
+  expression vm_ptr = bjvm_wasm_local_get(ctx->module, ctx->runtime.vm_local, bjvm_wasm_int32());
+
+  expression heap_ptr = bjvm_wasm_load(ctx->module, BJVM_WASM_OP_KIND_I32_LOAD,
+    vm_ptr, 0, offsetof(bjvm_vm, heap));
+
+  expression load_heap_used = bjvm_wasm_load(ctx->module, BJVM_WASM_OP_KIND_I32_LOAD,
+    vm_ptr, 0, offsetof(bjvm_vm, heap_used));
+  load_heap_used = bjvm_wasm_local_set(ctx->module, ctx->runtime.heap_used_local, load_heap_used);
+  expression heap_used = bjvm_wasm_local_get(ctx->module, ctx->runtime.heap_used_local, bjvm_wasm_int32());
+
+  expression new_heap_used = bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I32_ADD, heap_used, bjvm_wasm_i32_const(ctx->module, reserve_bytes));
+  expression store_heap_used = bjvm_wasm_store(ctx->module, BJVM_WASM_OP_KIND_I32_STORE, vm_ptr, new_heap_used, 0, offsetof(bjvm_vm, heap_used));
+
+  expression object = bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I32_ADD, heap_ptr, heap_used);
+  expression store_object = set_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE, object);
+
+  expression store_classdesc = bjvm_wasm_store(ctx->module, BJVM_WASM_OP_KIND_I32_STORE, get_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE),
+    bjvm_wasm_i32_const(ctx->module, (int)class), 0, offsetof(bjvm_obj_header, descriptor));
+
+  expression sequence = bjvm_wasm_block(ctx->module,
+    (expression[]){
+      load_vm_ptr,
+      load_heap_used,
+      store_heap_used,
+      store_object,
+      store_classdesc
+    }, 5, bjvm_wasm_void(), false);
+  return sequence;
+}
 
 // Each basic block compiles into a WASM block with epsilon type transition
 static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_ctx *topo, bool debug) {
@@ -774,6 +877,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
   for (; i < bb->insn_count;
        ++i, ++pc, ++expr_i) {
     if (debug && pc > MAX_PC_TO_EMIT) {
+      printf("Skipping emission of instruction %s\n", bjvm_insn_code_name(bb->start[i].kind));
       goto unimplemented;
     }
 
@@ -828,7 +932,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       break;
     }
     case bjvm_insn_aconst_null: {
-      PUSH_EXPR = set_local_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE,
+      PUSH_EXPR = set_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE,
                                   bjvm_wasm_i32_const(ctx->module, 0));
       break;
     }
@@ -856,10 +960,8 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
           bjvm_wasm_unop(ctx->module, BJVM_WASM_OP_KIND_I32_EQZ, exception),
           wasm_raise_npe(ctx), store, bjvm_wasm_void());
       PUSH_EXPR = execute;
-      expression ret = bjvm_wasm_return(
-          ctx->module,
-          bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_EXC));
-      PUSH_EXPR = ret;
+      // Spill all locals
+      PUSH_EXPR = spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_EXC, ctx->code->max_stack, -1);
       break;
     }
 
@@ -1075,8 +1177,10 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       break;
     }
     case bjvm_insn_new: {
-      goto unimplemented;
-      // PUSH_EXPR = wasm_lower_new(ctx, insn, sd);
+      expression result = wasm_lower_new(ctx, insn, sd);
+      if (!result)
+        goto unimplemented;
+      PUSH_EXPR = result;
       break;
     }
     case bjvm_insn_putstatic:
@@ -1101,7 +1205,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
     case bjvm_insn_invokestatic:
     case bjvm_insn_invokevirtual:
     case bjvm_insn_invokeinterface: {
-      expression result = wasm_lower_invoke(ctx, insn, sd);
+      expression result = wasm_lower_invoke(ctx, insn, pc, sd);
       if (!result)
         goto unimplemented;
       PUSH_EXPR = result;
@@ -1231,14 +1335,15 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
       // PUSH_EXPR = wasm_lower_newarray(ctx, insn, sd);
       break;
     }
+    case bjvm_insn_monitorenter:
+    case bjvm_insn_monitorexit:
+      break;
     case bjvm_insn_fcmpl:
     case bjvm_insn_fcmpg:
     case bjvm_insn_frem: // deprecated
     case bjvm_insn_drem: // deprecated
     case bjvm_insn_dcmpg:
     case bjvm_insn_dcmpl:
-    case bjvm_insn_monitorenter:
-    case bjvm_insn_monitorexit:
     default:
       goto unimplemented;
     }
@@ -1248,10 +1353,8 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb, topo_
   unimplemented:
     fprintf(stderr, "Rejecting JIT because of unimplemented instruction %s\n",
            bjvm_insn_code_name(bb->start[i].kind));
-    free(results);
-    return nullptr;
     PUSH_EXPR =
-        spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT);
+        spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT, 0, -1);
   } else if (!outgoing_edges_processed && bb->next_count) {
     int next = topo->block_to_topo[bb->next[0]];
     if (next != topo->topo_i + 1) {
@@ -1388,7 +1491,7 @@ static int cmp_ints_reverse(const void *a, const void *b) {
 bjvm_wasm_instantiation_result *
 bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool debug) {
   bjvm_wasm_instantiation_result *wasm = nullptr;
-  // printf("Requesting compile for method %.*s with signature %.*s\n", fmt_slice(method->name), fmt_slice(method->descriptor));
+  printf("Requesting compile for method %.*s on class %.*s with signature %.*s\n", fmt_slice(method->name), fmt_slice(method->my_class->name), fmt_slice(method->descriptor));
 
   // Resulting signature and (roughly) behavior is same as
   // bjvm_bytecode_interpret:
@@ -1445,7 +1548,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool de
   };
   // Push a block to load stuff from the stack
   *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression) {
-    spill_or_load_code(&ctx, 0, true, BJVM_INTERP_RESULT_INT),
+    spill_or_load_code(&ctx, 0, true, BJVM_INTERP_RESULT_INT, 0, -1),
     0,
     -1,
     false
@@ -1502,7 +1605,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method, bool de
 
     int block_i = topo.topo_to_block[topo.topo_i];
     bjvm_basic_block *bb = analy->blocks + block_i;
-    // debug = debug || utf8_equals(method->name, "abs");
+    debug = utf8_equals(method->name, "encodeArrayLoop");
     expression expr = compile_bb(&ctx, bb, &topo, debug);
     if (!expr) {
       goto error;
@@ -1545,6 +1648,7 @@ error:
 void free_wasm_compiled_method(void *p) {
   if (!p)
     return;
-  bjvm_wasm_jit_compiled_method *compiled_method = p;
+  bjvm_wasm_instantiation_result *compiled_method = p;
+  free(compiled_method->exports);
   free(compiled_method);
 }

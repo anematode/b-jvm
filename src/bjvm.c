@@ -702,7 +702,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 21;
+  options.heap_size = 1 << 23;
   return options;
 }
 
@@ -2700,7 +2700,6 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
                      bjvm_stack_value *result,
                      bjvm_interpreter_result_t *interp_result) {
   bjvm_cp_method *m = final_frame->method;
-
   if (!m->compiled_method) {
     m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
     if (!m->compiled_method || ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
@@ -2727,40 +2726,58 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 10 &&
+  return method->call_count > 50 &&
     method->code->insn_count > 10 &&
     !method->failed_jit; // && utf8_equals(method->name, "testOperation");
 }
 
-int w = 0, n = 0;
+static int double_to_int(double x) {
+  if (x > INT_MAX)
+    return INT_MAX;
+  if (x < INT_MIN)
+    return INT_MIN;
+  if (isnan(x))
+    return 0;
+  return (int)x;
+}
+
+static long double_to_long(double x) {
+  if (x > LONG_MAX)
+    return LONG_MAX;
+  if (x < LONG_MIN)
+    return LONG_MIN;
+  if (isnan(x))
+    return 0;
+  return (long)x;
+}
+
+// Main interpreter
 bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
                                                   bjvm_stack_frame *final_frame,
                                                   bjvm_stack_value *result) {
 
+#if ENABLE_JIT
   if (final_frame == thread->frames[thread->frames_count - 1] &&
       final_frame->program_counter == 0 &&
       should_attempt_to_jit(final_frame->method)) {
     bjvm_interpreter_result_t interp_result;
-    /*printf("Running method %.*s on %.*s as WASM\n",
-           fmt_slice(final_frame->method->name), fmt_slice(final_frame->method->my_class->name));
-    dump_frame(stdout, final_frame);*/
 #if AGGRESSIVE_DEBUG
-    printf("Running method %.*s as WASM\n",
-           fmt_slice(final_frame->method->name));
+    printf("Running method %.*s with signature %.*s on %.*s as WASM\n",
+           fmt_slice(final_frame->method->name),
+           fmt_slice(final_frame->method->descriptor),
+           fmt_slice(final_frame->method->my_class->name));
+    dump_frame(stdout, final_frame);
 #endif
     int failed_to_compile =
         bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
     if (!failed_to_compile) {
-      w++;
       return interp_result;
     }
 #if AGGRESSIVE_DEBUG
     printf("Continuing...\n");
 #endif
   }
-  n++;
-  printf("Method: %.*s, n: %d, w: %d\n", fmt_slice(final_frame->method->name), n, w);
-  //printf("n: %d, w: %d\n", n, w);
+#endif
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
 
@@ -2997,9 +3014,18 @@ interpret_frame:
       bjvm_obj_header *value = checked_pop(frame).obj;
       int index = checked_pop(frame).i;
       bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
       int len = *ArrayLength(array);
       if (index < 0 || index >= len) {
         bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      // Instanceof check against the component type
+      if (value && !bjvm_instanceof(value->descriptor, array->descriptor->one_fewer_dim)) {
+        bjvm_array_store_exception(thread);
         goto done;
       }
       bjvm_obj_header **obj = (bjvm_obj_header **)ArrayData(array) + index;
@@ -3094,12 +3120,12 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_d2i: {
-      checked_push(frame, (bjvm_stack_value){.i = (int)checked_pop(frame).d});
+      checked_push(frame, (bjvm_stack_value){.i = double_to_int(checked_pop(frame).d)});
       NEXT_INSN;
     }
     bjvm_insn_d2l: {
       checked_push(frame,
-                   (bjvm_stack_value){.l = (int64_t)checked_pop(frame).d});
+                   (bjvm_stack_value){.l = double_to_long(checked_pop(frame).d) });
       NEXT_INSN;
     }
     bjvm_insn_dadd: {
@@ -3217,12 +3243,12 @@ interpret_frame:
     }
     bjvm_insn_f2i: {
       float a = checked_pop(frame).f;
-      checked_push(frame, (bjvm_stack_value){.i = (int)a});
+      checked_push(frame, (bjvm_stack_value){.i = double_to_int(a)});
       NEXT_INSN;
     }
     bjvm_insn_f2l:
       checked_push(frame,
-                   (bjvm_stack_value){.l = (int64_t)checked_pop(frame).f});
+                   (bjvm_stack_value){.l = double_to_long(checked_pop(frame).f)});
       NEXT_INSN;
     bjvm_insn_fadd: {
       float b = checked_pop(frame).f, a = checked_pop(frame).f;

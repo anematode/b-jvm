@@ -9,7 +9,7 @@
 extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void *set_up() {
-  const char* classpath[2] = {"test_files/big_decimal/", nullptr};
+  const char* classpath[2] = {"test_files/playground/", nullptr};
   bjvm_vm_options options = bjvm_default_vm_options();
   options.load_classfile = Bjvm::Tests::load_classfile;
   options.load_classfile_param = classpath;

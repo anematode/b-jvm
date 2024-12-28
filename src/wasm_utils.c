@@ -933,7 +933,7 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
           let count = 0;
           for (var exp in instance.exports)
             count++;
-          //require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm", slice);
+          require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm", slice);
           return addFunction(instance.exports.run, 'iiii');
         } catch (e) {
           // Exit Node.js
