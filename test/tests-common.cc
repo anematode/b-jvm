@@ -212,7 +212,7 @@ std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
 }
 
 TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
-    std::string main_class) {
+                             std::string main_class) {
   bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};

@@ -16,7 +16,6 @@ typedef enum {
 } bjvm_arm64_reg;
 // clang-format on
 
-
 typedef struct {
   int a;
 } bjvm_arm64_jit_result;

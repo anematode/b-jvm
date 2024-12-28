@@ -168,7 +168,8 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   fprintf(stream, "%s", buf);
 }
 
-void bjvm_pop_frame(bjvm_thread *thr, [[maybe_unused]] const bjvm_stack_frame *reference) {
+void bjvm_pop_frame(bjvm_thread *thr,
+                    [[maybe_unused]] const bjvm_stack_frame *reference) {
   assert(thr->frames_count > 0);
   bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
   assert(reference == nullptr || reference == frame);
@@ -235,8 +236,7 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class,
   ent->callback = callback;
 }
 
-bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
-                                   bjvm_utf8 name,
+bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor, bjvm_utf8 name,
                                    bjvm_utf8 method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);

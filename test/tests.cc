@@ -521,13 +521,12 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 }
 
 TEST_CASE("JSON tests") {
-  std::string classpath = "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
-                    "json/jackson-core-2.18.2.jar:test_files/json/"
-                    "jackson-annotations-2.18.2.jar:test_files/json/"
-                    "jackson-databind-2.18.2.jar";
-  auto result =
-      run_test_case(classpath,
-                    true, "GsonExample");
+  std::string classpath =
+      "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+      "json/jackson-core-2.18.2.jar:test_files/json/"
+      "jackson-annotations-2.18.2.jar:test_files/json/"
+      "jackson-databind-2.18.2.jar";
+  auto result = run_test_case(classpath, true, "GsonExample");
   REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}
 )");

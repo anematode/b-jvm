@@ -52,11 +52,11 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
     bool exists = EM_ASM_INT(
-      {
-        const fs = require('fs');
-        return fs.existsSync(UTF8ToString($0));
-      },
-      filename);
+        {
+          const fs = require('fs');
+          return fs.existsSync(UTF8ToString($0));
+        },
+        filename);
     if (!exists)
       goto missing;
 
@@ -77,10 +77,10 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
         },
         filename, &loaded);
 
-    uint32_t length = *(uint32_t*)(length_and_data);
-    uint8_t *data = (uint8_t*)(length_and_data) + 4;
+    uint32_t length = *(uint32_t *)(length_and_data);
+    uint8_t *data = (uint8_t *)(length_and_data) + 4;
 
-    jar->data = (char*)data;
+    jar->data = (char *)data;
     jar->size_bytes = length;
     jar->is_mmap = false;
     return nullptr;
@@ -353,8 +353,9 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
 heap_string concat_path(heap_string name, bjvm_utf8 filename) {
   bool slash = !name.len || name.chars[name.len - 1] != '/';
   heap_string result = make_heap_str(name.len + slash + filename.len);
-  [[maybe_unused]] bjvm_utf8 slice = bprintf(hslc(result), "%.*s%s%.*s", fmt_slice(name),
-                            slash ? "/" : "", fmt_slice(filename));
+  [[maybe_unused]] bjvm_utf8 slice =
+      bprintf(hslc(result), "%.*s%s%.*s", fmt_slice(name), slash ? "/" : "",
+              fmt_slice(filename));
   assert(slice.len == result.len);
   return result;
 }
