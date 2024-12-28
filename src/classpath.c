@@ -138,7 +138,8 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
       return strdup(error);
     }
     bool is_compressed = cdr.compression != 0;
-    cd_offset += CDR_SIZE_BYTES + cdr.filename_len + cdr.extra_len + cdr.comment_len;
+    cd_offset +=
+        CDR_SIZE_BYTES + cdr.filename_len + cdr.extra_len + cdr.comment_len;
 
     bjvm_jar_entry *ent = malloc(sizeof(bjvm_jar_entry));
     ent->header = jar->data + header_offset;
@@ -285,7 +286,8 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     uint16_t filename_len = *(uint16_t *)(jar_entry->header + 26);
     uint16_t extra_len = *(uint16_t *)(jar_entry->header + 28);
     uint32_t offset = 30 + filename_len + extra_len;
-    if (offset + jar_entry->compressed_size + (jar_entry->header - jar->data) > jar->size_bytes) {
+    if (offset + jar_entry->compressed_size + (jar_entry->header - jar->data) >
+        jar->size_bytes) {
       return CORRUPT;
     }
 

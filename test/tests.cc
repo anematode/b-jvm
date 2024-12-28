@@ -243,13 +243,14 @@ struct TestCaseResult {
   std::string stderr_;
 };
 
-TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main") {
+TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true,
+                             std::string main_class = "Main") {
   bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
 
-  options.classpath =
-      (bjvm_utf8){.chars = (char *)classpath.c_str(), .len = (int)classpath.size()};
+  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
+                                  .len = (int)classpath.size()};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
   result->stdout_ += (char)ch;
@@ -263,7 +264,8 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, s
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_utf8 m { .chars = (char*)main_class.c_str(), .len = (int)main_class.size() };
+  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
+              .len = (int)main_class.size()};
 
   bjvm_classdesc *desc = bootstrap_class_create(thr, m);
   bjvm_stack_value args[1] = {{.obj = nullptr}};
@@ -593,7 +595,12 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 }
 
 TEST_CASE("Google's GSON + Jackson") {
-  auto result = run_test_case("test_files/json:test_files/json/gson-2.8.0.jar:test_files/json/jackson-core-2.18.2.jar:test_files/json/jackson-annotations-2.18.2.jar:test_files/json/jackson-databind-2.18.2.jar", true, "GsonExample");
+  auto result =
+      run_test_case("test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+                    "json/jackson-core-2.18.2.jar:test_files/json/"
+                    "jackson-annotations-2.18.2.jar:test_files/json/"
+                    "jackson-databind-2.18.2.jar",
+                    true, "GsonExample");
   REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}
 )");

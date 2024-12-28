@@ -151,18 +151,18 @@ DECLARE_NATIVE("sun/misc", Unsafe, putInt, "(Ljava/lang/Object;JI)V") {
   return value_null();
 }
 
-DECLARE_NATIVE("sun/misc", Unsafe, getObject, "(Ljava/lang/Object;J)Ljava/lang/Object;") {
+DECLARE_NATIVE("sun/misc", Unsafe, getObject,
+               "(Ljava/lang/Object;J)Ljava/lang/Object;") {
   assert(argc == 2);
   return (bjvm_stack_value){
-        .obj = *(void **)((void *)args[0].handle->obj + args[1].l)};
+      .obj = *(void **)((void *)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, getInt, "(Ljava/lang/Object;J)I") {
   assert(argc == 2);
   return (bjvm_stack_value){
-          .i = *(int *)((void *)args[0].handle->obj + args[1].l)};
+      .i = *(int *)((void *)args[0].handle->obj + args[1].l)};
 }
-
 
 DECLARE_NATIVE("sun/misc", Unsafe, getByte, "(J)B") {
   assert(argc == 1);

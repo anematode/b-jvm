@@ -360,7 +360,8 @@ DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   return (bjvm_stack_value){.obj = array->obj};
 }
 
-DECLARE_NATIVE("java/lang", Class, getGenericSignature0, "()Ljava/lang/String;") {
+DECLARE_NATIVE("java/lang", Class, getGenericSignature0,
+               "()Ljava/lang/String;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   bjvm_attribute *attr =
       find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_SIGNATURE);
