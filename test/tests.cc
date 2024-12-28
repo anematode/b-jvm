@@ -238,70 +238,6 @@ TEST_CASE("parse_field_descriptor valid cases") {
 
 TEST_CASE("VM initialization") { CreateTestVM(true); }
 
-struct TestCaseResult {
-  std::string stdout_;
-  std::string stderr_;
-};
-
-TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true,
-                             std::string main_class = "Main") {
-  bjvm_vm_options options = bjvm_default_vm_options();
-
-  TestCaseResult result{};
-
-  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
-                                  .len = (int)classpath.size()};
-  options.write_stdout = capture_stdio ? +[](int ch, void *param) {
-    auto *result = (TestCaseResult *)param;
-  result->stdout_ += (char)ch;
-  } : nullptr;
-  options.write_stderr = capture_stdio ? +[](int ch, void *param) {
-    auto *result = (TestCaseResult *)param;
-    result->stderr_ += (char)ch;
-  } : nullptr;
-  options.write_byte_param = &result;
-
-  bjvm_vm *vm = bjvm_create_vm(options);
-  bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
-
-  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
-              .len = (int)main_class.size()};
-
-  bjvm_classdesc *desc = bootstrap_class_create(thr, m);
-  bjvm_stack_value args[1] = {{.obj = nullptr}};
-
-  bjvm_cp_method *method;
-  bjvm_initialize_class(thr, desc);
-
-  method = bjvm_easy_method_lookup(desc, STR("main"),
-                                   STR("([Ljava/lang/String;)V"), false, false);
-
-  bjvm_thread_run(thr, method, args, nullptr);
-
-  if (thr->current_exception) {
-    method = bjvm_easy_method_lookup(thr->current_exception->descriptor,
-                                     STR("toString"),
-                                     STR("()Ljava/lang/String;"), true, false);
-    bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
-    thr->current_exception = nullptr;
-    bjvm_thread_run(thr, method, args, &result);
-    heap_string read = read_string_to_utf8(result.obj);
-    std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
-    free_heap_str(read);
-
-    // Then call printStackTrace ()V
-    method =
-        bjvm_easy_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
-                                STR("()V"), true, false);
-    bjvm_thread_run(thr, method, args, nullptr);
-  }
-
-  bjvm_free_thread(thr);
-  bjvm_free_vm(vm);
-
-  return result;
-}
-
 TEST_CASE("String hash table") {
   bjvm_string_hash_table tbl = bjvm_make_hash_table(free, 0.75, 48);
   REQUIRE(tbl.load_factor == 0.75);
@@ -385,23 +321,13 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
   for (int i = 0; i < 10; ++i)
     expected += expected; // repeat 1024 times
 
-  auto result = run_test_case("test_files/big_decimal/");
+  auto result = run_test_case("test_files/bench_big_decimal/");
   REQUIRE(result.stdout_ == expected);
-
-  BENCHMARK("Big decimal #2") {
-    auto result = run_test_case("test_files/big_decimal/");
-  };
 }
 
 TEST_CASE("Math natives") {
   auto result = run_test_case("test_files/math/", true);
   REQUIRE(result.stdout_ == "abcdefghijklmnopqrstu");
-}
-
-TEST_CASE("Stack traces") {
-  BENCHMARK("Stack traces") {
-    auto result = run_test_case("test_files/stack_trace_bench/", false);
-  };
 }
 
 /*
@@ -594,12 +520,13 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_free_classfile(desc);
 }
 
-TEST_CASE("Google's GSON + Jackson") {
-  auto result =
-      run_test_case("test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+TEST_CASE("JSON tests") {
+  std::string classpath = "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
                     "json/jackson-core-2.18.2.jar:test_files/json/"
                     "jackson-annotations-2.18.2.jar:test_files/json/"
-                    "jackson-databind-2.18.2.jar",
+                    "jackson-databind-2.18.2.jar";
+  auto result =
+      run_test_case(classpath,
                     true, "GsonExample");
   REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}

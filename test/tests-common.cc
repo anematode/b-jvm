@@ -9,6 +9,7 @@
 #include "tests-common.h"
 
 #include <fstream>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <vector>
@@ -208,6 +209,65 @@ std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
   }
   return result;
 #endif
+}
+
+TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
+    std::string main_class) {
+  bjvm_vm_options options = bjvm_default_vm_options();
+
+  TestCaseResult result{};
+
+  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
+                                  .len = (int)classpath.size()};
+  options.write_stdout = capture_stdio ? +[](int ch, void *param) {
+    auto *result = (TestCaseResult *)param;
+    result->stdout_ += (char)ch;
+  } : nullptr;
+  options.write_stderr = capture_stdio ? +[](int ch, void *param) {
+    auto *result = (TestCaseResult *)param;
+    result->stderr_ += (char)ch;
+  } : nullptr;
+  options.write_byte_param = &result;
+
+  bjvm_vm *vm = bjvm_create_vm(options);
+  bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
+
+  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
+              .len = (int)main_class.size()};
+
+  bjvm_classdesc *desc = bootstrap_class_create(thr, m);
+  bjvm_stack_value args[1] = {{.obj = nullptr}};
+
+  bjvm_cp_method *method;
+  bjvm_initialize_class(thr, desc);
+
+  method = bjvm_easy_method_lookup(desc, STR("main"),
+                                   STR("([Ljava/lang/String;)V"), false, false);
+
+  bjvm_thread_run(thr, method, args, nullptr);
+
+  if (thr->current_exception) {
+    method = bjvm_easy_method_lookup(thr->current_exception->descriptor,
+                                     STR("toString"),
+                                     STR("()Ljava/lang/String;"), true, false);
+    bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
+    thr->current_exception = nullptr;
+    bjvm_thread_run(thr, method, args, &result);
+    heap_string read = read_string_to_utf8(result.obj);
+    std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
+    free_heap_str(read);
+
+    // Then call printStackTrace ()V
+    method =
+        bjvm_easy_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
+                                STR("()V"), true, false);
+    bjvm_thread_run(thr, method, args, nullptr);
+  }
+
+  bjvm_free_thread(thr);
+  bjvm_free_vm(vm);
+
+  return result;
 }
 
 } // namespace Bjvm::Tests

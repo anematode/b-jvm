@@ -38,12 +38,12 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (TRUE)
+if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (FALSE) # NOT EMSCRIPTEN)
+if (TRUE) # NOT EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
@@ -74,7 +74,8 @@ set_target_properties(gen_natives PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
 add_executable(tests test/tests.cc test/arrays-test.cc test/tests-common.cc test/wasm-tests.cc
         test/analysis-tests.cc
-        test/classpath-tests.cc)
+        test/classpath-tests.cc
+        test/benches.cc)
 target_link_libraries(tests PRIVATE bjvm)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")

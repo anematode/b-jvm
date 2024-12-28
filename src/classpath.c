@@ -14,7 +14,7 @@
 #define BJVM_USE_MMAP
 #endif
 
-struct loaded_bytes { // TODO for Node impl
+struct loaded_bytes {
   char *bytes;
   uint32_t length;
 };
@@ -38,8 +38,6 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   struct stat sb;
   fstat(fd, &sb);
   jar->size_bytes = sb.st_size;
-  if (jar->size_bytes == 0)
-    goto empty;
   const char *file = mmap(NULL, jar->size_bytes, PROT_READ, MAP_PRIVATE, fd, 0);
   if (file == MAP_FAILED) {
     close(fd);
@@ -53,7 +51,39 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
 #elif EMSCRIPTEN
   int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
-    UNREACHABLE(); // TODO
+    bool exists = EM_ASM_INT(
+      {
+        const fs = require('fs');
+        return fs.existsSync(UTF8ToString($0));
+      },
+      filename);
+    if (!exists)
+      goto missing;
+
+    struct loaded_bytes loaded;
+
+    void *length_and_data = EM_ASM_PTR(
+        {
+          const fs = require('fs');
+          const buffer = fs.readFileSync(UTF8ToString($0));
+          const length = buffer.length;
+
+          const result = _malloc(length);
+          Module.HEAPU32[$1 >> 2] = length;
+          Module.HEAPU8.set(buffer, result);
+          Module.HEAPU32[1 + $1 >> 2] = result;
+
+          return result;
+        },
+        filename, &loaded);
+
+    uint32_t length = *(uint32_t*)(length_and_data);
+    uint8_t *data = (uint8_t*)(length_and_data) + 4;
+
+    jar->data = (char*)data;
+    jar->size_bytes = length;
+    jar->is_mmap = false;
+    return nullptr;
   }
 #endif
   FILE *f = fopen(filename, "rb");
@@ -68,9 +98,6 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   return nullptr;
 missing:
   snprintf(error, sizeof(error), "Failed to open file %s", filename);
-  return strdup(error);
-empty:
-  snprintf(error, sizeof(error), "File %s is empty", filename);
   return strdup(error);
 }
 
@@ -278,7 +305,6 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
   if (jar_entry) {
     // Check header at jar_entry->header
     if (memcmp(jar_entry->header, "PK\003\004", 4) != 0) {
-      printf("CORRUPT0\n");
       return CORRUPT;
     }
 
@@ -308,16 +334,12 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     stream.avail_out = jar_entry->claimed_uncompressed_size;
 
     if (inflateInit2(&stream, -MAX_WBITS) != Z_OK) {
-      printf("CORRUPT1\n");
       return CORRUPT;
     }
 
     int result = inflate(&stream, Z_FINISH);
     if (result != Z_STREAM_END) {
-      printf("failed to inflate: %.*s\n", fmt_slice(filename));
       inflateEnd(&stream);
-      printf("Result: %d\n", result);
-      printf("CORRUPT2\n");
       return CORRUPT;
     }
 

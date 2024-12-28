@@ -8,10 +8,10 @@
 // instruction. This messes up the debug dumps but can lead to slightly better
 // performance because the branch predictor has more information about pairs
 // of instructions which tend to follow another.
-#define ONE_GOTO_PER_INSN 0
+#define ONE_GOTO_PER_INSN 1
 // Skip the memset(...) call to clear each frame's locals/stack. This messes
 // up the debug dumps, but makes setting up frames faster.
-#define SKIP_CLEARING_FRAME 0
+#define SKIP_CLEARING_FRAME 1
 
 #include <assert.h>
 #include <limits.h>
@@ -130,27 +130,21 @@ const char *infer_type(bjvm_code_analysis *analysis, int insn, int index) {
                          floats = analysis->insn_index_to_floats[insn],
                          doubles = analysis->insn_index_to_doubles[insn],
                          longs = analysis->insn_index_to_longs[insn];
-  if (bjvm_test_compressed_bitset(refs, index)) {
+  if (bjvm_test_compressed_bitset(refs, index))
     return "ref";
-  } else if (bjvm_test_compressed_bitset(ints, index)) {
+  if (bjvm_test_compressed_bitset(ints, index))
     return "int";
-  } else if (bjvm_test_compressed_bitset(floats, index)) {
+  if (bjvm_test_compressed_bitset(floats, index))
     return "float";
-  } else if (bjvm_test_compressed_bitset(doubles, index)) {
+  if (bjvm_test_compressed_bitset(doubles, index))
     return "double";
-  } else if (bjvm_test_compressed_bitset(longs, index)) {
+  if (bjvm_test_compressed_bitset(longs, index))
     return "long";
-  }
   return "void";
 }
 
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   char buf[5000] = {0}, *write = buf, *end = buf + sizeof(buf);
-
-  bjvm_compressed_bitset refs =
-      frame->method ? ((bjvm_code_analysis *)frame->method->code_analysis)
-                          ->insn_index_to_references[frame->program_counter]
-                    : bjvm_empty_bitset();
 
   for (int i = 0; i < frame->stack_depth; ++i) {
     bjvm_stack_value value = frame->values[i];
@@ -177,9 +171,6 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
   assert(thr->frames_count > 0);
   bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
-  if (!(reference == nullptr || reference == frame)) {
-    *(char *)1 = 0;
-  }
   assert(reference == nullptr || reference == frame);
   thr->frames_count--;
   thr->frame_buffer_used =
@@ -245,8 +236,8 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class,
 }
 
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
-                                   const bjvm_utf8 name,
-                                   const bjvm_utf8 method_descriptor,
+                                   bjvm_utf8 name,
+                                   bjvm_utf8 method_descriptor,
                                    bool search_superclasses,
                                    bool search_superinterfaces);
 
@@ -259,7 +250,6 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
   bprintf(err, "Method %.*s on class %.*s with descriptor %.*s",
           fmt_slice(method->name), fmt_slice(method->my_class->name),
           fmt_slice(method->descriptor));
-
   bjvm_raise_exception(thread, STR("java/lang/UnsatisfiedLinkError"), err);
 }
 
@@ -615,6 +605,8 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   bjvm_classdesc *classdesc = bootstrap_class_create(thread, exception_name);
   bjvm_initialize_class(thread, classdesc);
 
+  thread->lang_exception_frame = (int)thread->frames_count - 1;
+
   // Create the exception object
   bjvm_obj_header *obj = new_object(thread, classdesc);
   if (exception_string.chars) {
@@ -629,6 +621,8 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
     bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}},
                     nullptr);
   }
+
+  thread->lang_exception_frame = -1;
 
 #ifndef EMSCRIPTEN
   printf("Exception: %.*s: %.*s\n", fmt_slice(exception_name),
@@ -844,6 +838,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   const int HANDLES_CAPACITY = 100;
   thr->handles = calloc(1, sizeof(bjvm_handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
+  thr->lang_exception_frame = -1;
 
   bjvm_classdesc *desc;
 
@@ -4374,7 +4369,7 @@ void relocate_instance_fields(bjvm_gc_ctx *ctx) {
 }
 
 void bjvm_major_gc(bjvm_vm *vm) {
-  printf("GCing!\n");
+  // printf("GCing!\n");
   // TODO wait for all threads to get ready (for now we'll just call this from
   // an already-running thread)
   bjvm_gc_ctx ctx = {.vm = vm};

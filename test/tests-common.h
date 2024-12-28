@@ -28,6 +28,13 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   bool EndsWith(const std::string &s, const std::string &suffix);
 
     std::optional<std::vector<uint8_t>> ReadFile(const std::string &file);
+
+struct TestCaseResult {
+  std::string stdout_;
+  std::string stderr_;
+};
+
+TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main");
 }
 
 #endif // BJVM_TESTS_COMMON_H

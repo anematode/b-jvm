@@ -32,16 +32,21 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
       bootstrap_class_create(thread, STR("java/lang/StackTraceElement"));
   bjvm_link_class(thread, StackTraceElement);
 
-  int i = thread->frames_count - 1;
-  for (; i >= 0; --i) {
-    bjvm_stack_frame *frame = thread->frames[i];
-    // The first frame in which the exception object is not mentioned
-    if (!frame_mentions_object(frame, obj->obj))
-      break;
+  int i = thread->lang_exception_frame;
+  if (i == -1) {
+    // Not a lang exception, skip frames involved in constructing the object
+    // TODO cleaner way of doing this?
+    i = (int)thread->frames_count - 1;
+    for (; i >= 0; --i) {
+      bjvm_stack_frame *frame = thread->frames[i];
+      // The first frame in which the exception object is not mentioned
+      if (!frame_mentions_object(frame, obj->obj))
+        break;
+    }
+    ++i;
   }
 
   // Create stack trace of the appropriate height
-  ++i;
   bjvm_handle *stack_trace = bjvm_make_handle(
       thread, CreateObjectArray1D(thread, StackTraceElement, i + 1, true));
   if (!stack_trace->obj) // Failed to allocate

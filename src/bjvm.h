@@ -259,6 +259,11 @@ typedef struct bjvm_thread {
 
   // Currently propagating exception
   bjvm_obj_header *current_exception;
+  // Frame in which we are raising a language Throwable (as opposed to a
+  // "manually" generated Throwable). Used so that the stack trace in such
+  // cases doesn't include the <init> frame. -1 if not applicable.
+  // See Throwable:fillInStackTrace for more information.
+  int lang_exception_frame;
 
   bool js_jit_enabled;
 

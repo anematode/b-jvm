@@ -27,300 +27,156 @@ typedef struct {
   int exc_handler_start;
 } bjvm_analy_stack_state;
 
+#define CASE(K) case bjvm_insn_##K: return #K;
+
 const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
   switch (code) {
-  case bjvm_insn_aaload:
-    return "aaload";
-  case bjvm_insn_aastore:
-    return "aastore";
-  case bjvm_insn_aconst_null:
-    return "aconst_null";
-  case bjvm_insn_areturn:
-    return "areturn";
-  case bjvm_insn_arraylength:
-    return "arraylength";
-  case bjvm_insn_athrow:
-    return "athrow";
-  case bjvm_insn_baload:
-    return "baload";
-  case bjvm_insn_bastore:
-    return "bastore";
-  case bjvm_insn_caload:
-    return "caload";
-  case bjvm_insn_castore:
-    return "castore";
-  case bjvm_insn_d2f:
-    return "d2f";
-  case bjvm_insn_d2i:
-    return "d2i";
-  case bjvm_insn_d2l:
-    return "d2l";
-  case bjvm_insn_dadd:
-    return "dadd";
-  case bjvm_insn_daload:
-    return "daload";
-  case bjvm_insn_dastore:
-    return "dastore";
-  case bjvm_insn_dcmpg:
-    return "dcmpg";
-  case bjvm_insn_dcmpl:
-    return "dcmpl";
-  case bjvm_insn_ddiv:
-    return "ddiv";
-  case bjvm_insn_dmul:
-    return "dmul";
-  case bjvm_insn_dneg:
-    return "dneg";
-  case bjvm_insn_drem:
-    return "drem";
-  case bjvm_insn_dreturn:
-    return "dreturn";
-  case bjvm_insn_dsub:
-    return "dsub";
-  case bjvm_insn_dup:
-    return "dup";
-  case bjvm_insn_dup_x1:
-    return "dup_x1";
-  case bjvm_insn_dup_x2:
-    return "dup_x2";
-  case bjvm_insn_dup2:
-    return "dup2";
-  case bjvm_insn_dup2_x1:
-    return "dup2_x1";
-  case bjvm_insn_dup2_x2:
-    return "dup2_x2";
-  case bjvm_insn_f2d:
-    return "f2d";
-  case bjvm_insn_f2i:
-    return "f2i";
-  case bjvm_insn_f2l:
-    return "f2l";
-  case bjvm_insn_fadd:
-    return "fadd";
-  case bjvm_insn_faload:
-    return "faload";
-  case bjvm_insn_fastore:
-    return "fastore";
-  case bjvm_insn_fcmpg:
-    return "fcmpg";
-  case bjvm_insn_fcmpl:
-    return "fcmpl";
-  case bjvm_insn_fdiv:
-    return "fdiv";
-  case bjvm_insn_fmul:
-    return "fmul";
-  case bjvm_insn_fneg:
-    return "fneg";
-  case bjvm_insn_frem:
-    return "frem";
-  case bjvm_insn_freturn:
-    return "freturn";
-  case bjvm_insn_fsub:
-    return "fsub";
-  case bjvm_insn_i2b:
-    return "i2b";
-  case bjvm_insn_i2c:
-    return "i2c";
-  case bjvm_insn_i2d:
-    return "i2d";
-  case bjvm_insn_i2f:
-    return "i2f";
-  case bjvm_insn_i2l:
-    return "i2l";
-  case bjvm_insn_i2s:
-    return "i2s";
-  case bjvm_insn_iadd:
-    return "iadd";
-  case bjvm_insn_iaload:
-    return "iaload";
-  case bjvm_insn_iand:
-    return "iand";
-  case bjvm_insn_iastore:
-    return "iastore";
-  case bjvm_insn_idiv:
-    return "idiv";
-  case bjvm_insn_imul:
-    return "imul";
-  case bjvm_insn_ineg:
-    return "ineg";
-  case bjvm_insn_ior:
-    return "ior";
-  case bjvm_insn_irem:
-    return "irem";
-  case bjvm_insn_ireturn:
-    return "ireturn";
-  case bjvm_insn_ishl:
-    return "ishl";
-  case bjvm_insn_ishr:
-    return "ishr";
-  case bjvm_insn_isub:
-    return "isub";
-  case bjvm_insn_iushr:
-    return "iushr";
-  case bjvm_insn_ixor:
-    return "ixor";
-  case bjvm_insn_l2d:
-    return "l2d";
-  case bjvm_insn_l2f:
-    return "l2f";
-  case bjvm_insn_l2i:
-    return "l2i";
-  case bjvm_insn_ladd:
-    return "ladd";
-  case bjvm_insn_laload:
-    return "laload";
-  case bjvm_insn_land:
-    return "land";
-  case bjvm_insn_lastore:
-    return "lastore";
-  case bjvm_insn_lcmp:
-    return "lcmp";
-  case bjvm_insn_ldc:
-    return "ldc";
-  case bjvm_insn_ldc2_w:
-    return "ldc2_w";
-  case bjvm_insn_ldiv:
-    return "ldiv";
-  case bjvm_insn_lmul:
-    return "lmul";
-  case bjvm_insn_lneg:
-    return "lneg";
-  case bjvm_insn_lor:
-    return "lor";
-  case bjvm_insn_lrem:
-    return "lrem";
-  case bjvm_insn_lreturn:
-    return "lreturn";
-  case bjvm_insn_lshl:
-    return "lshl";
-  case bjvm_insn_lshr:
-    return "lshr";
-  case bjvm_insn_lsub:
-    return "lsub";
-  case bjvm_insn_lushr:
-    return "lushr";
-  case bjvm_insn_lxor:
-    return "lxor";
-  case bjvm_insn_monitorenter:
-    return "monitorenter";
-  case bjvm_insn_monitorexit:
-    return "monitorexit";
-  case bjvm_insn_nop:
-    return "nop";
-  case bjvm_insn_pop:
-    return "pop";
-  case bjvm_insn_pop2:
-    return "pop2";
-  case bjvm_insn_return:
-    return "return_";
-  case bjvm_insn_saload:
-    return "saload";
-  case bjvm_insn_sastore:
-    return "sastore";
-  case bjvm_insn_swap:
-    return "swap";
-  case bjvm_insn_dload:
-    return "dload";
-  case bjvm_insn_fload:
-    return "fload";
-  case bjvm_insn_iload:
-    return "iload";
-  case bjvm_insn_lload:
-    return "lload";
-  case bjvm_insn_dstore:
-    return "dstore";
-  case bjvm_insn_fstore:
-    return "fstore";
-  case bjvm_insn_istore:
-    return "istore";
-  case bjvm_insn_lstore:
-    return "lstore";
-  case bjvm_insn_aload:
-    return "aload";
-  case bjvm_insn_astore:
-    return "astore";
-  case bjvm_insn_anewarray:
-    return "anewarray";
-  case bjvm_insn_checkcast:
-    return "checkcast";
-  case bjvm_insn_getfield:
-    return "getfield";
-  case bjvm_insn_getstatic:
-    return "getstatic";
-  case bjvm_insn_instanceof:
-    return "instanceof";
-  case bjvm_insn_invokedynamic:
-    return "invokedynamic";
-  case bjvm_insn_new:
-    return "new";
-  case bjvm_insn_putfield:
-    return "putfield";
-  case bjvm_insn_putstatic:
-    return "putstatic";
-  case bjvm_insn_invokevirtual:
-    return "invokevirtual";
-  case bjvm_insn_invokespecial:
-    return "invokespecial";
-  case bjvm_insn_invokestatic:
-    return "invokestatic";
-  case bjvm_insn_goto:
-    return "goto";
-  case bjvm_insn_jsr:
-    return "jsr";
-  case bjvm_insn_ret:
-    return "ret";
-  case bjvm_insn_if_acmpeq:
-    return "if_acmpeq";
-  case bjvm_insn_if_acmpne:
-    return "if_acmpne";
-  case bjvm_insn_if_icmpeq:
-    return "if_icmpeq";
-  case bjvm_insn_if_icmpne:
-    return "if_icmpne";
-  case bjvm_insn_if_icmplt:
-    return "if_icmplt";
-  case bjvm_insn_if_icmpge:
-    return "if_icmpge";
-  case bjvm_insn_if_icmpgt:
-    return "if_icmpgt";
-  case bjvm_insn_if_icmple:
-    return "if_icmple";
-  case bjvm_insn_ifeq:
-    return "ifeq";
-  case bjvm_insn_ifne:
-    return "ifne";
-  case bjvm_insn_iflt:
-    return "iflt";
-  case bjvm_insn_ifge:
-    return "ifge";
-  case bjvm_insn_ifgt:
-    return "ifgt";
-  case bjvm_insn_ifle:
-    return "ifle";
-  case bjvm_insn_ifnonnull:
-    return "ifnonnull";
-  case bjvm_insn_ifnull:
-    return "ifnull";
-  case bjvm_insn_iconst:
-    return "iconst";
-  case bjvm_insn_dconst:
-    return "dconst";
-  case bjvm_insn_fconst:
-    return "fconst";
-  case bjvm_insn_lconst:
-    return "lconst";
-  case bjvm_insn_iinc:
-    return "iinc";
-  case bjvm_insn_invokeinterface:
-    return "invokeinterface";
-  case bjvm_insn_multianewarray:
-    return "multianewarray";
-  case bjvm_insn_newarray:
-    return "newarray";
-  case bjvm_insn_tableswitch:
-    return "tableswitch";
-  case bjvm_insn_lookupswitch:
-    return "lookupswitch";
+  CASE(aaload)
+  CASE(aastore)
+  CASE(aconst_null)
+  CASE(areturn)
+  CASE(arraylength)
+  CASE(athrow)
+  CASE(baload)
+  CASE(bastore)
+  CASE(caload)
+  CASE(castore)
+  CASE(d2f)
+  CASE(d2i)
+  CASE(d2l)
+  CASE(dadd)
+  CASE(daload)
+  CASE(dastore)
+  CASE(dcmpg)
+  CASE(dcmpl)
+  CASE(ddiv)
+  CASE(dmul)
+  CASE(dneg)
+  CASE(drem)
+  CASE(dreturn)
+  CASE(dsub)
+  CASE(dup)
+  CASE(dup_x1)
+  CASE(dup_x2)
+  CASE(dup2)
+  CASE(dup2_x1)
+  CASE(dup2_x2)
+  CASE(f2d)
+  CASE(f2i)
+  CASE(f2l)
+  CASE(fadd)
+  CASE(faload)
+  CASE(fastore)
+  CASE(fcmpg)
+  CASE(fcmpl)
+  CASE(fdiv)
+  CASE(fmul)
+  CASE(fneg)
+  CASE(frem)
+  CASE(freturn)
+  CASE(fsub)
+  CASE(i2b)
+  CASE(i2c)
+  CASE(i2d)
+  CASE(i2f)
+  CASE(i2l)
+  CASE(i2s)
+  CASE(iadd)
+  CASE(iaload)
+  CASE(iand)
+  CASE(iastore)
+  CASE(idiv)
+  CASE(imul)
+  CASE(ineg)
+  CASE(ior)
+  CASE(irem)
+  CASE(ireturn)
+  CASE(ishl)
+  CASE(ishr)
+  CASE(isub)
+  CASE(iushr)
+  CASE(ixor)
+  CASE(l2d)
+  CASE(l2f)
+  CASE(l2i)
+  CASE(ladd)
+  CASE(laload)
+  CASE(land)
+  CASE(lastore)
+  CASE(lcmp)
+  CASE(ldc)
+  CASE(ldc2_w)
+  CASE(ldiv)
+  CASE(lmul)
+  CASE(lneg)
+  CASE(lor)
+  CASE(lrem)
+  CASE(lreturn)
+  CASE(lshl)
+  CASE(lshr)
+  CASE(lsub)
+  CASE(lushr)
+  CASE(lxor)
+  CASE(monitorenter)
+  CASE(monitorexit)
+  CASE(nop)
+  CASE(pop)
+  CASE(pop2)
+  CASE(return)
+  CASE(saload)
+  CASE(sastore)
+  CASE(swap)
+  CASE(dload)
+  CASE(fload)
+  CASE(iload)
+  CASE(lload)
+  CASE(dstore)
+  CASE(fstore)
+  CASE(istore)
+  CASE(lstore)
+  CASE(aload)
+  CASE(astore)
+  CASE(anewarray)
+  CASE(checkcast)
+  CASE(getfield)
+  CASE(getstatic)
+  CASE(instanceof)
+  CASE(invokedynamic)
+  CASE(new)
+  CASE(putfield)
+  CASE(putstatic)
+  CASE(invokevirtual)
+  CASE(invokespecial)
+  CASE(invokestatic)
+  CASE(goto)
+  CASE(jsr)
+  CASE(ret)
+  CASE(if_acmpeq)
+  CASE(if_acmpne)
+  CASE(if_icmpeq)
+  CASE(if_icmpne)
+  CASE(if_icmplt)
+  CASE(if_icmpge)
+  CASE(if_icmpgt)
+  CASE(if_icmple)
+  CASE(ifeq)
+  CASE(ifne)
+  CASE(iflt)
+  CASE(ifge)
+  CASE(ifgt)
+  CASE(ifle)
+  CASE(ifnonnull)
+  CASE(ifnull)
+  CASE(iconst)
+  CASE(dconst)
+  CASE(fconst)
+  CASE(lconst)
+  CASE(iinc)
+  CASE(invokeinterface)
+  CASE(multianewarray)
+  CASE(newarray)
+  CASE(tableswitch)
+  CASE(lookupswitch)
   }
   UNREACHABLE();
 }
@@ -1249,6 +1105,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
 
   return 0; // ok
 
+  // Error cases
 local_type_mismatch:
   ctx->insn_error = strdup("Local type mismatch:");
   goto error;
@@ -1614,7 +1471,7 @@ void dfs_nothrow_accessible(bjvm_basic_block *bs, int i) {
 
 // Scan basic blocks in the code. Code that is not accessible without throwing
 // an exception is DELETED because we're not handling exceptions at all in
-// JIT compiled code. (Once an exception is thrown in a method, it is
+// JIT compiled code. (Once an exception is thrown in a frame, it is
 // interpreted for the rest of its life.)
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy) {
@@ -1696,7 +1553,7 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
       *VECTOR_PUSH(next->prev, next->prev_count, next->prev_cap) = block_i;
     }
   }
-  // Create some auxiliary data for later analyses
+  // Create some allocations for later analyses
   for (int block_i = 0; block_i < block_count; ++block_i) {
     bjvm_basic_block *b = bs + block_i;
     b->is_backedge = calloc(b->next_count, sizeof(bool));
@@ -1738,7 +1595,7 @@ static void idom_dfs(bjvm_basic_block *block, int *visited, uint32_t *clock) {
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // bjvm_dump_cfg_to_graphviz(stderr, analy);
-  assert(analy->blocks);
+  assert(analy->blocks && "Basic blocks must have been already scanned");
   if (analy->dominator_tree_computed)
     return;
   analy->dominator_tree_computed = true;
@@ -1766,7 +1623,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     // Go through predecessor blocks in any order
     for (int prev_i = 0; prev_i < b->prev_count; ++prev_i) {
       int prev = b->prev[prev_i];
-      if (prev == i)
+      if (prev == i)  // self-loop, doesn't affect dominator properties
         continue;
       if (block_to_pre[prev] < preorder_i) {
         if (block_to_pre[prev] < sd) // prev is a better candidate for semidom
@@ -1795,7 +1652,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     bjvm_dominated_list_t *sdlist = &analy->blocks[i].idominates;
     for (int list_i = 0; list_i < sdlist->count; ++list_i) {
       int w = sdlist->list[list_i], walk = w, min = INT_MAX;
-      assert(semidom[w] == i);
+      assert(semidom[w] == i && "Algorithm invariant");
       // Walk from w to i and record the minimizer of the semidominator value
       while (walk != i) {
         if (block_to_pre[walk] < min) {
@@ -1837,6 +1694,7 @@ bool bjvm_query_dominance(const bjvm_basic_block *dominator,
          dominator->idom_post >= dominated->idom_post;
 }
 
+// Check whether the CFG is reducible
 static int forward_edges_form_a_cycle(bjvm_code_analysis *analy, int i,
                                       int *visited) {
   bjvm_basic_block *b = analy->blocks + i;
