@@ -15,6 +15,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+FetchContent_Declare(
+        zlib
+        GIT_REPOSITORY https://github.com/madler/zlib.git
+        GIT_TAG        v1.3.1
+)
+
+FetchContent_MakeAvailable(zlib)
+
 # If doing emscripten
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wpedantic")
@@ -30,12 +38,12 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (TRUE)
+if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (FALSE) # NOT EMSCRIPTEN)
+if (TRUE) # NOT EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
@@ -45,6 +53,7 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
+target_link_libraries(bjvm PRIVATE zlibstatic)
 
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now
@@ -61,7 +70,8 @@ target_link_libraries(gen_natives PRIVATE bjvm)
 set_target_properties(gen_natives PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
 add_executable(tests test/tests.cc test/arrays-test.cc test/tests-common.cc test/wasm-tests.cc
-        test/analysis-tests.cc)
+        test/analysis-tests.cc
+        test/classpath-tests.cc)
 target_link_libraries(tests PRIVATE bjvm)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
