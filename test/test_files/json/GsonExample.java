@@ -1,8 +1,11 @@
 import com.google.gson.Gson;
+//import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+//@JsonIgnoreProperties(ignoreUnknown = true)
 class Student {
-    private String name;
-    private int age;
+    public String name;
+    public int age;
 
     public Student() {
         this.name = "";
@@ -20,14 +23,21 @@ class Student {
 }
 
 public class GsonExample {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Gson gson = new Gson();
-        String json = "{\"name\":\"Goober\", \"age\":21}";
+        String json = "{\"name\":\"Goober\", \"age\":21, \"glorious\":\"egg\"}";
         Student student = gson.fromJson(json, Student.class);
         System.out.println(student);
 
         // And then serialize it back to JSON
         String json2 = gson.toJson(student);
         System.out.println(json2);
+
+/*
+        ObjectMapper mapper = new ObjectMapper();
+        Student jackson = mapper.readValue(json, Student.class);
+
+        mapper.writeValue(System.out, jackson);
+        */
     }
 }

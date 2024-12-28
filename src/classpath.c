@@ -124,16 +124,13 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
       return strdup("missing cdr header bytes");
     bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE_BYTES,
                           .len = cdr.filename_len};
-    uint32_t offset;
-    memcpy(&offset, cdr.local_header_offset, sizeof(offset));
+    uint32_t header_offset, data_offset;
+    memcpy(&header_offset, cdr.local_header_offset, sizeof(data_offset));
     // https://en.wikipedia.org/wiki/ZIP_(file_format)#Local_file_header
-    offset += 30 + cdr.filename_len + cdr.extra_len;
-    if ((uint64_t)offset + cdr.compressed_size > jar->size_bytes) {
+    if ((uint64_t)header_offset + 30 + cdr.compressed_size > jar->size_bytes) {
       snprintf(error, sizeof(error), "cdr %d local header out of bounds", i);
       return strdup(error);
     }
-    // Don't actually touch this pointer yet -- it's mmapped in
-    char *compressed_data = jar->data + offset;
     if (cdr.compression != 0 && cdr.compression != 8) {
       snprintf(error, sizeof(error),
                "cdr %d has unsupported compression type %d (supported: 0, 8)",
@@ -144,7 +141,7 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
     cd_offset += CDR_SIZE_BYTES + cdr.filename_len + cdr.extra_len + cdr.comment_len;
 
     bjvm_jar_entry *ent = malloc(sizeof(bjvm_jar_entry));
-    ent->compressed_data = compressed_data;
+    ent->header = jar->data + header_offset;
     ent->compressed_size = cdr.compressed_size;
     ent->claimed_uncompressed_size = cdr.uncompressed_size;
     ent->is_compressed = is_compressed;
@@ -278,10 +275,24 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
   bjvm_jar_entry *jar_entry =
       bjvm_hash_table_lookup(&jar->entries, filename.chars, filename.len);
   if (jar_entry) {
+    // Check header at jar_entry->header
+    if (memcmp(jar_entry->header, "PK\003\004", 4) != 0) {
+      printf("CORRUPT0\n");
+      return CORRUPT;
+    }
+
+    // Find the compressed data
+    uint16_t filename_len = *(uint16_t *)(jar_entry->header + 26);
+    uint16_t extra_len = *(uint16_t *)(jar_entry->header + 28);
+    uint32_t offset = 30 + filename_len + extra_len;
+    if (offset + jar_entry->compressed_size + (jar_entry->header - jar->data) > jar->size_bytes) {
+      return CORRUPT;
+    }
+
+    char *data = jar_entry->header + offset;
     if (!jar_entry->is_compressed) {
       *bytes = malloc(*len = jar_entry->claimed_uncompressed_size);
-      memcpy(*bytes, jar_entry->compressed_data,
-             jar_entry->claimed_uncompressed_size);
+      memcpy(*bytes, data, jar_entry->claimed_uncompressed_size);
       return FOUND;
     }
 
@@ -289,7 +300,7 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     *bytes = malloc(jar_entry->claimed_uncompressed_size);
 
     z_stream stream = {0};
-    stream.next_in = (unsigned char *)jar_entry->compressed_data;
+    stream.next_in = (unsigned char *)jar_entry->header + offset;
     stream.avail_in = jar_entry->compressed_size;
     stream.next_out = *bytes;
     stream.avail_out = jar_entry->claimed_uncompressed_size;
@@ -301,7 +312,9 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
 
     int result = inflate(&stream, Z_FINISH);
     if (result != Z_STREAM_END) {
+      printf("failed to inflate: %.*s\n", fmt_slice(filename));
       inflateEnd(&stream);
+      printf("Result: %d\n", result);
       printf("CORRUPT2\n");
       return CORRUPT;
     }

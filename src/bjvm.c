@@ -1982,7 +1982,6 @@ bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   struct bjvm_native_ConstantPool *cp_mirror = classdesc->cp_mirror =
       (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = classdesc;
-  printf("Mirror, desc: %p %p\n", cp_mirror, cp_mirror->reflected_class);
   return cp_mirror;
 }
 

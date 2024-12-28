@@ -26,6 +26,18 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
            obj->obj->descriptor->data_bytes - sizeof(bjvm_obj_header));
     return (bjvm_stack_value){.obj = new_obj};
   }
+  case BJVM_CD_KIND_PRIMITIVE_ARRAY: {
+    bjvm_obj_header *new_array =
+        CreatePrimitiveArray1D(thread, obj->obj->descriptor->primitive_component,
+                               *ArrayLength(obj->obj), true);
+    if (!new_array) {
+      return value_null();
+    }
+    memcpy(ArrayData(new_array), ArrayData(obj->obj),
+           *ArrayLength(obj->obj) * sizeof_type_kind(
+               obj->obj->descriptor->primitive_component));
+    return (bjvm_stack_value){.obj = new_array};
+  }
   default:
     UNREACHABLE();
   }

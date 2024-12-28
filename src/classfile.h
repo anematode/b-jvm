@@ -394,7 +394,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
   BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
   BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7,
-  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8,
+  BJVM_ATTRIBUTE_KIND_SIGNATURE = 9
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -540,6 +541,10 @@ typedef struct {
 } bjvm_attribute_runtime_visible_annotations;
 
 typedef struct {
+  bjvm_utf8 utf8;
+} bjvm_attribute_signature;
+
+typedef struct {
   bjvm_utf8 name;
 } bjvm_attribute_source_file;
 
@@ -557,6 +562,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_line_number_table lnt;
     bjvm_attribute_method_parameters method_parameters;
     bjvm_attribute_runtime_visible_annotations runtime_visible_annotations;
+    bjvm_attribute_signature signature;
   };
 } bjvm_attribute;
 

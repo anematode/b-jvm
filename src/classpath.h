@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 typedef struct {
-  char *compressed_data; // pointer into the JAR memory
+  char *header; // pointer into the JAR memory
   uint32_t compressed_size;
   uint32_t claimed_uncompressed_size;
   bool is_compressed;

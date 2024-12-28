@@ -592,14 +592,12 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_free_classfile(desc);
 }
 
-#if 0
-TEST_CASE("Google's GSON") {
-  auto result = run_test_case("test_files/gson:test_files/gson/gson-2.8.0.jar", false, "GsonExample");
-  REQUIRE(result == R"(Student: Goober is 21 years old.
-{\"name\":\"Goober\",\"age\":21}
+TEST_CASE("Google's GSON + Jackson") {
+  auto result = run_test_case("test_files/json:test_files/json/gson-2.8.0.jar:test_files/json/jackson-core-2.18.2.jar:test_files/json/jackson-annotations-2.18.2.jar:test_files/json/jackson-databind-2.18.2.jar", true, "GsonExample");
+  REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
+{"name":"Goober","age":21}
 )");
 }
-#endif
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);

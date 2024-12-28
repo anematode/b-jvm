@@ -40,7 +40,6 @@ DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
-  printf("File: %p\n", file);
   if (!file) {
     // Raise java.lang.IOException TODO
     UNREACHABLE();
@@ -69,4 +68,18 @@ DECLARE_NATIVE("java/io", FileInputStream, close0, "()V") {
   }
   *get_native_handle(fd) = -1; // make invalid again
   return value_null();
+}
+
+DECLARE_NATIVE("java/io", FileInputStream, available0, "()I") {
+  bjvm_obj_header *fd = *get_fd(obj->obj);
+  assert(fd);
+  FILE *file = (FILE *)*get_native_handle(fd);
+  if (!file) {
+    return (bjvm_stack_value){.i = 0};
+  }
+  long pos = ftell(file);
+  fseek(file, 0, SEEK_END);
+  long size = ftell(file);
+  fseek(file, pos, SEEK_SET);
+  return (bjvm_stack_value){.i = size - pos};
 }

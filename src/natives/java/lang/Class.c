@@ -360,6 +360,17 @@ DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   return (bjvm_stack_value){.obj = array->obj};
 }
 
+DECLARE_NATIVE("java/lang", Class, getGenericSignature0, "()Ljava/lang/String;") {
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
+  bjvm_attribute *attr =
+      find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_SIGNATURE);
+  if (attr) {
+    return (bjvm_stack_value){
+        .obj = bjvm_intern_string(thread, attr->signature.utf8)};
+  }
+  return value_null();
+}
+
 DECLARE_NATIVE("java/lang", Class, getProtectionDomain0,
                "()Ljava/security/ProtectionDomain;") {
   printf("TODO: getProtectionDomain0\n");

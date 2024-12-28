@@ -4,6 +4,11 @@
 #include <unistd.h>
 #include <util.h>
 
+#if defined(__APPLE__) || defined(__linux__)
+#include <sys/time.h>
+#define USE_SYS_TIME
+#endif
+
 // TODO read the properties from the VM instead of hardcoding them
 DECLARE_NATIVE("java/lang", System, initProperties,
                "(Ljava/util/Properties;)Ljava/util/Properties;") {
@@ -168,4 +173,16 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
   return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
+}
+
+DECLARE_NATIVE("java/lang", System, currentTimeMillis, "()J") {
+#ifdef EMSCRIPTEN
+  return (bjvm_stack_value){.l = (int64_t)(emscripten_get_now() * 1000)};
+#elifdef USE_SYS_TIME
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (bjvm_stack_value){.l = tv.tv_sec * 1000 + tv.tv_usec / 1000};
+#else
+  return (bjvm_stack_value){.l = time(NULL) * 1000};
+#endif
 }

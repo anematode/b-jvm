@@ -160,6 +160,7 @@ void bjvm_free_attribute(bjvm_attribute *attribute) {
   case BJVM_ATTRIBUTE_KIND_UNKNOWN:
   case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
   case BJVM_ATTRIBUTE_KIND_SOURCE_FILE:
+  case BJVM_ATTRIBUTE_KIND_SIGNATURE:
     break;
   }
 }
@@ -1910,6 +1911,10 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     free_on_format_error(ctx, data);
     memcpy(data, attr_reader.bytes, attr_reader.len);
     attr->runtime_visible_annotations.length = attr_reader.len;
+  } else if (utf8_equals(attr->name, "Signature")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_SIGNATURE;
+    attr->signature.utf8 = checked_get_utf8(ctx->cp,
+      reader_next_u16(&attr_reader, "Signature index"), "Signature index");
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
