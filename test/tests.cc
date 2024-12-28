@@ -243,13 +243,13 @@ struct TestCaseResult {
   std::string stderr_;
 };
 
-TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
+TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main") {
   bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
 
   options.classpath =
-      (bjvm_utf8){.chars = (char *)folder.c_str(), .len = (int)folder.size()};
+      (bjvm_utf8){.chars = (char *)classpath.c_str(), .len = (int)classpath.size()};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
   result->stdout_ += (char)ch;
@@ -263,7 +263,9 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_classdesc *desc = bootstrap_class_create(thr, STR("Main"));
+  bjvm_utf8 m { .chars = (char*)main_class.c_str(), .len = (int)main_class.size() };
+
+  bjvm_classdesc *desc = bootstrap_class_create(thr, m);
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
@@ -589,6 +591,15 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 
   bjvm_free_classfile(desc);
 }
+
+#if 0
+TEST_CASE("Google's GSON") {
+  auto result = run_test_case("test_files/gson:test_files/gson/gson-2.8.0.jar", false, "GsonExample");
+  REQUIRE(result == R"(Student: Goober is 21 years old.
+{\"name\":\"Goober\",\"age\":21}
+)");
+}
+#endif
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);

@@ -107,7 +107,7 @@ struct central_directory_record {
   uint8_t local_header_offset[4];
 };
 
-#define CDR_SIZE 46
+#define CDR_SIZE_BYTES 46
 #define CDR_HEADER 0x02014b50
 
 char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
@@ -120,10 +120,10 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
       snprintf(error, sizeof(error), "cdr %d out of bounds", i);
       return strdup(error);
     }
-    memcpy(&cdr, jar->data + cd_offset, CDR_SIZE);
+    memcpy(&cdr, jar->data + cd_offset, CDR_SIZE_BYTES);
     if (cdr.header != CDR_HEADER)
       return strdup("missing cdr header bytes");
-    bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE,
+    bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE_BYTES,
                           .len = cdr.filename_len};
     uint32_t offset;
     memcpy(&offset, cdr.local_header_offset, sizeof(offset));
@@ -142,7 +142,7 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
       return strdup(error);
     }
     bool is_compressed = cdr.compression != 0;
-    cd_offset += CDR_SIZE + cdr.filename_len + cdr.extra_len + cdr.comment_len;
+    cd_offset += CDR_SIZE_BYTES + cdr.filename_len + cdr.extra_len + cdr.comment_len;
 
     bjvm_jar_entry *ent = malloc(sizeof(bjvm_jar_entry));
     ent->compressed_data = compressed_data;
