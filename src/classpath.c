@@ -1,6 +1,6 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
 
@@ -13,12 +13,12 @@
 #define BJVM_USE_MMAP
 #endif
 
-struct loaded_bytes {  // TODO for Node impl
+struct loaded_bytes { // TODO for Node impl
   char *bytes;
   uint32_t length;
 };
 
-static struct loaded_bytes read_file(FILE* f) {
+static struct loaded_bytes read_file(FILE *f) {
   fseek(f, 0, SEEK_END);
   uint32_t length = ftell(f);
   fseek(f, 0, SEEK_SET);
@@ -46,14 +46,12 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
     snprintf(error, sizeof(error), "Failed to mmap file %s", filename);
     return strdup(error);
   }
-  jar->data = (char*) file;
+  jar->data = (char *)file;
   jar->is_mmap = true;
   close(fd);
   return nullptr;
 #elif EMSCRIPTEN
-  int is_node = EM_ASM_INT({
-    return ENVIRONMENT_IS_NODE;
-  });
+  int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
     UNREACHABLE(); // TODO
   }
@@ -68,10 +66,10 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   jar->is_mmap = false;
   fclose(f);
   return nullptr;
-  missing:
+missing:
   snprintf(error, sizeof(error), "Failed to open file %s", filename);
   return strdup(error);
-  empty:
+empty:
   snprintf(error, sizeof(error), "File %s is empty", filename);
   return strdup(error);
 }
@@ -104,14 +102,15 @@ struct central_directory_record {
   uint16_t comment_len;
   uint16_t disk_start;
   uint16_t internal_attr;
-  uint16_t external_attr[2];  // bc padding gets inserted above
+  uint16_t external_attr[2]; // bc padding gets inserted above
   uint8_t local_header_offset[4];
 };
 
 #define CDR_SIZE 46
 #define CDR_HEADER 0x02014b50
 
-char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset, uint32_t expected) {
+char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
+                              uint32_t expected) {
   struct central_directory_record cdr = {0};
   char error[256];
   for (uint32_t i = 0; i < expected; i++) {
@@ -122,7 +121,8 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset, uint32_t
     memcpy(&cdr, jar->data + cd_offset, CDR_SIZE);
     if (cdr.header != CDR_HEADER)
       return strdup("missing cdr header bytes");
-    bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE, .len = cdr.filename_len};
+    bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE,
+                          .len = cdr.filename_len};
     uint32_t offset;
     memcpy(&offset, cdr.local_header_offset, sizeof(offset));
     // https://en.wikipedia.org/wiki/ZIP_(file_format)#Local_file_header
@@ -134,7 +134,9 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset, uint32_t
     // Don't actually touch this pointer yet -- it's mmapped in
     char *compressed_data = jar->data + offset;
     if (cdr.compression != 0 && cdr.compression != 8) {
-      snprintf(error, sizeof(error), "cdr %d has unsupported compression type %d (supported: 0, 8)", i, cdr.compression);
+      snprintf(error, sizeof(error),
+               "cdr %d has unsupported compression type %d (supported: 0, 8)",
+               i, cdr.compression);
       return strdup(error);
     }
     bool is_compressed = cdr.compression != 0;
@@ -146,17 +148,19 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset, uint32_t
     ent->claimed_uncompressed_size = cdr.uncompressed_size;
     ent->is_compressed = is_compressed;
 
-    void* old = bjvm_hash_table_insert(&jar->entries, filename.chars, filename.len, ent);
+    void *old = bjvm_hash_table_insert(&jar->entries, filename.chars,
+                                       filename.len, ent);
     if (old) {
       free(old);
-      snprintf(error, sizeof(error), "duplicate filename in JAR: %.*s", fmt_slice(filename));
+      snprintf(error, sizeof(error), "duplicate filename in JAR: %.*s",
+               fmt_slice(filename));
       return strdup(error);
     }
   }
   return nullptr;
 }
 
-static void free_jar(bjvm_mapped_jar * jar) {
+static void free_jar(bjvm_mapped_jar *jar) {
   bjvm_free_hash_table(jar->entries);
   if (!jar->is_mmap) {
     free(jar->data);
@@ -182,13 +186,14 @@ static char *load_filesystem_jar(const char *filename, bjvm_mapped_jar *jar) {
   // Search 22 bytes from the end for the ZIP end of central directory record
   // signature
   const char sig[4] = "PK\005\006";
-  if (jar->size_bytes < 22 || memcmp(jar->data + jar->size_bytes - 22, sig, 4) != 0) {
+  if (jar->size_bytes < 22 ||
+      memcmp(jar->data + jar->size_bytes - 22, sig, 4) != 0) {
     specific_error = "Missing end of central directory record";
     goto inval;
   }
 
   struct end_of_central_directory_record eocdr = {0};
-  memcpy(&eocdr, (void*) (jar->data + jar->size_bytes - 22), 22);
+  memcpy(&eocdr, (void *)(jar->data + jar->size_bytes - 22), 22);
 
   if (eocdr.disk_number != 0 || eocdr.disk_with_cd != 0 ||
       eocdr.num_entries != eocdr.total_entries) {
@@ -196,15 +201,17 @@ static char *load_filesystem_jar(const char *filename, bjvm_mapped_jar *jar) {
     goto inval;
   }
 
-  specific_error = parse_central_directory(jar, eocdr.cd_offset, eocdr.num_entries);
+  specific_error =
+      parse_central_directory(jar, eocdr.cd_offset, eocdr.num_entries);
   error_needs_free = true;
   if (!specific_error) {
-    return nullptr;  // ok
+    return nullptr; // ok
   }
 
-  inval:
+inval:
   free_jar(jar);
-  snprintf(error, sizeof(error), "Invalid JAR file %s%s%s", filename, specific_error ? ": " : "", specific_error);
+  snprintf(error, sizeof(error), "Invalid JAR file %s%s%s", filename,
+           specific_error ? ": " : "", specific_error);
   if (error_needs_free)
     free(specific_error);
   return strdup(error);
@@ -216,13 +223,13 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
     bjvm_mapped_jar *jar = calloc(1, sizeof(bjvm_mapped_jar));
     jar->entries = bjvm_make_hash_table(free, 0.75, 16);
 
-    char* filename = calloc(1, entry.len + 1);
+    char *filename = calloc(1, entry.len + 1);
     memcpy(filename, entry.chars, entry.len);
-    char* error = load_filesystem_jar(filename, jar);
+    char *error = load_filesystem_jar(filename, jar);
     free(filename);
 
     *VECTOR_PUSH(cp->entries, cp->entries_cap, cp->entries_len) =
-      (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
+        (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
 
     if (error) {
       return error;
@@ -264,20 +271,18 @@ void bjvm_free_classpath(bjvm_classpath *cp) {
   memset(cp, 0, sizeof(*cp));
 }
 
-enum jar_lookup_result {
-  NOT_FOUND,
-  FOUND,
-  CORRUPT
-};
+enum jar_lookup_result { NOT_FOUND, FOUND, CORRUPT };
 
 // Returns true if found the bytes
-enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename, uint8_t ** bytes, size_t *len) {
-  bjvm_jar_entry *jar_entry = bjvm_hash_table_lookup(&jar->entries,
-          filename.chars, filename.len);
+enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
+                                  uint8_t **bytes, size_t *len) {
+  bjvm_jar_entry *jar_entry =
+      bjvm_hash_table_lookup(&jar->entries, filename.chars, filename.len);
   if (jar_entry) {
     if (!jar_entry->is_compressed) {
       *bytes = malloc(*len = jar_entry->claimed_uncompressed_size);
-      memcpy(*bytes, jar_entry->compressed_data, jar_entry->claimed_uncompressed_size);
+      memcpy(*bytes, jar_entry->compressed_data,
+             jar_entry->claimed_uncompressed_size);
       return FOUND;
     }
 
@@ -285,7 +290,7 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename, uint
     *bytes = malloc(jar_entry->claimed_uncompressed_size);
 
     z_stream stream = {0};
-    stream.next_in = (unsigned char*)jar_entry->compressed_data;
+    stream.next_in = (unsigned char *)jar_entry->compressed_data;
     stream.avail_in = jar_entry->compressed_size;
     stream.next_out = *bytes;
     stream.avail_out = jar_entry->claimed_uncompressed_size;
@@ -312,7 +317,8 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename, uint
 heap_string concat_path(heap_string name, bjvm_utf8 filename) {
   bool slash = !name.len || name.chars[name.len - 1] != '/';
   heap_string result = make_heap_str(name.len + slash + filename.len);
-  bjvm_utf8 slice = bprintf(hslc(result), "%.*s/%.*s", fmt_slice(name), slash ? "/" : "", fmt_slice(filename));
+  bjvm_utf8 slice = bprintf(hslc(result), "%.*s/%.*s", fmt_slice(name),
+                            slash ? "/" : "", fmt_slice(filename));
   assert(slice.len == result.len);
   return result;
 }
@@ -324,7 +330,8 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
   for (int i = 0; i < cp->entries_len; i++) {
     bjvm_classpath_entry *entry = &cp->entries[i];
     if (entry->jar) {
-      enum jar_lookup_result result = jar_lookup(entry->jar, filename, bytes, len);
+      enum jar_lookup_result result =
+          jar_lookup(entry->jar, filename, bytes, len);
       if (result == NOT_FOUND)
         continue;
       return -(result == CORRUPT);

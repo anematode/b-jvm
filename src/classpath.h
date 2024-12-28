@@ -2,17 +2,17 @@
 #ifndef CLASSPATH_H
 #define CLASSPATH_H
 
-#include <stdint.h>
-#include <stdlib.h>
 #include "adt.h"
 #include "util.h"
+#include <stdint.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct {
-  char* compressed_data;  // pointer into the JAR memory
+  char *compressed_data; // pointer into the JAR memory
   uint32_t compressed_size;
   uint32_t claimed_uncompressed_size;
   bool is_compressed;
@@ -25,9 +25,9 @@ typedef struct {
   // Map of complete file name to bjvm_jar_entry
   bjvm_string_hash_table entries;
 
-  char* data;
+  char *data;
   uint32_t size_bytes;
-  bool is_mmap;  // true = mmap, false = heap allocation
+  bool is_mmap; // true = mmap, false = heap allocation
 } bjvm_mapped_jar;
 
 typedef struct {
@@ -45,14 +45,14 @@ typedef struct {
 } bjvm_classpath;
 
 // Returns 0 if all elements in the path were loaded ok.
-[[nodiscard]] char* bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path);
+[[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path);
 void bjvm_free_classpath(bjvm_classpath *cp);
 
 int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
-                          uint8_t** bytes, size_t* len);
+                          uint8_t **bytes, size_t *len);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //CLASSPATH_H
+#endif // CLASSPATH_H

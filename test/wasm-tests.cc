@@ -28,8 +28,7 @@ TEST_CASE("Simple module", "[wasm]") {
 
   bjvm_wasm_value_type params_[] = {BJVM_WASM_TYPE_KIND_INT32,
                                     BJVM_WASM_TYPE_KIND_INT32};
-  bjvm_wasm_type params =
-      bjvm_wasm_make_tuple(module, params_, 2);
+  bjvm_wasm_type params = bjvm_wasm_make_tuple(module, params_, 2);
 
   bjvm_wasm_expression *body = bjvm_wasm_binop(
       module, BJVM_WASM_OP_KIND_I32_ADD, bjvm_wasm_i32_const(module, 1),
