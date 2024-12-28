@@ -30,7 +30,7 @@ static void *module_malloc(bjvm_wasm_module *module, int size) {
     return *VECTOR_PUSH(module->arenas, module->arenas_count,
                         module->arenas_count) = malloc(size);
   }
-  void* result;
+  void *result;
   if (module->last_arena_used + size < MODULE_ALLOCATION_SIZE_BYTES) {
     char *last_arena = module->arenas[module->arenas_count - 1];
     result = last_arena + module->last_arena_used;
@@ -125,7 +125,6 @@ bjvm_wasm_type bjvm_wasm_void() {
 bjvm_wasm_type bjvm_wasm_infer() {
   return (bjvm_wasm_type){.val = BJVM_WASM_TYPE_KIND_INFER};
 }
-
 
 bjvm_wasm_type bjvm_wasm_int32() {
   return (bjvm_wasm_type){.val = BJVM_WASM_TYPE_KIND_INT32};
@@ -648,7 +647,7 @@ static bjvm_wasm_value_type char_to_basic_type(char a) {
 }
 
 bjvm_wasm_type bjvm_wasm_string_to_tuple(bjvm_wasm_module *module,
-                                           const char *str) {
+                                         const char *str) {
   int len = strlen(str);
   bjvm_wasm_value_type types[256];
   assert(len < 256);
@@ -733,7 +732,7 @@ bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression * bjvm_wasm_unreachable(bjvm_wasm_module *module) {
+bjvm_wasm_expression *bjvm_wasm_unreachable(bjvm_wasm_module *module) {
   return module_expr(module, BJVM_WASM_EXPR_KIND_UNREACHABLE);
 }
 
@@ -765,10 +764,11 @@ bjvm_wasm_expression *bjvm_wasm_select(bjvm_wasm_module *module,
   return result;
 }
 
-bjvm_wasm_expression *bjvm_wasm_update_block(bjvm_wasm_module *module, bjvm_wasm_expression *existing_block,
-                                           bjvm_wasm_expression **exprs,
-                                           int expr_count, bjvm_wasm_type type,
-                                           bool is_loop) {
+bjvm_wasm_expression *
+bjvm_wasm_update_block(bjvm_wasm_module *module,
+                       bjvm_wasm_expression *existing_block,
+                       bjvm_wasm_expression **exprs, int expr_count,
+                       bjvm_wasm_type type, bool is_loop) {
   // Create a block expression
   existing_block->block = (bjvm_wasm_block_expression){
       .list =
@@ -784,9 +784,11 @@ bjvm_wasm_expression *bjvm_wasm_update_block(bjvm_wasm_module *module, bjvm_wasm
 
 bjvm_wasm_expression *bjvm_wasm_block(bjvm_wasm_module *module,
                                       bjvm_wasm_expression **exprs,
-                                      int expr_count, bjvm_wasm_type type, bool is_loop) {
+                                      int expr_count, bjvm_wasm_type type,
+                                      bool is_loop) {
   bjvm_wasm_expression *block = module_expr(module, BJVM_WASM_EXPR_KIND_BLOCK);
-  return bjvm_wasm_update_block(module, block, exprs, expr_count, type, is_loop);
+  return bjvm_wasm_update_block(module, block, exprs, expr_count, type,
+                                is_loop);
 }
 
 bjvm_wasm_expression *bjvm_wasm_br(bjvm_wasm_module *module,
@@ -806,7 +808,7 @@ bjvm_wasm_expression *bjvm_wasm_call(bjvm_wasm_module *module,
                                      int arg_count) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CALL);
   bjvm_wasm_expression **cpy =
-      module_copy(module, args, sizeof(bjvm_wasm_expression*) * arg_count);
+      module_copy(module, args, sizeof(bjvm_wasm_expression *) * arg_count);
   result->call = (bjvm_wasm_call_expression){
       .to_call = fn,
       .args = cpy,
@@ -922,23 +924,23 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
   // Serialize the module
   bjvm_bytevector serialized = bjvm_wasm_module_serialize(module);
   int ptr = EM_ASM_INT(
-    {
+      {
         var slice = HEAPU8.subarray($0, $1);
         try {
           var module = new WebAssembly.Module(slice);
-          var instance = new WebAssembly.Instance(module, {
-            env: wasmExports,
-            env2: {memory: wasmMemory}
-          });
+          var instance = new WebAssembly.Instance(
+              module, {env : wasmExports, env2 : {memory : wasmMemory}});
           let count = 0;
           for (var exp in instance.exports)
             count++;
-          require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm", slice);
+          require("fs").writeFileSync("debug/test" + UTF8ToString($2) + ".wasm",
+                                      slice);
           return addFunction(instance.exports.run, 'iiii');
         } catch (e) {
           // Exit Node.js
           console.log(e);
-          require("fs").writeFileSync("debug/broken" + UTF8ToString($2) + ".wasm", slice);
+          require("fs").writeFileSync(
+              "debug/broken" + UTF8ToString($2) + ".wasm", slice);
           process.exit(1);
           return 0;
         }
@@ -948,7 +950,7 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
       (intptr_t)debug_name);
   if (ptr) {
     result->status = BJVM_WASM_INSTANTIATION_SUCCESS;
-    result->run = (void*)ptr;
+    result->run = (void *)ptr;
   } else {
     result->status = BJVM_WASM_INSTANTIATION_FAIL;
   }

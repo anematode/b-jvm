@@ -91,15 +91,17 @@ bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
                              int const *dim_sizes, int total_dimensions,
                              bool attempt_gc);
 
-static inline bjvm_obj_header *
-CreateObjectArray1D(bjvm_thread *thread, bjvm_classdesc *inner_type, int size, bool attempt_gc) {
+static inline bjvm_obj_header *CreateObjectArray1D(bjvm_thread *thread,
+                                                   bjvm_classdesc *inner_type,
+                                                   int size, bool attempt_gc) {
   auto desc = make_array_classdesc(thread, inner_type);
   return CreateArray(thread, desc, &size, 1, attempt_gc);
 }
 
 static inline bjvm_obj_header *CreatePrimitiveArray1D(bjvm_thread *thread,
                                                       bjvm_type_kind inner_type,
-                                                      int count, bool attempt_gc) {
+                                                      int count,
+                                                      bool attempt_gc) {
   auto desc = make_array_classdesc(
       thread, bjvm_primitive_classdesc(thread, inner_type));
   return CreateArray(thread, desc, &count, 1, attempt_gc);

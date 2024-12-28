@@ -23,11 +23,3 @@ public class Main {
        return dLong;
    }
 }
-
-class BigDecimalTest {
-    static void error() {
-        throw new RuntimeException("HI");
-    }
-
-
-}

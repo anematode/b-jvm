@@ -545,7 +545,6 @@ TEST_CASE("Analysis") {
   // functions
 }
 
-
 TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_classdesc desc;
   auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();

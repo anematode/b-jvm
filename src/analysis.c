@@ -403,8 +403,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
     break;
   }
   case BJVM_CP_KIND_FIELD_REF: {
-    char *class_name =
-        class_info_entry_to_string(ent->field.class_info);
+    char *class_name = class_info_entry_to_string(ent->field.class_info);
     char *field_name = name_and_type_entry_to_string(ent->field.nat);
 
     snprintf(result, sizeof(result), "FieldRef: %s.%s", class_name, field_name);
@@ -414,8 +413,7 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    char *class_name =
-        class_info_entry_to_string(ent->field.class_info);
+    char *class_name = class_info_entry_to_string(ent->field.class_info);
     char *field_name = name_and_type_entry_to_string(ent->field.nat);
     snprintf(result, sizeof(result), "%s: %s; %s",
              ent->kind == BJVM_CP_KIND_METHOD_REF ? "MethodRef"
@@ -443,7 +441,8 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
   heap_string result = make_heap_str(10);
   int write = 0;
-  write = build_str(&result, write, "%04d = pc %04d: ", insn_index, insn->original_pc);
+  write = build_str(&result, write, "%04d = pc %04d: ", insn_index,
+                    insn->original_pc);
   write = build_str(&result, write, "%s ", bjvm_insn_code_name(insn->kind));
   if (insn->kind <= bjvm_insn_swap) {
     // no operands
@@ -475,8 +474,9 @@ heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
     write = build_str(&result, write, "[ default -> %d",
                       insn->lookupswitch.default_target);
     for (int i = 0; i < insn->lookupswitch.targets_count; ++i) {
-      write = build_str(&result, write, ", %d -> %d", insn->lookupswitch.keys[i],
-                        insn->lookupswitch.targets[i]);
+      write =
+          build_str(&result, write, ", %d -> %d", insn->lookupswitch.keys[i],
+                    insn->lookupswitch.targets[i]);
     }
     write = build_str(&result, write, " ]");
   } else {
@@ -689,12 +689,12 @@ struct method_analysis_ctx {
     ctx->locals.entries[index] = BJVM_TYPE_KIND_##kind;                        \
   }
 // Remap the index to the new local variable index after unwidening.
-#define SWIZZLE_LOCAL(index) \
-  { \
-  if (index >= ctx->code->max_locals) \
-    goto local_overflow; \
-  index = ctx->locals_swizzle[index];  \
-}
+#define SWIZZLE_LOCAL(index)                                                   \
+  {                                                                            \
+    if (index >= ctx->code->max_locals)                                        \
+      goto local_overflow;                                                     \
+    index = ctx->locals_swizzle[index];                                        \
+  }
 
 #define CHECK_LOCAL(index, kind)                                               \
   {                                                                            \
@@ -1270,8 +1270,10 @@ error:;
   char *locals_str = print_analy_stack_state(&ctx->locals);
   heap_string context = code_attribute_to_string(ctx->code);
   bprintf(hslc(*ctx->error),
-          "%s\nInstruction: %.*s\nStack preceding insn: %s\nLocals state: %s\nContext:\n%.*s\n",
-          ctx->insn_error, fmt_slice(insn_str), stack_str, locals_str, fmt_slice(context));
+          "%s\nInstruction: %.*s\nStack preceding insn: %s\nLocals state: "
+          "%s\nContext:\n%.*s\n",
+          ctx->insn_error, fmt_slice(insn_str), stack_str, locals_str,
+          fmt_slice(context));
   free_heap_str(insn_str);
   free(stack_str);
   free(locals_str);
@@ -1283,7 +1285,8 @@ error:;
 bool filter_locals(bjvm_analy_stack_state *s1,
                    const bjvm_analy_stack_state *s2) {
   if (s1->entries_count != s2->entries_count) {
-    printf("%s\n%s\n", print_analy_stack_state(s1), print_analy_stack_state(s2));
+    printf("%s\n%s\n", print_analy_stack_state(s1),
+           print_analy_stack_state(s2));
   }
   assert(s1->entries_count == s2->entries_count);
   bool changed = false;
@@ -1524,8 +1527,8 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
       heap_string context = code_attribute_to_string(method->code);
       heap_string unreachable_code_error = make_heap_str(context.len + 100);
       bprintf(hslc(unreachable_code_error),
-                "Unreachable code detected at instruction %d\nContext:\n%.*s\n", i,
-                fmt_slice(context));
+              "Unreachable code detected at instruction %d\nContext:\n%.*s\n",
+              i, fmt_slice(context));
       // TODO report
       UNREACHABLE();
       break;

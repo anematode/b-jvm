@@ -124,12 +124,12 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method) {
   return frame;
 }
 
-const char *infer_type(bjvm_code_analysis* analysis, int insn, int index) {
+const char *infer_type(bjvm_code_analysis *analysis, int insn, int index) {
   bjvm_compressed_bitset refs = analysis->insn_index_to_references[insn],
-  ints = analysis->insn_index_to_ints[insn],
-  floats = analysis->insn_index_to_floats[insn],
-  doubles = analysis->insn_index_to_doubles[insn],
-  longs = analysis->insn_index_to_longs[insn];
+                         ints = analysis->insn_index_to_ints[insn],
+                         floats = analysis->insn_index_to_floats[insn],
+                         doubles = analysis->insn_index_to_doubles[insn],
+                         longs = analysis->insn_index_to_longs[insn];
   if (bjvm_test_compressed_bitset(refs, index)) {
     return "ref";
   } else if (bjvm_test_compressed_bitset(ints, index)) {
@@ -154,8 +154,8 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 
   for (int i = 0; i < frame->stack_depth; ++i) {
     bjvm_stack_value value = frame->values[i];
-    const char *is_ref = infer_type(frame->method->code_analysis,
-                                    frame->program_counter, i);
+    const char *is_ref =
+        infer_type(frame->method->code_analysis, frame->program_counter, i);
     write +=
         snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n",
                  i, value.obj, value.i, is_ref);
@@ -163,8 +163,9 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 
   for (int i = 0; i < frame->max_locals; ++i) {
     bjvm_stack_value value = frame->values[i + frame->max_stack];
-    const char *is_ref = infer_type(frame->method->code_analysis,
-                                    frame->program_counter, i + frame->max_stack);
+    const char *is_ref =
+        infer_type(frame->method->code_analysis, frame->program_counter,
+                   i + frame->max_stack);
     write +=
         snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n",
                  i, value.obj, value.i, is_ref);
@@ -2517,8 +2518,8 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_stack_frame *frame,
     dim_sizes[i] = dim;
   }
 
-  bjvm_obj_header *result =
-      CreateArray(thread, multianewarray->entry->classdesc, dim_sizes, dims, true);
+  bjvm_obj_header *result = CreateArray(
+      thread, multianewarray->entry->classdesc, dim_sizes, dims, true);
   frame->stack_depth -= dims;
   checked_push(frame, (bjvm_stack_value){.obj = result});
   return 0;
@@ -2702,22 +2703,23 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
   bjvm_cp_method *m = final_frame->method;
   if (!m->compiled_method) {
     m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
-    if (!m->compiled_method || ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
-        BJVM_WASM_INSTANTIATION_SUCCESS) {
+    if (!m->compiled_method ||
+        ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
+            BJVM_WASM_INSTANTIATION_SUCCESS) {
       m->failed_jit = true;
       return 1;
     }
   }
 
-  //printf("%d", max_calls);
+  // printf("%d", max_calls);
 
   if (max_calls-- < 0) {
-    //printf("Skipping call to method: %.*s\n", fmt_slice(m->name));
+    // printf("Skipping call to method: %.*s\n", fmt_slice(m->name));
     return 1;
   }
 
   int (*run)(bjvm_thread *, bjvm_stack_frame *, bjvm_stack_value *) =
-  ((bjvm_wasm_instantiation_result *)m->compiled_method)->run;
+      ((bjvm_wasm_instantiation_result *)m->compiled_method)->run;
   *interp_result = run(thread, final_frame, result);
   if (*interp_result != BJVM_INTERP_RESULT_INT) {
     bjvm_pop_frame(thread, final_frame);
@@ -2726,9 +2728,8 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_stack_frame *final_frame,
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 50 &&
-    method->code->insn_count > 10 &&
-    !method->failed_jit; // && utf8_equals(method->name, "testOperation");
+  return method->call_count > 50 && method->code->insn_count > 10 &&
+         !method->failed_jit; // && utf8_equals(method->name, "testOperation");
 }
 
 static int double_to_int(double x) {
@@ -3024,7 +3025,8 @@ interpret_frame:
         goto done;
       }
       // Instanceof check against the component type
-      if (value && !bjvm_instanceof(value->descriptor, array->descriptor->one_fewer_dim)) {
+      if (value && !bjvm_instanceof(value->descriptor,
+                                    array->descriptor->one_fewer_dim)) {
         bjvm_array_store_exception(thread);
         goto done;
       }
@@ -3120,12 +3122,13 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_d2i: {
-      checked_push(frame, (bjvm_stack_value){.i = double_to_int(checked_pop(frame).d)});
+      checked_push(
+          frame, (bjvm_stack_value){.i = double_to_int(checked_pop(frame).d)});
       NEXT_INSN;
     }
     bjvm_insn_d2l: {
-      checked_push(frame,
-                   (bjvm_stack_value){.l = double_to_long(checked_pop(frame).d) });
+      checked_push(
+          frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).d)});
       NEXT_INSN;
     }
     bjvm_insn_dadd: {
@@ -3247,8 +3250,8 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_f2l:
-      checked_push(frame,
-                   (bjvm_stack_value){.l = double_to_long(checked_pop(frame).f)});
+      checked_push(
+          frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).f)});
       NEXT_INSN;
     bjvm_insn_fadd: {
       float b = checked_pop(frame).f, a = checked_pop(frame).f;

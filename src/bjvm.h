@@ -423,15 +423,14 @@ bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
 int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                          const bjvm_utf8 exception_string);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
-void bjvm_array_index_oob_exception(bjvm_thread *thread, int index,
-                                  int length);
+void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
 bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
                                                bjvm_stack_frame *frame,
                                                bjvm_bytecode_insn *insn);
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
-                                          bjvm_stack_frame *frame,
-                                          bjvm_bytecode_insn *insn);
+                                            bjvm_stack_frame *frame,
+                                            bjvm_bytecode_insn *insn);
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame);
 
 // e.g. int.class

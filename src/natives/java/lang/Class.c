@@ -278,7 +278,8 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
   int count = 0;
   bjvm_stack_value ret;
   ret.obj = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")), count, true);
+      thread, bootstrap_class_create(thread, STR("java/lang/Class")), count,
+      true);
   // TODO parse inner classes and return them here
   return ret;
 }

@@ -1,7 +1,7 @@
 // Make sure the analysis gets through all of the JDK successfully.
 
-#include "tests-common.h"
 #include "../src/analysis.h"
+#include "tests-common.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -14,7 +14,8 @@ TEST_CASE("Analysis passes on valid bytecode") {
       continue;
     auto contents = ReadFile(file).value();
     bjvm_classdesc cls;
-    parse_result_t result = bjvm_parse_classfile(contents.data(), contents.size(), &cls);
+    parse_result_t result =
+        bjvm_parse_classfile(contents.data(), contents.size(), &cls);
     assert(result == 0);
 
     for (int i = 0; i < cls.methods_count; ++i) {

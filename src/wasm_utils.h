@@ -514,12 +514,13 @@ bjvm_wasm_expression *bjvm_wasm_select(bjvm_wasm_module *module,
                                        bjvm_wasm_expression *false_expr);
 bjvm_wasm_expression *bjvm_wasm_block(bjvm_wasm_module *module,
                                       bjvm_wasm_expression **exprs,
-                                      int expr_count, bjvm_wasm_type type, bool is_loop);
-bjvm_wasm_expression *bjvm_wasm_update_block(bjvm_wasm_module *module,
-                                         bjvm_wasm_expression *existing_block,
-                                         bjvm_wasm_expression **exprs,
-                                         int expr_count, bjvm_wasm_type type,
-                                         bool is_loop);
+                                      int expr_count, bjvm_wasm_type type,
+                                      bool is_loop);
+bjvm_wasm_expression *
+bjvm_wasm_update_block(bjvm_wasm_module *module,
+                       bjvm_wasm_expression *existing_block,
+                       bjvm_wasm_expression **exprs, int expr_count,
+                       bjvm_wasm_type type, bool is_loop);
 bjvm_wasm_expression *bjvm_wasm_br(bjvm_wasm_module *module,
                                    bjvm_wasm_expression *condition,
                                    bjvm_wasm_expression *break_to);
@@ -566,7 +567,7 @@ typedef struct {
   bjvm_wasm_instantiation_status status;
   int js_promise;
 
-  bjvm_wasm_instantiation_export **exports;  // unused for now
+  bjvm_wasm_instantiation_export **exports; // unused for now
   int export_count;
   int export_cap;
 

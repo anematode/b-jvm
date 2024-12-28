@@ -470,8 +470,8 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     if (kind == CONSTANT_Fieldref) {
       return (bjvm_cp_entry){.kind = entry_kind,
                              .field = {.class_info = class_info,
-                                               .nat = name_and_type,
-                                               .field = nullptr}};
+                                       .nat = name_and_type,
+                                       .field = nullptr}};
     }
     return (bjvm_cp_entry){.kind = entry_kind,
                            .methodref = {.class_info = class_info,

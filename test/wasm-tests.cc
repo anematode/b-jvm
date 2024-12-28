@@ -42,11 +42,9 @@ TEST_CASE("Simple module", "[wasm]") {
                      bjvm_wasm_local_get(module, 0, bjvm_wasm_int32())),
       bjvm_wasm_i32_const(module, 2), body, bjvm_wasm_int32());
 
-  bjvm_wasm_type locals =
-      bjvm_wasm_make_tuple(module,
-                           (bjvm_wasm_value_type[]){BJVM_WASM_TYPE_KIND_INT32,
-                                                    BJVM_WASM_TYPE_KIND_INT32},
-                           2);
+  bjvm_wasm_value_type params_[] = {BJVM_WASM_TYPE_KIND_INT32,
+                                    BJVM_WASM_TYPE_KIND_INT32};
+  bjvm_wasm_type locals = bjvm_wasm_make_tuple(module, params_, 2);
 
   bjvm_wasm_function *fn = bjvm_wasm_add_function(
       module, params, bjvm_wasm_int32(), locals, ifelse, "add");
