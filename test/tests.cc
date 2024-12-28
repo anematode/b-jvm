@@ -14,19 +14,15 @@
 #include <unordered_map>
 
 #include "../src/adt.h"
+#include "../src/analysis.h"
 #include "../src/bjvm.h"
 #include "../src/util.h"
+#include "../src/wasm_jit.h"
 #include "tests-common.h"
 
 #include <numeric>
 
 using namespace Bjvm::Tests;
-
-bool HasSuffix(std::string_view str, std::string_view suffix) {
-  // Credit: https://stackoverflow.com/a/20446239/13458117
-  return str.size() >= suffix.size() &&
-         str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
 
 double get_time() {
 #ifdef EMSCRIPTEN
@@ -38,7 +34,7 @@ double get_time() {
 #endif
 }
 
-TEST_CASE("ATest STR() macro") {
+TEST_CASE("Test STR() macro") {
   bjvm_utf8 utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
@@ -442,7 +438,7 @@ Cow value: 15
   for (int i = 0; i < 10; ++i)
     expected += expected;
   auto result = run_test_case("test_files/advanced_lambda/", true);
-  //REQUIRE(result.stdout_.length() == expected.length());
+  // REQUIRE(result.stdout_.length() == expected.length());
   REQUIRE(result.stdout_ == expected);
 
   BENCHMARK("Advanced lambda benchmark") {
@@ -475,7 +471,37 @@ java.io.Serializable1537nullfalsetruetruetruetruetrue00nullfalsenull
 
 TEST_CASE("NPE") {
   auto result = run_test_case("test_files/npe/", true);
-  REQUIRE(result.stdout_ == "abcdefghijklmnop");
+  REQUIRE(result.stdout_ == "abcdefghijklmnopqr");
+}
+
+TEST_CASE("ArithmeticException") {
+  auto result = run_test_case("test_files/arithmetic_exception/", true);
+  REQUIRE(result.stdout_ == "abcd");
+}
+
+TEST_CASE("Numeric conversions") {
+  auto result = run_test_case("test_files/numerics/", true);
+  REQUIRE(result.stdout_ == R"(3.4028235E38 -> 2147483647
+1.4E-45 -> 0
+Infinity -> 2147483647
+-Infinity -> -2147483648
+NaN -> 0
+3.4028235E38 -> 9223372036854775807L
+1.4E-45 -> 0L
+Infinity -> 9223372036854775807L
+-Infinity -> -9223372036854775808L
+NaN -> 0L
+1.7976931348623157E308 -> 2147483647
+4.9E-324 -> 0
+Infinity -> 2147483647
+-Infinity -> -2147483648
+NaN -> 0
+1.7976931348623157E308 -> 9223372036854775807L
+4.9E-324 -> 0L
+Infinity -> 9223372036854775807L
+-Infinity -> -9223372036854775808L
+NaN -> 0L
+)");
 }
 
 TEST_CASE("ClassCircularityError") {
@@ -503,6 +529,66 @@ Chicken
 TEST_CASE("ConstantValue initialisation") {
   auto result = run_test_case("test_files/constant_value/", true);
   REQUIRE(result.stdout_ == "2147483647\n");
+}
+
+TEST_CASE("Deranged CFG") {
+  auto result = run_test_case("test_files/cfg_fuck/", true);
+  auto expected = ReadFile("test_files/cfg_fuck/reference.txt").value();
+  std::string as_string;
+  for (int i = 0; i < expected.size(); ++i)
+    as_string.push_back(expected.at(i));
+  REQUIRE(result.stdout_ == as_string);
+}
+
+TEST_CASE("Analysis") {
+  // TODO check that all code analysis functions succeed across all JDK
+  // functions
+}
+
+TEST_CASE("Immediate dominators computation on cursed CFG") {
+  bjvm_classdesc desc;
+  auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();
+  bjvm_parse_classfile(cursed_file.data(), cursed_file.size(), &desc);
+  REQUIRE(utf8_equals(hslc(desc.name), "Main"));
+
+  bjvm_cp_method *m = desc.methods + 4;
+  REQUIRE(utf8_equals(m->name, "main"));
+
+  bjvm_analyze_method_code(m, nullptr);
+  auto *analy = (bjvm_code_analysis *)m->code_analysis;
+  bjvm_scan_basic_blocks(m->code, analy);
+  bjvm_compute_dominator_tree(analy);
+
+  BENCHMARK("analyze method code") { bjvm_analyze_method_code(m, nullptr); };
+
+  BENCHMARK("scan basic blocks") {
+    free(analy->blocks);
+    analy->blocks = nullptr;
+    bjvm_scan_basic_blocks(m->code, analy);
+  };
+
+  BENCHMARK("compute dominator tree") {
+    analy->dominator_tree_computed = false;
+    bjvm_compute_dominator_tree(analy);
+  };
+
+  std::vector<std::pair<int, int>> doms = {
+      {1, 0},  {2, 1},  {3, 2},   {4, 3},   {5, 4},   {6, 5},
+      {7, 6},  {8, 6},  {9, 6},   {10, 6},  {11, 6},  {12, 6},
+      {13, 6}, {14, 5}, {15, 14}, {16, 14}, {17, 16}, {18, 5},
+      {19, 4}, {20, 4}, {21, 20}, {22, 1}};
+
+  for (auto [a, b] : doms) {
+    REQUIRE(analy->blocks[a].idom == b);
+  }
+
+  int result = bjvm_attempt_reduce_cfg(analy);
+  REQUIRE(result == 0);
+
+  bjvm_cp_method *m2 = desc.methods + 5;
+  bjvm_analyze_method_code(m2, nullptr);
+
+  bjvm_free_classfile(desc);
 }
 
 TEST_CASE("Playground") {

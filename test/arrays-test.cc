@@ -27,7 +27,7 @@ TEST_CASE("Multi-dimensional boolean array") {
     kind = make_array_classdesc(thr, kind);
   }
 
-  auto array = CreateArray(thr, kind, testArrayDimensions, 3);
+  auto array = CreateArray(thr, kind, testArrayDimensions, 3, true);
 
   for (int i = 0; i < testArrayDimensions[0]; i++) {
     auto array1 = ReferenceArrayLoad(array, i);

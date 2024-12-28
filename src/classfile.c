@@ -18,6 +18,7 @@
 #include "analysis.h"
 #include "classfile.h"
 #include "util.h"
+#include "wasm_jit.h"
 
 static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   switch (kind) {
@@ -65,7 +66,7 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
     free_heap_str(entry->utf8);
     break;
   case BJVM_CP_KIND_FIELD_REF: {
-    bjvm_field_descriptor *desc = entry->fieldref_info.parsed_descriptor;
+    bjvm_field_descriptor *desc = entry->field.parsed_descriptor;
     free_field_descriptor(*desc);
     free(desc);
     break;
@@ -213,6 +214,7 @@ void free_method(bjvm_cp_method *method) {
   for (int i = 0; i < method->attributes_count; ++i)
     bjvm_free_attribute(&method->attributes[i]);
   free_code_analysis(method->code_analysis);
+  free_wasm_compiled_method(method->compiled_method);
   free_method_descriptor(method->parsed_descriptor);
   free(method->attributes);
 }
@@ -467,9 +469,9 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     if (kind == CONSTANT_Fieldref) {
       return (bjvm_cp_entry){.kind = entry_kind,
-                             .fieldref_info = {.class_info = class_info,
-                                               .nat = name_and_type,
-                                               .field = nullptr}};
+                             .field = {.class_info = class_info,
+                                       .nat = name_and_type,
+                                       .field = nullptr}};
     }
     return (bjvm_cp_entry){.kind = entry_kind,
                            .methodref = {.class_info = class_info,
@@ -592,9 +594,9 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   switch (entry->kind) {
   case BJVM_CP_KIND_FIELD_REF: {
     bjvm_field_descriptor *parsed_descriptor = nullptr;
-    bjvm_cp_name_and_type *name_and_type = entry->fieldref_info.nat;
+    bjvm_cp_name_and_type *name_and_type = entry->field.nat;
 
-    entry->fieldref_info.parsed_descriptor = parsed_descriptor =
+    entry->field.parsed_descriptor = parsed_descriptor =
         calloc(1, sizeof(bjvm_field_descriptor));
     free_on_format_error(ctx, parsed_descriptor);
 
@@ -2202,6 +2204,8 @@ parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
   free_on_format_error(&ctx, cf->methods);
 
   cf->bootstrap_methods = nullptr;
+  cf->indy_insns = nullptr;
+  cf->indy_insns_count = 0;
 
   bool in_MethodHandle =
       utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle");

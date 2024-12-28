@@ -36,16 +36,11 @@ extern "C" {
 
 #define VECTOR_PUSH(vector, vector_count, vector_cap)                          \
   ({                                                                           \
-    if ((vector_count) >= (vector_cap)) {                                      \
-      int new_cap;                                                             \
-      int overflow = __builtin_mul_overflow((vector_cap), 2, &new_cap);        \
-      assert(!overflow);                                                       \
-      if (new_cap < 2)                                                         \
-        new_cap = 2;                                                           \
-      void *next = realloc(vector, new_cap * sizeof(*vector));                 \
-      assert(next);                                                            \
+    if (__builtin_expect((vector_count) >= (vector_cap), 0)) {                 \
+      int new_cap = vector_cap * 2 + 1;                                        \
+      void *_next = realloc(vector, new_cap * sizeof(*vector));                \
       (vector_cap) = new_cap;                                                  \
-      vector = next;                                                           \
+      vector = _next;                                                          \
     }                                                                          \
     &vector[(vector_count)++];                                                 \
   })
@@ -58,6 +53,7 @@ typedef struct {
 typedef struct {
   char *chars;
   int len;
+  int cap; // including null byte
 } heap_string;
 
 #define INIT_STACK_STRING(name, buffer_size)                                   \
@@ -80,16 +76,34 @@ static inline bjvm_utf8 slice_to(bjvm_utf8 str, int start, int end) {
 static inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
   va_list args;
   va_start(args, format);
-  char clobbered = buffer.chars[buffer.len];
   int len = vsnprintf(buffer.chars, buffer.len + 1, format, args);
-  buffer.chars[buffer.len] = clobbered; // in case '\0' was written
   va_end(args);
   return (bjvm_utf8){.chars = buffer.chars, .len = len};
 }
 
+/// Used to safely (?) build up a string in a heap-allocated buffer.
+static inline int build_str(heap_string *str, int write, const char *format,
+                            ...) {
+  va_list args;
+  va_start(args, format);
+  int len = vsnprintf(str->chars + write, str->len - write + 1, format, args);
+  va_end(args);
+  if (len > str->len - write) {
+    str->len = write + len;
+    // will be at least 1 greater than str->len, to accomodate null terminator
+    str->cap = 1 << (sizeof(str->cap) * 8 - __builtin_clz(str->len));
+    str->chars = (char *)realloc(str->chars, str->cap);
+    va_start(args, format);
+    len = vsnprintf(str->chars + write, str->len - write + 1, format, args);
+    va_end(args);
+  }
+  return write + len;
+}
+
 /// Mallocates a new heap string with the given length.
 static inline heap_string make_heap_str(int len) {
-  return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len};
+  return (heap_string){
+      .chars = (char *)calloc(len + 1, 1), .len = len, .cap = len + 1};
 }
 
 /// Creates a heap string from the given slice.

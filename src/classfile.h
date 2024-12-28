@@ -349,7 +349,7 @@ typedef struct bjvm_cp_entry {
     bjvm_cp_name_and_type name_and_type;
     bjvm_cp_class_info class_info;
 
-    bjvm_cp_field_info fieldref_info;
+    bjvm_cp_field_info field;
     bjvm_cp_method_info methodref;
     bjvm_cp_method_handle_info method_handle;
     bjvm_cp_method_type_info method_type;
@@ -581,6 +581,15 @@ typedef struct bjvm_cp_method {
   struct bjvm_native_Constructor *reflection_ctor;
   struct bjvm_native_Method *reflection_method;
   struct bjvm_native_MethodType *method_type_obj;
+
+  // Rough number of times this method has been called. Used for JIT heuristics.
+  // Not at all exact because of interrupts.
+  int call_count;
+
+  // JIT-compiled method
+  void *compiled_method; // bjvm_wasm_instantiation_result*
+  // Already tried and failed
+  bool failed_jit;
 } bjvm_cp_method;
 
 typedef struct bjvm_cp_field {
@@ -601,6 +610,7 @@ typedef struct bjvm_cp_field {
 
 typedef bjvm_utf8 cp_string;
 
+// Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
   bjvm_classdesc_state state;
@@ -656,7 +666,7 @@ typedef struct bjvm_classdesc {
   void (*dtor)(bjvm_classdesc *); // apoptosis
 } bjvm_classdesc;
 
-char *insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
+heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
 

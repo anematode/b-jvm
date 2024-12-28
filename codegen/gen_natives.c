@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
                           size_t *len) {

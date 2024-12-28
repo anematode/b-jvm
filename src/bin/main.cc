@@ -40,6 +40,22 @@ void *set_up() {
   bjvm_async_run_ctx *ctx = bjvm_thread_async_run(thr, method, args, nullptr);
   return ctx;
 }
+
+EMSCRIPTEN_KEEPALIVE
+int print_error(void *ctx) {
+  bjvm_async_run_ctx *run_ctx = (bjvm_async_run_ctx *)ctx;
+  bjvm_thread *thr = run_ctx->thread;
+  if (thr->current_exception) {
+    printf("Exception was raised!\n");
+    // bjvm_thread_run printStackTrace
+    bjvm_stack_value args[1] = {{.obj = thr->current_exception}};
+    bjvm_cp_method *method = bjvm_easy_method_lookup(
+            thr->current_exception->descriptor, STR("printStackTrace"), STR("()V"), true, false);
+    thr->current_exception = nullptr;
+    bjvm_thread_run(thr, method, args, nullptr);
+  }
+  return 0;
+}
 }
 
 int main() {

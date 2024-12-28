@@ -10,9 +10,10 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
   int32_t count = args[1].i;
   bjvm_obj_header *result;
   if (class->kind == BJVM_CD_KIND_PRIMITIVE) {
-    result = CreatePrimitiveArray1D(thread, class->primitive_component, count);
+    result =
+        CreatePrimitiveArray1D(thread, class->primitive_component, count, true);
   } else {
-    result = CreateObjectArray1D(thread, class, count);
+    result = CreateObjectArray1D(thread, class, count, true);
   }
   return (bjvm_stack_value){.obj = result};
 }

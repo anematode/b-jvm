@@ -5,12 +5,12 @@
 #ifndef BJVM_ARRAYS_H
 #define BJVM_ARRAYS_H
 
+#include "bjvm.h"
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "bjvm.h"
-#include <stdint.h>
 
 #define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 
@@ -88,20 +88,23 @@ bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
                                      bjvm_classdesc *classdesc);
 
 bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
-                             int const *dim_sizes, int total_dimensions);
+                             int const *dim_sizes, int total_dimensions,
+                             bool attempt_gc);
 
-static inline bjvm_obj_header *
-CreateObjectArray1D(bjvm_thread *thread, bjvm_classdesc *inner_type, int size) {
+static inline bjvm_obj_header *CreateObjectArray1D(bjvm_thread *thread,
+                                                   bjvm_classdesc *inner_type,
+                                                   int size, bool attempt_gc) {
   auto desc = make_array_classdesc(thread, inner_type);
-  return CreateArray(thread, desc, &size, 1);
+  return CreateArray(thread, desc, &size, 1, attempt_gc);
 }
 
 static inline bjvm_obj_header *CreatePrimitiveArray1D(bjvm_thread *thread,
                                                       bjvm_type_kind inner_type,
-                                                      int count) {
+                                                      int count,
+                                                      bool attempt_gc) {
   auto desc = make_array_classdesc(
       thread, bjvm_primitive_classdesc(thread, inner_type));
-  return CreateArray(thread, desc, &count, 1);
+  return CreateArray(thread, desc, &count, 1, attempt_gc);
 }
 
 #ifdef __cplusplus

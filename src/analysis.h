@@ -7,6 +7,16 @@
 
 #include "classfile.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+  int *list;
+  int count;
+  int cap;
+} bjvm_dominated_list_t;
+
 typedef struct bjvm_basic_block {
   int my_index;
 
@@ -14,9 +24,32 @@ typedef struct bjvm_basic_block {
   int start_index;
   int insn_count;
 
-  uint32_t *next;
+  // May contain duplicates in the presence of a switch or cursed if*.
+  // The order of branches is guaranteed for convenience. For if instructions,
+  // the TAKEN branch is FIRST, and the FALLTHROUGH branch is SECOND. For
+  // lookupswitch and tableswitch, the default branch is last.
+  int *next;
+  uint8_t *is_backedge;
   int next_count;
   int next_cap;
+
+  // May contain duplicates in the presence of a switch or cursed if*
+  int *prev;
+  int prev_count;
+  int prev_cap;
+
+  // Pre- and postorder in a DFS on the original CFG
+  uint32_t dfs_pre, dfs_post;
+  // Immediate dominator of this block
+  uint32_t idom;
+  // Blocks that this block immediately dominates
+  bjvm_dominated_list_t idominates;
+  // Pre- and postorder in the immediate dominator tree
+  uint32_t idom_pre, idom_post;
+  // Whether this block is the target of a backedge
+  bool is_loop_header;
+  // Whether we can get here in the method without an exception being thrown
+  bool nothrow_accessible;
 } bjvm_basic_block;
 
 // Result of the analysis of a code segment. During analysis, stack operations
@@ -28,6 +61,7 @@ typedef struct bjvm_basic_block {
 typedef struct {
   union {
     struct {
+      // wasm jit depends on the order here
       bjvm_compressed_bitset *insn_index_to_references;
       bjvm_compressed_bitset *insn_index_to_ints;
       bjvm_compressed_bitset *insn_index_to_floats;
@@ -44,23 +78,9 @@ typedef struct {
   // block 0 = entry point
   bjvm_basic_block *blocks;
   int block_count;
+
+  bool dominator_tree_computed;
 } bjvm_code_analysis;
-
-typedef bjvm_type_kind bjvm_analy_stack_entry;
-
-// State of the stack (or local variable table) during analysis, indexed by
-// formal JVM semantics (i.e., long/double take up two slots, and the second
-// slot is unusable).
-typedef struct {
-  bjvm_analy_stack_entry *entries;
-  int entries_count;
-  int entries_cap;
-
-  bool from_jump_target;
-  bool is_exc_handler;
-
-  int exc_handler_start;
-} bjvm_analy_stack_state;
 
 /**
  * Analyze the method's code segment if it exists, rewriting instructions in
@@ -69,11 +89,21 @@ typedef struct {
  * <br/>
  * Returns -1 if an error occurred, and writes the error message into error.
  */
-int bjvm_analyze_method_code_segment(bjvm_cp_method *method,
-                                     heap_string *error);
-
+int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error);
 void free_code_analysis(bjvm_code_analysis *analy);
-void scan_basic_blocks(const bjvm_attribute_code *code,
-                       bjvm_code_analysis *analy);
+int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
+                           bjvm_code_analysis *analy);
+void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
+void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis);
+// Returns true iff dominator dominates dominated. dom dom dom.
+bool bjvm_query_dominance(const bjvm_basic_block *dominator,
+                          const bjvm_basic_block *dominated);
+// Try to reduce the CFG and mark the edges/blocks accordingly.
+int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
+const char *bjvm_insn_code_name(bjvm_insn_code_kind code);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // BJVM_ANALYSIS_H
