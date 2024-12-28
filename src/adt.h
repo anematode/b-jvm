@@ -73,7 +73,7 @@ bool bjvm_hash_table_iterator_has_next(bjvm_hash_table_iterator iter,
 
 bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter);
 
-uint32_t bjvm_hash_string(const char *key, size_t len);
+void bjvm_hash_table_reserve(bjvm_string_hash_table *tbl, size_t new_capacity);
 
 /**
  * Insert the key/value pair into the hash table and return the old value, if

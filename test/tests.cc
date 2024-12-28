@@ -244,13 +244,11 @@ struct TestCaseResult {
 };
 
 TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
-  const char *classpath[2] = {folder.c_str(), nullptr};
   bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
 
-  options.load_classfile = load_classfile;
-  options.load_classfile_param = classpath;
+  options.classpath = (bjvm_utf8) { .chars = (char*) folder.c_str(), .len = (int) folder.size() };
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
   result->stdout_ += (char)ch;

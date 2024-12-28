@@ -172,10 +172,20 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
-uint32_t bjvm_hash_string(const char *key, size_t len) {
+#define FXHASH_CONST 0x517cc1b727220a95
+static uint32_t fxhash_string(const char *key, size_t len) {
   uint64_t hash = 0;
-  for (size_t i = 0; i < len; ++i) {
-    hash = 31 * hash + key[i]; // yk what I mean ;)
+  for (size_t i = 0; i + 7 < len; i += 8) {
+    uint64_t word;
+    memcpy(&word, key + i, 8);
+    hash = hash << 5 | hash >> 59;
+    hash = (hash ^ word) * FXHASH_CONST;
+  }
+  if (len & 7) {
+    uint64_t word = 0;
+    memcpy(&word, key + len - (len & 7), len & 7);
+    hash = hash << 5 | hash >> 59;
+    hash = (hash ^ word) * FXHASH_CONST;
   }
   return hash;
 }
@@ -184,7 +194,7 @@ bjvm_hash_table_entry *
 bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,
                            size_t len, bool *equal, bool *on_chain,
                            bjvm_hash_table_entry **prev_entry) {
-  uint32_t hash = bjvm_hash_string(key, len);
+  uint32_t hash = fxhash_string(key, len);
   size_t index = hash % tbl->entries_cap;
   bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = nullptr;
   while (ent) {
@@ -323,4 +333,11 @@ void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
   }
   free(tbl.entries);
   tbl.entries_cap = tbl.entries_count = 0; // good form
+}
+
+void bjvm_hash_table_reserve(bjvm_string_hash_table *tbl, size_t new_capacity) {
+  // Make large enough so the load factor is less than the desired load factor
+  size_t new_cap = (new_capacity * tbl->load_factor) + 2;
+  // rehash
+  bjvm_hash_table_rehash(tbl, new_cap);
 }

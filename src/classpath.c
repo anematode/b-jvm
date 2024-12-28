@@ -111,6 +111,7 @@ struct central_directory_record {
 
 char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
                               uint32_t expected) {
+  bjvm_hash_table_reserve(&jar->entries, expected);
   struct central_directory_record cdr = {0};
   char error[256];
   for (uint32_t i = 0; i < expected; i++) {
@@ -221,22 +222,20 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
   // If entry ends in .jar, load it as a JAR, otherwise treat it as a folder
   if (entry.len >= 4 && memcmp(entry.chars + entry.len - 4, ".jar", 4) == 0) {
     bjvm_mapped_jar *jar = calloc(1, sizeof(bjvm_mapped_jar));
-    jar->entries = bjvm_make_hash_table(free, 0.75, 16);
+    jar->entries = bjvm_make_hash_table(free, 0.75, 1);
 
     char *filename = calloc(1, entry.len + 1);
     memcpy(filename, entry.chars, entry.len);
     char *error = load_filesystem_jar(filename, jar);
     free(filename);
 
-    *VECTOR_PUSH(cp->entries, cp->entries_cap, cp->entries_len) =
+    *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
         (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
 
-    if (error) {
-      return error;
-    }
-  } else {
-    // Check if it's a directory TODO
+    return error;
   }
+  *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
+          (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};
   return nullptr;
 }
 
@@ -317,7 +316,7 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
 heap_string concat_path(heap_string name, bjvm_utf8 filename) {
   bool slash = !name.len || name.chars[name.len - 1] != '/';
   heap_string result = make_heap_str(name.len + slash + filename.len);
-  bjvm_utf8 slice = bprintf(hslc(result), "%.*s/%.*s", fmt_slice(name),
+  bjvm_utf8 slice = bprintf(hslc(result), "%.*s%s%.*s", fmt_slice(name),
                             slash ? "/" : "", fmt_slice(filename));
   assert(slice.len == result.len);
   return result;
@@ -340,6 +339,7 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
     heap_string search = concat_path(entry->name, filename);
     assert(search.chars[search.len] == '\0' && "Must be null terminated");
     FILE *f = fopen(search.chars, "rb");
+    free_heap_str(search);
     if (!f)
       continue;
     struct loaded_bytes lb = read_file(f);

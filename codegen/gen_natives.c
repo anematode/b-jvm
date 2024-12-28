@@ -69,9 +69,6 @@ int main(int argc, char **argv) {
   char *jre_dir = argv[2];
   bjvm_vm_options options = bjvm_default_vm_options();
 
-  options.load_classfile = load_classfile;
-  options.load_classfile_param = (void *)jre_dir;
-
   bjvm_vm *vm = bjvm_create_vm(options);
   bjvm_thread *thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 

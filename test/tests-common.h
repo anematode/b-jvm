@@ -21,8 +21,7 @@ namespace Bjvm::Tests {
 int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
                           size_t *len);
     std::unique_ptr<bjvm_vm, void(*)(bjvm_vm*)> CreateTestVM(bool preregister = false,
-                                                             bjvm_vm_options options = bjvm_default_vm_options(),
-                                                             const char** classpath = nullptr);
+                                                             bjvm_vm_options options = bjvm_default_vm_options());
   optional<vector<uint8_t>> ResolveClassPath(string const& filename, vector<string> const& extra_paths);
   std::vector<std::string> ListDirectory(const std::string &path,
                                          bool recursive);

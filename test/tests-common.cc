@@ -23,10 +23,7 @@ namespace Bjvm::Tests {
 int preregister_all_classes(bjvm_vm *vm);
 
 std::unique_ptr<bjvm_vm, void (*)(bjvm_vm *)>
-CreateTestVM(bool preregister, bjvm_vm_options options,
-             const char **classpath) {
-  options.load_classfile = load_classfile;
-  options.load_classfile_param = classpath;
+CreateTestVM(bool preregister, bjvm_vm_options options) {
   bjvm_vm *vm = bjvm_create_vm(options);
   if (preregister)
     preregister_all_classes(vm);

@@ -704,6 +704,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
   options.heap_size = 1 << 23;
+  options.runtime_classpath = STR("./rt.jar");
   return options;
 }
 
@@ -723,8 +724,15 @@ static void _free_classdesc(void *cd) {
 bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   bjvm_vm *vm = calloc(1, sizeof(bjvm_vm));
 
-  vm->load_classfile = options.load_classfile;
-  vm->load_classfile_param = options.load_classfile_param;
+  INIT_STACK_STRING(classpath, 1000);
+  classpath = bprintf(classpath, "%.*s:%.*s", fmt_slice(options.runtime_classpath),
+                      fmt_slice(options.classpath));
+
+  char *error = bjvm_init_classpath(&vm->classpath, classpath);
+  if (error) {
+    fprintf(stderr, "Classpath error: %s", error);
+    return nullptr;
+  }
 
   vm->classfiles = bjvm_make_hash_table(free_cf_entry, 0.75, 16);
   vm->classes = bjvm_make_hash_table(_free_classdesc, 0.75, 16);
@@ -768,6 +776,8 @@ void bjvm_free_vm(bjvm_vm *vm) {
       vm->primitive_classes[i]->dtor(vm->primitive_classes[i]);
     }
   }
+
+  bjvm_free_classpath(&vm->classpath);
 
   free(vm->active_threads);
   free(vm->heap);
@@ -929,23 +939,17 @@ int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
     return 0;
   }
 
-  // Otherwise, try to read it from the vm->load_classfile implementation
-  if (vm->load_classfile) {
-    uint8_t *loaded_bytes = nullptr;
-
-    int status = vm->load_classfile(filename, vm->load_classfile_param,
-                                    &loaded_bytes, len);
-    if (status) {
-      free(loaded_bytes);
-      return -1;
-    }
-
-    bjvm_vm_preregister_classfile(vm, filename, loaded_bytes, *len);
-    free(loaded_bytes);
-    return bjvm_vm_read_classfile(vm, filename, bytes, len);
+  uint8_t *data;  // we get ownership of this
+  int status = bjvm_lookup_classpath(&vm->classpath, filename, &data, len);
+  if (status) {
+    return -1;
   }
-
-  return -1;
+  entry = malloc(sizeof(struct file_entry));
+  entry->data = data;
+  entry->len = *len;
+  free_cf_entry(bjvm_hash_table_insert(&vm->classfiles, filename.chars,
+                                       filename.len, entry));
+  return bjvm_vm_read_classfile(vm, filename, bytes, len);
 }
 
 void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count) {

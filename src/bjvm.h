@@ -10,6 +10,7 @@
 
 #include "adt.h"
 #include "classfile.h"
+#include "classpath.h"
 #include "util.h"
 
 #ifdef EMSCRIPTEN
@@ -147,9 +148,8 @@ typedef struct bjvm_vm {
   // Native methods in javah form
   bjvm_string_hash_table natives;
 
-  int (*load_classfile)(const bjvm_utf8 filename, void *param, uint8_t **bytes,
-                        size_t *len);
-  void *load_classfile_param;
+  // Bootstrap class loader will look for classes here
+  bjvm_classpath classpath;
 
   // Main thread group
   bjvm_obj_header *main_thread_group;
@@ -190,12 +190,6 @@ typedef struct bjvm_vm {
 } bjvm_vm;
 
 typedef struct {
-  // Callback to load a classfile from the classpath. Returns 0 on success,
-  // nonzero on failure. Pointer passed to bytes will be free()-d by the VM.
-  int (*load_classfile)(const bjvm_utf8 filename, void *param, uint8_t **bytes,
-                        size_t *len);
-  void *load_classfile_param;
-
   // Write byte of stdout/stderr (if nullptr, uses the default implementation)
   bjvm_write_byte write_stdout;
   bjvm_write_byte write_stderr;
@@ -204,6 +198,11 @@ typedef struct {
 
   // Heap size (static for now)
   size_t heap_size;
+  // Classpath for built-in files, e.g. rt.jar. Must have definitions for
+  // Object.class, etc.
+  bjvm_utf8 runtime_classpath;
+  // Colon-separated custom classpath.
+  bjvm_utf8 classpath;
 } bjvm_vm_options;
 
 // Frames are aligned to 8 bytes, the natural alignment of a stack value.
