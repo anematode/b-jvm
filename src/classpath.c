@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -235,7 +236,7 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
     return error;
   }
   *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
-          (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};
+      (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};
   return nullptr;
 }
 

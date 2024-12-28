@@ -51,7 +51,9 @@ endif ()
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
 
-add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
+add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
+        src/arm64_jit.c
+        src/arm64_jit.h)
 target_include_directories(bjvm PRIVATE src)
 target_link_libraries(bjvm PRIVATE zlibstatic)
 

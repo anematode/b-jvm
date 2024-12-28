@@ -248,7 +248,8 @@ TestCaseResult run_test_case(std::string folder, bool capture_stdio = true) {
 
   TestCaseResult result{};
 
-  options.classpath = (bjvm_utf8) { .chars = (char*) folder.c_str(), .len = (int) folder.size() };
+  options.classpath =
+      (bjvm_utf8){.chars = (char *)folder.c_str(), .len = (int)folder.size()};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
   result->stdout_ += (char)ch;

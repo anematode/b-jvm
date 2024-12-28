@@ -1,6 +1,6 @@
 #include "../src/classpath.h"
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Basic classpath operations", "[classpath]") {
   bjvm_classpath cp;
@@ -30,12 +30,14 @@ TEST_CASE("Basic classpath operations", "[classpath]") {
 
 TEST_CASE("Folder in classpath", "[classpath]") {
   bjvm_classpath cp;
-  char *error = bjvm_init_classpath(&cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
+  char *error = bjvm_init_classpath(
+      &cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
   REQUIRE(error == nullptr);
 
   uint8_t *bytes;
   size_t len;
-  int ret_val = bjvm_lookup_classpath(&cp, STR("sun/misc/Unsafe.class"), &bytes, &len);
+  int ret_val =
+      bjvm_lookup_classpath(&cp, STR("sun/misc/Unsafe.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
   free(bytes);
@@ -43,7 +45,8 @@ TEST_CASE("Folder in classpath", "[classpath]") {
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
   free(bytes);
-  ret_val = bjvm_lookup_classpath(&cp, STR("nested/boi/Boi.class"), &bytes, &len);
+  ret_val =
+      bjvm_lookup_classpath(&cp, STR("nested/boi/Boi.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
   free(bytes);
@@ -51,7 +54,8 @@ TEST_CASE("Folder in classpath", "[classpath]") {
   bjvm_free_classpath(&cp);
 
   BENCHMARK("init classpath") {
-    (void)bjvm_init_classpath(&cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
+    (void)bjvm_init_classpath(
+        &cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
 
     bjvm_free_classpath(&cp);
   };

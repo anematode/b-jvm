@@ -725,8 +725,9 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   bjvm_vm *vm = calloc(1, sizeof(bjvm_vm));
 
   INIT_STACK_STRING(classpath, 1000);
-  classpath = bprintf(classpath, "%.*s:%.*s", fmt_slice(options.runtime_classpath),
-                      fmt_slice(options.classpath));
+  classpath =
+      bprintf(classpath, "%.*s:%.*s", fmt_slice(options.runtime_classpath),
+              fmt_slice(options.classpath));
 
   char *error = bjvm_init_classpath(&vm->classpath, classpath);
   if (error) {
@@ -939,7 +940,7 @@ int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
     return 0;
   }
 
-  uint8_t *data;  // we get ownership of this
+  uint8_t *data; // we get ownership of this
   int status = bjvm_lookup_classpath(&vm->classpath, filename, &data, len);
   if (status) {
     return -1;
