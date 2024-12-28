@@ -26,7 +26,6 @@ static struct loaded_bytes read_file(FILE *f) {
   char *data = malloc(length);
   assert(data);
   fread(data, 1, length, f);
-  fclose(f);
   return (struct loaded_bytes){.bytes = data, .length = length};
 }
 
