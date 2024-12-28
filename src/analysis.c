@@ -344,11 +344,9 @@ heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
 heap_string code_attribute_to_string(const bjvm_attribute_code *attrib) {
   heap_string result = make_heap_str(1000);
   int write = 0;
-  size_t total_length = 0;
   for (int i = 0; i < attrib->insn_count; ++i) {
     heap_string insn_str = insn_to_string(attrib->code + i, i);
     write = build_str(&result, write, "%.*s\n", fmt_slice(insn_str));
-    total_length += insn_str.len + 1;
   }
   return result;
 }

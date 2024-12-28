@@ -168,7 +168,7 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
   fprintf(stream, "%s", buf);
 }
 
-void bjvm_pop_frame(bjvm_thread *thr, const bjvm_stack_frame *reference) {
+void bjvm_pop_frame(bjvm_thread *thr, [[maybe_unused]] const bjvm_stack_frame *reference) {
   assert(thr->frames_count > 0);
   bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
   assert(reference == nullptr || reference == frame);
@@ -852,8 +852,6 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->stack_overflow_error = new_object(thr, desc);
 
   // Link (but don't initialize) java.lang.Class immediately
-  auto thing = STR("java/lang/Class");
-  assert(thing.len != 0);
   desc = bootstrap_class_create(thr, STR("java/lang/Class"));
   bjvm_initialize_class(thr, desc);
 
@@ -1472,7 +1470,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   // Add superclass instance references
   if (super) {
     bjvm_compressed_bitset bs = super->instance_references;
-    for (int i = 0; i < super->data_bytes / sizeof(void *); ++i) {
+    for (size_t i = 0; i < super->data_bytes / sizeof(void *); ++i) {
       if (bjvm_test_compressed_bitset(bs, i)) {
         bjvm_test_set_compressed_bitset(&classdesc->instance_references, i);
       }
@@ -2741,14 +2739,14 @@ static int double_to_int(double x) {
   return (int)x;
 }
 
-static long double_to_long(double x) {
-  if (x > LONG_MAX)
-    return LONG_MAX;
-  if (x < LONG_MIN)
-    return LONG_MIN;
+static int64_t double_to_long(double x) {
+  if (x >= (double)(ULLONG_MAX / 2))
+    return LLONG_MAX;
+  if (x < (double)LLONG_MIN)
+    return LLONG_MIN;
   if (isnan(x))
     return 0;
-  return (long)x;
+  return (int64_t)x;
 }
 
 // Main interpreter
