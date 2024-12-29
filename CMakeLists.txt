@@ -15,6 +15,7 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+if (NOT EMSCRIPTEN)
 FetchContent_Declare(
         zlib
         GIT_REPOSITORY https://github.com/madler/zlib.git
@@ -22,10 +23,11 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(zlib)
+endif()
 
 # If doing emscripten
 if (EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wpedantic")
+    set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wpedantic -sUSE_ZLIB=1")
     set(CMAKE_CXX_FLAGS "-O2 -Wall -Wpedantic")
     set(EmscriptenFlags "-O2 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\"'")
 elseif (APPLE)
@@ -38,12 +40,12 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (FALSE)
+if (TRUE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (TRUE) # NOT EMSCRIPTEN)
+if (FALSE) # NOT EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
@@ -56,7 +58,12 @@ add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         src/arm64_jit.h
         src/natives/java/util/TimeZone.c)
 target_include_directories(bjvm PRIVATE src)
+
+if (NOT EMSCRIPTEN)
 target_link_libraries(bjvm PRIVATE zlibstatic)
+else()
+target_link_libraries(bjvm PRIVATE z)
+endif()
 
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.cc test/tests-common.cc)  # for now

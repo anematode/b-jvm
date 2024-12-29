@@ -2676,7 +2676,6 @@ fail:
 bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
                                              bjvm_stack_frame *frame,
                                              bjvm_bytecode_insn *insn) {
-
   bjvm_cp_indy_info *indy = &insn->cp->indy_info;
   if (!insn->ic) {
     if (indy_resolve(thread, insn, indy)) {

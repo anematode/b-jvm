@@ -16,9 +16,7 @@ TEST_CASE("Benchmarks", "[bench]") {
     auto result = run_test_case("test_files/bench_stack_trace/", true);
   };
 
-  /*
   BENCHMARK("JSON") {
 
   };
-  */
 }

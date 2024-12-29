@@ -107,6 +107,15 @@ static inline bjvm_obj_header *CreatePrimitiveArray1D(bjvm_thread *thread,
   return CreateArray(thread, desc, &count, 1, attempt_gc);
 }
 
+static inline bjvm_obj_header *CreateByteArray(bjvm_thread *thread,
+  uint8_t *data, int length) {
+  bjvm_obj_header *result = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, length, true);
+  if (!result)
+    return nullptr;
+  memcpy(ArrayData(result), data, length);
+  return result;
+}
+
 #ifdef __cplusplus
 }
 #endif

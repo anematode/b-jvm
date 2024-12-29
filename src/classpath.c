@@ -13,6 +13,9 @@
 #include <sys/stat.h>
 #define BJVM_USE_MMAP
 #endif
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
 
 struct loaded_bytes {
   char *bytes;
@@ -28,6 +31,33 @@ static struct loaded_bytes read_file(FILE *f) {
   fread(data, 1, length, f);
   return (struct loaded_bytes){.bytes = data, .length = length};
 }
+
+#ifdef EMSCRIPTEN
+struct loaded_bytes emscripten_read_file(const char * filename) {
+  struct loaded_bytes result = {0};
+  bool exists = EM_ASM_INT(
+        {
+          const fs = require('fs');
+          return fs.existsSync(UTF8ToString($0));
+        },
+        filename);
+  if (exists) {
+    result.bytes = EM_ASM_PTR(
+        {
+          const fs = require('fs');
+          const buffer = fs.readFileSync(UTF8ToString($0));
+          const length = buffer.length;
+
+          const result = _malloc(length);
+          Module.HEAPU32[$1 >> 2] = length;
+          Module.HEAPU8.set(buffer, result);
+          return result;
+        },
+        filename, &result.length);
+  }
+  return result;
+}
+#endif
 
 static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   char error[256];
@@ -51,37 +81,12 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
 #elif EMSCRIPTEN
   int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
-    bool exists = EM_ASM_INT(
-        {
-          const fs = require('fs');
-          return fs.existsSync(UTF8ToString($0));
-        },
-        filename);
-    if (!exists)
+    struct loaded_bytes load = emscripten_read_file(filename);
+    if (!load.bytes)
       goto missing;
 
-    struct loaded_bytes loaded;
-
-    void *length_and_data = EM_ASM_PTR(
-        {
-          const fs = require('fs');
-          const buffer = fs.readFileSync(UTF8ToString($0));
-          const length = buffer.length;
-
-          const result = _malloc(length);
-          Module.HEAPU32[$1 >> 2] = length;
-          Module.HEAPU8.set(buffer, result);
-          Module.HEAPU32[1 + $1 >> 2] = result;
-
-          return result;
-        },
-        filename, &loaded);
-
-    uint32_t length = *(uint32_t *)(length_and_data);
-    uint8_t *data = (uint8_t *)(length_and_data) + 4;
-
-    jar->data = (char *)data;
-    jar->size_bytes = length;
+    jar->data = load.bytes;
+    jar->size_bytes = load.length;
     jar->is_mmap = false;
     return nullptr;
   }
@@ -377,14 +382,22 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
     // Concatenate with the desired filename (and optionally a / in between)
     heap_string search = concat_path(entry->name, filename);
     assert(search.chars[search.len] == '\0' && "Must be null terminated");
+
+#ifdef EMSCRIPTEN
+    struct loaded_bytes lb = emscripten_read_file(search.chars);
+    free_heap_str(search);
+    if (!lb.bytes)
+      continue;
+#else
     FILE *f = fopen(search.chars, "rb");
     free_heap_str(search);
     if (!f)
       continue;
     struct loaded_bytes lb = read_file(f);
+    fclose(f);
+#endif
     *bytes = (uint8_t *)lb.bytes;
     *len = lb.length;
-    fclose(f);
     return 0;
   }
   return -1;
