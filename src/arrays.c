@@ -103,6 +103,7 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
 // given component. For example, J -> [J, [[J -> [[[J, Object -> [Object
 bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
                                      bjvm_classdesc *classdesc) {
+  assert(classdesc);
   if (!classdesc->array_type) {
     if (classdesc->kind == BJVM_CD_KIND_PRIMITIVE) {
       classdesc->array_type = primitive_array_classdesc(thread, classdesc);

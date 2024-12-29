@@ -1,8 +1,8 @@
 import com.google.gson.Gson;
-//import com.fasterxml.jackson.databind.ObjectMapper;
-//import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-//@JsonIgnoreProperties(ignoreUnknown = true)
+@JsonIgnoreProperties(ignoreUnknown = true)
 class Student {
     public String name;
     public int age;
@@ -33,11 +33,9 @@ public class GsonExample {
         String json2 = gson.toJson(student);
         System.out.println(json2);
 
-/*
         ObjectMapper mapper = new ObjectMapper();
         Student jackson = mapper.readValue(json, Student.class);
 
         mapper.writeValue(System.out, jackson);
-        */
     }
 }

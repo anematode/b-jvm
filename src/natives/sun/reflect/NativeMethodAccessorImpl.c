@@ -18,7 +18,6 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
     assembled[arg_i++] = (bjvm_stack_value){.obj = data[i]};
   }
 
-  // TODO unbox arguments
   bjvm_stack_value result;
   assert(method->code);
   // TODO make this native async

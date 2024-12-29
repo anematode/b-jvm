@@ -1597,7 +1597,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
   bjvm_compute_dominator_tree(method->code_analysis);
   if (bjvm_attempt_reduce_cfg(method->code_analysis))
     // CFG is not reducible, so we can't compile it (yet! -- low prio)
-    goto error;
+    goto error_1;
 
   bjvm_code_analysis *analy = method->code_analysis;
 
@@ -1693,7 +1693,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
     debug = utf8_equals(method->name, "encodeArrayLoop");
     expression expr = compile_bb(&ctx, bb, &topo, debug);
     if (!expr) {
-      goto error;
+      goto error_2;
     }
     *VECTOR_PUSH(expr_stack, stack_count, stack_cap) =
         (inchoate_expression){expr, topo.topo_i, -1, false};
@@ -1722,8 +1722,9 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
 
   free(result.bytes);
 
-error:
+error_2:
   free_topo_ctx(topo);
+error_1:
   free(ctx.val_to_local_map);
   free(ctx.wasm_blocks);
   free(ctx.wvars);

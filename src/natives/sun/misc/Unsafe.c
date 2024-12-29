@@ -83,6 +83,21 @@ DECLARE_NATIVE("sun/misc", Unsafe, putObjectVolatile,
   return value_null();
 }
 
+DECLARE_NATIVE("sun/misc", Unsafe, putOrderedObject,
+               "(Ljava/lang/Object;JLjava/lang/Object;)V") {
+  assert(argc == 3);
+  *(void **)((void *)args[0].handle->obj + args[1].l) =
+      args[2].handle->obj;
+}
+
+DECLARE_NATIVE("sun/misc", Unsafe, putOrderedLong,
+               "(Ljava/lang/Object;JJ)V") {
+  assert(argc == 3);
+  *(int64_t *)((void *)args[0].handle->obj + args[1].l) =
+      args[2].l;
+}
+
+
 DECLARE_NATIVE("sun/misc", Unsafe, putObject,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
   assert(argc == 3);

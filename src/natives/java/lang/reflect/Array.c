@@ -7,6 +7,7 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
   if (!args[0].handle->obj)
     return value_null();
   bjvm_classdesc *class = bjvm_unmirror_class(args[0].handle->obj);
+  bjvm_initialize_class(thread, class);
   int32_t count = args[1].i;
   bjvm_obj_header *result;
   if (class->kind == BJVM_CD_KIND_PRIMITIVE) {

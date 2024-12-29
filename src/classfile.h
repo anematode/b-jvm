@@ -273,12 +273,12 @@ typedef struct {
 } bjvm_cp_string_info;
 
 typedef struct {
-  // Sign extended if original entry was an Integer
+  // Sign-extended if original entry was an Integer
   int64_t value;
 } bjvm_cp_integral_info;
 
 typedef struct {
-  // Extended if original entry was a Float
+  // Value-extended if original entry was a Float
   double value;
 } bjvm_cp_floating_info;
 
@@ -395,7 +395,10 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
   BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8,
-  BJVM_ATTRIBUTE_KIND_SIGNATURE = 9
+  BJVM_ATTRIBUTE_KIND_SIGNATURE = 9,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS = 10,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS = 11,
+  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT = 12,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -499,7 +502,7 @@ typedef struct {
     // non-owned pointer into the constant pool
     bjvm_cp_entry *cp;
   };
-  // Per-instruction resolved data
+  // Per-instruction inline cache data
   void *ic;
   void *ic2;
   int args;
@@ -541,6 +544,21 @@ typedef struct {
 } bjvm_attribute_runtime_visible_annotations;
 
 typedef struct {
+  uint8_t *data;
+  int length;
+} bjvm_attribute_runtime_visible_parameter_annotations;
+
+typedef struct {
+  uint8_t* data;
+  int length;
+} bjvm_attribute_runtime_visible_type_annotations;
+
+typedef struct {
+  uint8_t *data;
+  int length;
+} bjvm_attribute_annotation_default;
+
+typedef struct {
   bjvm_utf8 utf8;
 } bjvm_attribute_signature;
 
@@ -561,7 +579,10 @@ typedef struct bjvm_attribute {
     bjvm_attribute_source_file source_file;
     bjvm_attribute_line_number_table lnt;
     bjvm_attribute_method_parameters method_parameters;
-    bjvm_attribute_runtime_visible_annotations runtime_visible_annotations;
+    bjvm_attribute_runtime_visible_annotations annotations;
+    bjvm_attribute_runtime_visible_parameter_annotations parameter_annotations;
+    bjvm_attribute_runtime_visible_type_annotations type_annotations;
+    bjvm_attribute_annotation_default annotation_default;
     bjvm_attribute_signature signature;
   };
 } bjvm_attribute;

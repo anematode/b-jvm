@@ -18,6 +18,9 @@ bjvm_cp_entry *lookup_entry(bjvm_obj_header *obj, int index,
 DECLARE_NATIVE("sun/reflect", ConstantPool, getUTF8At0,
                "(Ljava/lang/Object;I)Ljava/lang/String;") {
   bjvm_cp_entry *entry = lookup_entry(obj->obj, args[1].i, BJVM_CP_KIND_UTF8);
+  if (!entry) {
+    return (bjvm_stack_value){.obj = nullptr};
+  }
   return (bjvm_stack_value){.obj =
                                 bjvm_intern_string(thread, hslc(entry->utf8))};
 }
@@ -25,6 +28,9 @@ DECLARE_NATIVE("sun/reflect", ConstantPool, getUTF8At0,
 DECLARE_NATIVE("sun/reflect", ConstantPool, getIntAt0,
                "(Ljava/lang/Object;I)I") {
   bjvm_cp_entry *entry =
-      lookup_entry(obj->obj, args[1].i, BJVM_CP_KIND_INTEGER);
-  return (bjvm_stack_value){.i = entry->integral.value};
+    lookup_entry(obj->obj, args[1].i, BJVM_CP_KIND_INTEGER);
+  if (!entry) {
+    return (bjvm_stack_value){.obj = nullptr};
+  }
+  return (bjvm_stack_value){.i = (int)entry->integral.value};
 }

@@ -1,9 +1,5 @@
 #define AGGRESSIVE_DEBUG 0
 
-// Cache invokestatic resolutions.
-#define CACHE_INVOKESTATIC 1
-// Cache invokevirtual, invokespecial, and invokeinterface resolutions.
-#define CACHE_INVOKENONSTATIC 1
 // If set, the interpreter will use a goto per instruction to jump to the next
 // instruction. This messes up the debug dumps but can lead to slightly better
 // performance because the branch predictor has more information about pairs
@@ -409,88 +405,6 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   return (void *)str;
 }
 
-bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
-                                               bjvm_utf8 name) {
-  const char *chars = name.chars;
-  if (chars[0] == 'L') {
-    name = slice_to(name, 1, name.len - 1);
-    return bootstrap_class_create(thread, name);
-  }
-  if (chars[0] == '[')
-    return bootstrap_class_create(thread, name);
-  switch (chars[0]) {
-  case 'Z':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_BOOLEAN)
-        ->reflected_class;
-  case 'B':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_BYTE)
-        ->reflected_class;
-  case 'C':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_CHAR)
-        ->reflected_class;
-  case 'S':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_SHORT)
-        ->reflected_class;
-  case 'I':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_INT)
-        ->reflected_class;
-  case 'J':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_LONG)
-        ->reflected_class;
-  case 'F':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_FLOAT)
-        ->reflected_class;
-  case 'D':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_DOUBLE)
-        ->reflected_class;
-  case 'V':
-    return bjvm_primitive_class_mirror(thread, BJVM_TYPE_KIND_VOID)
-        ->reflected_class;
-  }
-  UNREACHABLE();
-}
-
-void bjvm_reflect_initialize_field(bjvm_thread *thread,
-                                   bjvm_classdesc *classdesc,
-                                   bjvm_cp_field *field) {
-
-  bjvm_classdesc *reflect_Field =
-      bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
-  bjvm_initialize_class(thread, reflect_Field);
-
-  bjvm_handle *field_mirror =
-      bjvm_make_handle(thread, new_object(thread, reflect_Field));
-  if (!field_mirror->obj) {
-    return;
-  }
-
-#define F ((struct bjvm_native_Field *)field_mirror->obj)
-  field->reflection_field = (void *)F;
-
-  F->reflected_field = field;
-  F->name = bjvm_intern_string(thread, field->name);
-  F->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
-  F->type = (void *)bjvm_get_class_mirror(
-      thread, load_class_of_field_descriptor(thread, field->descriptor));
-  F->modifiers = field->access_flags;
-
-  // Find runtimevisibleannotations attribute
-  for (int i = 0; i < field->attributes_count; ++i) {
-    if (field->attributes[i].kind ==
-        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
-      const bjvm_attribute_runtime_visible_annotations a =
-          field->attributes[i].runtime_visible_annotations;
-      F->annotations =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
-      memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
-      break;
-    }
-  }
-#undef F
-
-  bjvm_drop_handle(thread, field_mirror);
-}
-
 bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
                                    const bjvm_field_descriptor *desc) {
   bjvm_utf8 write = str;
@@ -508,6 +422,71 @@ bjvm_utf8 unparse_field_descriptor(bjvm_utf8 str,
   }
   str.len = write.chars - str.chars;
   return str;
+}
+
+bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
+                                               bjvm_utf8 name) {
+  const char *chars = name.chars;
+  if (chars[0] == 'L') {
+    name = slice_to(name, 1, name.len - 1);
+    return bootstrap_class_create(thread, name);
+  }
+  if (chars[0] == '[')
+    return bootstrap_class_create(thread, name);
+  switch (chars[0]) {
+  case 'Z':
+  case 'B':
+  case 'C':
+  case 'S':
+  case 'I':
+  case 'J':
+  case 'F':
+  case 'D':
+  case 'V':
+    return bjvm_primitive_class_mirror(thread, chars[0])
+        ->reflected_class;
+  default:
+    UNREACHABLE();
+  }
+}
+
+void bjvm_reflect_initialize_field(bjvm_thread *thread,
+                                   bjvm_classdesc *classdesc,
+                                   bjvm_cp_field *field) {
+
+  bjvm_classdesc *reflect_Field =
+      bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
+  bjvm_initialize_class(thread, reflect_Field);
+  bjvm_handle *field_mirror =
+      bjvm_make_handle(thread, new_object(thread, reflect_Field));
+  if (!field_mirror->obj) {
+    return;
+  }
+#define F ((struct bjvm_native_Field *)field_mirror->obj)
+  field->reflection_field = (void *)F;
+
+  F->reflected_field = field;
+  F->name = bjvm_intern_string(thread, field->name);
+  F->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+  F->type = (void *)bjvm_get_class_mirror(
+      thread, load_class_of_field_descriptor(thread, field->descriptor));
+  F->modifiers = field->access_flags;
+
+  // Find runtimevisibleannotations attribute
+  for (int i = 0; i < field->attributes_count; ++i) {
+    if (field->attributes[i].kind ==
+        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
+      const bjvm_attribute_runtime_visible_annotations a =
+          field->attributes[i].annotations;
+      F->annotations =
+          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
+      memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
+      break;
+    }
+  }
+#undef F
+
+  bjvm_drop_handle(thread, field_mirror);
 }
 
 void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
@@ -549,18 +528,52 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       bootstrap_class_create(thread, STR("java/lang/reflect/Method"));
   bjvm_initialize_class(thread, reflect_Method);
 
-  struct bjvm_native_Method *result = method->reflection_method =
+  method->reflection_method =
       (void *)new_object(thread, reflect_Method);
-  result->reflected_method = method;
-  result->name = bjvm_intern_string(thread, method->name);
-  result->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
-  result->modifiers = method->access_flags;
-  result->signature = make_string(thread, method->descriptor);
+  bjvm_handle *result = bjvm_make_handle(thread, (void*)method->reflection_method);
+#define M ((struct bjvm_native_Method *)result->obj)
+  M->reflected_method = method;
+  M->name = bjvm_intern_string(thread, method->name);
+  M->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
+  M->modifiers = method->access_flags;
+  M->signature = make_string(thread, method->descriptor);
+  for (int i = 0; i < method->attributes_count; ++i) {
+    if (method->attributes[i].kind ==
+        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
+      const bjvm_attribute_runtime_visible_annotations a =
+          method->attributes[i].annotations;
+      M->annotations =
+          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
+      if (M->annotations)
+        memcpy(ArrayData(M->annotations), a.data, method->attributes[i].length);
+      break;
+    }
+    if (method->attributes[i].kind ==
+               BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS) {
+      const bjvm_attribute_runtime_visible_parameter_annotations a =
+          method->attributes[i].parameter_annotations;
+      M->parameterAnnotations =
+          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
+      if (M->parameterAnnotations)
+        memcpy(ArrayData(M->parameterAnnotations), a.data,
+               method->attributes[i].length);
+    }
+    if (method->attributes[i].kind ==
+      BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT) {
+      const bjvm_attribute_annotation_default a =
+          method->attributes[i].annotation_default;
+      M->annotationDefault = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE,
+                                                     a.length, true);
+      if (M->annotationDefault)
+        memcpy(ArrayData(M->annotationDefault), a.data,
+               method->attributes[i].length);
+    }
+  }
 
-  result->parameterTypes = CreateObjectArray1D(
+  M->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
       method->parsed_descriptor->args_count, true);
-  struct bjvm_native_Class **types = (void *)ArrayData(result->parameterTypes);
+  struct bjvm_native_Class **types = (void *)ArrayData(M->parameterTypes);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->parsed_descriptor->args_count; ++i) {
     bjvm_utf8 desc =
@@ -571,12 +584,14 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 
   bjvm_utf8 ret_desc =
       unparse_field_descriptor(str, &method->parsed_descriptor->return_type);
-  result->returnType = (void *)bjvm_get_class_mirror(
+  M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
 
   // TODO parse and fill these in
-  result->exceptionTypes = CreateObjectArray1D(
+  M->exceptionTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0, true);
+
+  bjvm_drop_handle(thread, result);
 }
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
@@ -646,14 +661,7 @@ bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind) {
 bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread,
                                               bjvm_type_kind kind,
                                               const bjvm_utf8 name) {
-  bjvm_classdesc *mirror_desc =
-      bootstrap_class_create(thread, STR("java/lang/Class"));
-  assert(mirror_desc->state == BJVM_CD_STATE_INITIALIZED);
-
   bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
-  struct bjvm_native_Class *mirror = (void *)new_object(thread, mirror_desc);
-
-  mirror->reflected_class = desc;
 
   desc->kind = BJVM_CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
@@ -661,7 +669,6 @@ bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread,
   desc->access_flags =
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
   desc->array_type = nullptr;
-  desc->mirror = mirror;
   desc->primitive_component = kind;
   desc->dtor = free_primitive_classdesc;
 
@@ -693,6 +700,12 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
                                     STR("double"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_VOID)] =
       bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, STR("void"));
+
+  // Set up mirrors
+  for (int i = 0; i < 9; ++i) {
+    bjvm_classdesc *desc = vm->primitive_classes[i];
+    desc->mirror = bjvm_get_class_mirror(thread, desc);
+  }
 }
 
 bjvm_vm_options bjvm_default_vm_options() {
@@ -798,6 +811,14 @@ bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc,
     }
   }
 
+  // Then look on superinterfaces
+  for (int i = 0; i < classdesc->interfaces_count; ++i) {
+    bjvm_cp_field *result = bjvm_field_lookup(classdesc->interfaces[i]->classdesc,
+                                            name, descriptor);
+    if (result)
+      return result;
+  }
+
   if (classdesc->super_class) {
     return bjvm_field_lookup(classdesc->super_class->classdesc, name,
                              descriptor);
@@ -842,6 +863,10 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
   bjvm_classdesc *desc;
 
+  desc = bootstrap_class_create(thr, STR("java/lang/Class"));
+  bjvm_initialize_class(thr, desc);
+  bjvm_vm_init_primitive_classes(thr);
+
   // Pre-allocate OOM and stack overflow errors
   desc = bootstrap_class_create(thr, STR("java/lang/OutOfMemoryError"));
   bjvm_initialize_class(thr, desc);
@@ -850,12 +875,6 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   desc = bootstrap_class_create(thr, STR("java/lang/StackOverflowError"));
   bjvm_initialize_class(thr, desc);
   thr->stack_overflow_error = new_object(thr, desc);
-
-  // Link (but don't initialize) java.lang.Class immediately
-  desc = bootstrap_class_create(thr, STR("java/lang/Class"));
-  bjvm_initialize_class(thr, desc);
-
-  bjvm_vm_init_primitive_classes(thr);
 
   desc = bootstrap_class_create(thr, STR("java/lang/reflect/Field"));
   desc = bootstrap_class_create(thr, STR("java/lang/reflect/Constructor"));
@@ -1645,7 +1664,17 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
   classdesc->state = BJVM_CD_STATE_INITIALIZING;
   int failed_to_init = 0;
 
-  // TODO initialize supers
+  if (classdesc->super_class) {
+    failed_to_init = bjvm_initialize_class(thread, classdesc->super_class->classdesc);
+    if (failed_to_init)
+      goto done;
+  }
+
+  for (int i = 0; i < classdesc->interfaces_count; ++i) {
+    failed_to_init = bjvm_initialize_class(thread, classdesc->interfaces[i]->classdesc);
+    if (failed_to_init)
+      goto done;
+  }
 
   if (initialize_constant_value_fields(thread, classdesc)) {
     failed_to_init = -1;
@@ -2252,8 +2281,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
 
   if (!method || !target ||
       (insn->kind != bjvm_insn_invokespecial &&
-       target->descriptor != insn->ic2) ||
-      !CACHE_INVOKENONSTATIC) {
+       target->descriptor != insn->ic2)) {
     argc = insn->args = info->method_descriptor->args_count + 1;
 
     assert(argc <= frame->stack_depth);
@@ -2398,7 +2426,7 @@ bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_bytecode_insn *insn) {
   bjvm_cp_method *method = insn->ic;
   const bjvm_cp_method_info *info = &insn->cp->methodref;
-  if (!method || !CACHE_INVOKESTATIC) {
+  if (!method) {
     bjvm_cp_class_info *class = info->class_info;
 
     int status = bjvm_resolve_class(thread, class);

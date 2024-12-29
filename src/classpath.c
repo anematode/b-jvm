@@ -309,8 +309,9 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     }
 
     // Find the compressed data
-    uint16_t filename_len = *(uint16_t *)(jar_entry->header + 26);
-    uint16_t extra_len = *(uint16_t *)(jar_entry->header + 28);
+    uint16_t filename_len, extra_len;
+    memcpy(&filename_len, jar_entry->header + 26, 2);
+    memcpy(&extra_len, jar_entry->header + 28, 2);
     uint32_t offset = 30 + filename_len + extra_len;
     if (offset + jar_entry->compressed_size + (jar_entry->header - jar->data) >
         jar->size_bytes) {

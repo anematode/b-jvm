@@ -16,6 +16,10 @@ DECLARE_NATIVE("java/lang", Thread, isAlive, "()Z") {
   return (bjvm_stack_value){.i = 0}; // TODO
 }
 
+DECLARE_NATIVE("java/lang", Thread, holdsLock, "(Ljava/lang/Object;)Z") {
+  return (bjvm_stack_value){.i = 0}; // TODO
+}
+
 DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
   return value_null(); // TODO
 }

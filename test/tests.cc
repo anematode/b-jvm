@@ -529,8 +529,15 @@ TEST_CASE("JSON tests") {
   auto result = run_test_case(classpath, true, "GsonExample");
   REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}
-)");
+{"name":"Goober","age":21})");
 }
+
+#if 0
+TEST_CASE("java.lang.reflect.Method", "[reflection]") {
+  auto result = run_test_case("test_files/reflection_method/", false, "ReflectionMethod");
+  REQUIRE(result.stdout_ == "abcdefghijklmnopqr");
+}
+#endif
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/playground/", false);
