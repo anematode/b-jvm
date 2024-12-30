@@ -31,7 +31,7 @@ jobs:
       run: mkdir ${{github.workspace}}/test/jre8
       
     - name: Unzip
-      run: unzip ${{github.workspace}}/test/rt.jar -d ${{github.workspace}}/test/jre8
+      run: unzip ${{github.workspace}}/test/jre/lib/rt.jar -d ${{github.workspace}}/test/jre8
 
     - name: Build
       # Build your program with the given configuration
