@@ -83,6 +83,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
       method->descriptor->args_count, true);
 
+
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     INIT_STACK_STRING(desc, 1000);
     desc = bjvm_unparse_field_descriptor(desc, &method->descriptor->args[i]);
@@ -110,47 +111,31 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   M->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   M->modifiers = method->access_flags;
   M->signature = make_string(thread, method->unparsed_descriptor);
+
   for (int i = 0; i < method->attributes_count; ++i) {
-    if (method->attributes[i].kind ==
-        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
-      const bjvm_attribute_runtime_visible_annotations a =
-          method->attributes[i].annotations;
-      M->annotations =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
-      if (M->annotations)
-        memcpy(ArrayData(M->annotations), a.data, method->attributes[i].length);
-      break;
+    const bjvm_attribute *attr = method->attributes + i;
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
+      M->annotations = CreateByteArray(thread, attr->annotations.data,
+                                       attr->annotations.length);
     }
-    if (method->attributes[i].kind ==
-        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS) {
-      const bjvm_attribute_runtime_visible_parameter_annotations a =
-          method->attributes[i].parameter_annotations;
-      M->parameterAnnotations =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
-      if (M->parameterAnnotations)
-        memcpy(ArrayData(M->parameterAnnotations), a.data,
-               method->attributes[i].length);
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS) {
+      M->parameterAnnotations = CreateByteArray(thread, attr->parameter_annotations.data,
+                                       attr->parameter_annotations.length);
     }
-    if (method->attributes[i].kind == BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT) {
-      const bjvm_attribute_annotation_default a =
-          method->attributes[i].annotation_default;
-      M->annotationDefault =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
-      if (M->annotationDefault)
-        memcpy(ArrayData(M->annotationDefault), a.data,
-               method->attributes[i].length);
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT) {
+      M->annotationDefault = CreateByteArray(thread, attr->annotation_default.data,
+                                             attr->annotation_default.length);
     }
   }
 
   M->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
       method->descriptor->args_count, true);
-  struct bjvm_native_Class **types = (void *)ArrayData(M->parameterTypes);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     bjvm_utf8 desc =
         bjvm_unparse_field_descriptor(str, &method->descriptor->args[i]);
-    types[i] = (void *)bjvm_get_class_mirror(
+    ((void**)ArrayData(M->parameterTypes))[i] = (void *)bjvm_get_class_mirror(
         thread, load_class_of_field_descriptor(thread, desc));
   }
 
@@ -158,10 +143,9 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       bjvm_unparse_field_descriptor(str, &method->descriptor->return_type);
   M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
-
-  // TODO parse and fill these in
   M->exceptionTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0, true);
+  // TODO parse these ^^
 
   bjvm_drop_handle(thread, result);
 }
