@@ -318,8 +318,8 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     memcpy(&filename_len, jar_entry->header + 26, 2);
     memcpy(&extra_len, jar_entry->header + 28, 2);
     uint32_t offset = 30 + filename_len + extra_len;
-    if (offset + jar_entry->compressed_size + (jar_entry->header - jar->data) >
-        jar->size_bytes) {
+    if ((uint64_t)offset + jar_entry->compressed_size +
+      (jar_entry->header - jar->data) > jar->size_bytes) {
       return CORRUPT;
     }
 
@@ -356,7 +356,7 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
   return NOT_FOUND;
 }
 
-heap_string concat_path(heap_string name, bjvm_utf8 filename) {
+static heap_string concat_path(heap_string name, bjvm_utf8 filename) {
   bool slash = !name.len || name.chars[name.len - 1] != '/';
   heap_string result = make_heap_str(name.len + slash + filename.len);
   [[maybe_unused]] bjvm_utf8 slice =
@@ -366,10 +366,22 @@ heap_string concat_path(heap_string name, bjvm_utf8 filename) {
   return result;
 }
 
-int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
+bool bad_filename(const bjvm_utf8 filename) {
+  for (int i = 0; i < filename.len - 1; ++i) {
+    if (filename.chars[i] == '.' && filename.chars[i + 1] == '.') {
+      return true;
+    }
+  }
+  return false;
+}
+
+int bjvm_lookup_classpath(bjvm_classpath *cp, const bjvm_utf8 filename,
                           uint8_t **bytes, size_t *len) {
   *bytes = nullptr;
   *len = 0;
+  if (bad_filename(filename)) {
+    return -1;
+  }
   for (int i = 0; i < cp->entries_len; i++) {
     bjvm_classpath_entry *entry = &cp->entries[i];
     if (entry->jar) {

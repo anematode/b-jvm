@@ -12,7 +12,7 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
     assembled[arg_i++] = (bjvm_stack_value){.obj = args[1].handle->obj};
   }
 
-  int args_count = method->parsed_descriptor->args_count;
+  int args_count = method->descriptor->args_count;
   bjvm_obj_header **data = ArrayData(args[2].handle->obj);
   for (int i = 0; i < args_count; i++) {
     assembled[arg_i++] = (bjvm_stack_value){.obj = data[i]};

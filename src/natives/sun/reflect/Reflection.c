@@ -3,12 +3,12 @@
 DECLARE_NATIVE("sun/reflect", Reflection, getCallerClass,
                "()Ljava/lang/Class;") {
   // Look at frame before latest frame
-  if (thread->frames_count < 2) {
+  if (thread->frames_count < 3) {
     return value_null();
   }
-  bjvm_stack_frame *frame = thread->frames[thread->frames_count - 2];
+  bjvm_stack_frame *frame = thread->frames[thread->frames_count - 3];
   return (bjvm_stack_value){
-      .obj = (void *)bjvm_get_class_mirror(thread, frame->method->my_class)};
+      .obj = (void *)bjvm_get_class_mirror(thread, bjvm_get_frame_method(frame)->my_class)};
 }
 
 DECLARE_NATIVE("sun/reflect", Reflection, getClassAccessFlags,

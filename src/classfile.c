@@ -68,7 +68,7 @@ void free_constant_pool_entry(bjvm_cp_entry *entry) {
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    free_method_descriptor(entry->methodref.method_descriptor);
+    free_method_descriptor(entry->methodref.descriptor);
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
@@ -216,7 +216,7 @@ void free_method(bjvm_cp_method *method) {
     bjvm_free_attribute(&method->attributes[i]);
   free_code_analysis(method->code_analysis);
   free_wasm_compiled_method(method->compiled_method);
-  free_method_descriptor(method->parsed_descriptor);
+  free_method_descriptor(method->descriptor);
   free(method->attributes);
 }
 
@@ -630,7 +630,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
                fmt_slice(nat->name), fmt_slice(nat->descriptor), error);
       format_error_dynamic(buf);
     }
-    entry->methodref.method_descriptor = desc;
+    entry->methodref.descriptor = desc;
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
@@ -1939,7 +1939,7 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
   method.access_flags = reader_next_u16(reader, "method access flags");
   method.name = checked_get_utf8(
       ctx->cp, reader_next_u16(reader, "method name"), "method name");
-  method.descriptor =
+  method.unparsed_descriptor =
       checked_get_utf8(ctx->cp, reader_next_u16(reader, "method descriptor"),
                        "method descriptor");
   method.attributes_count = reader_next_u16(reader, "method attributes count");
@@ -1947,14 +1947,14 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
   method.attributes = malloc(method.attributes_count * sizeof(bjvm_attribute));
   free_on_format_error(ctx, method.attributes);
 
-  method.parsed_descriptor = calloc(1, sizeof(bjvm_method_descriptor));
+  method.descriptor = calloc(1, sizeof(bjvm_method_descriptor));
   char *error =
-      parse_method_descriptor(method.descriptor, method.parsed_descriptor);
+      parse_method_descriptor(method.unparsed_descriptor, method.descriptor);
   if (error) {
-    free(method.parsed_descriptor);
+    free(method.descriptor);
     format_error_dynamic(error);
   }
-  complex_free_on_format_error(ctx, method.parsed_descriptor,
+  complex_free_on_format_error(ctx, method.descriptor,
                                free_method_descriptor);
 
   for (int i = 0; i < method.attributes_count; i++) {

@@ -187,8 +187,10 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
       ++fields;
     }
   }
+  bjvm_classdesc* Field = bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
+  bjvm_initialize_class(thread, Field);
   bjvm_obj_header *result = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/reflect/Field")),
+      thread, Field,
       fields, true);
   if (!result)
     return value_null();

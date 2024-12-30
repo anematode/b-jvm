@@ -17,6 +17,8 @@ typedef struct {
   int cap;
 } bjvm_dominated_list_t;
 
+typedef struct bjvm_bytecode_insn bjvm_bytecode_insn;
+
 typedef struct bjvm_basic_block {
   int my_index;
 
@@ -58,7 +60,7 @@ typedef struct bjvm_basic_block {
 // Also, we progressively resolve the state of the stack and local variable
 // table at each program counter, and store a bitset of which stack/local
 // variables are references, so that the GC can follow them.
-typedef struct {
+typedef struct bjvm_code_analysis {
   union {
     struct {
       // wasm jit depends on the order here

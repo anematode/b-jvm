@@ -446,7 +446,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
                                 bjvm_analy_stack_state *locals,
                                 int **locals_swizzle) {
   const bjvm_attribute_code *code = method->code;
-  const bjvm_method_descriptor *desc = method->parsed_descriptor;
+  const bjvm_method_descriptor *desc = method->descriptor;
   assert(code);
   uint16_t max_locals = code->max_locals;
   locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
@@ -925,7 +925,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
                             BJVM_CP_KIND_METHOD_REF |
                                 BJVM_CP_KIND_INTERFACE_METHOD_REF,
                             "invoke* argument")
-            ->methodref.method_descriptor;
+            ->methodref.descriptor;
     for (int j = descriptor->args_count - 1; j >= 0; --j) {
       bjvm_field_descriptor *field = descriptor->args + j;
       POP_KIND(field_to_kind(field))

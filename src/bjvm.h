@@ -205,37 +205,92 @@ typedef struct {
   bjvm_utf8 classpath;
 } bjvm_vm_options;
 
+// Stack frame associated with a Java method.
+//
 // Frames are aligned to 8 bytes, the natural alignment of a stack value.
 // Layout:
 //             -> stack grows this way
-// ┌──────────┬───────────────────────────────┬───────────────────────────────┐
-// │ metadata │ max_stack * bjvm_stack_value  │ max_locals * bjvm_stack_value │
-// └──────────┴───────────────────────────────┴───────────────────────────────┘
+// ┌──────────┬───────────────────────────────┬───────────────────────────────────────────────┐
+// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x bjvm_stack_value │
+// └──────────┴───────────────────────────────┴───────────────────────────────────────────────┘
+//                      stack values                            local values
+//
+// The stack depth should be inferred from the program counter: In particular,
+// the method contains an analysis of the stack depth at each instruction.
 typedef struct {
-  // Don't change these types or their order w/o changing the respective stores
-  // in wasm_jit.c > spill or load code
+  uint16_t is_native;       // always 0
+  uint16_t values_count;
   uint16_t program_counter; // in instruction indices
-  uint16_t stack_depth;
   uint16_t max_stack;
-  uint16_t max_locals;
 
-  // initialized to 0 on frame creation, but used by the currently executing
-  // instruction to enable partial completions due to interruption. All
-  // invoke* instructions use this field.
-  int state;
-  // Used by invoke* instructions: native state passed into the async native
-  void *native_state;
-  // Used by invoke* instructions: handles passed into the native method
-  bjvm_value *native_args;
-  // When an inner frame completes, the result is stored here. (The top-level
-  // frame doesn't have its result stored anywhere.)
-  bjvm_stack_value result_of_next;
   // The method associated with this frame
   bjvm_cp_method *method;
+  // When the next frame completes in bjvm_bytecode_interpret, and a "result"
+  // pointer isn't explicitly passed to the method, the result is stored here.
+  bjvm_stack_value result_of_next;
+  // Used by some instructions for interrupting
+  int state;
 
-  // First max_locals bjvm_stack_values, then max_stack more
-  bjvm_stack_value values[];
+  // The first max_stack values correspond to data on the stack
+  bjvm_stack_value values[] __attribute__((__counted_by__(values_count)));
+} bjvm_plain_frame;
+
+// Stack frame associated with a native method. Note that this is stored
+// separately from the (inaccessible) WebAssembly stack, and merely contains
+// data necessary for correct stack trace recovery and resumption after
+// interrupts.
+typedef struct {
+  uint16_t is_native;        // always 1
+  uint16_t values_count;     // number of args passed into the native method
+
+  // Used by async native methods for their state machines
+  int state;
+
+  // see bjvm_plain_frame
+  bjvm_cp_method *method;
+  bjvm_stack_value result_of_next;
+  // Descriptor on the instruction itself. Unequal to method->descriptor only
+  // in the situation of signature-polymorphic methods.
+  const bjvm_method_descriptor *method_shape;
+
+  // Used by async native methods to store custom state
+  void* async_native_data;
+  // Called when the thread is destroyed while the async native method is
+  // in progress; the function is not called if the method completes normally,
+  // or if an exception is thrown in an inner frame and it propagates to the
+  // native method. (The native method is invoked again in that case.)
+  //
+  // A well-behaved method should place a clean-up destructor here which will be
+  // passed the pointer in async_native_data. The destructor should not attempt
+  // to invoke any VM functions (i.e., it should only clean up things like
+  // mallocated pointers).
+  void (*free_async_native_data)(void*);
+
+  // Arguments to the native method, including the class instance as the first
+  // argument (if the method is not static)
+  bjvm_value values[] __attribute__((__counted_by__(values_count)));
+} bjvm_native_frame;
+
+// A frame is either a native frame or a plain frame. They may be distinguished
+// with bjvm_is_frame_native.
+//
+// Native frames may be consecutive: for example, a native method might invoke
+// another native method, which itself raises an interrupt.
+typedef union {
+  bjvm_plain_frame plain;
+  bjvm_native_frame native;
 } bjvm_stack_frame;
+
+// Get the current stack depth of the interpreted frame, based on the program
+// counter.
+uint16_t stack_depth(const bjvm_plain_frame *frame);
+
+bool bjvm_is_frame_native(const bjvm_stack_frame *frame);
+
+bjvm_native_frame *bjvm_get_native_frame(bjvm_stack_frame *frame);
+bjvm_plain_frame *bjvm_get_plain_frame(bjvm_stack_frame *frame);
+bjvm_cp_method *bjvm_get_frame_method(bjvm_stack_frame *frame);
+bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame);
 
 typedef struct bjvm_thread {
   // Global VM corresponding to this thread
@@ -243,7 +298,7 @@ typedef struct bjvm_thread {
 
   // Essentially the stack of the thread -- a contiguous buffer which stores
   // stack_frames
-  uint8_t *frame_buffer;
+  char *frame_buffer;
   uint32_t frame_buffer_capacity;
   // Also pointer one past the end of the last stack frame
   uint32_t frame_buffer_used;
@@ -299,7 +354,7 @@ bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
  * Create an uninitialized frame with space sufficient for the given method.
  * Raises a StackOverflowError if the frames are exhausted.
  */
-bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method);
+bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, int argc);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -402,7 +457,7 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
 // popped off, the result of that frame (if any) is placed in "result", and
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
-bjvm_interpreter_result_t bjvm_bytecode_interpret(bjvm_thread *thread,
+bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                                   bjvm_stack_frame *final_frame,
                                                   bjvm_stack_value *result);
 bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
@@ -426,16 +481,19 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
 bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
 int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                          const bjvm_utf8 exception_string);
+void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
 void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
 bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
-                                               bjvm_stack_frame *frame,
-                                               bjvm_bytecode_insn *insn);
+                                               bjvm_plain_frame *frame,
+                                               bjvm_bytecode_insn *insn,
+                                               int *sd);
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
-                                            bjvm_stack_frame *frame,
-                                            bjvm_bytecode_insn *insn);
-void dump_frame(FILE *stream, const bjvm_stack_frame *frame);
+                                            bjvm_plain_frame *frame,
+                                            bjvm_bytecode_insn *insn,
+                                            int *sd);
+void dump_frame(FILE *stream, const bjvm_plain_frame *frame);
 
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,

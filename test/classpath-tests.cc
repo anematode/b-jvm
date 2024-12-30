@@ -49,6 +49,10 @@ TEST_CASE("Folder in classpath", "[classpath]") {
       bjvm_lookup_classpath(&cp, STR("nested/boi/Boi.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
+  ret_val = bjvm_lookup_classpath(&cp, STR("../classpath_test/Chick.class"), &bytes,
+                                  &len);
+  REQUIRE(bytes == nullptr);
+  REQUIRE(ret_val == -1);
   free(bytes);
 
   bjvm_free_classpath(&cp);
@@ -56,7 +60,6 @@ TEST_CASE("Folder in classpath", "[classpath]") {
   BENCHMARK("init classpath") {
     (void)bjvm_init_classpath(
         &cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
-
     bjvm_free_classpath(&cp);
   };
 }

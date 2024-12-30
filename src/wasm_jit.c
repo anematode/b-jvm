@@ -138,7 +138,7 @@ expression set_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
 // or load parameters from the stack at the function beginning.
 expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
                               int return_value, int start, int end) {
-  int values_start = offsetof(bjvm_stack_frame, values);
+  int values_start = offsetof(bjvm_plain_frame, values);
   int value_size = sizeof(bjvm_stack_value);
 
   bjvm_compressed_bitset refs[5];
@@ -209,7 +209,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
     expression pc_sd_const = bjvm_wasm_i32_const(ctx->module, (sd << 16) | pc);
     expression store = bjvm_wasm_store(
         ctx->module, BJVM_WASM_OP_KIND_I32_STORE, frame, pc_sd_const, 0,
-        offsetof(bjvm_stack_frame, program_counter));
+        offsetof(bjvm_plain_frame, program_counter));
     *VECTOR_PUSH(result, result_count, result_cap) = store;
     if (return_value != -1) {
       *VECTOR_PUSH(result, result_count, result_cap) = bjvm_wasm_return(
@@ -257,20 +257,22 @@ bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
-                                                    bjvm_stack_frame *frame,
+                                                    bjvm_plain_frame *frame,
                                                     bjvm_bytecode_insn *insn) {
   // printf("invokestatic called!\n");
-  return bjvm_invokestatic(thread, frame, insn);
+  int sd = stack_depth(frame);
+  return bjvm_invokestatic(thread, frame, insn, &sd);
 }
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_interpreter_result_t
-wasm_runtime_invokenonstatic(bjvm_thread *thread, bjvm_stack_frame *frame,
+wasm_runtime_invokenonstatic(bjvm_thread *thread, bjvm_plain_frame *frame,
                              bjvm_bytecode_insn *insn) {
   // fprintf(stderr, "invokenonstatic called from method %.*s!\n",
   // frame->method->name.len, frame->method->name.chars); dump_frame(stderr,
   // frame);
-  return bjvm_invokenonstatic(thread, frame, insn);
+  int sd = stack_depth(frame);
+  return bjvm_invokenonstatic(thread, frame, insn, &sd);
 }
 
 void add_runtime_imports(compile_ctx *ctx) {
@@ -792,7 +794,7 @@ expression wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
                              int pc, int sd) {
   // For now, we do everything in the runtime. Eventually we'll do something
   // more clever.
-  int args = insn->cp->methodref.method_descriptor->args_count +
+  int args = insn->cp->methodref.descriptor->args_count +
              (insn->kind != bjvm_insn_invokestatic);
 
   // Spill the top n variables of the stack
@@ -817,7 +819,7 @@ expression wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
       interrupt(ctx, pc), nullptr, bjvm_wasm_int32());
 
   // Now load in the return value
-  bool is_void = insn->cp->methodref.method_descriptor->return_type.base_kind ==
+  bool is_void = insn->cp->methodref.descriptor->return_type.base_kind ==
                  BJVM_TYPE_KIND_VOID;
   expression load;
   if (!is_void)
@@ -1583,7 +1585,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
   printf(
       "Requesting compile for method %.*s on class %.*s with signature %.*s\n",
       fmt_slice(method->name), fmt_slice(method->my_class->name),
-      fmt_slice(method->descriptor));
+      fmt_slice(method->unparsed_descriptor));
 
   // Resulting signature and (roughly) behavior is same as
   // bjvm_bytecode_interpret:

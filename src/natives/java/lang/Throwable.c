@@ -2,9 +2,12 @@
 
 #include <natives.h>
 
-bool frame_mentions_object(bjvm_stack_frame *frame,
+bool frame_mentions_object(bjvm_stack_frame *raw_frame,
                            const bjvm_obj_header *obj) {
-  for (int i = 0; i < frame->max_locals + frame->max_stack; ++i) {
+  if (bjvm_is_frame_native(raw_frame))
+    return false;
+  bjvm_plain_frame *frame = bjvm_get_plain_frame(raw_frame);
+  for (int i = 0; i < frame->values_count; ++i) {
     if (frame->values[i].obj == obj) {
       bjvm_compressed_bitset refs =
           ((bjvm_code_analysis *)frame->method->code_analysis)
@@ -43,7 +46,6 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
       if (!frame_mentions_object(frame, obj->obj))
         break;
     }
-    ++i;
   }
 
   // Create stack trace of the appropriate height
@@ -51,7 +53,13 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
       thread, CreateObjectArray1D(thread, StackTraceElement, i + 1, true));
   if (!stack_trace->obj) // Failed to allocate
     return value_null();
+
   for (int j = 0; i >= 0; --i, ++j) {
+    // Check that all frames have an non-null method
+    for (int i = 0; i < thread->frames_count; ++i) {
+      assert(bjvm_get_frame_method(thread->frames[i]));
+    }
+
     bjvm_stack_frame *frame = thread->frames[i];
     // Create the stack trace element
     bjvm_handle *e =
@@ -59,13 +67,16 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     if (!e->obj) // Failed to allocate StackTraceElement
       goto cleanup;
 
+    bjvm_cp_method *method = bjvm_get_frame_method(frame);
+
 #define E ((struct bjvm_native_StackTraceElement *)e->obj)
-    int line =
-        bjvm_get_line_number(frame->method->code, frame->program_counter);
+    int line = bjvm_is_frame_native(frame)
+                   ? -1
+                   : bjvm_get_line_number(method->code, frame->plain.program_counter);
     E->declaringClass =
-        bjvm_intern_string(thread, hslc(frame->method->my_class->name));
-    E->methodName = bjvm_intern_string(thread, frame->method->name);
-    bjvm_attribute_source_file *sf = frame->method->my_class->source_file;
+        bjvm_intern_string(thread, hslc(method->my_class->name));
+    E->methodName = bjvm_intern_string(thread, method->name);
+    bjvm_attribute_source_file *sf = method->my_class->source_file;
     E->fileName = sf ? bjvm_intern_string(thread, sf->name) : nullptr;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;

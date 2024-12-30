@@ -5,12 +5,12 @@
 #ifndef BJVM_CLASSFILE_H
 #define BJVM_CLASSFILE_H
 
+#include "adt.h"
+#include "util.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include "adt.h"
-#include "util.h"
 
 typedef struct bjvm_cp_entry bjvm_cp_entry;
 typedef struct bjvm_field_descriptor bjvm_field_descriptor;
@@ -265,7 +265,7 @@ typedef struct bjvm_method_descriptor bjvm_method_descriptor;
 typedef struct {
   bjvm_cp_class_info *class_info;
   bjvm_cp_name_and_type *name_and_type;
-  bjvm_method_descriptor *method_descriptor;
+  bjvm_method_descriptor *descriptor;
 } bjvm_cp_method_info;
 
 typedef struct {
@@ -473,7 +473,7 @@ struct bjvm_bc_invokeinterface_data {
   uint8_t count;
 };
 
-typedef struct {
+typedef struct bjvm_bytecode_insn {
   bjvm_insn_code_kind kind;
   int original_pc;
 
@@ -587,14 +587,16 @@ typedef struct bjvm_attribute {
   };
 } bjvm_attribute;
 
+typedef struct bjvm_code_analysis bjvm_code_analysis;
+
 typedef struct bjvm_cp_method {
   bjvm_access_flags access_flags;
 
   bjvm_utf8 name;
-  bjvm_utf8 descriptor;
+  bjvm_utf8 unparsed_descriptor;
 
-  bjvm_method_descriptor *parsed_descriptor;
-  void *code_analysis; // bjvm_code_analysis*
+  bjvm_method_descriptor *descriptor;
+  bjvm_code_analysis* code_analysis;
 
   int attributes_count;
   bjvm_attribute *attributes;
