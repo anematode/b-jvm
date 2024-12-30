@@ -12,7 +12,6 @@ DECLARE_NATIVE("java/io", WinNTFileSystem, getBooleanAttributes,
 }
 
 static heap_string canonicalize_path(bjvm_utf8 path) {
-  // Use strtok on / to split the path into components
   bjvm_utf8 *components = nullptr;
   int count = 0, cap = 0;
 
@@ -38,6 +37,7 @@ static heap_string canonicalize_path(bjvm_utf8 path) {
     }
   }
   result.len = i;
+  free(components);
   return result;
 }
 
@@ -47,10 +47,7 @@ DECLARE_NATIVE("java/io", WinNTFileSystem, canonicalize0,
   bjvm_obj_header *path_obj = args[0].handle->obj;
   heap_string path = read_string_to_utf8(path_obj);
 
-  printf("Full path: %.*s\n", fmt_slice(path));
   heap_string canonical = canonicalize_path(hslc(path));
-
-  printf("Canonical path: %.*s\n", fmt_slice(canonical));
 
   bjvm_obj_header *result = make_string(thread, hslc(canonical));
   free_heap_str(canonical);
