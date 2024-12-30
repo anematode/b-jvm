@@ -52,7 +52,7 @@ typedef struct bjvm_string_hash_table_iterator {
 // Separate chaining hash map from (char) strings to void* (arbitrary)
 // entries. Sigh.
 typedef struct bjvm_string_hash_table {
-  void (*free_fn)(void *entry);
+  void (*free)(void *entry);
   bjvm_hash_table_entry *entries;
 
   size_t entries_count;

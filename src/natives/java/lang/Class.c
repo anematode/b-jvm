@@ -187,11 +187,10 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
       ++fields;
     }
   }
-  bjvm_classdesc* Field = bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
+  bjvm_classdesc *Field =
+      bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
   bjvm_initialize_class(thread, Field);
-  bjvm_obj_header *result = CreateObjectArray1D(
-      thread, Field,
-      fields, true);
+  bjvm_obj_header *result = CreateObjectArray1D(thread, Field, fields, true);
   if (!result)
     return value_null();
   struct bjvm_native_Field **data = ArrayData(result);
@@ -205,7 +204,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
 
 bool include_ctor(const bjvm_cp_method *method, bool public_only) {
   return utf8_equals(method->name, "<init>") &&
-    !utf8_equals(method->name, "<clinit>") &&
+         !utf8_equals(method->name, "<clinit>") &&
          (!public_only || method->access_flags & BJVM_ACCESS_PUBLIC);
 }
 
@@ -240,7 +239,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
 
 bool include_method(const bjvm_cp_method *method, bool public_only) {
   return !utf8_equals(method->name, "<init>") &&
-    !utf8_equals(method->name, "<clinit>") &&
+         !utf8_equals(method->name, "<clinit>") &&
          (!public_only || method->access_flags & BJVM_ACCESS_PUBLIC);
 }
 
@@ -336,8 +335,7 @@ DECLARE_NATIVE("java/lang", Class, getRawAnnotations, "()[B") {
   bjvm_attribute *attr = find_attribute_by_kind(
       desc, BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS);
   if (attr) {
-    bjvm_attribute_runtime_visible_annotations r =
-        attr->annotations;
+    bjvm_attribute_runtime_visible_annotations r = attr->annotations;
     bjvm_obj_header *array =
         CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, r.length, true);
     memcpy(ArrayData(array), r.data, r.length);
@@ -351,8 +349,7 @@ DECLARE_NATIVE("java/lang", Class, getRawTypeAnnotations, "()[B") {
   bjvm_attribute *attr = find_attribute_by_kind(
       desc, BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS);
   if (attr) {
-    bjvm_attribute_runtime_visible_type_annotations r =
-        attr->type_annotations;
+    bjvm_attribute_runtime_visible_type_annotations r = attr->type_annotations;
     bjvm_obj_header *array =
         CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, r.length, true);
     memcpy(ArrayData(array), r.data, r.length);

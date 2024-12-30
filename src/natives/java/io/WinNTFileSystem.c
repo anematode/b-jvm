@@ -1,6 +1,6 @@
 #include <natives.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 DECLARE_NATIVE("java/io", WinNTFileSystem, initIDs, "()V") {
   return value_null();
@@ -56,9 +56,9 @@ DECLARE_NATIVE("java/io", WinNTFileSystem, canonicalize0,
   return (bjvm_stack_value){.obj = result};
 }
 
-static int get_file_path(bjvm_obj_header *obj, heap_string* result) {
+static int get_file_path(bjvm_obj_header *obj, heap_string *result) {
   bjvm_cp_field *field = bjvm_easy_field_lookup(obj->descriptor, STR("path"),
-    STR("Ljava/lang/String;"));
+                                                STR("Ljava/lang/String;"));
   if (!field)
     return -1;
   bjvm_obj_header *str = bjvm_get_field(obj, field).obj;
@@ -68,7 +68,8 @@ static int get_file_path(bjvm_obj_header *obj, heap_string* result) {
   return 0;
 }
 
-DECLARE_NATIVE("java/io", WinNTFileSystem, getLastModifiedTime, "(Ljava/io/File;)J") {
+DECLARE_NATIVE("java/io", WinNTFileSystem, getLastModifiedTime,
+               "(Ljava/io/File;)J") {
   bjvm_obj_header *file_obj = args[0].handle->obj;
   heap_string path;
   if (get_file_path(file_obj, &path) != 0)

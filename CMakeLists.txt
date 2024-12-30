@@ -56,7 +56,9 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         src/arm64_jit.c
         src/arm64_jit.h
-        src/natives/java/util/TimeZone.c)
+        src/natives/java/util/TimeZone.c
+        src/vtable.c
+        src/vtable.h)
 target_include_directories(bjvm PRIVATE src)
 
 if (NOT EMSCRIPTEN)

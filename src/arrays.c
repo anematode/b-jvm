@@ -17,8 +17,7 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
     free_array_classdesc(classdesc->array_type);
   free_heap_str(classdesc->name);
   free(classdesc->super_class);
-  free(classdesc->interfaces[0]); // Cloneable
-  free(classdesc->interfaces[1]); // Serializable
+  free(classdesc->interfaces[0]); // Cloneable and Serializable together
   free(classdesc->interfaces);
   free(classdesc);
 }
@@ -29,18 +28,16 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
 
   bjvm_utf8 name = STR("java/lang/Object");
-
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
   info->classdesc = bootstrap_class_create(thread, name);
   info->name = name;
   base->super_class = info;
 
-  bjvm_cp_class_info *Cloneable = calloc(1, sizeof(bjvm_cp_class_info));
+  bjvm_cp_class_info *Cloneable = calloc(2, sizeof(bjvm_cp_class_info)),
+                     *Serializable = Cloneable + 1;
   Cloneable->classdesc =
       bootstrap_class_create(thread, STR("java/lang/Cloneable"));
   Cloneable->name = STR("java/lang/Cloneable");
-
-  bjvm_cp_class_info *Serializable = calloc(1, sizeof(bjvm_cp_class_info));
   Serializable->classdesc =
       bootstrap_class_create(thread, STR("java/io/Serializable"));
   Serializable->name = STR("java/io/Serializable");
@@ -60,14 +57,8 @@ primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
   result->dimensions = component_type->dimensions + 1;
   result->one_fewer_dim = component_type;
   result->primitive_component = component_type->primitive_component;
-  if (component_type->kind == BJVM_CD_KIND_PRIMITIVE) {
-    result->name = make_heap_str(2);
-    bprintf(hslc(result->name), "[%c",
-            (char)component_type->primitive_component);
-  } else {
-    result->name = make_heap_str(component_type->name.len + 1);
-    bprintf(hslc(result->name), "[%.*s", fmt_slice(component_type->name));
-  }
+  result->name = make_heap_str(2);
+  bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
   return result;
 }
 

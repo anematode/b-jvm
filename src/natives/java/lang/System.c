@@ -20,17 +20,19 @@ DECLARE_NATIVE("java/lang", System, initProperties,
   INIT_STACK_STRING(jre, 1024);
   jre = bprintf(jre, "%.*s/jre", fmt_slice(cwd));
 
-  const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
-                                {STR("stdout.encoding"), STR("UTF-8")},
-                                {STR("native.encoding"), STR("UTF-8")},
-                                {STR("stderr.encoding"), STR("UTF-8")},
-                                {STR("java.home"), jre},
-                                {STR("line.separator"), STR("\n")},
-                                {STR("path.separator"), STR(":")},
-                                {STR("sun.boot.class.path"), hslc(thread->vm->classpath.as_colon_separated)},
-                                {STR("os.name"), STR("Windows")},
-                                {STR("user.dir"), cwd},
-                                {STR("file.separator"), STR("/")}};
+  const bjvm_utf8 props[][2] = {
+      {STR("file.encoding"), STR("UTF-8")},
+      {STR("stdout.encoding"), STR("UTF-8")},
+      {STR("native.encoding"), STR("UTF-8")},
+      {STR("stderr.encoding"), STR("UTF-8")},
+      {STR("java.home"), jre},
+      {STR("line.separator"), STR("\n")},
+      {STR("path.separator"), STR(":")},
+      {STR("sun.boot.class.path"),
+       hslc(thread->vm->classpath.as_colon_separated)},
+      {STR("os.name"), STR("Windows")},
+      {STR("user.dir"), cwd},
+      {STR("file.separator"), STR("/")}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
       props_obj->descriptor, STR("put"),
       STR("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,

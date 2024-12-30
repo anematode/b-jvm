@@ -25,7 +25,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
     bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"),
-                             hslc(filename));
+                         hslc(filename));
   } else {
     *get_native_handle(fd) = (int64_t)file;
   }
@@ -38,7 +38,8 @@ DECLARE_NATIVE("java/io", RandomAccessFile, read0, "()I") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"), STR("File not open"));
+    bjvm_raise_exception(thread, STR("java/io/IOException"),
+                         STR("File not open"));
     return value_null();
   }
   int ch = fgetc(file);
@@ -50,7 +51,8 @@ DECLARE_NATIVE("java/io", RandomAccessFile, seek0, "(J)V") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"), STR("File not open"));
+    bjvm_raise_exception(thread, STR("java/io/IOException"),
+                         STR("File not open"));
     return value_null();
   }
   long pos = args[0].l;
@@ -63,7 +65,8 @@ DECLARE_NATIVE("java/io", RandomAccessFile, getFilePointer, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"), STR("File not open"));
+    bjvm_raise_exception(thread, STR("java/io/IOException"),
+                         STR("File not open"));
     return value_null();
   }
   long pos = ftell(file);
@@ -86,11 +89,11 @@ DECLARE_NATIVE("java/io", RandomAccessFile, length, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"), STR("File not open"));
+    bjvm_raise_exception(thread, STR("java/io/IOException"),
+                         STR("File not open"));
     return value_null();
   }
   fseek(file, 0, SEEK_END);
   long length = ftell(file);
   return (bjvm_stack_value){.l = length};
 }
-

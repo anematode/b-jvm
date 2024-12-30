@@ -23,7 +23,7 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   case BJVM_CD_KIND_ORDINARY: {
     bjvm_obj_header *new_obj = new_object(thread, obj->obj->descriptor);
     memcpy(new_obj + 1, obj->obj + 1,
-           obj->obj->descriptor->data_bytes - sizeof(bjvm_obj_header));
+           obj->obj->descriptor->instance_bytes - sizeof(bjvm_obj_header));
     return (bjvm_stack_value){.obj = new_obj};
   }
   case BJVM_CD_KIND_PRIMITIVE_ARRAY: {

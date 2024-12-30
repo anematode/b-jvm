@@ -125,7 +125,7 @@ bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
                                             double load_factor,
                                             size_t initial_capacity) {
   bjvm_string_hash_table table;
-  table.free_fn = free_fn;
+  table.free = free_fn;
   table.entries = calloc(initial_capacity, sizeof(bjvm_hash_table_entry));
   table.entries_count = 0;
   table.entries_cap = initial_capacity;
@@ -172,20 +172,18 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
-#define FXHASH_CONST 0x517cc1b727220a95
 static uint32_t fxhash_string(const char *key, size_t len) {
+  const uint64_t FXHASH_CONST = 0x517cc1b727220a95ULL;
   uint64_t hash = 0;
   for (size_t i = 0; i + 7 < len; i += 8) {
     uint64_t word;
     memcpy(&word, key + i, 8);
-    hash = hash << 5 | hash >> 59;
-    hash = (hash ^ word) * FXHASH_CONST;
+    hash = ((hash << 5 | hash >> 59) ^ word) * FXHASH_CONST;
   }
   if (len & 7) {
     uint64_t word = 0;
     memcpy(&word, key + len - (len & 7), len & 7);
-    hash = hash << 5 | hash >> 59;
-    hash = (hash ^ word) * FXHASH_CONST;
+    hash = ((hash << 5 | hash >> 59) ^ word) * FXHASH_CONST;
   }
   return hash;
 }
@@ -245,7 +243,7 @@ void *bjvm_hash_table_delete(bjvm_string_hash_table *tbl, const char *key,
 
 void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
   bjvm_string_hash_table new_table =
-      bjvm_make_hash_table(tbl->free_fn, tbl->load_factor, new_capacity);
+      bjvm_make_hash_table(tbl->free, tbl->load_factor, new_capacity);
   bjvm_hash_table_iterator iter = bjvm_hash_table_get_iterator(tbl);
   char *key;
   size_t len;
@@ -268,13 +266,14 @@ void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len, void *value, bool copy_key) {
   len = len == -1 ? (int)strlen(key) : len;
   bool equal, on_chain;
-  if (tbl->entries_count + 1 >= tbl->load_factor * tbl->entries_cap) {
+  if ((double)tbl->entries_count + 1 >=
+      tbl->load_factor * (double)tbl->entries_cap) {
     bjvm_hash_table_rehash(tbl, tbl->entries_cap * 2);
   }
 
-  bjvm_hash_table_entry *_prev,
-      *ent =
-          bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
+  [[maybe_unused]] bjvm_hash_table_entry *prev;
+  bjvm_hash_table_entry *ent =
+      bjvm_find_hash_table_entry(tbl, key, len, &equal, &on_chain, &prev);
   if (equal) {
     void *ret_val = ent->data;
     ent->data = value;
@@ -325,8 +324,8 @@ void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
     bjvm_hash_table_entry *ent = it.current;
     bool needs_free = it.current != it.current_base;
     free(key);
-    if (tbl.free_fn)
-      tbl.free_fn(value);
+    if (tbl.free)
+      tbl.free(value);
     bjvm_hash_table_iterator_next(&it);
     if (needs_free)
       free(ent);
@@ -337,7 +336,6 @@ void bjvm_free_hash_table(bjvm_string_hash_table tbl) {
 
 void bjvm_hash_table_reserve(bjvm_string_hash_table *tbl, size_t new_capacity) {
   // Make large enough so the load factor is less than the desired load factor
-  size_t new_cap = (new_capacity * tbl->load_factor) + 2;
-  // rehash
-  bjvm_hash_table_rehash(tbl, new_cap);
+  const size_t new = (size_t)((double)new_capacity * tbl->load_factor) + 2;
+  bjvm_hash_table_rehash(tbl, new);
 }

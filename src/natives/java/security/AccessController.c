@@ -1,6 +1,7 @@
 #include <natives.h>
 
-static bjvm_stack_value impl(bjvm_thread*thread, bjvm_obj_header *target, bjvm_obj_header *context) {
+static bjvm_stack_value impl(bjvm_thread *thread, bjvm_obj_header *target,
+                             bjvm_obj_header *context) {
   bjvm_classdesc *classdesc = target->descriptor;
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
@@ -17,10 +18,9 @@ static bjvm_stack_value impl(bjvm_thread*thread, bjvm_obj_header *target, bjvm_o
   return ret;
 }
 
-DECLARE_NATIVE(
-    "java/security", AccessController, doPrivileged,
-    "(Ljava/security/PrivilegedExceptionAction;Ljava/security/"
-    "AccessControlContext;)Ljava/lang/Object;") {
+DECLARE_NATIVE("java/security", AccessController, doPrivileged,
+               "(Ljava/security/PrivilegedExceptionAction;Ljava/security/"
+               "AccessControlContext;)Ljava/lang/Object;") {
   assert(argc == 2);
 
   return impl(thread, args[0].handle->obj, args[1].handle->obj);

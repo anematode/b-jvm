@@ -22,7 +22,7 @@ static inline bjvm_obj_header *AllocateObject(bjvm_thread *thread,
                                               size_t data_size,
                                               bool attempt_gc) {
   if (descriptor->state < BJVM_CD_STATE_LINKED)
-    *(char*)1 = 0;
+    *(char *)1 = 0;
   assert(descriptor);
   assert(descriptor->state >=
          BJVM_CD_STATE_LINKED); // important to know the size

@@ -28,7 +28,7 @@ DECLARE_NATIVE("sun/reflect", ConstantPool, getUTF8At0,
 DECLARE_NATIVE("sun/reflect", ConstantPool, getIntAt0,
                "(Ljava/lang/Object;I)I") {
   bjvm_cp_entry *entry =
-    lookup_entry(obj->obj, args[1].i, BJVM_CP_KIND_INTEGER);
+      lookup_entry(obj->obj, args[1].i, BJVM_CP_KIND_INTEGER);
   if (!entry) {
     return (bjvm_stack_value){.obj = nullptr};
   }

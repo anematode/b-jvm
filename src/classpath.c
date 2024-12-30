@@ -33,14 +33,14 @@ static struct loaded_bytes read_file(FILE *f) {
 }
 
 #ifdef EMSCRIPTEN
-struct loaded_bytes emscripten_read_file(const char * filename) {
+struct loaded_bytes emscripten_read_file(const char *filename) {
   struct loaded_bytes result = {0};
   bool exists = EM_ASM_INT(
-        {
-          const fs = require('fs');
-          return fs.existsSync(UTF8ToString($0));
-        },
-        filename);
+      {
+        const fs = require('fs');
+        return fs.existsSync(UTF8ToString($0));
+      },
+      filename);
   if (exists) {
     result.bytes = EM_ASM_PTR(
         {
@@ -321,7 +321,8 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
     memcpy(&extra_len, jar_entry->header + 28, 2);
     uint32_t offset = 30 + filename_len + extra_len;
     if ((uint64_t)offset + jar_entry->compressed_size +
-      (jar_entry->header - jar->data) > jar->size_bytes) {
+            (jar_entry->header - jar->data) >
+        jar->size_bytes) {
       return CORRUPT;
     }
 

@@ -1905,21 +1905,25 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
           reader_next_u16(&attr_reader, "method parameter access flags");
     }
   } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
-#define BYTE_ARRAY_ANNOTATION(attr_kind, union_member) \
-attr->kind = attr_kind; \
-uint8_t *data = attr->annotations.data = \
-malloc(attr_reader.len); \
-free_on_format_error(ctx, data); \
-memcpy(data, attr_reader.bytes, attr_reader.len); \
-attr->annotations.length = attr_reader.len;
+#define BYTE_ARRAY_ANNOTATION(attr_kind, union_member)                         \
+  attr->kind = attr_kind;                                                      \
+  uint8_t *data = attr->annotations.data = malloc(attr_reader.len);            \
+  free_on_format_error(ctx, data);                                             \
+  memcpy(data, attr_reader.bytes, attr_reader.len);                            \
+  attr->annotations.length = attr_reader.len;
 
-    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS, annotations);
+    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS,
+                          annotations);
   } else if (utf8_equals(attr->name, "RuntimeVisibleParameterAnnotations")) {
-    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS, parameter_annotations);
+    BYTE_ARRAY_ANNOTATION(
+        BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS,
+        parameter_annotations);
   } else if (utf8_equals(attr->name, "RuntimeVisibleTypeAnnotations")) {
-    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS, type_annotations);
+    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS,
+                          type_annotations);
   } else if (utf8_equals(attr->name, "AnnotationDefault")) {
-    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT, annotation_default);
+    BYTE_ARRAY_ANNOTATION(BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT,
+                          annotation_default);
   } else if (utf8_equals(attr->name, "Signature")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_SIGNATURE;
     attr->signature.utf8 = checked_get_utf8(
@@ -1954,8 +1958,7 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
     free(method.descriptor);
     format_error_dynamic(error);
   }
-  complex_free_on_format_error(ctx, method.descriptor,
-                               free_method_descriptor);
+  complex_free_on_format_error(ctx, method.descriptor, free_method_descriptor);
 
   for (int i = 0; i < method.attributes_count; i++) {
     bjvm_attribute *attrib = &method.attributes[i];

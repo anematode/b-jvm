@@ -7,6 +7,7 @@
 
 #include "adt.h"
 #include "util.h"
+#include "vtable.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -367,6 +368,7 @@ typedef struct bjvm_constant_pool {
   bjvm_cp_entry entries[];
 } bjvm_constant_pool;
 
+// Access flags. Same as given in the class file specification.
 typedef enum {
   BJVM_ACCESS_PUBLIC = 0x0001,
   BJVM_ACCESS_PRIVATE = 0x0002,
@@ -386,19 +388,19 @@ typedef enum {
 } bjvm_access_flags;
 
 typedef enum {
-  BJVM_ATTRIBUTE_KIND_CODE = 0,
-  BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE = 1,
-  BJVM_ATTRIBUTE_KIND_UNKNOWN = 2,
-  BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS = 3,
-  BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD = 4,
-  BJVM_ATTRIBUTE_KIND_SOURCE_FILE = 5,
-  BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE = 6,
-  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS = 7,
-  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS = 8,
-  BJVM_ATTRIBUTE_KIND_SIGNATURE = 9,
-  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS = 10,
-  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS = 11,
-  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT = 12,
+  BJVM_ATTRIBUTE_KIND_CODE,
+  BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE,
+  BJVM_ATTRIBUTE_KIND_UNKNOWN,
+  BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS,
+  BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD,
+  BJVM_ATTRIBUTE_KIND_SOURCE_FILE,
+  BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE,
+  BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS,
+  BJVM_ATTRIBUTE_KIND_SIGNATURE,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS,
+  BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS,
+  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -549,7 +551,7 @@ typedef struct {
 } bjvm_attribute_runtime_visible_parameter_annotations;
 
 typedef struct {
-  uint8_t* data;
+  uint8_t *data;
   int length;
 } bjvm_attribute_runtime_visible_type_annotations;
 
@@ -596,7 +598,7 @@ typedef struct bjvm_cp_method {
   bjvm_utf8 unparsed_descriptor;
 
   bjvm_method_descriptor *descriptor;
-  bjvm_code_analysis* code_analysis;
+  bjvm_code_analysis *code_analysis;
 
   int attributes_count;
   bjvm_attribute *attributes;
@@ -643,7 +645,6 @@ typedef bjvm_utf8 cp_string;
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
   bjvm_classdesc_state state;
-
   bjvm_constant_pool *pool;
 
   bjvm_access_flags access_flags;
@@ -659,21 +660,17 @@ typedef struct bjvm_classdesc {
   int methods_count;
   bjvm_cp_method *methods;
 
-  int bootstrap_methods_count;
   bjvm_attribute_bootstrap_methods *bootstrap_methods;
-
   bjvm_attribute_source_file *source_file;
 
   int attributes_count;
   bjvm_attribute *attributes;
-
   bjvm_classdesc *array_type;
 
   uint8_t *static_fields;
-  int data_bytes;
-  // Padding bytes before nonstatic fields for implementation details (e.g.
-  // pointers to VM constructs)
-  int imp_padding;
+  // Number of bytes (including the object header) which an instance of this
+  // class takes up. Unused for array types.
+  int instance_bytes;
 
   struct bjvm_native_Class *mirror;
   struct bjvm_native_ConstantPool *cp_mirror;
@@ -689,10 +686,13 @@ typedef struct bjvm_classdesc {
   int dimensions;                     // array types only
   bjvm_type_kind primitive_component; // primitives and array types only
 
-  bjvm_bytecode_insn **indy_insns; // used to get GC roots
   int indy_insns_count;
+  bjvm_bytecode_insn **indy_insns; // used to get GC roots
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
+
+  bjvm_vtable vtable;
+  bjvm_itable itable;
 } bjvm_classdesc;
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

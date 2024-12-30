@@ -540,5 +540,7 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 #endif
 
 TEST_CASE("Playground") {
-  //auto result = run_test_case("test_files/compiler:jre/lib/tools.jar:jre/lib/resources.jar", false);
+  // auto result =
+  // run_test_case("test_files/compiler:jre/lib/tools.jar:jre/lib/resources.jar",
+  // false);
 }

@@ -8,7 +8,8 @@ DECLARE_NATIVE("sun/reflect", Reflection, getCallerClass,
   }
   bjvm_stack_frame *frame = thread->frames[thread->frames_count - 3];
   return (bjvm_stack_value){
-      .obj = (void *)bjvm_get_class_mirror(thread, bjvm_get_frame_method(frame)->my_class)};
+      .obj = (void *)bjvm_get_class_mirror(
+          thread, bjvm_get_frame_method(frame)->my_class)};
 }
 
 DECLARE_NATIVE("sun/reflect", Reflection, getClassAccessFlags,

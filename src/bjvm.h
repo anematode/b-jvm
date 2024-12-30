@@ -211,14 +211,15 @@ typedef struct {
 // Layout:
 //             -> stack grows this way
 // ┌──────────┬───────────────────────────────┬───────────────────────────────────────────────┐
-// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x bjvm_stack_value │
+// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x
+// bjvm_stack_value │
 // └──────────┴───────────────────────────────┴───────────────────────────────────────────────┘
 //                      stack values                            local values
 //
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
 typedef struct {
-  uint16_t is_native;       // always 0
+  uint16_t is_native; // always 0
   uint16_t values_count;
   uint16_t program_counter; // in instruction indices
   uint16_t max_stack;
@@ -240,8 +241,8 @@ typedef struct {
 // data necessary for correct stack trace recovery and resumption after
 // interrupts.
 typedef struct {
-  uint16_t is_native;        // always 1
-  uint16_t values_count;     // number of args passed into the native method
+  uint16_t is_native;    // always 1
+  uint16_t values_count; // number of args passed into the native method
 
   // Used by async native methods for their state machines
   int state;
@@ -254,7 +255,7 @@ typedef struct {
   const bjvm_method_descriptor *method_shape;
 
   // Used by async native methods to store custom state
-  void* async_native_data;
+  void *async_native_data;
   // Called when the thread is destroyed while the async native method is
   // in progress; the function is not called if the method completes normally,
   // or if an exception is thrown in an inner frame and it propagates to the
@@ -264,7 +265,7 @@ typedef struct {
   // passed the pointer in async_native_data. The destructor should not attempt
   // to invoke any VM functions (i.e., it should only clean up things like
   // mallocated pointers).
-  void (*free_async_native_data)(void*);
+  void (*free_async_native_data)(void *);
 
   // Arguments to the native method, including the class instance as the first
   // argument (if the method is not static)
@@ -354,7 +355,8 @@ bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
  * Create an uninitialized frame with space sufficient for the given method.
  * Raises a StackOverflowError if the frames are exhausted.
  */
-bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, int argc);
+bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method,
+                                  bjvm_stack_value *args, int argc);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -458,8 +460,8 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
 bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
-                                                  bjvm_stack_frame *final_frame,
-                                                  bjvm_stack_value *result);
+                                         bjvm_stack_frame *final_frame,
+                                         bjvm_stack_value *result);
 bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
                                                 bjvm_classdesc *classdesc);
 
@@ -491,8 +493,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
                                                int *sd);
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_plain_frame *frame,
-                                            bjvm_bytecode_insn *insn,
-                                            int *sd);
+                                            bjvm_bytecode_insn *insn, int *sd);
 void dump_frame(FILE *stream, const bjvm_plain_frame *frame);
 
 // e.g. int.class
@@ -510,6 +511,8 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
 struct bjvm_native_ConstantPool *
 bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc);
 
+bjvm_utf8 bjvm_unparse_field_descriptor(bjvm_utf8 str,
+                                        const bjvm_field_descriptor *desc);
 void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_classdesc *classdesc,
                                    bjvm_cp_field *field);

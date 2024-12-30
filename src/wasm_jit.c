@@ -225,7 +225,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
 
 EMSCRIPTEN_KEEPALIVE
 void *wasm_runtime_new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  return AllocateObject(thread, classdesc, classdesc->data_bytes, false);
+  return AllocateObject(thread, classdesc, classdesc->instance_bytes, false);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -843,7 +843,7 @@ bjvm_wasm_expression *wasm_lower_new(compile_ctx *ctx,
   if (!class) {
     return nullptr;
   }
-  int reserve_bytes = insn->cp->class_info.classdesc->data_bytes;
+  int reserve_bytes = insn->cp->class_info.classdesc->instance_bytes;
   // round up to 8 bytes
   reserve_bytes = (reserve_bytes + 7) & ~7;
 

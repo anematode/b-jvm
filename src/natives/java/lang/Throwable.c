@@ -10,7 +10,7 @@ bool frame_mentions_object(bjvm_stack_frame *raw_frame,
   for (int i = 0; i < frame->values_count; ++i) {
     if (frame->values[i].obj == obj) {
       bjvm_compressed_bitset refs =
-          ((bjvm_code_analysis *)frame->method->code_analysis)
+          (frame->method->code_analysis)
               ->insn_index_to_references[frame->program_counter];
       if (bjvm_test_compressed_bitset(refs, i)) {
         return true;
@@ -70,9 +70,10 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
     bjvm_cp_method *method = bjvm_get_frame_method(frame);
 
 #define E ((struct bjvm_native_StackTraceElement *)e->obj)
-    int line = bjvm_is_frame_native(frame)
-                   ? -1
-                   : bjvm_get_line_number(method->code, frame->plain.program_counter);
+    int line =
+        bjvm_is_frame_native(frame)
+            ? -1
+            : bjvm_get_line_number(method->code, frame->plain.program_counter);
     E->declaringClass =
         bjvm_intern_string(thread, hslc(method->my_class->name));
     E->methodName = bjvm_intern_string(thread, method->name);
