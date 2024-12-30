@@ -500,6 +500,7 @@ struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread,
                                                       bjvm_type_kind prim_kind);
 
 bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const bjvm_utf8 chars);
+bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string);
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
 #include "natives_gen.h"

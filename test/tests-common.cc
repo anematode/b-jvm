@@ -230,6 +230,10 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   options.write_byte_param = &result;
 
   bjvm_vm *vm = bjvm_create_vm(options);
+  if (!vm) {
+    fprintf(stderr, "Failed to create VM");
+    return result;
+  }
   bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
 
   bjvm_utf8 m{.chars = (char *)main_class.c_str(),

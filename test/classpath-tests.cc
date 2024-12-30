@@ -31,7 +31,7 @@ TEST_CASE("Basic classpath operations", "[classpath]") {
 TEST_CASE("Folder in classpath", "[classpath]") {
   bjvm_classpath cp;
   char *error = bjvm_init_classpath(
-      &cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
+      &cp, STR("./jre/lib/rt.jar:test_files/circularity:test_files/classpath_test"));
   REQUIRE(error == nullptr);
 
   uint8_t *bytes;
@@ -59,7 +59,7 @@ TEST_CASE("Folder in classpath", "[classpath]") {
 
   BENCHMARK("init classpath") {
     (void)bjvm_init_classpath(
-        &cp, STR("rt.jar:test_files/circularity:test_files/classpath_test"));
+        &cp, STR("./jre/lib/rt.jar:test_files/circularity:test_files/classpath_test"));
     bjvm_free_classpath(&cp);
   };
 }

@@ -17,13 +17,19 @@ DECLARE_NATIVE("java/lang", System, initProperties,
   getcwd(cwd.chars, 1024);
   cwd.len = (int)strlen(cwd.chars);
 
+  INIT_STACK_STRING(jre, 1024);
+  jre = bprintf(jre, "%.*s/jre", fmt_slice(cwd));
+
   const bjvm_utf8 props[][2] = {{STR("file.encoding"), STR("UTF-8")},
                                 {STR("stdout.encoding"), STR("UTF-8")},
                                 {STR("native.encoding"), STR("UTF-8")},
                                 {STR("stderr.encoding"), STR("UTF-8")},
-                                {STR("java.home"), cwd},
+                                {STR("java.home"), jre},
                                 {STR("line.separator"), STR("\n")},
                                 {STR("path.separator"), STR(":")},
+                                {STR("sun.boot.class.path"), hslc(thread->vm->classpath.as_colon_separated)},
+                                {STR("os.name"), STR("Windows")},
+                                {STR("user.dir"), cwd},
                                 {STR("file.separator"), STR("/")}};
   bjvm_cp_method *put = bjvm_easy_method_lookup(
       props_obj->descriptor, STR("put"),
@@ -175,14 +181,22 @@ DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
 }
 
-DECLARE_NATIVE("java/lang", System, currentTimeMillis, "()J") {
+int64_t micros() {
 #ifdef EMSCRIPTEN
-  return (bjvm_stack_value){.l = (int64_t)(emscripten_get_now() * 1000)};
+  return (int64_t)(emscripten_get_now() * 1000000);
 #elifdef USE_SYS_TIME
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  return (bjvm_stack_value){.l = tv.tv_sec * 1000 + tv.tv_usec / 1000};
+  return tv.tv_sec * 1000000 + tv.tv_usec;
 #else
-  return (bjvm_stack_value){.l = time(NULL) * 1000};
+  return time(NULL) * 1000;
 #endif
+}
+
+DECLARE_NATIVE("java/lang", System, currentTimeMillis, "()J") {
+  return (bjvm_stack_value){.l = micros() / 1000};
+}
+
+DECLARE_NATIVE("java/lang", System, nanoTime, "()J") {
+  return (bjvm_stack_value){.l = micros() * 1000};
 }

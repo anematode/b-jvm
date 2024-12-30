@@ -272,6 +272,7 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
 char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path) {
   cp->entries = nullptr;
   cp->entries_cap = cp->entries_len = 0;
+  cp->as_colon_separated = make_heap_str_from(path);
   int start = 0;
   for (int i = 0; i <= path.len; i++) {
     if (i == path.len || path.chars[i] == ':') {
@@ -297,6 +298,7 @@ void bjvm_free_classpath(bjvm_classpath *cp) {
     }
   }
   free(cp->entries);
+  free_heap_str(cp->as_colon_separated);
   memset(cp, 0, sizeof(*cp));
 }
 

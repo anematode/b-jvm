@@ -42,6 +42,8 @@ typedef struct {
   bjvm_classpath_entry *entries;
   int entries_len;
   int entries_cap;
+
+  heap_string as_colon_separated;
 } bjvm_classpath;
 
 // Returns 0 if all elements in the path were loaded ok.

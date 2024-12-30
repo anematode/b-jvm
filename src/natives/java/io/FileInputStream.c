@@ -5,13 +5,13 @@ DECLARE_NATIVE("java/io", FileInputStream, initIDs, "()V") {
   return value_null();
 }
 
-bjvm_obj_header **get_fd(bjvm_obj_header *obj) {
+static bjvm_obj_header **get_fd(bjvm_obj_header *obj) {
   bjvm_cp_field *field = bjvm_easy_field_lookup(
       obj->descriptor, STR("fd"), STR("Ljava/io/FileDescriptor;"));
   return (void *)obj + field->byte_offset;
 }
 
-int64_t *get_native_handle(bjvm_obj_header *obj) {
+static int64_t *get_native_handle(bjvm_obj_header *obj) {
   bjvm_cp_field *native_fd_field =
       bjvm_easy_field_lookup(obj->descriptor, STR("handle"), STR("J"));
   return (void *)obj + native_fd_field->byte_offset;

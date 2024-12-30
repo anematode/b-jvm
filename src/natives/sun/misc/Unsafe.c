@@ -21,8 +21,9 @@ DECLARE_NATIVE("sun/misc", Unsafe, shouldBeInitialized,
 DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized,
                "(Ljava/lang/Class;)V") {
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
-  if (desc->state != BJVM_CD_STATE_INITIALIZED)
-    UNREACHABLE(); // TODO figure out what normal JVM does here
+  if (desc->state != BJVM_CD_STATE_INITIALIZED) {
+    bjvm_initialize_class(thread, desc);
+  }
   return value_null();
 }
 

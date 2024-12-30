@@ -259,8 +259,6 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread,
   assert(method != nullptr && "Method is null");
   bool argc_ok = argc == method->descriptor->args_count +
     !(method->access_flags & BJVM_ACCESS_STATIC);
-  if (!argc_ok)
-    *(char*)1 = 0;
   assert(argc_ok && "Wrong argc");
   if (method->access_flags & BJVM_ACCESS_NATIVE) {
     return bjvm_push_native_frame(thread, method, method->descriptor, args, argc);
@@ -862,7 +860,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
   options.heap_size = 1 << 23;
-  options.runtime_classpath = STR("./rt.jar");
+  options.runtime_classpath = STR("./jre/lib/rt.jar");
   return options;
 }
 
@@ -905,6 +903,8 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
   vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
+  vm->active_threads = nullptr;
+  vm->active_thread_count = vm->active_thread_cap = 0;
 
   vm->write_stdout = options.write_stdout;
   vm->write_stderr = options.write_stderr;
@@ -2735,6 +2735,7 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
       return BJVM_INTERP_RESULT_EXC;
     }
   }
+
   assert(insn->ic);
   struct bjvm_native_CallSite *cs = insn->ic;
   struct bjvm_native_MethodHandle *mh = (void *)cs->target;
@@ -4291,9 +4292,9 @@ void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
 
   for (int frame_i = 0; frame_i < thr->frames_count; ++frame_i) {
     bjvm_stack_frame *raw_frame = thr->frames[frame_i];
-    bjvm_plain_frame *frame = bjvm_get_plain_frame(raw_frame);
-    if (!frame)
+    if (bjvm_is_frame_native(raw_frame))
       continue;
+    bjvm_plain_frame *frame = bjvm_get_plain_frame(raw_frame);
     bjvm_code_analysis *analy = frame->method->code_analysis;
     bjvm_compressed_bitset refs =
         analy->insn_index_to_references[frame->program_counter];

@@ -1,12 +1,6 @@
 #include <natives.h>
 
-DECLARE_NATIVE(
-    "java/security", AccessController, doPrivileged,
-    "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;") {
-  // Look up method "run" on obj
-  assert(argc == 1);
-
-  bjvm_obj_header *target = args[0].handle->obj;
+static bjvm_stack_value impl(bjvm_thread*thread, bjvm_obj_header *target, bjvm_obj_header *context) {
   bjvm_classdesc *classdesc = target->descriptor;
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
@@ -21,6 +15,24 @@ DECLARE_NATIVE(
   bjvm_stack_value ret;
   bjvm_thread_run(thread, method, method_args, &ret);
   return ret;
+}
+
+DECLARE_NATIVE(
+    "java/security", AccessController, doPrivileged,
+    "(Ljava/security/PrivilegedExceptionAction;Ljava/security/"
+    "AccessControlContext;)Ljava/lang/Object;") {
+  assert(argc == 2);
+
+  return impl(thread, args[0].handle->obj, args[1].handle->obj);
+}
+
+DECLARE_NATIVE(
+    "java/security", AccessController, doPrivileged,
+    "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;") {
+  // Look up method "run" on obj
+  assert(argc == 1);
+
+  return impl(thread, args[0].handle->obj, nullptr);
 }
 
 DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
