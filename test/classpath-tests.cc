@@ -49,6 +49,7 @@ TEST_CASE("Folder in classpath", "[classpath]") {
       bjvm_lookup_classpath(&cp, STR("nested/boi/Boi.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
+  free(bytes);
   ret_val = bjvm_lookup_classpath(&cp, STR("../classpath_test/Chick.class"), &bytes,
                                   &len);
   REQUIRE(bytes == nullptr);
