@@ -1143,8 +1143,8 @@ bjvm_resolve_method_handle(bjvm_thread *thread,
     bjvm_resolve_class(thread, method->class_info);
     bjvm_initialize_class(thread, method->class_info->classdesc);
     bjvm_cp_method *m = bjvm_method_lookup(
-        method->class_info->classdesc, method->name_and_type->name,
-        method->name_and_type->descriptor, true, true);
+        method->class_info->classdesc, method->nat->name,
+        method->nat->descriptor, true, true);
     bjvm_reflect_initialize_method(thread, method->class_info->classdesc, m);
 
     // Call DirectMethodHandle.make(method, true)
@@ -1174,6 +1174,7 @@ static void free_ordinary_classdesc(bjvm_classdesc *cd) {
   if (cd->array_type)
     cd->array_type->dtor(cd->array_type);
   bjvm_free_classfile(*cd);
+  bjvm_free_function_tables(cd);
   free(cd);
 }
 
@@ -1351,17 +1352,25 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
 }
 
 int bjvm_link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  if (classdesc->state >= BJVM_CD_STATE_LINKED)
+    return 0;
+
   bjvm_classdesc_state st = BJVM_CD_STATE_LINKED;
-  int status = bjvm_link_class(thread, classdesc->base_component);
-  if (status) {
-    st = BJVM_CD_STATE_LINKAGE_ERROR;
+  classdesc->state = st;
+  int status = 0;
+  if (classdesc->base_component) {
+    status = bjvm_link_class(thread, classdesc->base_component);
+    if (status) {
+      st = BJVM_CD_STATE_LINKAGE_ERROR;
+    }
+    // Link all higher dimensional components
+    bjvm_classdesc *a = classdesc->base_component;
+    while (a->array_type) {
+      a = a->array_type;
+      a->state = st;
+    }
   }
-  // Link all higher dimensional components
-  bjvm_classdesc *a = classdesc->base_component;
-  while (a->array_type) {
-    a = a->array_type;
-    a->state = st;
-  }
+  bjvm_setup_function_tables(classdesc);
   return status;
 }
 
@@ -1407,13 +1416,8 @@ int allocate_field(int *current, bjvm_type_kind kind) {
 
 // Link the class.
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  assert(classdesc);
   if (classdesc->state != BJVM_CD_STATE_LOADED) {
     return 0;
-  }
-  if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
-    assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-    return bjvm_link_array_class(thread, classdesc);
   }
   // Link superclasses
   if (classdesc->super_class) {
@@ -1430,6 +1434,10 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
       return status;
     }
+  }
+  if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
+    assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
+    return bjvm_link_array_class(thread, classdesc);
   }
   classdesc->state = BJVM_CD_STATE_LINKED;
   // Link the corresponding array type(s)
@@ -1502,6 +1510,9 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   // Create static field memory, initializing all to 0
   classdesc->static_fields = calloc(static_offset, 1);
   classdesc->instance_bytes = nonstatic_offset;
+
+  // Set up vtable and itables
+  bjvm_setup_function_tables(classdesc);
 
   return 0;
 }
@@ -2224,6 +2235,41 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
   return BJVM_INTERP_RESULT_OK;
 }
 
+static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread, bjvm_cp_method_info *info) {
+  if (info->resolved) {
+    return BJVM_INTERP_RESULT_OK;
+  }
+
+  bjvm_cp_class_info *class = info->class_info;
+  int status = bjvm_resolve_class(thread, class);
+  if (status) {
+    // Failed to resolve the class in question
+    return BJVM_INTERP_RESULT_EXC;
+  }
+
+  status = bjvm_initialize_class(thread, class->classdesc);
+  if (status) {
+    // <clinit> might get interrupted, that's ok -- steps until here are
+    // idempotent
+    return status;
+  }
+
+  info->resolved = bjvm_method_lookup(class->classdesc, info->nat->name,
+                         info->nat->descriptor, true, true);
+  if (!info->resolved) {
+    INIT_STACK_STRING(complaint, 1000);
+    complaint = bprintf(
+        complaint,
+        "Could not find method %.*s with descriptor %.*s on class %.*s",
+        fmt_slice(info->nat->name),
+        fmt_slice(info->nat->descriptor), fmt_slice(class->name));
+    bjvm_incompatible_class_change_error(thread, complaint);
+    return -1;
+  }
+
+  return BJVM_INTERP_RESULT_OK;
+}
+
 // Implementation of invokespecial/invokeinterface/invokevirtual. (But not
 // invokedynamic!)
 //
@@ -2241,7 +2287,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
   bjvm_cp_method *method = insn->ic;
   int argc = insn->args;
   bjvm_obj_header *target;
-  const bjvm_cp_method_info *method_info = &insn->cp->methodref;
+  bjvm_cp_method_info *method_info = &insn->cp->methodref;
 
   if (!method || !((target = frame->values[*sd - argc].obj)) ||
       (insn->kind != bjvm_insn_invokespecial &&
@@ -2270,6 +2316,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
         insn->kind == bjvm_insn_invokespecial
             ? method_info->class_info->classdesc
             : target->descriptor;
+
     assert(lookup_on);
     if (lookup_on->state != BJVM_CD_STATE_INITIALIZED) {
       bjvm_interpreter_result_t status =
@@ -2282,17 +2329,31 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
       }
     }
 
-    method = insn->ic =
-        bjvm_method_lookup(lookup_on, method_info->name_and_type->name,
-                           method_info->name_and_type->descriptor, true, true);
-    insn->ic2 = lookup_on;
+    if (insn->kind == bjvm_insn_invokevirtual) {
+      int status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        return status;
+      // Transmogrify into a invokeinterface
+      if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
+        insn->kind = bjvm_insn_invokeinterface;
+        return bjvm_invokenonstatic(thread, frame, insn, sd);
+      }
+
+      method = insn->ic = bjvm_vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
+      insn->ic2 = target->descriptor;
+    } else {
+      method = insn->ic =
+          bjvm_method_lookup(lookup_on, method_info->nat->name,
+                             method_info->nat->descriptor, true, true);
+      insn->ic2 = lookup_on;
+    }
 
     if (!method) {
       INIT_STACK_STRING(complaint, 1000);
       complaint =
           bprintf(complaint, "No method %.*s with descriptor %.*s on %s %.*s",
-                  fmt_slice(method_info->name_and_type->name),
-                  fmt_slice(method_info->name_and_type->descriptor),
+                  fmt_slice(method_info->nat->name),
+                  fmt_slice(method_info->nat->descriptor),
                   lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
                                                                   : "class",
                   fmt_slice(lookup_on->name));
@@ -2318,7 +2379,7 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
 
   if (frame->state < INVOKE_STATE_MADE_FRAME) {
     bjvm_stack_frame *invoked_frame = bjvm_push_frame(
-        thread, method, frame->values + stack_depth(frame) - argc, argc);
+        thread, method, frame->values + *sd - argc, argc);
     if (!invoked_frame) { // stack overflow, etc.
       assert(thread->current_exception);
       return BJVM_INTERP_RESULT_EXC;
@@ -2354,32 +2415,13 @@ bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_plain_frame *frame,
                                             bjvm_bytecode_insn *insn, int *sd) {
   bjvm_cp_method *method = insn->ic;
-  const bjvm_cp_method_info *info = &insn->cp->methodref;
-  if (!method) {
-    bjvm_cp_class_info *class = info->class_info;
-    int status = bjvm_resolve_class(thread, class);
-    if (status)
-      return BJVM_INTERP_RESULT_EXC;
-
-    status = bjvm_initialize_class(thread, class->classdesc);
-    if (status) {
-      // <clinit> might get interrupted, that's ok
+  bjvm_cp_method_info *info = &insn->cp->methodref;
+  if (unlikely(!method)) {
+    bjvm_interpreter_result_t status = resolve_methodref(thread, info);
+    if (status != BJVM_INTERP_RESULT_OK) {
       return status;
     }
-
-    method = insn->ic =
-        bjvm_method_lookup(class->classdesc, info->name_and_type->name,
-                           info->name_and_type->descriptor, true, false);
-    if (!method) {
-      INIT_STACK_STRING(complaint, 1000);
-      complaint = bprintf(
-          complaint,
-          "Could not find method %.*s with descriptor %.*s on class %.*s",
-          fmt_slice(info->name_and_type->name),
-          fmt_slice(info->name_and_type->descriptor), fmt_slice(class->name));
-      bjvm_incompatible_class_change_error(thread, complaint);
-      return -1;
-    }
+    method = insn->ic = info->resolved;
   }
 
   int argc = info->descriptor->args_count;
@@ -2538,6 +2580,7 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
     if (is_handle[i]) {
       fake_frame->values[i + 4] =
           (bjvm_stack_value){.obj = handles[i].handle->obj};
+      bjvm_drop_handle(thread, handles[i].handle);
     } else {
       memcpy(fake_frame->values + i + 4, handles + i, sizeof(bjvm_stack_value));
     }

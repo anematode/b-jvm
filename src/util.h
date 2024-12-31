@@ -141,6 +141,13 @@ bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
 int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
                                    int *result_len, bool sloppy);
 
+// These are unlikely (ha!) to actually improve codegen, but are actually kind of nice
+// to indicate what we "think" is going to happen. Long term we might use these
+// macro sites to instrument certain operations and see what "unhappy" cases
+// are more common than we thought.
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#define likely(x) __builtin_expect(!!(x), 1)
+
 #ifdef __cplusplus
 }
 #endif

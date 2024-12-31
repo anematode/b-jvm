@@ -476,7 +476,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     }
     return (bjvm_cp_entry){.kind = entry_kind,
                            .methodref = {.class_info = class_info,
-                                         .name_and_type = name_and_type}};
+                                         .nat = name_and_type}};
   }
   case CONSTANT_String: {
     uint16_t index = reader_next_u16(reader, "string index");
@@ -621,7 +621,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
     bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
     free_on_format_error(ctx, desc);
-    bjvm_cp_name_and_type *nat = entry->methodref.name_and_type;
+    bjvm_cp_name_and_type *nat = entry->methodref.nat;
     char *error = parse_method_descriptor(nat->descriptor,
                                           desc); // TODO free on FormatError
     if (error) {

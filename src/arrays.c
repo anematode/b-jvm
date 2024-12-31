@@ -19,6 +19,7 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
   free(classdesc->super_class);
   free(classdesc->interfaces[0]); // Cloneable and Serializable together
   free(classdesc->interfaces);
+  bjvm_free_function_tables(classdesc);
   free(classdesc);
 }
 
@@ -59,6 +60,7 @@ primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
   result->primitive_component = component_type->primitive_component;
   result->name = make_heap_str(2);
   bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
+  bjvm_setup_function_tables(result);
   return result;
 }
 
@@ -66,8 +68,6 @@ primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
 static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
                                                 bjvm_classdesc *component) {
   bjvm_classdesc *result = calloc(1, sizeof(bjvm_classdesc));
-  // linkage state of array class is same as component class
-  result->state = component->state;
   result->kind = BJVM_CD_KIND_ORDINARY_ARRAY;
   fill_array_classdesc(thread, result);
   result->dimensions = component->dimensions + 1;
@@ -86,6 +86,13 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
 
   // propagate to n-D primitive arrays
   result->primitive_component = component->primitive_component;
+
+  // linkage state of array class is same as component class
+  result->state = BJVM_CD_STATE_LOADED;
+  if (component->state >= BJVM_CD_STATE_LINKED) {
+    bjvm_link_class(thread, result);
+  }
+  result->state = component->state;
 
   return result;
 }

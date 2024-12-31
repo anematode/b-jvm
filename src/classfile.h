@@ -265,8 +265,11 @@ typedef struct bjvm_method_descriptor bjvm_method_descriptor;
 // Used by both methodref and interface methodref
 typedef struct {
   bjvm_cp_class_info *class_info;
-  bjvm_cp_name_and_type *name_and_type;
+  bjvm_cp_name_and_type *nat;
   bjvm_method_descriptor *descriptor;
+
+  // The resolved method -- initially nullptr
+  bjvm_cp_method *resolved;
 } bjvm_cp_method_info;
 
 typedef struct {
@@ -607,6 +610,9 @@ typedef struct bjvm_cp_method {
   bool is_signature_polymorphic;
   bjvm_classdesc *my_class;
 
+  // Index in the vtable or (for an interface method) itable. Only set at class
+  // link time.
+  int vtable_index;
   void *native_handle; // bjvm_native_callback
 
   struct bjvm_native_Constructor *reflection_ctor;
@@ -616,6 +622,9 @@ typedef struct bjvm_cp_method {
   // Rough number of times this method has been called. Used for JIT heuristics.
   // Not at all exact because of interrupts.
   int call_count;
+
+  // This method overrides a method in a superclass
+  bool overrides;
 
   // JIT-compiled method
   void *compiled_method; // bjvm_wasm_instantiation_result*
@@ -692,7 +701,7 @@ typedef struct bjvm_classdesc {
   void (*dtor)(bjvm_classdesc *); // apoptosis
 
   bjvm_vtable vtable;
-  bjvm_itable itable;
+  bjvm_itables itables;
 } bjvm_classdesc;
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

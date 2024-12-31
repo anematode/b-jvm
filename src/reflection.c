@@ -102,29 +102,38 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       bootstrap_class_create(thread, STR("java/lang/reflect/Method"));
   bjvm_initialize_class(thread, reflect_Method);
 
-  method->reflection_method = (void *)new_object(thread, reflect_Method);
   bjvm_handle *result =
-      bjvm_make_handle(thread, (void *)method->reflection_method);
+      bjvm_make_handle(thread, new_object(thread, reflect_Method));
+
 #define M ((struct bjvm_native_Method *)result->obj)
+
   M->reflected_method = method;
-  M->name = bjvm_intern_string(thread, method->name);
-  M->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   M->modifiers = method->access_flags;
-  M->signature = make_string(thread, method->unparsed_descriptor);
+
+  if (!((M->name = bjvm_intern_string(thread, method->name))))
+    goto oom;
+  if (!((M->clazz = (void *)bjvm_get_class_mirror(thread, classdesc))))
+    goto oom;
+  if (!((M->signature = make_string(thread, method->unparsed_descriptor))))
+    goto oom;
 
   for (int i = 0; i < method->attributes_count; ++i) {
     const bjvm_attribute *attr = method->attributes + i;
-    if (attr->kind == BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
-      M->annotations = CreateByteArray(thread, attr->annotations.data,
-                                       attr->annotations.length);
-    }
-    if (attr->kind == BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS) {
-      M->parameterAnnotations = CreateByteArray(thread, attr->parameter_annotations.data,
-                                       attr->parameter_annotations.length);
-    }
-    if (attr->kind == BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT) {
-      M->annotationDefault = CreateByteArray(thread, attr->annotation_default.data,
-                                             attr->annotation_default.length);
+    switch (attr->kind) {
+    case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
+      if (!((M->annotations = CreateByteArray(thread, attr->annotations.data,
+                                       attr->annotations.length))))
+        goto oom;
+    case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
+      if (!((M->parameterAnnotations = CreateByteArray(thread, attr->parameter_annotations.data,
+                                       attr->parameter_annotations.length))))
+        goto oom;
+    case BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
+      if (!((M->annotationDefault = CreateByteArray(thread, attr->annotation_default.data,
+                                             attr->annotation_default.length))))
+        goto oom;
+    default:
+      break;
     }
   }
 
@@ -147,5 +156,8 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0, true);
   // TODO parse these ^^
 
+  method->reflection_method = (void *)M;
+
+oom:  // OOM while creating the Method
   bjvm_drop_handle(thread, result);
 }
