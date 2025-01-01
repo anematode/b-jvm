@@ -16,7 +16,15 @@ TEST_CASE("Benchmarks", "[bench]") {
     auto result = run_test_case("test_files/bench_stack_trace/", true);
   };
 
-  BENCHMARK("JSON"){
+  BENCHMARK("JSON startup"){
+    auto result = run_test_case("test_files/gson_example/", true, "GsonExample");
+  };
 
+  BENCHMARK("Advanced lambda"){
+    auto result = run_test_case("test_files/advanced_lambda", true);
+  };
+
+  BENCHMARK("Cfg fuck"){
+    auto result = run_test_case("test_files/cfg_fuck", true);
   };
 }

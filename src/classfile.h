@@ -194,7 +194,16 @@ typedef enum {
   bjvm_insn_newarray,
   bjvm_insn_tableswitch,
   bjvm_insn_lookupswitch,
-  bjvm_insn_ret
+  bjvm_insn_ret,
+
+  /** Resolved versions of invoke* */
+  bjvm_insn_invokevtable_monomorphic,  // inline cache with previous object
+  bjvm_insn_invokevtable_polymorphic,  // slower dispatch
+  bjvm_insn_invokeitable_monomorphic,  // inline cache with previous object
+  bjvm_insn_invokeitable_polymorphic,  // slower dispatch
+  bjvm_insn_invokecallsite,  // resolved version of invokedynamic
+  bjvm_insn_invokestatic_resolved,
+  bjvm_insn_invokespecial_resolved
 } bjvm_insn_code_kind;
 
 typedef enum : char {
@@ -511,6 +520,7 @@ typedef struct bjvm_bytecode_insn {
   void *ic;
   void *ic2;
   int args;
+  int table_index;
 } bjvm_bytecode_insn;
 
 typedef struct {
@@ -610,9 +620,10 @@ typedef struct bjvm_cp_method {
   bool is_signature_polymorphic;
   bjvm_classdesc *my_class;
 
-  // Index in the vtable or (for an interface method) itable. Only set at class
-  // link time.
+  // Index in the vtable, if applicable. Only set at class link time.
   int vtable_index;
+  // Index in the itable, if applicable.
+  int itable_index;
   void *native_handle; // bjvm_native_callback
 
   struct bjvm_native_Constructor *reflection_ctor;
@@ -625,6 +636,8 @@ typedef struct bjvm_cp_method {
 
   // This method overrides a method in a superclass
   bool overrides;
+  // This method overrides a method in an interface
+  bool overrides_interface;
 
   // JIT-compiled method
   void *compiled_method; // bjvm_wasm_instantiation_result*

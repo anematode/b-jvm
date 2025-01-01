@@ -240,6 +240,9 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
               .len = (int)main_class.size()};
 
   bjvm_classdesc *desc = bootstrap_class_create(thr, m);
+  if (!desc) {
+    return result;
+  }
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;

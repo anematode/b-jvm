@@ -2317,18 +2317,6 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
             ? method_info->class_info->classdesc
             : target->descriptor;
 
-    assert(lookup_on);
-    if (lookup_on->state != BJVM_CD_STATE_INITIALIZED) {
-      bjvm_interpreter_result_t status =
-          bjvm_initialize_class(thread, lookup_on);
-      if (status != BJVM_INTERP_RESULT_OK) {
-        // If an interrupt occurs here, that's ok; when we resume execution,
-        // <clinit> will have finished (or failed), then this instruction will
-        // be called again.
-        return status;
-      }
-    }
-
     if (insn->kind == bjvm_insn_invokevirtual) {
       int status = resolve_methodref(thread, method_info);
       if (status != BJVM_INTERP_RESULT_OK)
@@ -2341,6 +2329,19 @@ bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
 
       method = insn->ic = bjvm_vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
       insn->ic2 = target->descriptor;
+    } else if (insn->kind == bjvm_insn_invokeinterface) {
+      int status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        return status;
+      // Transmogrify into an invokevirtual
+      if (!(method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE)) {
+        insn->kind = bjvm_insn_invokevirtual;
+        return bjvm_invokenonstatic(thread, frame, insn, sd);
+      }
+
+      method = insn->ic = bjvm_itable_lookup(target->descriptor,
+        method_info->resolved->my_class, method_info->resolved->itable_index);
+      insn->ic2 = lookup_on;
     } else {
       method = insn->ic =
           bjvm_method_lookup(lookup_on, method_info->nat->name,
@@ -2743,6 +2744,21 @@ bjvm_interpreter_result_t bjvm_run_native(bjvm_thread *thread,
   return status;
 }
 
+void make_invokevtable_polymorphic(bjvm_bytecode_insn *insn) {
+  assert(insn->kind == bjvm_insn_invokevtable_monomorphic);
+  bjvm_cp_method *method = insn->ic;
+  assert(method);
+  insn->kind = bjvm_insn_invokevtable_polymorphic;
+  insn->ic2 = (void*)method->vtable_index;
+}
+
+void make_invokeitable_polymorphic(bjvm_bytecode_insn *insn) {
+  assert(insn->kind == bjvm_insn_invokeitable_monomorphic);
+  insn->kind = bjvm_insn_invokeitable_polymorphic;
+  insn->ic = (void*)insn->cp->methodref.resolved->my_class;
+  insn->ic2 = (void*)insn->cp->methodref.resolved->itable_index;
+}
+
 // Main interpreter
 bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                          bjvm_stack_frame *final_frame,
@@ -2811,6 +2827,7 @@ get_top_frame:
 interpret_frame:
   while (true) {
     bjvm_bytecode_insn *insn = &code[frame->program_counter];
+    assert(sd == stack_depth(frame));
 
 #if AGGRESSIVE_DEBUG
     heap_string insn_dump = insn_to_string(insn, frame->program_counter);
@@ -2972,7 +2989,12 @@ interpret_frame:
                                             &&bjvm_insn_newarray,
                                             &&bjvm_insn_tableswitch,
                                             &&bjvm_insn_lookupswitch,
-                                            &&bjvm_insn_ret};
+                                            &&bjvm_insn_ret,
+                                            &&bjvm_insn_invokevtable_monomorphic,
+                                            &&bjvm_insn_invokevtable_polymorphic,
+      &&bjvm_insn_invokeitable_monomorphic,
+      &&bjvm_insn_invokeitable_polymorphic,
+    };
     goto *insn_jump_table[insn->kind];
 
     // Macros to go to the next instruction in the frame
@@ -3778,9 +3800,7 @@ interpret_frame:
 
       NEXT_INSN;
     }
-    bjvm_insn_invokespecial:
-    bjvm_insn_invokeinterface:
-    bjvm_insn_invokevirtual: {
+    bjvm_insn_invokespecial: {
       status = bjvm_invokenonstatic(thread, frame, insn, &sd);
       if (status != BJVM_INTERP_RESULT_OK) {
         // If an interrupt occurs, then there will be some new frames on the
@@ -3791,6 +3811,64 @@ interpret_frame:
         goto done;
       }
       NEXT_INSN;
+    }
+    bjvm_insn_invokeinterface: {
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+      if (!(method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE)) {
+        insn->kind = bjvm_insn_invokevirtual;
+        JMP_INSN;
+      }
+      insn->kind = bjvm_insn_invokeitable_monomorphic;
+      insn->ic = bjvm_itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
+      insn->ic2 = target->descriptor;
+      if (!insn->ic) {
+        // TODO IncompatibleClassChangeError
+        UNREACHABLE();
+      }
+      JMP_INSN;
+    }
+    bjvm_insn_invokevirtual: {
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+      if (method_info->resolved->is_signature_polymorphic) {
+        status = bjvm_invokevirtual_signature_polymorphic(
+            thread, frame, &sd, method,
+            bjvm_resolve_method_type(thread, method_info->descriptor), target);
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        NEXT_INSN;
+      }
+
+      // If we found an interface method, transmogrify into a invokeinterface
+      if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
+        insn->kind = bjvm_insn_invokeinterface;
+        JMP_INSN;
+      }
+
+      insn->kind = bjvm_insn_invokevtable_monomorphic;
+      insn->ic = bjvm_vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
+      assert(method);
+      insn->ic2 = target->descriptor;
+      JMP_INSN;
     }
     bjvm_insn_invokestatic: {
       status = bjvm_invokestatic(thread, frame, insn, &sd);
@@ -3974,9 +4052,8 @@ interpret_frame:
           CreatePrimitiveArray1D(thread, insn->array_type, count, true);
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
-      } else { // failed to create array
-        /// TODO: throw OOM
-        goto done;
+      } else {
+        goto done;  // OOM
       }
       NEXT_INSN;
     }
@@ -4009,6 +4086,86 @@ interpret_frame:
     bjvm_insn_ret:
       UNREACHABLE("bjvm_insn_ret");
       NEXT_INSN;
+    bjvm_insn_invokevtable_monomorphic:
+    bjvm_insn_invokeitable_monomorphic: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
+          goto done;
+        }
+        if (target->descriptor != insn->ic2) {
+          if (insn->kind == bjvm_insn_invokevtable_monomorphic)
+            make_invokevtable_polymorphic(insn);
+          else
+            make_invokeitable_polymorphic(insn);
+          JMP_INSN;
+        }
+        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, insn->ic,
+            frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status = bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_ENTRY;
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
+        }
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_invokevtable_polymorphic:
+    bjvm_insn_invokeitable_polymorphic: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
+          goto done;
+        }
+        bjvm_cp_method *method;
+        if (insn->kind == bjvm_insn_invokevtable_polymorphic)
+          method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
+        else {
+          method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
+          if (!method) {
+            // IncompatibleClassChangeError
+            UNREACHABLE();
+          }
+        }
+        assert(method);
+        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, method,
+              frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status = bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_ENTRY;
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        frame->state = INVOKE_STATE_ENTRY;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
+        }
+      }
+      NEXT_INSN;
+    }
     }
 
     frame->program_counter++;
@@ -4378,7 +4535,6 @@ void relocate_instance_fields(bjvm_gc_ctx *ctx) {
 }
 
 void bjvm_major_gc(bjvm_vm *vm) {
-  // printf("GCing!\n");
   // TODO wait for all threads to get ready (for now we'll just call this from
   // an already-running thread)
   bjvm_gc_ctx ctx = {.vm = vm};

@@ -108,17 +108,7 @@ typedef struct {
   bjvm_native_callback callback;
 } bjvm_native_t;
 
-typedef struct bjvm_array_classdesc bjvm_array_classdesc;
-
 typedef uint64_t bjvm_mark_word_t;
-
-typedef struct bjvm_ordinary_class bjvm_ordinary_class;
-
-// Equivalent to HotSpot's InstanceKlass
-typedef struct bjvm_ordinary_class {
-  bjvm_classdesc base;
-  bjvm_classdesc classfile;
-} bjvm_ordinary_classdesc;
 
 // Appears at the top of every object -- corresponds to HotSpot's oopDesc
 typedef struct bjvm_obj_header {
@@ -168,8 +158,7 @@ typedef struct bjvm_vm {
   // Passed to write_stdout/write_stderr
   void *write_byte_param;
 
-  // Primitive classes (int.class, etc., boolean (4 -> 0) through void (12 -> 8)
-  // )
+  // Primitive classes (int.class, etc.)
   bjvm_classdesc *primitive_classes[9];
 
   // Active threads (unused for now)
@@ -211,8 +200,7 @@ typedef struct {
 // Layout:
 //             -> stack grows this way
 // ┌──────────┬───────────────────────────────┬───────────────────────────────────────────────┐
-// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x
-// bjvm_stack_value │
+// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x bjvm_stack_value │
 // └──────────┴───────────────────────────────┴───────────────────────────────────────────────┘
 //                      stack values                            local values
 //
@@ -232,7 +220,6 @@ typedef struct {
   // Used by some instructions for interrupting
   int state;
 
-  // The first max_stack values correspond to data on the stack
   bjvm_stack_value values[] __attribute__((__counted_by__(values_count)));
 } bjvm_plain_frame;
 
@@ -346,11 +333,6 @@ bjvm_handle *bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj);
 
 void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
 
-bjvm_array_classdesc *
-bjvm_checked_to_array_classdesc(bjvm_classdesc *classdesc);
-bjvm_classdesc *
-bjvm_checked_to_primitive_array_classdesc(bjvm_classdesc *classdesc);
-
 /**
  * Create an uninitialized frame with space sufficient for the given method.
  * Raises a StackOverflowError if the frames are exhausted.
@@ -421,7 +403,6 @@ bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
                                         const bjvm_utf8 descriptor,
                                         bool superclasses,
                                         bool superinterfaces);
-bjvm_utf8 bjvm_make_utf8_cstr(const bjvm_utf8 c_literal);
 
 // Run the interpreter, getting stuck if we hit an asynchronous function. This
 // should only be used when you know that you're not going to be calling any

@@ -179,6 +179,8 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(newarray)
     CASE(tableswitch)
     CASE(lookupswitch)
+    CASE(invokevtable_monomorphic)
+    CASE(invokevtable_polymorphic)
   }
   UNREACHABLE();
 }
