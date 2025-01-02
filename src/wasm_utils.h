@@ -1,5 +1,4 @@
 // Lightweight version of the parts of Binaryen that we need, written in C
-// TODO
 
 #ifndef WASM_UTILS_H
 #define WASM_UTILS_H
@@ -16,11 +15,7 @@ typedef enum {
   BJVM_WASM_TYPE_KIND_FLOAT64 = 0x7C,
   BJVM_WASM_TYPE_KIND_FLOAT32 = 0x7D,
   BJVM_WASM_TYPE_KIND_INT64 = 0x7E,
-  BJVM_WASM_TYPE_KIND_INT32 = 0x7F,
-
-  // during serialization, we'll replace this with the correct type from
-  // context (todo)
-  BJVM_WASM_TYPE_KIND_INFER
+  BJVM_WASM_TYPE_KIND_INT32 = 0x7F
 } bjvm_wasm_value_type;
 
 typedef struct {
@@ -54,16 +49,15 @@ typedef enum {
   // Instruction takes in a memory argument (align and offset)
   BJVM_WASM_EXPR_KIND_LOAD,
   BJVM_WASM_EXPR_KIND_STORE,
-  // Both block and loop go here
+  // Subsumes (block) and (loop)
   BJVM_WASM_EXPR_KIND_BLOCK,
   BJVM_WASM_EXPR_KIND_IF,
-  // Both br and br_if go here
+  // Subsumes (br) and (br_if)
   BJVM_WASM_EXPR_KIND_BR,
   BJVM_WASM_EXPR_KIND_BR_TABLE,
   BJVM_WASM_EXPR_KIND_RETURN,
   BJVM_WASM_EXPR_KIND_CALL,
   BJVM_WASM_EXPR_KIND_CALL_INDIRECT,
-
 } bjvm_wasm_expr_kind;
 
 // Generated from

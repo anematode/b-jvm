@@ -25,13 +25,14 @@ typedef struct bjvm_vtable {
   bjvm_cp_method **methods __attribute__((__counted_by__(method_count)));
 } bjvm_vtable;
 
-typedef uintptr_t bjvm_itable_method_t;  // bjvm_cp_method*
+typedef uintptr_t bjvm_itable_method_t; // bjvm_cp_method*
 
 enum {
   // The method is either abstract or ambiguous, and therefore an
   // IncompatibleClassChangeError ought to be raised if it is called.
   BJVM_ITABLE_METHOD_BIT_INVALID = 1 << 0,
-  // The method is ambiguous
+  // The method is ambiguous: there are multiple methods with the same name
+  // and signature which would be selected by an invokevirtual instruction.
   BJVM_ITABLE_METHOD_BIT_AMBIGUOUS = 1 << 1
 };
 
@@ -40,8 +41,7 @@ enum {
 // write WASM stubs for this.)
 typedef struct {
   bjvm_classdesc *interface;
-  int method_count;
-  int method_cap;
+  int method_count, method_cap;
 
   // All methods in the interface are found in at a consistent index, as
   // prescribed by the order in the original interface.
@@ -53,19 +53,18 @@ typedef struct {
 } bjvm_itable;
 
 typedef struct {
-  int interface_count;
-  int interface_cap;
-  int entries_count;
-  int entries_cap;
+  int interface_count, interface_cap, entries_count, entries_cap;
 
+  // Scan this vector for the interface in question ...
   bjvm_classdesc **interfaces __attribute__((__counted_by__(interface_count)));
+  // ... and look for the matching itable here
   bjvm_itable *entries __attribute__((__counted_by__(interface_count)));
 } bjvm_itables;
 
 // Set up a class descriptor's itables and vtable, assuming all of its
 // superinterfaces and its superclass have already been linked (and their
 // itables/vtable set up).
-void bjvm_setup_function_tables(bjvm_classdesc *classdesc);
+void bjvm_set_up_function_tables(bjvm_classdesc *classdesc);
 
 // Free memory associated with a class's vtable and itables.
 void bjvm_free_function_tables(bjvm_classdesc *classdesc);

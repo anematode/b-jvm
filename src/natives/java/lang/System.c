@@ -33,7 +33,7 @@ DECLARE_NATIVE("java/lang", System, initProperties,
       {STR("os.name"), STR("Windows")},
       {STR("user.dir"), cwd},
       {STR("file.separator"), STR("/")}};
-  bjvm_cp_method *put = bjvm_easy_method_lookup(
+  bjvm_cp_method *put = bjvm_method_lookup(
       props_obj->descriptor, STR("put"),
       STR("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,
       false);

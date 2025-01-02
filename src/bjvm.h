@@ -200,7 +200,8 @@ typedef struct {
 // Layout:
 //             -> stack grows this way
 // ┌──────────┬───────────────────────────────┬───────────────────────────────────────────────┐
-// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x bjvm_stack_value │
+// │ metadata │ max_stack x bjvm_stack_value  │ (values_count - max_stack) x
+// bjvm_stack_value │
 // └──────────┴───────────────────────────────┴───────────────────────────────────────────────┘
 //                      stack values                            local values
 //
@@ -398,7 +399,7 @@ void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
-bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
+bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
                                         const bjvm_utf8 name,
                                         const bjvm_utf8 descriptor,
                                         bool superclasses,
@@ -468,10 +469,6 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
 void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
-bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
-                                               bjvm_plain_frame *frame,
-                                               bjvm_bytecode_insn *insn,
-                                               int *sd);
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_plain_frame *frame,
                                             bjvm_bytecode_insn *insn, int *sd);

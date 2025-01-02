@@ -4,10 +4,10 @@
 // instruction. This messes up the debug dumps but can lead to slightly better
 // performance because the branch predictor has more information about pairs
 // of instructions which tend to follow another.
-#define ONE_GOTO_PER_INSN 0
+#define ONE_GOTO_PER_INSN 1
 // Skip the memset(...) call to clear each frame's locals/stack. This messes
 // up the debug dumps, but makes setting up frames faster.
-#define SKIP_CLEARING_FRAME 0
+#define SKIP_CLEARING_FRAME 1
 
 #include <assert.h>
 #include <limits.h>
@@ -409,8 +409,8 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
 void bjvm_abstract_method_error(bjvm_thread *thread,
                                 const bjvm_cp_method *method) {
   INIT_STACK_STRING(err, 1000);
-  bprintf(err, "Found no concrete implementation of %.*s", fmt_slice(method->name),
-          fmt_slice(method->my_class->name));
+  bprintf(err, "Found no concrete implementation of %.*s",
+          fmt_slice(method->name), fmt_slice(method->my_class->name));
   bjvm_raise_exception(thread, STR("java/lang/AbstractMethodError"), err);
 }
 
@@ -550,15 +550,20 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   bjvm_classdesc *java_lang_String =
       bootstrap_class_create(thread, STR("java/lang/String"));
   bjvm_initialize_class(thread, java_lang_String);
-  struct bjvm_native_String *str = (void *)new_object(thread, java_lang_String);
+  bjvm_handle *str = bjvm_make_handle(thread, new_object(thread, java_lang_String));
+
+#define S ((struct bjvm_native_String *)str->obj)
 
   short *chars;
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
-  str->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_CHAR, len, true);
-  memcpy(ArrayData(str->value), chars, len * sizeof(short));
+  S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_CHAR, len, true);
+  memcpy(ArrayData(S->value), chars, len * sizeof(short));
   free(chars);
-  return (void *)str;
+
+  bjvm_obj_header *result = (void*)S;
+  bjvm_drop_handle(thread, str);
+  return result;
 }
 
 bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
@@ -618,12 +623,12 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   bjvm_obj_header *obj = new_object(thread, classdesc);
   if (exception_string.chars) {
     bjvm_obj_header *str = make_string(thread, exception_string);
-    bjvm_cp_method *method = bjvm_easy_method_lookup(
+    bjvm_cp_method *method = bjvm_method_lookup(
         classdesc, STR("<init>"), STR("(Ljava/lang/String;)V"), true, false);
     bjvm_thread_run(thread, method,
                     (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, nullptr);
   } else {
-    bjvm_cp_method *method = bjvm_easy_method_lookup(classdesc, STR("<init>"),
+    bjvm_cp_method *method = bjvm_method_lookup(classdesc, STR("<init>"),
                                                      STR("()V"), true, false);
     bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}},
                     nullptr);
@@ -633,7 +638,7 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
 
 #ifndef EMSCRIPTEN
   fprintf(stderr, "Exception: %.*s: %.*s\n", fmt_slice(exception_name),
-         fmt_slice(exception_string));
+          fmt_slice(exception_string));
 #endif
   bjvm_raise_exception_object(thread, obj);
   return 0;
@@ -890,7 +895,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   }
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
-  bjvm_cp_method *make_thread = bjvm_easy_method_lookup(
+  bjvm_cp_method *make_thread = bjvm_method_lookup(
       desc, STR("<init>"), STR("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"),
       false, false);
   bjvm_obj_header *name = make_string(thr, STR("main"));
@@ -904,7 +909,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   desc = bootstrap_class_create(thr, STR("java/lang/System"));
   bjvm_initialize_class(thr, desc);
 
-  bjvm_cp_method *method = bjvm_easy_method_lookup(
+  bjvm_cp_method *method = bjvm_method_lookup(
       desc, STR("initializeSystemClass"), STR("()V"), false, false);
   bjvm_stack_value ret;
   bjvm_thread_run(thr, method, nullptr, &ret);
@@ -912,7 +917,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->current_exception = nullptr;
 
   // Call setJavaLangAccess() since we crash before getting there
-  method = bjvm_easy_method_lookup(desc, STR("setJavaLangAccess"), STR("()V"),
+  method = bjvm_method_lookup(desc, STR("setJavaLangAccess"), STR("()V"),
                                    false, false);
   bjvm_thread_run(thr, method, nullptr, &ret);
 
@@ -1028,7 +1033,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   struct bjvm_native_Class *rtype = bjvm_get_class_mirror(thread, ret_desc);
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
   bjvm_cp_method *init =
-      bjvm_easy_method_lookup(MethodType, STR("makeImpl"),
+      bjvm_method_lookup(MethodType, STR("makeImpl"),
                               STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                   "lang/invoke/MethodType;"),
                               false, false);
@@ -1098,7 +1103,7 @@ struct bjvm_native_MethodType *resolve_mh_mt(bjvm_thread *thread,
       bootstrap_class_create(thread, STR("java/lang/invoke/MethodType"));
   bjvm_initialize_class(thread, MethodType);
   bjvm_cp_method *make =
-      bjvm_easy_method_lookup(MethodType, STR("makeImpl"),
+      bjvm_method_lookup(MethodType, STR("makeImpl"),
                               STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                   "lang/invoke/MethodType;"),
                               false, false);
@@ -1142,9 +1147,9 @@ bjvm_resolve_method_handle(bjvm_thread *thread,
     bjvm_cp_method_info *method = &info->reference->methodref;
     bjvm_resolve_class(thread, method->class_info);
     bjvm_initialize_class(thread, method->class_info->classdesc);
-    bjvm_cp_method *m = bjvm_method_lookup(
-        method->class_info->classdesc, method->nat->name,
-        method->nat->descriptor, true, true);
+    bjvm_cp_method *m =
+        bjvm_method_lookup(method->class_info->classdesc, method->nat->name,
+                           method->nat->descriptor, true, true);
     bjvm_reflect_initialize_method(thread, method->class_info->classdesc, m);
 
     // Call DirectMethodHandle.make(method, true)
@@ -1152,7 +1157,7 @@ bjvm_resolve_method_handle(bjvm_thread *thread,
         thread, STR("java/lang/invoke/DirectMethodHandle"));
     bjvm_initialize_class(thread, DirectMethodHandle);
     bjvm_cp_method *make =
-        bjvm_easy_method_lookup(DirectMethodHandle, STR("make"),
+        bjvm_method_lookup(DirectMethodHandle, STR("make"),
                                 STR("(Ljava/lang/reflect/Method;)Ljava/lang/"
                                     "invoke/DirectMethodHandle;"),
                                 false, false);
@@ -1370,7 +1375,7 @@ int bjvm_link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       a->state = st;
     }
   }
-  bjvm_setup_function_tables(classdesc);
+  bjvm_set_up_function_tables(classdesc);
   return status;
 }
 
@@ -1484,8 +1489,10 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 #endif
   }
 
-  bjvm_init_compressed_bitset(&classdesc->static_references, static_offset / sizeof(void *));
-  bjvm_init_compressed_bitset(&classdesc->instance_references, nonstatic_offset / sizeof(void *));
+  bjvm_init_compressed_bitset(&classdesc->static_references,
+                              static_offset / sizeof(void *));
+  bjvm_init_compressed_bitset(&classdesc->instance_references,
+                              nonstatic_offset / sizeof(void *));
 
   // Add superclass instance references
   if (super) {
@@ -1511,7 +1518,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   classdesc->instance_bytes = nonstatic_offset;
 
   // Set up vtable and itables
-  bjvm_setup_function_tables(classdesc);
+  bjvm_set_up_function_tables(classdesc);
 
   return 0;
 }
@@ -1632,7 +1639,7 @@ void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
       thread, STR("java/lang/ExceptionInInitializerError"));
   bjvm_initialize_class(thread, EIIE);
   bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
-  bjvm_cp_method *ctor = bjvm_easy_method_lookup(
+  bjvm_cp_method *ctor = bjvm_method_lookup(
       EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
   thread->current_exception = nullptr; // clear exception
   int error = bjvm_thread_run(
@@ -1687,7 +1694,7 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
     goto done;
   }
 
-  bjvm_cp_method *clinit = bjvm_easy_method_lookup(classdesc, STR("<clinit>"),
+  bjvm_cp_method *clinit = bjvm_method_lookup(classdesc, STR("<clinit>"),
                                                    STR("()V"), false, false);
   if (clinit) {
     failed_to_init = bjvm_thread_run(thread, clinit, nullptr, nullptr);
@@ -1779,20 +1786,6 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor,
   }
 
   return nullptr;
-}
-
-bjvm_cp_method *bjvm_easy_method_lookup(bjvm_classdesc *classdesc,
-                                        const bjvm_utf8 name,
-                                        const bjvm_utf8 descriptor,
-                                        bool superclasses,
-                                        bool superinterfaces) {
-  if (!classdesc)
-    return nullptr;
-
-  bjvm_cp_method *result = bjvm_method_lookup(classdesc, name, descriptor,
-                                              superclasses, superinterfaces);
-
-  return result;
 }
 
 bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
@@ -2095,7 +2088,7 @@ bool method_types_compatible(struct bjvm_native_MethodType *provider_mt,
 
 heap_string debug_dump_string(bjvm_thread *thread, bjvm_obj_header *header) {
   bjvm_cp_method *toString =
-      bjvm_easy_method_lookup(header->descriptor, STR("toString"),
+      bjvm_method_lookup(header->descriptor, STR("toString"),
                               STR("()Ljava/lang/String;"), true, true);
   bjvm_stack_value result;
   bjvm_thread_run(thread, toString, (bjvm_stack_value[]){{.obj = header}},
@@ -2157,7 +2150,7 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
 
   if (!mts_are_same && !is_invoke_basic) {
     // Call asType to get an adapter handle
-    bjvm_cp_method *asType = bjvm_easy_method_lookup(
+    bjvm_cp_method *asType = bjvm_method_lookup(
         mh->base.descriptor, STR("asType"),
         STR("(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"),
         true, false);
@@ -2234,7 +2227,8 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
   return BJVM_INTERP_RESULT_OK;
 }
 
-static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread, bjvm_cp_method_info *info) {
+static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread,
+                                                   bjvm_cp_method_info *info) {
   if (info->resolved) {
     return BJVM_INTERP_RESULT_OK;
   }
@@ -2254,161 +2248,19 @@ static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread, bjvm_cp_
   }
 
   info->resolved = bjvm_method_lookup(class->classdesc, info->nat->name,
-                         info->nat->descriptor, true, true);
+                                      info->nat->descriptor, true, true);
   if (!info->resolved) {
     INIT_STACK_STRING(complaint, 1000);
-    complaint = bprintf(
-        complaint,
-        "Could not find method %.*s with descriptor %.*s on class %.*s",
-        fmt_slice(info->nat->name),
-        fmt_slice(info->nat->descriptor), fmt_slice(class->name));
+    complaint =
+        bprintf(complaint,
+                "Could not find method %.*s with descriptor %.*s on class %.*s",
+                fmt_slice(info->nat->name), fmt_slice(info->nat->descriptor),
+                fmt_slice(class->name));
     bjvm_incompatible_class_change_error(thread, complaint);
     return -1;
   }
 
   return BJVM_INTERP_RESULT_OK;
-}
-
-// Implementation of invokespecial/invokeinterface/invokevirtual. (But not
-// invokedynamic!)
-//
-// This function needs to cope with being called more than once throughout the
-// execution of the instruction if an interrupt occurs in <clinit>.
-bjvm_interpreter_result_t bjvm_invokenonstatic(bjvm_thread *thread,
-                                               bjvm_plain_frame *frame,
-                                               bjvm_bytecode_insn *insn,
-                                               int *sd) {
-  // Instruction must refer to a methodref.
-  assert(insn->cp->kind == BJVM_CP_KIND_METHOD_REF ||
-         insn->cp->kind == BJVM_CP_KIND_INTERFACE_METHOD_REF);
-  assert(*sd == stack_depth(frame));
-
-  bjvm_cp_method *method = insn->ic;
-  int argc = insn->args;
-  bjvm_obj_header *target;
-  bjvm_cp_method_info *method_info = &insn->cp->methodref;
-
-  if (!method || !((target = frame->values[*sd - argc].obj)) ||
-      (insn->kind != bjvm_insn_invokespecial &&
-       target->descriptor != insn->ic2)) {
-    // One argument for the object itself, plus the method arguments
-    argc = insn->args = method_info->descriptor->args_count + 1;
-    assert(argc <= *sd);
-    target = frame->values[*sd - argc].obj;
-
-    // Trying to call a method on a null pointer
-    if (target == nullptr) {
-      bjvm_null_pointer_exception(thread);
-      return BJVM_INTERP_RESULT_EXC;
-    }
-
-    // For invokespecial instructions we perform method lookup on the class
-    // given in the instruction encoding, rather than the class of the object
-    // we're invoking on.
-    if (insn->kind == bjvm_insn_invokespecial) {
-      int error = bjvm_resolve_class(thread, method_info->class_info);
-      if (error)
-        return BJVM_INTERP_RESULT_EXC;
-    }
-
-    bjvm_classdesc *lookup_on = insn->ic2 =
-        insn->kind == bjvm_insn_invokespecial
-            ? method_info->class_info->classdesc
-            : target->descriptor;
-
-    if (insn->kind == bjvm_insn_invokevirtual) {
-      int status = resolve_methodref(thread, method_info);
-      if (status != BJVM_INTERP_RESULT_OK)
-        return status;
-      // Transmogrify into a invokeinterface
-      if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
-        insn->kind = bjvm_insn_invokeinterface;
-        return bjvm_invokenonstatic(thread, frame, insn, sd);
-      }
-
-      method = insn->ic = bjvm_vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
-      insn->ic2 = target->descriptor;
-    } else if (insn->kind == bjvm_insn_invokeinterface) {
-      int status = resolve_methodref(thread, method_info);
-      if (status != BJVM_INTERP_RESULT_OK)
-        return status;
-      // Transmogrify into an invokevirtual
-      if (!(method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE)) {
-        insn->kind = bjvm_insn_invokevirtual;
-        return bjvm_invokenonstatic(thread, frame, insn, sd);
-      }
-
-      method = insn->ic = bjvm_itable_lookup(target->descriptor,
-        method_info->resolved->my_class, method_info->resolved->itable_index);
-      insn->ic2 = lookup_on;
-    } else {
-      method = insn->ic =
-          bjvm_method_lookup(lookup_on, method_info->nat->name,
-                             method_info->nat->descriptor, true, true);
-      insn->ic2 = lookup_on;
-    }
-
-    if (!method) {
-      INIT_STACK_STRING(complaint, 1000);
-      complaint =
-          bprintf(complaint, "No method %.*s with descriptor %.*s on %s %.*s",
-                  fmt_slice(method_info->nat->name),
-                  fmt_slice(method_info->nat->descriptor),
-                  lookup_on->access_flags & BJVM_ACCESS_INTERFACE ? "interface"
-                                                                  : "class",
-                  fmt_slice(lookup_on->name));
-      bjvm_incompatible_class_change_error(thread, complaint);
-      return BJVM_INTERP_RESULT_EXC;
-    }
-
-    if (method->access_flags & BJVM_ACCESS_STATIC) {
-      INIT_STACK_STRING(complaint, 1000);
-      complaint =
-          bprintf(complaint, "Method %.*s is static", fmt_slice(method->name));
-      bjvm_incompatible_class_change_error(thread, complaint);
-      return BJVM_INTERP_RESULT_EXC;
-    }
-  }
-
-  bjvm_stack_value invoked_result;
-  if (method->is_signature_polymorphic) {
-    return bjvm_invokevirtual_signature_polymorphic(
-        thread, frame, sd, method,
-        bjvm_resolve_method_type(thread, method_info->descriptor), target);
-  }
-
-  if (frame->state < INVOKE_STATE_MADE_FRAME) {
-    bjvm_stack_frame *invoked_frame = bjvm_push_frame(
-        thread, method, frame->values + *sd - argc, argc);
-    if (!invoked_frame) { // stack overflow, etc.
-      assert(thread->current_exception);
-      return BJVM_INTERP_RESULT_EXC;
-    }
-
-    int err = bjvm_interpret(thread, invoked_frame, &frame->result_of_next);
-    if (err != BJVM_INTERP_RESULT_OK) {
-      if (err == BJVM_INTERP_RESULT_INT)
-        frame->state = INVOKE_STATE_MADE_FRAME;
-
-      return err;
-    }
-  }
-
-  frame->state = INVOKE_STATE_ENTRY;
-  invoked_result = frame->result_of_next;
-
-  if (method->descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
-    frame->values[*sd - argc] = invoked_result;
-    (*sd)++;
-  }
-
-  *sd -= argc;
-  return BJVM_INTERP_RESULT_OK;
-}
-
-int method_handle_linker(bjvm_thread *thread, bjvm_plain_frame *frame,
-                         bjvm_cp_method *method) {
-  return 0;
 }
 
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
@@ -2546,7 +2398,7 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
   bjvm_classdesc *lookup_class =
       bootstrap_class_create(thread, STR("java/lang/invoke/MethodHandles"));
   bjvm_initialize_class(thread, lookup_class);
-  bjvm_cp_method *lookup_factory = bjvm_easy_method_lookup(
+  bjvm_cp_method *lookup_factory = bjvm_method_lookup(
       lookup_class, STR("lookup"),
       STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
 
@@ -2587,7 +2439,7 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
   }
 
   // Invoke the bootstrap method using invokeExact
-  bjvm_cp_method *invokeExact = bjvm_easy_method_lookup(
+  bjvm_cp_method *invokeExact = bjvm_method_lookup(
       bootstrap_handle->obj->descriptor, STR("invokeExact"),
       STR("(Ljava/lang/invoke/MethodHandle;[Ljava/lang/Object;)Ljava/lang/"
           "Object;"),
@@ -2640,7 +2492,7 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
          d->args_count * sizeof(bjvm_stack_value));
 
   bjvm_cp_method *invokeExact =
-      bjvm_easy_method_lookup(mh->base.descriptor, STR("invokeExact"),
+      bjvm_method_lookup(mh->base.descriptor, STR("invokeExact"),
                               STR("(Ljava/lang/invoke/MethodHandle;[Ljava/lang/"
                                   "Object;)Ljava/lang/Object;"),
                               true, false);
@@ -2748,14 +2600,14 @@ void make_invokevtable_polymorphic(bjvm_bytecode_insn *insn) {
   bjvm_cp_method *method = insn->ic;
   assert(method);
   insn->kind = bjvm_insn_invokevtable_polymorphic;
-  insn->ic2 = (void*)method->vtable_index;
+  insn->ic2 = (void *)method->vtable_index;
 }
 
 void make_invokeitable_polymorphic(bjvm_bytecode_insn *insn) {
   assert(insn->kind == bjvm_insn_invokeitable_monomorphic);
   insn->kind = bjvm_insn_invokeitable_polymorphic;
-  insn->ic = (void*)insn->cp->methodref.resolved->my_class;
-  insn->ic2 = (void*)insn->cp->methodref.resolved->itable_index;
+  insn->ic = (void *)insn->cp->methodref.resolved->my_class;
+  insn->ic2 = (void *)insn->cp->methodref.resolved->itable_index;
 }
 
 // Main interpreter
@@ -2843,156 +2695,158 @@ interpret_frame:
     free_heap_str(insn_dump);
 #endif
 
-    static const void *insn_jump_table[] = {&&bjvm_insn_nop,
-                                            &&bjvm_insn_aaload,
-                                            &&bjvm_insn_aastore,
-                                            &&bjvm_insn_aconst_null,
-                                            &&bjvm_insn_areturn,
-                                            &&bjvm_insn_arraylength,
-                                            &&bjvm_insn_athrow,
-                                            &&bjvm_insn_baload,
-                                            &&bjvm_insn_bastore,
-                                            &&bjvm_insn_caload,
-                                            &&bjvm_insn_castore,
-                                            &&bjvm_insn_d2f,
-                                            &&bjvm_insn_d2i,
-                                            &&bjvm_insn_d2l,
-                                            &&bjvm_insn_dadd,
-                                            &&bjvm_insn_daload,
-                                            &&bjvm_insn_dastore,
-                                            &&bjvm_insn_dcmpg,
-                                            &&bjvm_insn_dcmpl,
-                                            &&bjvm_insn_ddiv,
-                                            &&bjvm_insn_dmul,
-                                            &&bjvm_insn_dneg,
-                                            &&bjvm_insn_drem,
-                                            &&bjvm_insn_dreturn,
-                                            &&bjvm_insn_dsub,
-                                            &&bjvm_insn_dup,
-                                            &&bjvm_insn_dup_x1,
-                                            &&bjvm_insn_dup_x2,
-                                            &&bjvm_insn_dup2,
-                                            &&bjvm_insn_dup2_x1,
-                                            &&bjvm_insn_dup2_x2,
-                                            &&bjvm_insn_f2d,
-                                            &&bjvm_insn_f2i,
-                                            &&bjvm_insn_f2l,
-                                            &&bjvm_insn_fadd,
-                                            &&bjvm_insn_faload,
-                                            &&bjvm_insn_fastore,
-                                            &&bjvm_insn_fcmpg,
-                                            &&bjvm_insn_fcmpl,
-                                            &&bjvm_insn_fdiv,
-                                            &&bjvm_insn_fmul,
-                                            &&bjvm_insn_fneg,
-                                            &&bjvm_insn_frem,
-                                            &&bjvm_insn_freturn,
-                                            &&bjvm_insn_fsub,
-                                            &&bjvm_insn_i2b,
-                                            &&bjvm_insn_i2c,
-                                            &&bjvm_insn_i2d,
-                                            &&bjvm_insn_i2f,
-                                            &&bjvm_insn_i2l,
-                                            &&bjvm_insn_i2s,
-                                            &&bjvm_insn_iadd,
-                                            &&bjvm_insn_iaload,
-                                            &&bjvm_insn_iand,
-                                            &&bjvm_insn_iastore,
-                                            &&bjvm_insn_idiv,
-                                            &&bjvm_insn_imul,
-                                            &&bjvm_insn_ineg,
-                                            &&bjvm_insn_ior,
-                                            &&bjvm_insn_irem,
-                                            &&bjvm_insn_ireturn,
-                                            &&bjvm_insn_ishl,
-                                            &&bjvm_insn_ishr,
-                                            &&bjvm_insn_isub,
-                                            &&bjvm_insn_iushr,
-                                            &&bjvm_insn_ixor,
-                                            &&bjvm_insn_l2d,
-                                            &&bjvm_insn_l2f,
-                                            &&bjvm_insn_l2i,
-                                            &&bjvm_insn_ladd,
-                                            &&bjvm_insn_laload,
-                                            &&bjvm_insn_land,
-                                            &&bjvm_insn_lastore,
-                                            &&bjvm_insn_lcmp,
-                                            &&bjvm_insn_ldiv,
-                                            &&bjvm_insn_lmul,
-                                            &&bjvm_insn_lneg,
-                                            &&bjvm_insn_lor,
-                                            &&bjvm_insn_lrem,
-                                            &&bjvm_insn_lreturn,
-                                            &&bjvm_insn_lshl,
-                                            &&bjvm_insn_lshr,
-                                            &&bjvm_insn_lsub,
-                                            &&bjvm_insn_lushr,
-                                            &&bjvm_insn_lxor,
-                                            &&bjvm_insn_monitorenter,
-                                            &&bjvm_insn_monitorexit,
-                                            &&bjvm_insn_pop,
-                                            &&bjvm_insn_pop2,
-                                            &&bjvm_insn_return,
-                                            &&bjvm_insn_saload,
-                                            &&bjvm_insn_sastore,
-                                            &&bjvm_insn_swap,
-                                            &&bjvm_insn_anewarray,
-                                            &&bjvm_insn_checkcast,
-                                            &&bjvm_insn_getfield,
-                                            &&bjvm_insn_getstatic,
-                                            &&bjvm_insn_instanceof,
-                                            &&bjvm_insn_invokedynamic,
-                                            &&bjvm_insn_new,
-                                            &&bjvm_insn_putfield,
-                                            &&bjvm_insn_putstatic,
-                                            &&bjvm_insn_invokevirtual,
-                                            &&bjvm_insn_invokespecial,
-                                            &&bjvm_insn_invokestatic,
-                                            &&bjvm_insn_ldc,
-                                            &&bjvm_insn_ldc2_w,
-                                            &&bjvm_insn_dload,
-                                            &&bjvm_insn_fload,
-                                            &&bjvm_insn_iload,
-                                            &&bjvm_insn_lload,
-                                            &&bjvm_insn_dstore,
-                                            &&bjvm_insn_fstore,
-                                            &&bjvm_insn_istore,
-                                            &&bjvm_insn_lstore,
-                                            &&bjvm_insn_aload,
-                                            &&bjvm_insn_astore,
-                                            &&bjvm_insn_goto,
-                                            &&bjvm_insn_jsr,
-                                            &&bjvm_insn_if_acmpeq,
-                                            &&bjvm_insn_if_acmpne,
-                                            &&bjvm_insn_if_icmpeq,
-                                            &&bjvm_insn_if_icmpne,
-                                            &&bjvm_insn_if_icmplt,
-                                            &&bjvm_insn_if_icmpge,
-                                            &&bjvm_insn_if_icmpgt,
-                                            &&bjvm_insn_if_icmple,
-                                            &&bjvm_insn_ifeq,
-                                            &&bjvm_insn_ifne,
-                                            &&bjvm_insn_iflt,
-                                            &&bjvm_insn_ifge,
-                                            &&bjvm_insn_ifgt,
-                                            &&bjvm_insn_ifle,
-                                            &&bjvm_insn_ifnonnull,
-                                            &&bjvm_insn_ifnull,
-                                            &&bjvm_insn_iconst,
-                                            &&bjvm_insn_dconst,
-                                            &&bjvm_insn_fconst,
-                                            &&bjvm_insn_lconst,
-                                            &&bjvm_insn_iinc,
-                                            &&bjvm_insn_invokeinterface,
-                                            &&bjvm_insn_multianewarray,
-                                            &&bjvm_insn_newarray,
-                                            &&bjvm_insn_tableswitch,
-                                            &&bjvm_insn_lookupswitch,
-                                            &&bjvm_insn_ret,
-                                            &&bjvm_insn_invokevtable_monomorphic,
-                                            &&bjvm_insn_invokevtable_polymorphic,
-      &&bjvm_insn_invokeitable_monomorphic,
-      &&bjvm_insn_invokeitable_polymorphic,
+    static const void *insn_jump_table[] = {
+        &&bjvm_insn_nop,
+        &&bjvm_insn_aaload,
+        &&bjvm_insn_aastore,
+        &&bjvm_insn_aconst_null,
+        &&bjvm_insn_areturn,
+        &&bjvm_insn_arraylength,
+        &&bjvm_insn_athrow,
+        &&bjvm_insn_baload,
+        &&bjvm_insn_bastore,
+        &&bjvm_insn_caload,
+        &&bjvm_insn_castore,
+        &&bjvm_insn_d2f,
+        &&bjvm_insn_d2i,
+        &&bjvm_insn_d2l,
+        &&bjvm_insn_dadd,
+        &&bjvm_insn_daload,
+        &&bjvm_insn_dastore,
+        &&bjvm_insn_dcmpg,
+        &&bjvm_insn_dcmpl,
+        &&bjvm_insn_ddiv,
+        &&bjvm_insn_dmul,
+        &&bjvm_insn_dneg,
+        &&bjvm_insn_drem,
+        &&bjvm_insn_dreturn,
+        &&bjvm_insn_dsub,
+        &&bjvm_insn_dup,
+        &&bjvm_insn_dup_x1,
+        &&bjvm_insn_dup_x2,
+        &&bjvm_insn_dup2,
+        &&bjvm_insn_dup2_x1,
+        &&bjvm_insn_dup2_x2,
+        &&bjvm_insn_f2d,
+        &&bjvm_insn_f2i,
+        &&bjvm_insn_f2l,
+        &&bjvm_insn_fadd,
+        &&bjvm_insn_faload,
+        &&bjvm_insn_fastore,
+        &&bjvm_insn_fcmpg,
+        &&bjvm_insn_fcmpl,
+        &&bjvm_insn_fdiv,
+        &&bjvm_insn_fmul,
+        &&bjvm_insn_fneg,
+        &&bjvm_insn_frem,
+        &&bjvm_insn_freturn,
+        &&bjvm_insn_fsub,
+        &&bjvm_insn_i2b,
+        &&bjvm_insn_i2c,
+        &&bjvm_insn_i2d,
+        &&bjvm_insn_i2f,
+        &&bjvm_insn_i2l,
+        &&bjvm_insn_i2s,
+        &&bjvm_insn_iadd,
+        &&bjvm_insn_iaload,
+        &&bjvm_insn_iand,
+        &&bjvm_insn_iastore,
+        &&bjvm_insn_idiv,
+        &&bjvm_insn_imul,
+        &&bjvm_insn_ineg,
+        &&bjvm_insn_ior,
+        &&bjvm_insn_irem,
+        &&bjvm_insn_ireturn,
+        &&bjvm_insn_ishl,
+        &&bjvm_insn_ishr,
+        &&bjvm_insn_isub,
+        &&bjvm_insn_iushr,
+        &&bjvm_insn_ixor,
+        &&bjvm_insn_l2d,
+        &&bjvm_insn_l2f,
+        &&bjvm_insn_l2i,
+        &&bjvm_insn_ladd,
+        &&bjvm_insn_laload,
+        &&bjvm_insn_land,
+        &&bjvm_insn_lastore,
+        &&bjvm_insn_lcmp,
+        &&bjvm_insn_ldiv,
+        &&bjvm_insn_lmul,
+        &&bjvm_insn_lneg,
+        &&bjvm_insn_lor,
+        &&bjvm_insn_lrem,
+        &&bjvm_insn_lreturn,
+        &&bjvm_insn_lshl,
+        &&bjvm_insn_lshr,
+        &&bjvm_insn_lsub,
+        &&bjvm_insn_lushr,
+        &&bjvm_insn_lxor,
+        &&bjvm_insn_monitorenter,
+        &&bjvm_insn_monitorexit,
+        &&bjvm_insn_pop,
+        &&bjvm_insn_pop2,
+        &&bjvm_insn_return,
+        &&bjvm_insn_saload,
+        &&bjvm_insn_sastore,
+        &&bjvm_insn_swap,
+        &&bjvm_insn_anewarray,
+        &&bjvm_insn_checkcast,
+        &&bjvm_insn_getfield,
+        &&bjvm_insn_getstatic,
+        &&bjvm_insn_instanceof,
+        &&bjvm_insn_invokedynamic,
+        &&bjvm_insn_new,
+        &&bjvm_insn_putfield,
+        &&bjvm_insn_putstatic,
+        &&bjvm_insn_invokevirtual,
+        &&bjvm_insn_invokespecial,
+        &&bjvm_insn_invokestatic,
+        &&bjvm_insn_ldc,
+        &&bjvm_insn_ldc2_w,
+        &&bjvm_insn_dload,
+        &&bjvm_insn_fload,
+        &&bjvm_insn_iload,
+        &&bjvm_insn_lload,
+        &&bjvm_insn_dstore,
+        &&bjvm_insn_fstore,
+        &&bjvm_insn_istore,
+        &&bjvm_insn_lstore,
+        &&bjvm_insn_aload,
+        &&bjvm_insn_astore,
+        &&bjvm_insn_goto,
+        &&bjvm_insn_jsr,
+        &&bjvm_insn_if_acmpeq,
+        &&bjvm_insn_if_acmpne,
+        &&bjvm_insn_if_icmpeq,
+        &&bjvm_insn_if_icmpne,
+        &&bjvm_insn_if_icmplt,
+        &&bjvm_insn_if_icmpge,
+        &&bjvm_insn_if_icmpgt,
+        &&bjvm_insn_if_icmple,
+        &&bjvm_insn_ifeq,
+        &&bjvm_insn_ifne,
+        &&bjvm_insn_iflt,
+        &&bjvm_insn_ifge,
+        &&bjvm_insn_ifgt,
+        &&bjvm_insn_ifle,
+        &&bjvm_insn_ifnonnull,
+        &&bjvm_insn_ifnull,
+        &&bjvm_insn_iconst,
+        &&bjvm_insn_dconst,
+        &&bjvm_insn_fconst,
+        &&bjvm_insn_lconst,
+        &&bjvm_insn_iinc,
+        &&bjvm_insn_invokeinterface,
+        &&bjvm_insn_multianewarray,
+        &&bjvm_insn_newarray,
+        &&bjvm_insn_tableswitch,
+        &&bjvm_insn_lookupswitch,
+        &&bjvm_insn_ret,
+        &&bjvm_insn_invokevtable_monomorphic,
+        &&bjvm_insn_invokevtable_polymorphic,
+        &&bjvm_insn_invokeitable_monomorphic,
+        &&bjvm_insn_invokeitable_polymorphic,
+        &&bjvm_insn_invokespecial_resolved
     };
     goto *insn_jump_table[insn->kind];
 
@@ -3798,16 +3652,56 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_invokespecial: {
-      status = bjvm_invokenonstatic(thread, frame, insn, &sd);
-      if (status != BJVM_INTERP_RESULT_OK) {
-        // If an interrupt occurs, then there will be some new frames on the
-        // stack beyond the current ones. Once interpret is called again, those
-        // frames will ultimately resolve and bjvm_invokenonstatic will be
-        // called again, but this time, the result will be known and pushed
-        // onto the execution stack.
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
         goto done;
       }
-      NEXT_INSN;
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+
+      bjvm_classdesc *lookup_on = method_info->resolved->my_class;
+
+      // "If all of the following are true, let C [the class to look up the
+      // method upon] be the direct superclass of the current class:
+      //
+      // The resolved method is not an instance initialization method;
+      // If the symbolic reference names a class (not an interface), then that
+      // class is a superclass of the current class."
+      if (!utf8_equals(method_info->resolved->name, "<init>") &&
+        (lookup_on->access_flags & BJVM_ACCESS_INTERFACE || (
+          method->my_class != lookup_on &&
+          bjvm_instanceof(method->my_class, lookup_on)))) {
+        lookup_on = method->my_class->super_class->classdesc;
+      }
+
+      // Look at the class and its superclasses first
+      bjvm_cp_method *candidate = bjvm_method_lookup(
+          lookup_on, method_info->resolved->name,
+          method_info->resolved->unparsed_descriptor,
+          true, false);
+      if (!candidate) {
+        // Then perform an itable lookup (I rly don't think this is correct...)
+        if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
+          candidate = bjvm_itable_lookup(lookup_on,
+            method_info->resolved->my_class, method_info->resolved->itable_index);
+        }
+        if (!candidate) {
+          bjvm_abstract_method_error(thread, method_info->resolved);
+          goto done;
+        }
+      } else if (candidate->access_flags & BJVM_ACCESS_ABSTRACT) {
+        bjvm_abstract_method_error(thread, candidate);
+        goto done;
+      }
+
+      insn->kind = bjvm_insn_invokespecial_resolved;
+      insn->ic = candidate;
+      JMP_INSN;
     }
     bjvm_insn_invokeinterface: {
       bjvm_cp_method_info *method_info = &insn->cp->methodref;
@@ -3821,12 +3715,15 @@ interpret_frame:
       status = resolve_methodref(thread, method_info);
       if (status != BJVM_INTERP_RESULT_OK)
         goto done;
-      if (!(method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE)) {
+      if (!(method_info->resolved->my_class->access_flags &
+            BJVM_ACCESS_INTERFACE)) {
         insn->kind = bjvm_insn_invokevirtual;
         JMP_INSN;
       }
       insn->kind = bjvm_insn_invokeitable_monomorphic;
-      insn->ic = bjvm_itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
+      insn->ic = bjvm_itable_lookup(target->descriptor,
+                                    method_info->resolved->my_class,
+                                    method_info->resolved->itable_index);
       insn->ic2 = target->descriptor;
       if (!insn->ic) {
         bjvm_abstract_method_error(thread, method_info->resolved);
@@ -3856,13 +3753,15 @@ interpret_frame:
       }
 
       // If we found an interface method, transmogrify into a invokeinterface
-      if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
+      if (method_info->resolved->my_class->access_flags &
+          BJVM_ACCESS_INTERFACE) {
         insn->kind = bjvm_insn_invokeinterface;
         JMP_INSN;
       }
 
       insn->kind = bjvm_insn_invokevtable_monomorphic;
-      insn->ic = bjvm_vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
+      insn->ic = bjvm_vtable_lookup(target->descriptor,
+                                    method_info->resolved->vtable_index);
       assert(method);
       insn->ic2 = target->descriptor;
       JMP_INSN;
@@ -4050,7 +3949,7 @@ interpret_frame:
       if (array) {
         checked_push(frame, (bjvm_stack_value){.obj = array});
       } else {
-        goto done;  // OOM
+        goto done; // OOM
       }
       NEXT_INSN;
     }
@@ -4100,12 +3999,13 @@ interpret_frame:
             make_invokeitable_polymorphic(insn);
           JMP_INSN;
         }
-        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, insn->ic,
-            frame->values + sd - insn->args, insn->args);
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, insn->ic, frame->values + sd - insn->args, insn->args);
         if (!new_frame)
           goto done;
         frame->state = INVOKE_STATE_MADE_FRAME;
-        status = bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
         if (status < BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_ENTRY;
         if (status != BJVM_INTERP_RESULT_OK)
@@ -4124,7 +4024,8 @@ interpret_frame:
     bjvm_insn_invokevtable_polymorphic:
     bjvm_insn_invokeitable_polymorphic: {
       bjvm_obj_header *target = frame->values[sd - insn->args].obj;
-      bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
       if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
         if (target == nullptr) {
           bjvm_null_pointer_exception(thread);
@@ -4132,21 +4033,57 @@ interpret_frame:
         }
         bjvm_cp_method *target_method;
         if (insn->kind == bjvm_insn_invokevtable_polymorphic)
-          target_method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
+          target_method =
+              bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
         else {
-          target_method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
+          target_method =
+              bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
           if (!target_method) {
             bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
             goto done;
           }
         }
         assert(target_method);
-        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, target_method,
-              frame->values + sd - insn->args, insn->args);
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, target_method, frame->values + sd - insn->args, insn->args);
         if (!new_frame)
           goto done;
         frame->state = INVOKE_STATE_MADE_FRAME;
-        status = bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_ENTRY;
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        frame->state = INVOKE_STATE_ENTRY;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
+        }
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_invokespecial_resolved: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
+          goto done;
+        }
+        bjvm_cp_method *target_method = insn->ic;
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, target_method, frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
         if (status < BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_ENTRY;
         if (status != BJVM_INTERP_RESULT_OK)
@@ -4245,7 +4182,7 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
     int error = bjvm_initialize_class(thread, ThreadGroup);
     assert(!error);
 
-    bjvm_cp_method *init = bjvm_easy_method_lookup(ThreadGroup, STR("<init>"),
+    bjvm_cp_method *init = bjvm_method_lookup(ThreadGroup, STR("<init>"),
                                                    STR("()V"), false, false);
 
     assert(init);

@@ -69,7 +69,6 @@ static bjvm_wasm_expression *module_expr(bjvm_wasm_module *module,
   bjvm_wasm_expression *result =
       module_calloc(module, sizeof(bjvm_wasm_expression));
   result->kind = kind;
-  result->expr_type = from_basic_type(BJVM_WASM_TYPE_KIND_INFER);
   return result;
 }
 
@@ -120,10 +119,6 @@ void write_string(bjvm_bytevector *ctx, const char *str) {
 
 bjvm_wasm_type bjvm_wasm_void() {
   return (bjvm_wasm_type){.val = BJVM_WASM_TYPE_KIND_VOID};
-}
-
-bjvm_wasm_type bjvm_wasm_infer() {
-  return (bjvm_wasm_type){.val = BJVM_WASM_TYPE_KIND_INFER};
 }
 
 bjvm_wasm_type bjvm_wasm_int32() {

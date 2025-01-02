@@ -6,7 +6,7 @@ static bjvm_stack_value impl(bjvm_thread *thread, bjvm_obj_header *target,
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
-      bjvm_easy_method_lookup(classdesc, STR("run"), null_str(), true, true);
+      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
   if (!method) {
     // TODO figure out what JVM normally does here
     UNREACHABLE();
@@ -50,7 +50,7 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
-      bjvm_easy_method_lookup(classdesc, STR("run"), null_str(), true, true);
+      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
   if (!method) {
     // TODO figure out what JVM normally does here
     UNREACHABLE();
@@ -72,7 +72,7 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =
-      bjvm_easy_method_lookup(classdesc, STR("run"), null_str(), true, true);
+      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
   if (!method) {
     // TODO figure out what JVM normally does here
     UNREACHABLE();

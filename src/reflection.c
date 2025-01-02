@@ -84,7 +84,6 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
       method->descriptor->args_count, true);
 
-
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     INIT_STACK_STRING(desc, 1000);
     desc = bjvm_unparse_field_descriptor(desc, &method->descriptor->args[i]);
@@ -123,15 +122,17 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
     switch (attr->kind) {
     case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
       if (!((M->annotations = CreateByteArray(thread, attr->annotations.data,
-                                       attr->annotations.length))))
+                                              attr->annotations.length))))
         goto oom;
     case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
-      if (!((M->parameterAnnotations = CreateByteArray(thread, attr->parameter_annotations.data,
-                                       attr->parameter_annotations.length))))
+      if (!((M->parameterAnnotations =
+                 CreateByteArray(thread, attr->parameter_annotations.data,
+                                 attr->parameter_annotations.length))))
         goto oom;
     case BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
-      if (!((M->annotationDefault = CreateByteArray(thread, attr->annotation_default.data,
-                                             attr->annotation_default.length))))
+      if (!((M->annotationDefault =
+                 CreateByteArray(thread, attr->annotation_default.data,
+                                 attr->annotation_default.length))))
         goto oom;
     default:
       break;
@@ -145,7 +146,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     bjvm_utf8 desc =
         bjvm_unparse_field_descriptor(str, &method->descriptor->args[i]);
-    ((void**)ArrayData(M->parameterTypes))[i] = (void *)bjvm_get_class_mirror(
+    ((void **)ArrayData(M->parameterTypes))[i] = (void *)bjvm_get_class_mirror(
         thread, load_class_of_field_descriptor(thread, desc));
   }
 
@@ -159,6 +160,6 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 
   method->reflection_method = (void *)M;
 
-oom:  // OOM while creating the Method
+oom: // OOM while creating the Method
   bjvm_drop_handle(thread, result);
 }

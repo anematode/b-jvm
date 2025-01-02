@@ -465,8 +465,8 @@ TEST_CASE("Deranged CFG") {
   auto result = run_test_case("test_files/cfg_fuck/", true);
   auto expected = ReadFile("test_files/cfg_fuck/reference.txt").value();
   std::string as_string;
-  for (int i = 0; i < expected.size(); ++i)
-    as_string.push_back(expected.at(i));
+  for (unsigned char i : expected)
+    as_string.push_back(i);
   REQUIRE(result.stdout_ == as_string);
 }
 
@@ -502,7 +502,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
     bjvm_compute_dominator_tree(analy);
   };
 
-  std::vector<std::pair<int, int>> doms = {
+  std::vector<std::pair<int, uint32_t>> doms = {
       {1, 0},  {2, 1},  {3, 2},   {4, 3},   {5, 4},   {6, 5},
       {7, 6},  {8, 6},  {9, 6},   {10, 6},  {11, 6},  {12, 6},
       {13, 6}, {14, 5}, {15, 14}, {16, 14}, {17, 16}, {18, 5},
@@ -524,7 +524,8 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
 TEST_CASE("Conflicting defaults") {
   // Attempting to invokeinterface on a class which inherits multiple maximally
   // -specific implementations of a given interface method.
-  auto result = run_test_case("test_files/conflicting_defaults/", true, "ConflictingDefaults");
+  auto result = run_test_case("test_files/conflicting_defaults/", true,
+                              "ConflictingDefaults");
   REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 

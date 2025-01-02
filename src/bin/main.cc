@@ -32,7 +32,7 @@ void *set_up() {
   bjvm_cp_method *method;
   bjvm_initialize_class(thr, desc);
 
-  method = bjvm_easy_method_lookup(desc, STR("main"),
+  method = bjvm_method_lookup(desc, STR("main"),
                                    STR("([Ljava/lang/String;)V"), false, false);
 
   bjvm_async_run_ctx *ctx = bjvm_thread_async_run(thr, method, args, nullptr);
@@ -47,7 +47,7 @@ int print_error(void *ctx) {
     printf("Exception was raised!\n");
     // bjvm_thread_run printStackTrace
     bjvm_stack_value args[1] = {{.obj = thr->current_exception}};
-    bjvm_cp_method *method = bjvm_easy_method_lookup(
+    bjvm_cp_method *method = bjvm_method_lookup(
             thr->current_exception->descriptor, STR("printStackTrace"), STR("()V"), true, false);
     thr->current_exception = nullptr;
     bjvm_thread_run(thr, method, args, nullptr);

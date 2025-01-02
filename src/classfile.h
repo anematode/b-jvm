@@ -197,13 +197,13 @@ typedef enum {
   bjvm_insn_ret,
 
   /** Resolved versions of invoke* */
-  bjvm_insn_invokevtable_monomorphic,  // inline cache with previous object
-  bjvm_insn_invokevtable_polymorphic,  // slower dispatch
-  bjvm_insn_invokeitable_monomorphic,  // inline cache with previous object
-  bjvm_insn_invokeitable_polymorphic,  // slower dispatch
-  bjvm_insn_invokecallsite,  // resolved version of invokedynamic
+  bjvm_insn_invokevtable_monomorphic, // inline cache with previous object
+  bjvm_insn_invokevtable_polymorphic, // slower dispatch
+  bjvm_insn_invokeitable_monomorphic, // inline cache with previous object
+  bjvm_insn_invokeitable_polymorphic, // slower dispatch
+  bjvm_insn_invokespecial_resolved,   // resolved version of invokespecial
+  bjvm_insn_invokecallsite,           // resolved version of invokedynamic
   bjvm_insn_invokestatic_resolved,
-  bjvm_insn_invokespecial_resolved
 } bjvm_insn_code_kind;
 
 typedef enum : char {

@@ -149,7 +149,7 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   case BJVM_MH_KIND_INVOKE_INTERFACE:
     struct bjvm_native_MethodType *mt = (void *)M->type;
     heap_string descriptor = unparse_method_type(mt);
-    bjvm_cp_method *method = bjvm_easy_method_lookup(
+    bjvm_cp_method *method = bjvm_method_lookup(
         search_on, hslc(search_for), hslc(descriptor), true, false);
     free_heap_str(descriptor);
 
@@ -201,7 +201,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   bjvm_obj_header **data = ArrayData(array);
 
   bjvm_classdesc *Long = bootstrap_class_create(thread, STR("java/lang/Long"));
-  bjvm_cp_method *valueFrom = bjvm_easy_method_lookup(
+  bjvm_cp_method *valueFrom = bjvm_method_lookup(
       Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
   bjvm_stack_value result;

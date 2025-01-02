@@ -9,7 +9,7 @@ bjvm_obj_header *MakeJavaStringUtf8(bjvm_thread *thread, char const *chars);
 inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
   assert(utf8_equals(hslc(string->descriptor->name), "java/lang/String"));
 
-  auto method = bjvm_easy_method_lookup(string->descriptor, STR("length"),
+  auto method = bjvm_method_lookup(string->descriptor, STR("length"),
                                         STR("()I"), false, false);
   bjvm_stack_value result;
   bjvm_thread_run(thread, method, (bjvm_stack_value[]){}, &result);

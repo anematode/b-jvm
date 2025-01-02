@@ -54,29 +54,18 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
   return existing_buf;
 }
 
-void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs, int bits_capacity) {
+void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs,
+                                 int bits_capacity) {
   if (bits_capacity > 63) {
     uint32_t size_words = (bits_capacity + 63) / 64;
     uint64_t *buffer = calloc(size_words, sizeof(uint64_t));
     *bs = (bjvm_compressed_bitset){.ptr.bits = buffer,
-                                    .ptr.size_words = size_words};
+                                   .ptr.size_words = size_words};
   } else {
     *bs = (bjvm_compressed_bitset){
-      .bits_inl = 1 // lowest bit = 1
+        .bits_inl = 1 // lowest bit = 1
     };
   }
-}
-
-bjvm_compressed_bitset
-bjvm_copy_compressed_bitset(bjvm_compressed_bitset bits) {
-  if (bjvm_is_bitset_compressed(bits)) {
-    return bits;
-  }
-  const size_t buf_size = bits.ptr.size_words * sizeof(uint64_t);
-  uint64_t *buffer = malloc(buf_size);
-  memcpy(buffer, bits.ptr.bits, buf_size);
-  return (bjvm_compressed_bitset){.ptr.bits = buffer,
-                                  .ptr.size_words = bits.ptr.size_words};
 }
 
 void get_compressed_bitset_word_and_offset(bjvm_compressed_bitset *bits,

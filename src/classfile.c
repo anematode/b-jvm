@@ -474,9 +474,9 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                                        .nat = name_and_type,
                                        .field = nullptr}};
     }
-    return (bjvm_cp_entry){.kind = entry_kind,
-                           .methodref = {.class_info = class_info,
-                                         .nat = name_and_type}};
+    return (bjvm_cp_entry){
+        .kind = entry_kind,
+        .methodref = {.class_info = class_info, .nat = name_and_type}};
   }
   case CONSTANT_String: {
     uint16_t index = reader_next_u16(reader, "string index");

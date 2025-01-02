@@ -272,7 +272,7 @@ wasm_runtime_invokenonstatic(bjvm_thread *thread, bjvm_plain_frame *frame,
   // frame->method->name.len, frame->method->name.chars); dump_frame(stderr,
   // frame);
   int sd = stack_depth(frame);
-  return bjvm_invokenonstatic(thread, frame, insn, &sd);
+  return 0;
 }
 
 void add_runtime_imports(compile_ctx *ctx) {

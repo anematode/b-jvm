@@ -60,7 +60,7 @@ primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
   result->primitive_component = component_type->primitive_component;
   result->name = make_heap_str(2);
   bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
-  bjvm_setup_function_tables(result);
+  bjvm_set_up_function_tables(result);
   return result;
 }
 
