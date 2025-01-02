@@ -32,9 +32,10 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
   bjvm_initialize_class(thread, reflect_Field);
   bjvm_handle *field_mirror =
       bjvm_make_handle(thread, new_object(thread, reflect_Field));
-  if (!field_mirror->obj) {
+  if (!field_mirror->obj) { // out of memory
     return;
   }
+
 #define F ((struct bjvm_native_Field *)field_mirror->obj)
   field->reflection_field = (void *)F;
 

@@ -409,7 +409,7 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
 void bjvm_abstract_method_error(bjvm_thread *thread,
                                 const bjvm_cp_method *method) {
   INIT_STACK_STRING(err, 1000);
-  bprintf(err, "Abstract method %.*s on class %.*s", fmt_slice(method->name),
+  bprintf(err, "Found no concrete implementation of %.*s", fmt_slice(method->name),
           fmt_slice(method->my_class->name));
   bjvm_raise_exception(thread, STR("java/lang/AbstractMethodError"), err);
 }
@@ -632,7 +632,7 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   thread->lang_exception_frame = -1;
 
 #ifndef EMSCRIPTEN
-  printf("Exception: %.*s: %.*s\n", fmt_slice(exception_name),
+  fprintf(stderr, "Exception: %.*s: %.*s\n", fmt_slice(exception_name),
          fmt_slice(exception_string));
 #endif
   bjvm_raise_exception_object(thread, obj);
@@ -1484,10 +1484,9 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 #endif
   }
 
-  classdesc->static_references =
-      bjvm_init_compressed_bitset(static_offset / sizeof(void *));
-  classdesc->instance_references =
-      bjvm_init_compressed_bitset(nonstatic_offset / sizeof(void *));
+  bjvm_init_compressed_bitset(&classdesc->static_references, static_offset / sizeof(void *));
+  bjvm_init_compressed_bitset(&classdesc->instance_references, nonstatic_offset / sizeof(void *));
+
   // Add superclass instance references
   if (super) {
     bjvm_compressed_bitset bs = super->instance_references;
@@ -3749,8 +3748,6 @@ interpret_frame:
         goto done;
       }
 
-      // TODO raise NPE
-
       void *addr = (void *)obj + field_info->field->byte_offset;
 
       bjvm_type_kind kind = field_to_kind(field_info->parsed_descriptor);
@@ -3832,8 +3829,8 @@ interpret_frame:
       insn->ic = bjvm_itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
       insn->ic2 = target->descriptor;
       if (!insn->ic) {
-        // TODO IncompatibleClassChangeError
-        UNREACHABLE();
+        bjvm_abstract_method_error(thread, method_info->resolved);
+        goto done;
       }
       JMP_INSN;
     }
@@ -4133,18 +4130,18 @@ interpret_frame:
           bjvm_null_pointer_exception(thread);
           goto done;
         }
-        bjvm_cp_method *method;
+        bjvm_cp_method *target_method;
         if (insn->kind == bjvm_insn_invokevtable_polymorphic)
-          method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
+          target_method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
         else {
-          method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
-          if (!method) {
-            // IncompatibleClassChangeError
-            UNREACHABLE();
+          target_method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
+          if (!target_method) {
+            bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
+            goto done;
           }
         }
-        assert(method);
-        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, method,
+        assert(target_method);
+        bjvm_stack_frame *new_frame = bjvm_push_frame(thread, target_method,
               frame->values + sd - insn->args, insn->args);
         if (!new_frame)
           goto done;

@@ -1406,7 +1406,7 @@ done:
                                  BJVM_TYPE_KIND_FLOAT, BJVM_TYPE_KIND_DOUBLE,
                                  BJVM_TYPE_KIND_LONG};
       bjvm_compressed_bitset *bitset = analy->insn_index_to_kinds[j] + i;
-      *bitset = bjvm_init_compressed_bitset(code->max_stack + code->max_locals);
+      bjvm_init_compressed_bitset(bitset, code->max_stack + code->max_locals);
 
       write_kinds_to_bitset(&inferred_stacks[i], 0, bitset, order[j]);
       write_kinds_to_bitset(&inferred_locals[i], code->max_stack, bitset,

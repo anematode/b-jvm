@@ -54,16 +54,17 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
   return existing_buf;
 }
 
-bjvm_compressed_bitset bjvm_init_compressed_bitset(int bits_capacity) {
+void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs, int bits_capacity) {
   if (bits_capacity > 63) {
     uint32_t size_words = (bits_capacity + 63) / 64;
     uint64_t *buffer = calloc(size_words, sizeof(uint64_t));
-    return (bjvm_compressed_bitset){.ptr.bits = buffer,
+    *bs = (bjvm_compressed_bitset){.ptr.bits = buffer,
                                     .ptr.size_words = size_words};
-  }
-  return (bjvm_compressed_bitset){
+  } else {
+    *bs = (bjvm_compressed_bitset){
       .bits_inl = 1 // lowest bit = 1
-  };
+    };
+  }
 }
 
 bjvm_compressed_bitset

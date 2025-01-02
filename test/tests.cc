@@ -150,7 +150,8 @@ TEST_CASE("Class file management") {
 TEST_CASE("Compressed bitset") {
   for (int size = 1; size < 256; ++size) {
     std::vector<uint8_t> reference(size);
-    auto bitset = bjvm_init_compressed_bitset(size);
+    bjvm_compressed_bitset bitset;
+    bjvm_init_compressed_bitset(&bitset, size);
 
     for (int i = 0; i < 1000; ++i) {
       int index = rand() % size;
@@ -518,6 +519,13 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_analyze_method_code(m2, nullptr);
 
   bjvm_free_classfile(desc);
+}
+
+TEST_CASE("Conflicting defaults") {
+  // Attempting to invokeinterface on a class which inherits multiple maximally
+  // -specific implementations of a given interface method.
+  auto result = run_test_case("test_files/conflicting_defaults/", true, "ConflictingDefaults");
+  REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 
 TEST_CASE("JSON tests") {

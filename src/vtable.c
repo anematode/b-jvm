@@ -116,7 +116,7 @@ static void merge_itable(bjvm_itable *dst,
   }
 }
 
-bool itable_include(const bjvm_cp_method *method) {
+static bool itable_include(const bjvm_cp_method *method) {
   return !utf8_equals(method->name, "<init>") &&
     !utf8_equals(method->name, "<clinit>") &&
     !(method->access_flags & (BJVM_ACCESS_STATIC | BJVM_ACCESS_PRIVATE));
