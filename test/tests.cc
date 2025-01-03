@@ -113,40 +113,6 @@ TEST_CASE("Test classfile parsing") {
   };
 }
 
-TEST_CASE("Class file management") {
-  auto vm = CreateTestVM(true);
-  auto files = ListDirectory("jre8", true);
-
-  int file_count = std::accumulate(files.begin(), files.end(), 0,
-                                   [](int acc, const std::string &file) {
-                                     return acc + EndsWith(file, ".class");
-                                   });
-
-  size_t len;
-  const uint8_t *bytes;
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.class"),
-                                 &bytes, &len) == 0);
-  REQUIRE(len > 0);
-  REQUIRE(*(uint32_t *)bytes == 0xBEBAFECA);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.clas"),
-                                 nullptr, &len) != 0);
-  REQUIRE(bjvm_vm_read_classfile(vm.get(), STR("java/lang/Object.classe"),
-                                 nullptr, &len) != 0);
-  bjvm_vm_list_classfiles(vm.get(), nullptr, &len);
-  REQUIRE((int)len == file_count);
-  std::vector<heap_string> strings(len);
-
-  bjvm_vm_list_classfiles(vm.get(), strings.data(), &len);
-  bool found = false;
-  for (size_t i = 0; i < len; ++i) {
-    found = found ||
-            utf8_equals(hslc(strings[i]), "java/lang/ClassLoader.class") == 0;
-    free_heap_str(strings[i]);
-  }
-  printf("Hello");
-  REQUIRE(found);
-}
-
 TEST_CASE("Compressed bitset") {
   for (int size = 1; size < 256; ++size) {
     std::vector<uint8_t> reference(size);
@@ -236,8 +202,6 @@ TEST_CASE("parse_field_descriptor valid cases") {
   free_field_descriptor(java_lang_Object);
   free_field_descriptor(java_lang_String);
 }
-
-TEST_CASE("VM initialization") { CreateTestVM(true); }
 
 TEST_CASE("String hash table") {
   bjvm_string_hash_table tbl = bjvm_make_hash_table(free, 0.75, 48);

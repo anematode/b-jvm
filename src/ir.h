@@ -22,8 +22,8 @@ typedef enum {
 } bjvm_ir_op_kind;
 
 typedef struct {
-  bjvm_insn_code_kind kind;
-  // target <- lhs * rhs
+  bjvm_ir_op_kind kind;
+  // target <- lhs * rhs   (or possibly unary)
   bjvm_var_t target;
   bjvm_var_t lhs, rhs;
 } bjvm_ir_assign;
@@ -68,7 +68,16 @@ typedef struct {
 } bjvm_ir_return;
 
 typedef struct {
+  // Variable to select
+  bjvm_var_t val;
+  // Predecessor block taken
+  bjvm_bb_t pred;
+} bjvm_ir_phi_entry;
+
+typedef struct {
   bjvm_var_t target;
+  bjvm_ir_phi_entry *entries;
+  int entry_count;
 } bjvm_ir_phi;
 
 typedef struct {
@@ -79,13 +88,27 @@ typedef struct {
 } bjvm_ir_insn;
 
 typedef struct {
-
-} bjvm_ir;
+  bjvm_bb_t next;
+} bjvm_ir_goto;
 
 typedef struct {
-  bjvm_ir_insn *insns;
-  int count;
+  bjvm_bb_t taken, not_taken;
+} bjvm_ir_ifelse;
 
+typedef struct {
+  bjvm_bb_t default_target;
+  int targetc;
+  bjvm_bb_t *targets;
+} bjvm_ir_switch;
+
+typedef struct {
+  bjvm_ir_phi *phis;
+  int phi_count;
+
+  bjvm_ir_insn *insns;
+  int insn_count;
+
+  // Either a return or a branching instruction
   bjvm_ir_insn last;
 } bjvm_ir_bb;
 

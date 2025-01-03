@@ -21,13 +21,10 @@ using std::string_view;
 using std::vector;
 
 namespace Bjvm::Tests {
-int preregister_all_classes(bjvm_vm *vm);
 
 std::unique_ptr<bjvm_vm, void (*)(bjvm_vm *)>
-CreateTestVM(bool preregister, bjvm_vm_options options) {
+CreateTestVM(bjvm_vm_options options) {
   bjvm_vm *vm = bjvm_create_vm(options);
-  if (preregister)
-    preregister_all_classes(vm);
   return {vm, bjvm_free_vm};
 }
 
@@ -119,25 +116,6 @@ bool EndsWith(const std::string &s, const std::string &suffix) {
     return false;
   }
   return s.substr(s.size() - suffix.size()) == suffix;
-}
-
-int preregister_all_classes(bjvm_vm *vm) {
-  auto files = ListDirectory("jre8", true);
-  int file_count = 0;
-  for (auto file : files) {
-    if (!EndsWith(file, ".class")) {
-      continue;
-    }
-
-    vector<uint8_t> read = ReadFile(file).value();
-
-    file = file.substr(5); // remove "jre8/"
-    bjvm_utf8 filename = {.chars = (char *)file.c_str(),
-                          .len = (int)file.size()};
-    bjvm_vm_preregister_classfile(vm, filename, read.data(), read.size());
-    file_count++;
-  }
-  return file_count;
 }
 
 int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,

@@ -24,8 +24,8 @@ DECLARE_NATIVE(
   INIT_STACK_STRING(cf_name, 1000);
   cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(name_str));
 
-  bjvm_vm_preregister_classfile(thread->vm, cf_name, bytes, length);
-  bjvm_classdesc *result = bootstrap_class_create(thread, hslc(name_str));
+  bjvm_classdesc *result = bjvm_define_class(thread, hslc(name_str), bytes,
+                                             length);
 
   free_heap_str(name_str);
 

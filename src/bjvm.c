@@ -29,38 +29,7 @@
 #include "util.h"
 #include "wasm_jit.h"
 
-struct file_entry {
-  size_t len;
-  uint8_t *data;
-};
-
-struct file_entry *make_cf_entry(const uint8_t *bytes, size_t len) {
-  struct file_entry *result = malloc(sizeof(struct file_entry));
-  result->data = malloc(result->len = len);
-  memcpy(result->data, bytes, len);
-  return result;
-}
-
-void free_cf_entry(void *entry_) {
-  if (!entry_)
-    return;
-  struct file_entry *entry = entry_;
-  free(entry->data);
-  free(entry);
-}
-
 #define MAX_CF_NAME_LENGTH 1000
-
-int add_classfile_bytes(bjvm_vm *vm, const bjvm_utf8 filename,
-                        const uint8_t *bytes, size_t len) {
-  if (filename.len > MAX_CF_NAME_LENGTH)
-    return -1;
-
-  struct file_entry *entry = make_cf_entry(bytes, len);
-  free_cf_entry(bjvm_hash_table_insert(&vm->classfiles, filename.chars,
-                                       filename.len, entry));
-  return 0;
-}
 
 uint16_t stack_depth(const bjvm_plain_frame *frame) {
   assert(frame->method && "Can't get stack depth of fake frame");
@@ -740,7 +709,6 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
     return nullptr;
   }
 
-  vm->classfiles = bjvm_make_hash_table(free_cf_entry, 0.75, 16);
   vm->classes = bjvm_make_hash_table(_free_classdesc, 0.75, 16);
   vm->inchoate_classes = bjvm_make_hash_table(nullptr, 0.75, 16);
   vm->natives = bjvm_make_hash_table(free_native_entries, 0.75, 16);
@@ -772,7 +740,6 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
 }
 
 void bjvm_free_vm(bjvm_vm *vm) {
-  bjvm_free_hash_table(vm->classfiles);
   bjvm_free_hash_table(vm->classes);
   bjvm_free_hash_table(vm->natives);
   bjvm_free_hash_table(vm->inchoate_classes);
@@ -928,61 +895,10 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 void bjvm_free_thread(bjvm_thread *thread) {
   // TODO remove from the VM
 
-  // TODO what happens to ->current_exception etc.?
   free(thread->frames);
   free(thread->frame_buffer);
   free(thread->handles);
   free(thread);
-}
-
-int bjvm_vm_preregister_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
-                                  const uint8_t *bytes, size_t len) {
-  return add_classfile_bytes(vm, filename, bytes, len);
-}
-
-int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
-                           const uint8_t **bytes, size_t *len) {
-  struct file_entry *entry =
-      bjvm_hash_table_lookup(&vm->classfiles, filename.chars, filename.len);
-  if (entry) {
-    if (bytes)
-      *bytes = entry->data;
-    if (len)
-      *len = entry->len;
-    return 0;
-  }
-
-  uint8_t *data; // we get ownership of this
-  int status = bjvm_lookup_classpath(&vm->classpath, filename, &data, len);
-  if (status) {
-    return -1;
-  }
-  entry = malloc(sizeof(struct file_entry));
-  entry->data = data;
-  entry->len = *len;
-  free_cf_entry(bjvm_hash_table_insert(&vm->classfiles, filename.chars,
-                                       filename.len, entry));
-  return bjvm_vm_read_classfile(vm, filename, bytes, len);
-}
-
-void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count) {
-  *count = vm->classfiles.entries_count;
-  if (strings) {
-    bjvm_hash_table_iterator iter =
-        bjvm_hash_table_get_iterator(&vm->classfiles);
-    size_t i = 0;
-    void *value;
-
-    bjvm_utf8 key;
-
-    while (i < *count && bjvm_hash_table_iterator_has_next(
-                             iter, &key.chars, (size_t *)&key.len, &value)) {
-      heap_string heap_key = make_heap_str_from(key);
-      strings[i] = heap_key;
-      ++i;
-      bjvm_hash_table_iterator_next(&iter);
-    }
-  }
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
@@ -1192,39 +1108,14 @@ void bjvm_class_circularity_error(bjvm_thread *thread,
   bjvm_raise_exception(thread, STR("java/lang/ClassCircularityError"), message);
 }
 
-bjvm_classdesc *bootstrap_load_class_and_supers(bjvm_thread *thread,
-                                                bjvm_utf8 chars) {
+bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
+                                  bjvm_utf8 chars,
+                                  uint8_t *classfile_bytes,
+                                  size_t classfile_len) {
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
-  // e.g. "java/lang/Object.class"
-  const bjvm_utf8 cf_ending = STR(".class");
-  INIT_STACK_STRING(filename, MAX_CF_NAME_LENGTH + 6);
-  memcpy(filename.chars, chars.chars, chars.len);
-  memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
-  filename.len = chars.len + cf_ending.len;
-
-  uint8_t *bytes;
-  size_t cf_len;
-  int read_status =
-      bjvm_vm_read_classfile(vm, filename, (const uint8_t **)&bytes, &cf_len);
-  if (read_status) {
-    // If the file is ClassNotFoundException, abort to avoid stack overflow
-    if (utf8_equals(chars, "java/lang/ClassNotFoundException")) {
-      printf("Could not find class %.*s\n", fmt_slice(chars));
-      abort();
-    }
-
-    int i = 0;
-    for (; i < chars.len; ++i)
-      filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
-    // ClassNotFoundException: com.google.DontBeEvil
-    bjvm_raise_exception(thread, STR("java/lang/ClassNotFoundException"),
-                         filename);
-    goto error_1;
-  }
-
-  parse_result_t error = bjvm_parse_classfile(bytes, cf_len, class);
+  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class);
   if (error != PARSE_SUCCESS) {
     // Raise VerifyError
     UNREACHABLE();
@@ -1343,8 +1234,38 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
   if (!class) {
     (void)bjvm_hash_table_insert(&vm->inchoate_classes, chars.chars, chars.len,
                                  (void *)1);
-    class = bootstrap_load_class_and_supers(thread, chars);
+
+    // e.g. "java/lang/Object.class"
+    const bjvm_utf8 cf_ending = STR(".class");
+    INIT_STACK_STRING(filename, MAX_CF_NAME_LENGTH + 6);
+    memcpy(filename.chars, chars.chars, chars.len);
+    memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
+    filename.len = chars.len + cf_ending.len;
+
+    uint8_t *bytes;
+    size_t cf_len;
+    int read_status =
+      bjvm_lookup_classpath(&vm->classpath, filename, &bytes, &cf_len);
+    if (read_status) {
+      // If the file is ClassNotFoundException, abort to avoid stack overflow
+      if (utf8_equals(chars, "java/lang/ClassNotFoundException")) {
+        printf("Could not find class %.*s\n", fmt_slice(chars));
+        abort();
+      }
+
+      int i = 0;
+      for (; i < chars.len; ++i)
+        filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
+      // ClassNotFoundException: com.google.DontBeEvil
+      bjvm_raise_exception(thread, STR("java/lang/ClassNotFoundException"),
+                           filename);
+      return nullptr;
+    }
+
+    class = bjvm_define_class(thread, chars, bytes, cf_len);
     (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars.chars, chars.len);
+    if (!class)
+      return nullptr;
   }
 
   // Derive nth dimension

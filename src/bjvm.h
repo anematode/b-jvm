@@ -128,8 +128,6 @@ typedef void (*bjvm_write_byte)(int ch, void *param);
 #define BJVM_CARD_BYTES 4096
 
 typedef struct bjvm_vm {
-  // Map class file name -> cf bytes
-  bjvm_string_hash_table classfiles;
   // Map class name (e.g. "java/lang/String") to classdesc*
   bjvm_string_hash_table classes;
   // Classes currently under creation -- used to detect circularity
@@ -372,23 +370,6 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options);
 void bjvm_free_thread(bjvm_thread *thread);
 
 /**
- * Directly add the given classfile as accessible to the VM, bypassing the
- * callback to load_classfile.
- */
-int bjvm_vm_preregister_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
-                                  const uint8_t *bytes, size_t len);
-
-/**
- * Read the classfile in the class path. Returns -1 on failure to find the
- * classfile. Writes a pointer to the classfile bytes and the length of the
- * classfile to the given pointers.
- */
-int bjvm_vm_read_classfile(bjvm_vm *vm, const bjvm_utf8 filename,
-                           const uint8_t **bytes, size_t *len);
-
-void bjvm_vm_list_classfiles(bjvm_vm *vm, heap_string *strings, size_t *count);
-
-/**
  * Free the classfile.
  */
 void bjvm_free_classfile(bjvm_classdesc cf);
@@ -396,8 +377,11 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 void bjvm_free_vm(bjvm_vm *vm);
 
 void free_field_descriptor(bjvm_field_descriptor descriptor);
-bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
-                                       const bjvm_utf8 name);
+bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread, bjvm_utf8 name);
+bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
+                                bjvm_utf8 chars,
+                                uint8_t *classfile_bytes,
+                                size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
                                    const bjvm_utf8 name,

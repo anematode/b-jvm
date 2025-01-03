@@ -213,9 +213,7 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass,
   INIT_STACK_STRING(cf_name, 1000);
   cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(random_name));
 
-  bjvm_vm_preregister_classfile(thread->vm, cf_name, bytes, length);
-  bjvm_classdesc *result = bootstrap_class_create(thread, random_name);
-
+  bjvm_classdesc *result = bjvm_define_class(thread, random_name, bytes, length);
   bjvm_initialize_class(thread, result);
 
   return (bjvm_stack_value){.obj =
@@ -251,8 +249,8 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineClass,
 
   printf("Defining class %.*s\n", fmt_slice(name_str));
 
-  bjvm_vm_preregister_classfile(thread->vm, cf_name, bytes, length);
-  bjvm_classdesc *result = bootstrap_class_create(thread, hslc(name_str));
+  bjvm_classdesc *result = bjvm_define_class(thread, hslc(name_str), bytes,
+                                             length);
 
   free_heap_str(name_str);
 

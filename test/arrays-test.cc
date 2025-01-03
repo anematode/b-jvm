@@ -19,7 +19,7 @@ using std::array;
 constexpr static int testArrayDimensions[] = {7, 8, 9};
 
 TEST_CASE("Multi-dimensional boolean array") {
-  auto vm = CreateTestVM(false);
+  auto vm = CreateTestVM();
   auto thr = bjvm_create_thread(vm.get(), bjvm_default_thread_options());
 
   auto kind = bjvm_primitive_classdesc(thr, BJVM_TYPE_KIND_BOOLEAN);
