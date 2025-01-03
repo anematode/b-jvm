@@ -58,7 +58,9 @@ add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         src/arm64_jit.h
         src/natives/java/util/TimeZone.c
         src/vtable.c
-        src/vtable.h)
+        src/vtable.h
+        src/ir.c
+        src/ir.h)
 target_include_directories(bjvm PRIVATE src)
 
 if (NOT EMSCRIPTEN)
