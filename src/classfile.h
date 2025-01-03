@@ -211,7 +211,7 @@ typedef enum {
   bjvm_insn_invokestatic_resolved,    // resolved version of invokestatic
   bjvm_insn_invokecallsite,           // resolved version of invokedynamic
 
-  /** Resolved versions of getfield* */
+  /** Resolved versions of getfield */
   bjvm_insn_getfield_B,
   bjvm_insn_getfield_C,
   bjvm_insn_getfield_S,
@@ -222,7 +222,7 @@ typedef enum {
   bjvm_insn_getfield_Z,
   bjvm_insn_getfield_L,
 
-  /** Resolved versions of putfield* */
+  /** Resolved versions of putfield */
   bjvm_insn_putfield_B,
   bjvm_insn_putfield_C,
   bjvm_insn_putfield_S,
@@ -232,6 +232,28 @@ typedef enum {
   bjvm_insn_putfield_D,
   bjvm_insn_putfield_Z,
   bjvm_insn_putfield_L,
+
+  /** Resolved versions of getstatic */
+  bjvm_insn_getstatic_B,
+  bjvm_insn_getstatic_C,
+  bjvm_insn_getstatic_S,
+  bjvm_insn_getstatic_I,
+  bjvm_insn_getstatic_J,
+  bjvm_insn_getstatic_F,
+  bjvm_insn_getstatic_D,
+  bjvm_insn_getstatic_Z,
+  bjvm_insn_getstatic_L,
+
+  /** Resolved versions of putstatic */
+  bjvm_insn_putstatic_B,
+  bjvm_insn_putstatic_C,
+  bjvm_insn_putstatic_S,
+  bjvm_insn_putstatic_I,
+  bjvm_insn_putstatic_J,
+  bjvm_insn_putstatic_F,
+  bjvm_insn_putstatic_D,
+  bjvm_insn_putstatic_Z,
+  bjvm_insn_putstatic_L,
 } bjvm_insn_code_kind;
 
 typedef enum : char {
