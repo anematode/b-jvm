@@ -2407,8 +2407,8 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
   }
   insn->ic = fake_frame->values[0].obj;
 
-  fail:
-    free(fake_frame);
+fail:
+  free(fake_frame);
 
   bjvm_drop_handle(thread, bootstrap_handle);
   bjvm_drop_handle(thread, lookup_handle);
@@ -3526,7 +3526,7 @@ interpret_frame:
       insn->kind = bjvm_insn_invokecallsite;
       struct bjvm_native_CallSite *cs = insn->ic;
       struct bjvm_native_MethodHandle *mh = (void *)cs->target;
-      struct bjvm_native_LambdaForm *form = (void*)mh->form;
+      struct bjvm_native_LambdaForm *form = (void *)mh->form;
       struct bjvm_native_MemberName *name = (void *)form->vmentry;
       insn->args = form->arity;
       JMP_INSN;
@@ -3535,7 +3535,7 @@ interpret_frame:
       // Call the "vmtarget" method with the correct number of arguments
       struct bjvm_native_CallSite *cs = insn->ic;
       struct bjvm_native_MethodHandle *mh = (void *)cs->target;
-      struct bjvm_native_LambdaForm *form = (void*)mh->form;
+      struct bjvm_native_LambdaForm *form = (void *)mh->form;
       struct bjvm_native_MemberName *name = (void *)form->vmentry;
 
       bjvm_method_handle_kind kind = (name->flags >> 24) & 0xf;
@@ -3546,14 +3546,17 @@ interpret_frame:
         // Invoke name->vmtarget with arguments mh, args
         bjvm_cp_method *invoke = name->vmtarget;
         bjvm_stack_value *args = alloca(insn->args * sizeof(bjvm_stack_value));
-        args[0] = (bjvm_stack_value){.obj = (void*)mh};  // MethodHandle
+        args[0] = (bjvm_stack_value){.obj = (void *)mh}; // MethodHandle
         memcpy(args + 1, frame->values + sd - insn->args + 1,
                (insn->args - 1) * sizeof(bjvm_stack_value));
-        bjvm_stack_frame *invoked = bjvm_push_frame(thread, invoke, args, insn->args);
+        bjvm_stack_frame *invoked =
+            bjvm_push_frame(thread, invoke, args, insn->args);
         if (!invoked) {
           goto done;
         }
-        status = bjvm_interpret(thread, invoked, returns ? &frame->values[sd - insn->args + 1] : nullptr);
+        status = bjvm_interpret(thread, invoked,
+                                returns ? &frame->values[sd - insn->args + 1]
+                                        : nullptr);
         if (status != BJVM_INTERP_RESULT_OK) {
           goto done;
         }
@@ -3645,7 +3648,7 @@ interpret_frame:
     bjvm_insn_putstatic: {
       bjvm_cp_field_info *field_info = &insn->cp->field;
       bool putstatic = insn->kind == bjvm_insn_putstatic;
-      
+
       bjvm_cp_class_info *class = field_info->class_info;
       int error = bjvm_resolve_class(thread, class);
       if (error)
@@ -3654,9 +3657,8 @@ interpret_frame:
       error = bjvm_initialize_class(thread, class->classdesc);
       if (error)
         goto done;
-      bjvm_cp_field *field =
-          bjvm_field_lookup(class->classdesc, field_info->nat->name,
-                            field_info->nat->descriptor);
+      bjvm_cp_field *field = bjvm_field_lookup(
+          class->classdesc, field_info->nat->name, field_info->nat->descriptor);
       field_info->field = field;
       if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
         INIT_STACK_STRING(complaint, 1000);
@@ -3668,38 +3670,38 @@ interpret_frame:
       }
 
       switch (field_to_kind(field_info->parsed_descriptor)) {
-        case BJVM_TYPE_KIND_BOOLEAN:
-          insn->kind = putstatic ? bjvm_insn_putstatic_B : bjvm_insn_getstatic_B;
-          break;
-        case BJVM_TYPE_KIND_CHAR:
-          insn->kind = putstatic ? bjvm_insn_putstatic_C : bjvm_insn_getstatic_C;
-          break;
-        case BJVM_TYPE_KIND_FLOAT:
-          insn->kind = putstatic ? bjvm_insn_putstatic_F : bjvm_insn_getstatic_F;
-          break;
-        case BJVM_TYPE_KIND_DOUBLE:
-          insn->kind = putstatic ? bjvm_insn_putstatic_D : bjvm_insn_getstatic_D;
-          break;
-        case BJVM_TYPE_KIND_BYTE:
-          insn->kind = putstatic ? bjvm_insn_putstatic_B : bjvm_insn_getstatic_B;
-          break;
-        case BJVM_TYPE_KIND_SHORT:
-          insn->kind = putstatic ? bjvm_insn_putstatic_S : bjvm_insn_getstatic_S;
-          break;
-        case BJVM_TYPE_KIND_INT:
-          insn->kind = putstatic ? bjvm_insn_putstatic_I : bjvm_insn_getstatic_I;
-          break;
-        case BJVM_TYPE_KIND_LONG:
-          insn->kind = putstatic ? bjvm_insn_putstatic_J : bjvm_insn_getstatic_J;
-          break;
-        case BJVM_TYPE_KIND_VOID:
-          UNREACHABLE();
-          break;
-        case BJVM_TYPE_KIND_REFERENCE:
-          insn->kind = putstatic ? bjvm_insn_putstatic_L : bjvm_insn_getstatic_L;
-          break;
+      case BJVM_TYPE_KIND_BOOLEAN:
+        insn->kind = putstatic ? bjvm_insn_putstatic_B : bjvm_insn_getstatic_B;
+        break;
+      case BJVM_TYPE_KIND_CHAR:
+        insn->kind = putstatic ? bjvm_insn_putstatic_C : bjvm_insn_getstatic_C;
+        break;
+      case BJVM_TYPE_KIND_FLOAT:
+        insn->kind = putstatic ? bjvm_insn_putstatic_F : bjvm_insn_getstatic_F;
+        break;
+      case BJVM_TYPE_KIND_DOUBLE:
+        insn->kind = putstatic ? bjvm_insn_putstatic_D : bjvm_insn_getstatic_D;
+        break;
+      case BJVM_TYPE_KIND_BYTE:
+        insn->kind = putstatic ? bjvm_insn_putstatic_B : bjvm_insn_getstatic_B;
+        break;
+      case BJVM_TYPE_KIND_SHORT:
+        insn->kind = putstatic ? bjvm_insn_putstatic_S : bjvm_insn_getstatic_S;
+        break;
+      case BJVM_TYPE_KIND_INT:
+        insn->kind = putstatic ? bjvm_insn_putstatic_I : bjvm_insn_getstatic_I;
+        break;
+      case BJVM_TYPE_KIND_LONG:
+        insn->kind = putstatic ? bjvm_insn_putstatic_J : bjvm_insn_getstatic_J;
+        break;
+      case BJVM_TYPE_KIND_VOID:
+        UNREACHABLE();
+        break;
+      case BJVM_TYPE_KIND_REFERENCE:
+        insn->kind = putstatic ? bjvm_insn_putstatic_L : bjvm_insn_getstatic_L;
+        break;
       }
-      insn->ic = (void*)field->my_class->static_fields + field->byte_offset;
+      insn->ic = (void *)field->my_class->static_fields + field->byte_offset;
       JMP_INSN;
     }
     bjvm_insn_invokespecial: {
@@ -4213,12 +4215,17 @@ interpret_frame:
   }
 
 #define PUTSTATIC_IMPL(kind)                                                   \
-  { bjvm_stack_value value = checked_pop(frame);                               \
-        store_stack_value(insn->ic, value, kind);                                  \
-        NEXT_INSN; }
+  {                                                                            \
+    bjvm_stack_value value = checked_pop(frame);                               \
+    store_stack_value(insn->ic, value, kind);                                  \
+    NEXT_INSN;                                                                 \
+  }
 
 #define GETSTATIC_IMPL(kind)                                                   \
-  { checked_push(frame, load_stack_value(insn->ic, kind)); NEXT_INSN; }
+  {                                                                            \
+    checked_push(frame, load_stack_value(insn->ic, kind));                     \
+    NEXT_INSN;                                                                 \
+  }
 
     bjvm_insn_getfield_B:
       GETFIELD_IMPL(BJVM_TYPE_KIND_BYTE);
