@@ -53,7 +53,6 @@ static void *module_calloc(bjvm_wasm_module *module, int size) {
   return result;
 }
 
-// TODO use
 static void *module_copy(bjvm_wasm_module *module, const void *src, int size) {
   void *dest = module_malloc(module, size);
   memcpy(dest, src, size);

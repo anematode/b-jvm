@@ -111,7 +111,6 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
     bjvm_cp_method *maybe_overrides = bjvm_method_lookup(
         classdesc, d_method->name, d_method->unparsed_descriptor, true, false);
     if (method_overrides(maybe_overrides, d_method)) {
-      maybe_overrides->overrides_interface = true;
       result = make(maybe_overrides); // unambiguous of course
     }
     dst->methods[i] = result;
@@ -242,8 +241,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
 
   // If the class is itself an interface, create a new itable representing that
   // interface, only including the appropriate functions (i.e., functions which
-  // are public, non-static, and not overriding a superinterface or superclass
-  // method).
+  // are public and non-static).
   if (classdesc->access_flags & BJVM_ACCESS_INTERFACE) {
     bjvm_itable itable = {classdesc};
     for (int i = 0; i < classdesc->methods_count; ++i) {

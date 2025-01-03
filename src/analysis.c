@@ -181,6 +181,17 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(lookupswitch)
     CASE(invokevtable_monomorphic)
     CASE(invokevtable_polymorphic)
+    CASE(invokeitable_monomorphic)
+    CASE(invokeitable_polymorphic)
+    CASE(invokespecial_resolved)
+    CASE(getfield_B)
+      CASE(getfield_C)
+    CASE(getfield_S)
+        CASE(getfield_I)
+    CASE(getfield_J)
+        CASE(getfield_F)
+    CASE(getfield_D)
+        CASE(getfield_L)
   }
   UNREACHABLE();
 }

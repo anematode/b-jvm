@@ -50,7 +50,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
 
   // Create stack trace of the appropriate height
   bjvm_handle *stack_trace = bjvm_make_handle(
-      thread, CreateObjectArray1D(thread, StackTraceElement, i + 1, true));
+      thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
   if (!stack_trace->obj) // Failed to allocate
     return value_null();
 

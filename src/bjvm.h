@@ -469,6 +469,11 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
 void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
+void bjvm_incompatible_class_change_error(bjvm_thread *thread, bjvm_utf8 complaint);
+void bjvm_unsatisfied_link_error(bjvm_thread *thread,
+                                 const bjvm_cp_method *method);
+void bjvm_abstract_method_error(bjvm_thread *thread,
+                                const bjvm_cp_method *method);
 bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_plain_frame *frame,
                                             bjvm_bytecode_insn *insn, int *sd);
@@ -530,7 +535,7 @@ static inline int sizeof_type_kind(bjvm_type_kind kind) {
 
 bjvm_classdesc *bjvm_primitive_classdesc(bjvm_thread *thread,
                                          bjvm_type_kind prim_kind);
-void *bump_allocate(bjvm_thread *thread, size_t bytes, bool attempt_Gc);
+void *bump_allocate(bjvm_thread *thread, size_t bytes);
 
 #ifdef __cplusplus
 }

@@ -13,7 +13,7 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
     bjvm_obj_header *new_array =
         CreateObjectArray1D(thread, obj->obj->descriptor->one_fewer_dim,
-                            *ArrayLength(obj->obj), true);
+                            *ArrayLength(obj->obj));
     if (new_array) {
       memcpy(ArrayData(new_array), ArrayData(obj->obj),
              *ArrayLength(obj->obj) * sizeof(void *));
@@ -29,7 +29,7 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   case BJVM_CD_KIND_PRIMITIVE_ARRAY: {
     bjvm_obj_header *new_array = CreatePrimitiveArray1D(
         thread, obj->obj->descriptor->primitive_component,
-        *ArrayLength(obj->obj), true);
+        *ArrayLength(obj->obj));
     if (!new_array) {
       return value_null();
     }

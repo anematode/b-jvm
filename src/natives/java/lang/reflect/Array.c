@@ -12,9 +12,9 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
   bjvm_obj_header *result;
   if (class->kind == BJVM_CD_KIND_PRIMITIVE) {
     result =
-        CreatePrimitiveArray1D(thread, class->primitive_component, count, true);
+        CreatePrimitiveArray1D(thread, class->primitive_component, count);
   } else {
-    result = CreateObjectArray1D(thread, class, count, true);
+    result = CreateObjectArray1D(thread, class, count);
   }
   return (bjvm_stack_value){.obj = result};
 }

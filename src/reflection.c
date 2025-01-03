@@ -53,7 +53,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
       const bjvm_attribute_runtime_visible_annotations a =
           field->attributes[i].annotations;
       F->annotations =
-          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length, true);
+          CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, a.length);
       memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
       break;
     }
@@ -82,7 +82,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   C->modifiers = method->access_flags;
   C->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      method->descriptor->args_count, true);
+      method->descriptor->args_count);
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     INIT_STACK_STRING(desc, 1000);
@@ -124,16 +124,19 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       if (!((M->annotations = CreateByteArray(thread, attr->annotations.data,
                                               attr->annotations.length))))
         goto oom;
+      break;
     case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
       if (!((M->parameterAnnotations =
                  CreateByteArray(thread, attr->parameter_annotations.data,
                                  attr->parameter_annotations.length))))
         goto oom;
+      break;
     case BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
       if (!((M->annotationDefault =
                  CreateByteArray(thread, attr->annotation_default.data,
                                  attr->annotation_default.length))))
         goto oom;
+      break;
     default:
       break;
     }
@@ -141,7 +144,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 
   M->parameterTypes = CreateObjectArray1D(
       thread, bootstrap_class_create(thread, STR("java/lang/Class")),
-      method->descriptor->args_count, true);
+      method->descriptor->args_count);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     bjvm_utf8 desc =
@@ -155,7 +158,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
   M->exceptionTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0, true);
+      thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0);
   // TODO parse these ^^
 
   method->reflection_method = (void *)M;

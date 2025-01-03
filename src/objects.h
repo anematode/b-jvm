@@ -19,13 +19,12 @@ inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
 
 static inline bjvm_obj_header *AllocateObject(bjvm_thread *thread,
                                               bjvm_classdesc *descriptor,
-                                              size_t data_size,
-                                              bool attempt_gc) {
+                                              size_t data_size) {
   assert(descriptor);
   assert(descriptor->state >=
          BJVM_CD_STATE_LINKED); // important to know the size
   bjvm_obj_header *obj =
-      bump_allocate(thread, sizeof(bjvm_obj_header) + data_size, attempt_gc);
+      bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
   if (obj) {
     obj->mark_word = ObjNextHashCode();
     obj->descriptor = descriptor;

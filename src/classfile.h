@@ -196,14 +196,42 @@ typedef enum {
   bjvm_insn_lookupswitch,
   bjvm_insn_ret,
 
+  /** Resolved versions of misc instructions */
+  bjvm_insn_anewarray_resolved,
+  bjvm_insn_checkcast_resolved,
+  bjvm_insn_instanceof_resolved,
+  bjvm_insn_new_resolved,
+
   /** Resolved versions of invoke* */
   bjvm_insn_invokevtable_monomorphic, // inline cache with previous object
-  bjvm_insn_invokevtable_polymorphic, // slower dispatch
+  bjvm_insn_invokevtable_polymorphic, // slower vtable-based dispatch
   bjvm_insn_invokeitable_monomorphic, // inline cache with previous object
-  bjvm_insn_invokeitable_polymorphic, // slower dispatch
+  bjvm_insn_invokeitable_polymorphic, // slower itable-based dispatch
   bjvm_insn_invokespecial_resolved,   // resolved version of invokespecial
-  bjvm_insn_invokecallsite,           // resolved version of invokedynamic
-  bjvm_insn_invokestatic_resolved,
+  bjvm_insn_invokestatic_resolved,    // resolved version of invokestatic
+  // bjvm_insn_invokecallsite,           // resolved version of invokedynamic
+
+  /** Resolved versions of getfield* */
+  bjvm_insn_getfield_B,
+  bjvm_insn_getfield_C,
+  bjvm_insn_getfield_S,
+  bjvm_insn_getfield_I,
+  bjvm_insn_getfield_J,
+  bjvm_insn_getfield_F,
+  bjvm_insn_getfield_D,
+  bjvm_insn_getfield_Z,
+  bjvm_insn_getfield_L,
+
+  /** Resolved versions of putfield* */
+  bjvm_insn_putfield_B,
+  bjvm_insn_putfield_C,
+  bjvm_insn_putfield_S,
+  bjvm_insn_putfield_I,
+  bjvm_insn_putfield_J,
+  bjvm_insn_putfield_F,
+  bjvm_insn_putfield_D,
+  bjvm_insn_putfield_Z,
+  bjvm_insn_putfield_L,
 } bjvm_insn_code_kind;
 
 typedef enum : char {
@@ -515,6 +543,8 @@ typedef struct bjvm_bytecode_insn {
     struct bjvm_multianewarray_data multianewarray;
     // non-owned pointer into the constant pool
     bjvm_cp_entry *cp;
+    // anewarray_resolved, checkcast_resolved
+    bjvm_classdesc *classdesc;
   };
   // Per-instruction inline cache data
   void *ic;
@@ -636,8 +666,6 @@ typedef struct bjvm_cp_method {
 
   // This method overrides a method in a superclass
   bool overrides;
-  // This method overrides a method in an interface
-  bool overrides_interface;
 
   // JIT-compiled method
   void *compiled_method; // bjvm_wasm_instantiation_result*

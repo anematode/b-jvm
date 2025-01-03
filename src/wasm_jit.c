@@ -200,15 +200,12 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
 
   // Make block of all the spill/load instructions
   if (!do_load) {
-    // Set thread->program_counter to pc and thread->stack_depth to the stack
-    // depth
-    int sd = ctx->analysis->insn_index_to_stack_depth[pc];
+    // Set thread->program_counter to pc
     expression frame =
         bjvm_wasm_local_get(ctx->module, FRAME_PARAM, bjvm_wasm_int32());
-    // Can do it in one 32-bit store
-    expression pc_sd_const = bjvm_wasm_i32_const(ctx->module, (sd << 16) | pc);
+    expression pc_const = bjvm_wasm_i32_const(ctx->module, pc);
     expression store = bjvm_wasm_store(
-        ctx->module, BJVM_WASM_OP_KIND_I32_STORE, frame, pc_sd_const, 0,
+        ctx->module, BJVM_WASM_OP_KIND_I32_STORE16, frame, pc_const, 0,
         offsetof(bjvm_plain_frame, program_counter));
     *VECTOR_PUSH(result, result_count, result_cap) = store;
     if (return_value != -1) {
@@ -225,7 +222,7 @@ expression spill_or_load_code(compile_ctx *ctx, int pc, bool do_load,
 
 EMSCRIPTEN_KEEPALIVE
 void *wasm_runtime_new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
-  return AllocateObject(thread, classdesc, classdesc->instance_bytes, false);
+  return AllocateObject(thread, classdesc, classdesc->instance_bytes);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -252,7 +249,7 @@ bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
                                                 bjvm_classdesc *classdesc) {
   if (count < 0)
     return nullptr; // interrupt and raise NegativeArraySizeException
-  return CreateObjectArray1D(thread, classdesc, count, false);
+  return CreateObjectArray1D(thread, classdesc, count);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -261,7 +258,7 @@ bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
                                                     bjvm_bytecode_insn *insn) {
   // printf("invokestatic called!\n");
   int sd = stack_depth(frame);
-  return bjvm_invokestatic(thread, frame, insn, &sd);
+  return 0; //bjvm_invokestatic(thread, frame, insn, &sd);
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1284,14 +1281,12 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
     case bjvm_insn_invokespecial:
     case bjvm_insn_invokestatic:
     case bjvm_insn_invokevirtual:
-    case bjvm_insn_invokeinterface: {
-      expression result = wasm_lower_invoke(ctx, insn, pc, sd);
-      if (!result)
-        goto unimplemented;
-      PUSH_EXPR = result;
-      break;
-    }
+    case bjvm_insn_invokeinterface:
     case bjvm_insn_invokedynamic: {
+      goto unimplemented;
+    }
+    case bjvm_insn_invokevtable_monomorphic:
+    case bjvm_insn_invokevtable_polymorphic: {
       goto unimplemented;
     }
     case bjvm_insn_ldc:
