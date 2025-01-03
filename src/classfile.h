@@ -209,7 +209,7 @@ typedef enum {
   bjvm_insn_invokeitable_polymorphic, // slower itable-based dispatch
   bjvm_insn_invokespecial_resolved,   // resolved version of invokespecial
   bjvm_insn_invokestatic_resolved,    // resolved version of invokestatic
-  // bjvm_insn_invokecallsite,           // resolved version of invokedynamic
+  bjvm_insn_invokecallsite,           // resolved version of invokedynamic
 
   /** Resolved versions of getfield* */
   bjvm_insn_getfield_B,

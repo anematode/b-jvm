@@ -2407,57 +2407,14 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
   }
   insn->ic = fake_frame->values[0].obj;
 
-fail:
-  free(fake_frame);
+  fail:
+    free(fake_frame);
 
   bjvm_drop_handle(thread, bootstrap_handle);
   bjvm_drop_handle(thread, lookup_handle);
   bjvm_drop_handle(thread, name);
 
   return result;
-}
-
-bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
-                                             bjvm_plain_frame *frame,
-                                             bjvm_bytecode_insn *insn,
-                                             int *sd) {
-  bjvm_cp_indy_info *indy = &insn->cp->indy_info;
-  if (!insn->ic) {
-    if (indy_resolve(thread, insn, indy)) {
-      return BJVM_INTERP_RESULT_EXC;
-    }
-  }
-
-  assert(insn->ic);
-  struct bjvm_native_CallSite *cs = insn->ic;
-  struct bjvm_native_MethodHandle *mh = (void *)cs->target;
-
-  bjvm_method_descriptor *d = indy->method_descriptor;
-  bjvm_plain_frame *fake_frame =
-      calloc(1, sizeof(bjvm_plain_frame) +
-                    sizeof(bjvm_stack_value) * (d->args_count + 1));
-  fake_frame->values_count = fake_frame->max_stack = d->args_count + 1;
-  fake_frame->values[0].obj = (void *)mh;
-  memcpy(fake_frame->values + 1,
-         frame->values + stack_depth(frame) - d->args_count,
-         d->args_count * sizeof(bjvm_stack_value));
-
-  bjvm_cp_method *invokeExact =
-      bjvm_method_lookup(mh->base.descriptor, STR("invokeExact"),
-                         STR("(Ljava/lang/invoke/MethodHandle;[Ljava/lang/"
-                             "Object;)Ljava/lang/Object;"),
-                         true, false);
-  assert(invokeExact);
-  int fake_sd = d->args_count + 1;
-  int status = bjvm_invokevirtual_signature_polymorphic(
-      thread, fake_frame, &fake_sd, invokeExact, (void *)mh->type, (void *)mh);
-  if (d->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
-    frame->values[*sd - d->args_count] = fake_frame->values[0];
-    (*sd)++;
-  }
-  *sd -= d->args_count;
-  free(fake_frame);
-  return status;
 }
 
 int max_calls = 4251;
@@ -2805,6 +2762,7 @@ interpret_frame:
         &&bjvm_insn_invokeitable_polymorphic,
         &&bjvm_insn_invokespecial_resolved,
         &&bjvm_insn_invokestatic_resolved,
+        &&bjvm_insn_invokecallsite,
         &&bjvm_insn_getfield_B,
         &&bjvm_insn_getfield_C,
         &&bjvm_insn_getfield_S,
@@ -3542,9 +3500,52 @@ interpret_frame:
       NEXT_INSN;
     }
     bjvm_insn_invokedynamic: {
-      status = bjvm_invokedynamic(thread, frame, insn, &sd);
-      if (status != BJVM_INTERP_RESULT_OK)
+      bjvm_cp_indy_info *indy = &insn->cp->indy_info;
+      if (indy_resolve(thread, insn, indy)) {
         goto done;
+      }
+      assert(insn->ic);
+      insn->kind = bjvm_insn_invokecallsite;
+      struct bjvm_native_CallSite *cs = insn->ic;
+      struct bjvm_native_MethodHandle *mh = (void *)cs->target;
+      struct bjvm_native_LambdaForm *form = (void*)mh->form;
+      struct bjvm_native_MemberName *name = (void *)form->vmentry;
+      insn->args = form->arity;
+      JMP_INSN;
+    }
+    bjvm_insn_invokecallsite: {
+      // Call the "vmtarget" method with the correct number of arguments
+      struct bjvm_native_CallSite *cs = insn->ic;
+      struct bjvm_native_MethodHandle *mh = (void *)cs->target;
+      struct bjvm_native_LambdaForm *form = (void*)mh->form;
+      struct bjvm_native_MemberName *name = (void *)form->vmentry;
+
+      bjvm_method_handle_kind kind = (name->flags >> 24) & 0xf;
+      switch (kind) {
+      case BJVM_MH_KIND_INVOKE_STATIC: {
+        bool returns = form->result != -1;
+
+        // Invoke name->vmtarget with arguments mh, args
+        bjvm_cp_method *invoke = name->vmtarget;
+        bjvm_stack_value *args = alloca(insn->args * sizeof(bjvm_stack_value));
+        args[0] = (bjvm_stack_value){.obj = (void*)mh};  // MethodHandle
+        memcpy(args + 1, frame->values + sd - insn->args + 1,
+               (insn->args - 1) * sizeof(bjvm_stack_value));
+        bjvm_stack_frame *invoked = bjvm_push_frame(thread, invoke, args, insn->args);
+        if (!invoked) {
+          goto done;
+        }
+        status = bjvm_interpret(thread, invoked, returns ? &frame->values[sd - insn->args + 1] : nullptr);
+        if (status != BJVM_INTERP_RESULT_OK) {
+          goto done;
+        }
+        sd -= insn->args - 1;
+        sd += returns;
+        break;
+      }
+      default:
+        UNREACHABLE();
+      }
       NEXT_INSN;
     }
     bjvm_insn_new: {
