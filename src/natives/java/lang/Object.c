@@ -11,9 +11,8 @@ DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") {
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   switch (obj->obj->descriptor->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
-    bjvm_obj_header *new_array =
-        CreateObjectArray1D(thread, obj->obj->descriptor->one_fewer_dim,
-                            *ArrayLength(obj->obj));
+    bjvm_obj_header *new_array = CreateObjectArray1D(
+        thread, obj->obj->descriptor->one_fewer_dim, *ArrayLength(obj->obj));
     if (new_array) {
       memcpy(ArrayData(new_array), ArrayData(obj->obj),
              *ArrayLength(obj->obj) * sizeof(void *));

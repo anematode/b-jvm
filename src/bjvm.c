@@ -550,7 +550,8 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   bjvm_classdesc *java_lang_String =
       bootstrap_class_create(thread, STR("java/lang/String"));
   bjvm_initialize_class(thread, java_lang_String);
-  bjvm_handle *str = bjvm_make_handle(thread, new_object(thread, java_lang_String));
+  bjvm_handle *str =
+      bjvm_make_handle(thread, new_object(thread, java_lang_String));
 
 #define S ((struct bjvm_native_String *)str->obj)
 
@@ -561,7 +562,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   memcpy(ArrayData(S->value), chars, len * sizeof(short));
   free(chars);
 
-  bjvm_obj_header *result = (void*)S;
+  bjvm_obj_header *result = (void *)S;
   bjvm_drop_handle(thread, str);
   return result;
 }
@@ -628,8 +629,8 @@ int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
     bjvm_thread_run(thread, method,
                     (bjvm_stack_value[]){{.obj = obj}, {.obj = str}}, nullptr);
   } else {
-    bjvm_cp_method *method = bjvm_method_lookup(classdesc, STR("<init>"),
-                                                     STR("()V"), true, false);
+    bjvm_cp_method *method =
+        bjvm_method_lookup(classdesc, STR("<init>"), STR("()V"), true, false);
     bjvm_thread_run(thread, method, (bjvm_stack_value[]){{.obj = obj}},
                     nullptr);
   }
@@ -917,8 +918,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->current_exception = nullptr;
 
   // Call setJavaLangAccess() since we crash before getting there
-  method = bjvm_method_lookup(desc, STR("setJavaLangAccess"), STR("()V"),
-                                   false, false);
+  method = bjvm_method_lookup(desc, STR("setJavaLangAccess"), STR("()V"), false,
+                              false);
   bjvm_thread_run(thr, method, nullptr, &ret);
 
   return thr;
@@ -1034,9 +1035,9 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
   bjvm_cp_method *init =
       bjvm_method_lookup(MethodType, STR("makeImpl"),
-                              STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
-                                  "lang/invoke/MethodType;"),
-                              false, false);
+                         STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
+                             "lang/invoke/MethodType;"),
+                         false, false);
   bjvm_stack_value result;
   bjvm_thread_run(thread, init,
                   (bjvm_stack_value[]){{.obj = (void *)rtype},
@@ -1104,9 +1105,9 @@ struct bjvm_native_MethodType *resolve_mh_mt(bjvm_thread *thread,
   bjvm_initialize_class(thread, MethodType);
   bjvm_cp_method *make =
       bjvm_method_lookup(MethodType, STR("makeImpl"),
-                              STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
-                                  "lang/invoke/MethodType;"),
-                              false, false);
+                         STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
+                             "lang/invoke/MethodType;"),
+                         false, false);
   bjvm_stack_value result;
 
   bjvm_classdesc *Class =
@@ -1158,9 +1159,9 @@ bjvm_resolve_method_handle(bjvm_thread *thread,
     bjvm_initialize_class(thread, DirectMethodHandle);
     bjvm_cp_method *make =
         bjvm_method_lookup(DirectMethodHandle, STR("make"),
-                                STR("(Ljava/lang/reflect/Method;)Ljava/lang/"
-                                    "invoke/DirectMethodHandle;"),
-                                false, false);
+                           STR("(Ljava/lang/reflect/Method;)Ljava/lang/"
+                               "invoke/DirectMethodHandle;"),
+                           false, false);
     bjvm_stack_value result;
     bjvm_thread_run(thread, make,
                     (bjvm_stack_value[]){{.obj = (void *)m->reflection_method}},
@@ -1692,8 +1693,8 @@ bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
     goto done;
   }
 
-  bjvm_cp_method *clinit = bjvm_method_lookup(classdesc, STR("<clinit>"),
-                                                   STR("()V"), false, false);
+  bjvm_cp_method *clinit =
+      bjvm_method_lookup(classdesc, STR("<clinit>"), STR("()V"), false, false);
   if (clinit) {
     failed_to_init = bjvm_thread_run(thread, clinit, nullptr, nullptr);
     if (failed_to_init && !is_error(thread->current_exception->descriptor)) {
@@ -2087,7 +2088,7 @@ bool method_types_compatible(struct bjvm_native_MethodType *provider_mt,
 heap_string debug_dump_string(bjvm_thread *thread, bjvm_obj_header *header) {
   bjvm_cp_method *toString =
       bjvm_method_lookup(header->descriptor, STR("toString"),
-                              STR("()Ljava/lang/String;"), true, true);
+                         STR("()Ljava/lang/String;"), true, true);
   bjvm_stack_value result;
   bjvm_thread_run(thread, toString, (bjvm_stack_value[]){{.obj = header}},
                   &result);
@@ -2286,8 +2287,8 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame,
     dim_sizes[i] = dim;
   }
 
-  bjvm_obj_header *result = CreateArray(
-      thread, multianewarray->entry->classdesc, dim_sizes, dims);
+  bjvm_obj_header *result =
+      CreateArray(thread, multianewarray->entry->classdesc, dim_sizes, dims);
   frame->values[*sd - dims] = (bjvm_stack_value){.obj = result};
   *sd -= dims - 1;
   return 0;
@@ -2443,9 +2444,9 @@ bjvm_interpreter_result_t bjvm_invokedynamic(bjvm_thread *thread,
 
   bjvm_cp_method *invokeExact =
       bjvm_method_lookup(mh->base.descriptor, STR("invokeExact"),
-                              STR("(Ljava/lang/invoke/MethodHandle;[Ljava/lang/"
-                                  "Object;)Ljava/lang/Object;"),
-                              true, false);
+                         STR("(Ljava/lang/invoke/MethodHandle;[Ljava/lang/"
+                             "Object;)Ljava/lang/Object;"),
+                         true, false);
   assert(invokeExact);
   int fake_sd = d->args_count + 1;
   int status = bjvm_invokevirtual_signature_polymorphic(
@@ -2821,8 +2822,7 @@ interpret_frame:
         &&bjvm_insn_putfield_F,
         &&bjvm_insn_putfield_D,
         &&bjvm_insn_putfield_Z,
-        &&bjvm_insn_putfield_L
-    };
+        &&bjvm_insn_putfield_L};
     goto *insn_jump_table[insn->kind];
 
     // Macros to go to the next instruction in the frame
@@ -2845,1360 +2845,1366 @@ interpret_frame:
     switch (0) {
       /** BEGIN INSTRUCTION HANDLERS */
 
-      bjvm_insn_nop:
-        NEXT_INSN;
-      bjvm_insn_aaload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        assert(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          // ArrayIndexOutOfBoundsException
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        bjvm_obj_header *obj = *((bjvm_obj_header **)ArrayData(array) + index);
-        checked_push(frame, (bjvm_stack_value){.obj = obj});
-        NEXT_INSN;
-      }
-      bjvm_insn_aastore: {
-        bjvm_obj_header *value = checked_pop(frame).obj;
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        // Instanceof check against the component type
-        if (value && !bjvm_instanceof(value->descriptor,
-                                      array->descriptor->one_fewer_dim)) {
-          bjvm_array_store_exception(thread);
-          goto done;
-                                      }
-        bjvm_obj_header **obj = (bjvm_obj_header **)ArrayData(array) + index;
-        *obj = value;
-        NEXT_INSN;
-      }
-      bjvm_insn_aconst_null:
-        checked_push(frame, (bjvm_stack_value){.obj = nullptr});
+    bjvm_insn_nop:
       NEXT_INSN;
-      bjvm_insn_arraylength: {
-        bjvm_obj_header *obj = checked_pop(frame).obj;
-        if (!obj) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        assert(obj->descriptor->kind != BJVM_CD_KIND_ORDINARY);
-        checked_push(frame, (bjvm_stack_value){.i = *ArrayLength(obj)});
-        NEXT_INSN;
-      }
-      bjvm_insn_athrow: {
-        bjvm_raise_exception_object(thread, checked_pop(frame).obj);
+    bjvm_insn_aaload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
         goto done;
       }
-      bjvm_insn_baload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          // ArrayIndexOutOfBoundsException
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){
-                                .i = *((int8_t *)ArrayData(array) + index)});
-        NEXT_INSN;
-      }
-      bjvm_insn_bastore: {
-        int value = checked_pop(frame).i;
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        *((int8_t *)ArrayData(array) + index) = value;
-        NEXT_INSN;
-      }
-      bjvm_insn_caload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){
-                                .i = *((uint16_t *)ArrayData(array) + index)});
-        NEXT_INSN;
-      }
-      bjvm_insn_sastore:
-      bjvm_insn_castore: {
-        int value = checked_pop(frame).i;
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        *((uint16_t *)ArrayData(array) + index) = value;
-        NEXT_INSN;
-      }
-      bjvm_insn_d2f: {
-        checked_push(frame, (bjvm_stack_value){.f = (float)checked_pop(frame).d});
-        NEXT_INSN;
-      }
-      bjvm_insn_d2i: {
-        checked_push(
-            frame, (bjvm_stack_value){.i = double_to_int(checked_pop(frame).d)});
-        NEXT_INSN;
-      }
-      bjvm_insn_d2l: {
-        checked_push(
-            frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).d)});
-        NEXT_INSN;
-      }
-      bjvm_insn_dadd: {
-        checked_push(frame, (bjvm_stack_value){.d = checked_pop(frame).d +
-                                                    checked_pop(frame).d});
-        NEXT_INSN;
-      }
-      bjvm_insn_dcmpg: {
-        double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
-        if (value1 < value2) {
-          checked_push(frame, (bjvm_stack_value){.i = -1});
-        } else if (value1 == value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 0});
-        } else {
-          checked_push(frame, (bjvm_stack_value){.i = 1});
-        }
-        NEXT_INSN;
-      }
-      bjvm_insn_dcmpl: {
-        double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
-        if (value1 > value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 1});
-        } else if (value1 == value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 0});
-        } else {
-          checked_push(frame, (bjvm_stack_value){.i = -1});
-        }
-        NEXT_INSN;
-      }
-      bjvm_insn_ddiv: {
-        double b = checked_pop(frame).d, a = checked_pop(frame).d;
-        checked_push(frame, (bjvm_stack_value){.d = a / b});
-        NEXT_INSN;
-      }
-      bjvm_insn_dmul: {
-        double b = checked_pop(frame).d, a = checked_pop(frame).d;
-        checked_push(frame, (bjvm_stack_value){.d = a * b});
-        NEXT_INSN;
-      }
-      bjvm_insn_dneg: {
-        double a = checked_pop(frame).d;
-        checked_push(frame, (bjvm_stack_value){.d = -a});
-        NEXT_INSN;
-      }
-      bjvm_insn_drem: { // deprecated
-        double b = checked_pop(frame).d, a = checked_pop(frame).d;
-        checked_push(frame, (bjvm_stack_value){.d = fmod(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_dsub: {
-        double b = checked_pop(frame).d, a = checked_pop(frame).d;
-        checked_push(frame, (bjvm_stack_value){.d = a - b});
-        NEXT_INSN;
-      }
-      bjvm_insn_dup: {
-        bjvm_stack_value val = checked_pop(frame);
-        checked_push(frame, val);
-        checked_push(frame, val);
-        NEXT_INSN;
-      }
-      bjvm_insn_dup_x1: {
-        bjvm_stack_value val1 = checked_pop(frame);
-        bjvm_stack_value val2 = checked_pop(frame);
-        checked_push(frame, val1);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        NEXT_INSN;
-      }
-      bjvm_insn_dup_x2: {
-        bjvm_stack_value val1 = checked_pop(frame);
-        bjvm_stack_value val2 = checked_pop(frame);
-        bjvm_stack_value val3 = checked_pop(frame);
-        checked_push(frame, val1);
-        checked_push(frame, val3);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        NEXT_INSN;
-      }
-      bjvm_insn_dup2: {
-        bjvm_stack_value val1 = checked_pop(frame), val2 = checked_pop(frame);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        NEXT_INSN;
-      }
-      bjvm_insn_dup2_x1: {
-        bjvm_stack_value val1 = checked_pop(frame);
-        bjvm_stack_value val2 = checked_pop(frame);
-        bjvm_stack_value val3 = checked_pop(frame);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        checked_push(frame, val3);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        NEXT_INSN;
-      }
-      bjvm_insn_dup2_x2: {
-        bjvm_stack_value val1 = checked_pop(frame);
-        bjvm_stack_value val2 = checked_pop(frame);
-        bjvm_stack_value val3 = checked_pop(frame);
-        bjvm_stack_value val4 = checked_pop(frame);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        checked_push(frame, val4);
-        checked_push(frame, val3);
-        checked_push(frame, val2);
-        checked_push(frame, val1);
-        NEXT_INSN;
-      }
-      bjvm_insn_f2d: {
-        checked_push(frame,
-                     (bjvm_stack_value){.d = (double)checked_pop(frame).f});
-        NEXT_INSN;
-      }
-      bjvm_insn_f2i: {
-        float a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.i = double_to_int(a)});
-        NEXT_INSN;
-      }
-      bjvm_insn_f2l:
-        checked_push(
-            frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).f)});
-      NEXT_INSN;
-      bjvm_insn_fadd: {
-        float b = checked_pop(frame).f, a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = a + b});
-        NEXT_INSN;
-      }
-      bjvm_insn_fcmpg: {
-        float value2 = checked_pop(frame).f, value1 = checked_pop(frame).f;
-
-        if (value1 < value2) {
-          checked_push(frame, (bjvm_stack_value){.i = -1});
-        } else if (value1 == value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 0});
-        } else {
-          checked_push(frame, (bjvm_stack_value){.i = 1});
-        }
-
-        NEXT_INSN;
-      }
-      bjvm_insn_fcmpl: {
-        float value2 = checked_pop(frame).f, value1 = checked_pop(frame).f;
-
-        if (value1 > value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 1});
-        } else if (value1 == value2) {
-          checked_push(frame, (bjvm_stack_value){.i = 0});
-        } else {
-          checked_push(frame, (bjvm_stack_value){.i = -1});
-        }
-
-        NEXT_INSN;
-      }
-      bjvm_insn_fdiv: {
-        float b = checked_pop(frame).f, a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = a / b});
-        NEXT_INSN;
-      }
-      bjvm_insn_fmul: {
-        float a = checked_pop(frame).f, b = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = a * b});
-        NEXT_INSN;
-      }
-      bjvm_insn_fneg: {
-        float a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = -a});
-        NEXT_INSN;
-      }
-      bjvm_insn_frem: { // deprecated
-        float b = checked_pop(frame).f, a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = fmodf(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_fsub: {
-        float b = checked_pop(frame).f, a = checked_pop(frame).f;
-        checked_push(frame, (bjvm_stack_value){.f = a - b});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2b: {
-        checked_push(frame,
-                     (bjvm_stack_value){.i = (int8_t)checked_pop(frame).i});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2c: {
-        checked_push(frame,
-                     (bjvm_stack_value){.i = checked_pop(frame).i & 0xffff});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2d: {
-        checked_push(frame,
-                     (bjvm_stack_value){.d = (double)checked_pop(frame).i});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2f: {
-        int a = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.f = (float)a});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2l: {
-        int a = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.l = (int64_t)a});
-        NEXT_INSN;
-      }
-      bjvm_insn_i2s: {
-        checked_push(frame,
-                     (bjvm_stack_value){.i = (int16_t)checked_pop(frame).i});
-        NEXT_INSN;
-      }
-      bjvm_insn_iadd: {
-        uint32_t a = checked_pop(frame).i, b = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a + b});
-        NEXT_INSN;
-      }
-      bjvm_insn_faload:
-      bjvm_insn_iaload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){
-                                .i = *((int32_t *)ArrayData(array) + index)});
-        NEXT_INSN;
-      }
-      bjvm_insn_iand: {
-        int a = checked_pop(frame).i, b = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a & b});
-        NEXT_INSN;
-      }
-      bjvm_insn_fastore:
-      bjvm_insn_iastore: {
-        int value = checked_pop(frame).i;
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        *((int32_t *)ArrayData(array) + index) = value;
-        NEXT_INSN;
-      }
-      bjvm_insn_idiv: {
-        int b = checked_pop(frame).i, a = checked_pop(frame).i;
-        if (b == 0) {
-          bjvm_arithmetic_exception(thread, STR("/ by zero"));
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){.i = java_idiv(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_imul: {
-        int a = checked_pop(frame).i, b = checked_pop(frame).i, c;
-        __builtin_mul_overflow(a, b, &c);
-        checked_push(frame, (bjvm_stack_value){.i = c});
-        NEXT_INSN;
-      }
-      bjvm_insn_ineg: {
-        uint32_t a = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = -a});
-        NEXT_INSN;
-      }
-      bjvm_insn_ior: {
-        int a = checked_pop(frame).i, b = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a | b});
-        NEXT_INSN;
-      }
-      bjvm_insn_irem: {
-        int32_t b = checked_pop(frame).i, a = checked_pop(frame).i;
-        if (b == 0) {
-          bjvm_arithmetic_exception(thread, STR("/ by zero"));
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){.i = java_irem(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_dreturn:
-      bjvm_insn_areturn:
-      bjvm_insn_lreturn:
-      bjvm_insn_freturn:
-      bjvm_insn_ireturn: {
-        // Look at the frame before and store it there
-        bjvm_stack_value r = checked_pop(frame);
-        if (thread->frames_count > 1) {
-          bjvm_stack_frame *prev_frame = thread->frames[thread->frames_count - 2];
-          *bjvm_get_frame_result_of_next(prev_frame) = r;
-        }
-        if (result) {
-          *result = r;
-        }
+      assert(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        // ArrayIndexOutOfBoundsException
+        bjvm_array_index_oob_exception(thread, index, len);
         goto done;
       }
-      bjvm_insn_ishl: {
-        int b = checked_pop(frame).i, a = checked_pop(frame).i;
-        uint32_t c = (uint32_t)a << (b & 0x1f); // fuck u UB
-        checked_push(frame, (bjvm_stack_value){.i = (int)c});
-        NEXT_INSN;
-      }
-      bjvm_insn_ishr: {
-        int b = checked_pop(frame).i, a = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a >> b});
-        NEXT_INSN;
-      }
-      bjvm_insn_isub: {
-        uint32_t b = checked_pop(frame).i, a = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a - b});
-        NEXT_INSN;
-      }
-      bjvm_insn_iushr: {
-        int b = checked_pop(frame).i, a = checked_pop(frame).i;
-        uint32_t c = (uint32_t)a >> (b & 0x1f);
-        checked_push(frame, (bjvm_stack_value){.i = (int)c});
-        NEXT_INSN;
-      }
-      bjvm_insn_ixor: {
-        int a = checked_pop(frame).i, b = checked_pop(frame).i;
-        checked_push(frame, (bjvm_stack_value){.i = a ^ b});
-        NEXT_INSN;
-      }
-      bjvm_insn_l2d: {
-        checked_push(frame,
-                     (bjvm_stack_value){.d = (double)checked_pop(frame).l});
-        NEXT_INSN;
-      }
-      bjvm_insn_l2f: {
-        checked_push(frame, (bjvm_stack_value){.f = (float)checked_pop(frame).l});
-        NEXT_INSN;
-      }
-      bjvm_insn_l2i: {
-        checked_push(frame, (bjvm_stack_value){.i = (int)checked_pop(frame).l});
-        NEXT_INSN;
-      }
-      bjvm_insn_ladd: {
-        uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a + b});
-        NEXT_INSN;
-      }
-      bjvm_insn_laload:
-      bjvm_insn_daload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){
-                                .l = *((int64_t *)ArrayData(array) + index)});
-        NEXT_INSN;
-      }
-      bjvm_insn_land: {
-        int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a & b});
-        NEXT_INSN;
-      }
-      bjvm_insn_lastore:
-      bjvm_insn_dastore: {
-        int64_t value = checked_pop(frame).l;
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        *((int64_t *)ArrayData(array) + index) = value;
-        NEXT_INSN;
-      }
-      bjvm_insn_lcmp: {
-        int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        int sign = a > b ? 1 : a == b ? 0 : -1;
-        checked_push(frame, (bjvm_stack_value){.i = sign});
-        NEXT_INSN;
-      }
-      bjvm_insn_ldiv: {
-        int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        if (b == 0) {
-          bjvm_arithmetic_exception(thread, STR("/ by zero"));
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){.l = java_ldiv(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_lmul: {
-        uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a * b});
-        NEXT_INSN;
-      }
-      bjvm_insn_lneg: {
-        uint64_t a = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = -a});
-        NEXT_INSN;
-      }
-      bjvm_insn_lor: {
-        int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a | b});
-        NEXT_INSN;
-      }
-      bjvm_insn_lrem: {
-        int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        if (b == 0) {
-          bjvm_arithmetic_exception(thread, STR("/ by zero"));
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){.l = java_lrem(a, b)});
-        NEXT_INSN;
-      }
-      bjvm_insn_lshl: {
-        int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        uint64_t c = (uint64_t)a << (b & 0x3f); // fuck u UB
-        checked_push(frame, (bjvm_stack_value){.l = (int64_t)c});
-        NEXT_INSN;
-      }
-      bjvm_insn_lshr: {
-        int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        checked_push(frame,
-                     (bjvm_stack_value){.l = a >> (b & 0x3f)}); // fuck u UB
-        NEXT_INSN;
-      }
-      bjvm_insn_lsub: {
-        uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a - b});
-        NEXT_INSN;
-      }
-      bjvm_insn_lushr: {
-        uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
-        checked_push(frame,
-                     (bjvm_stack_value){.l = a >> (b & 0x3f)}); // fuck u UB
-        NEXT_INSN;
-      }
-      bjvm_insn_lxor: {
-        int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
-        checked_push(frame, (bjvm_stack_value){.l = a ^ b});
-        NEXT_INSN;
-      }
-      bjvm_insn_monitorenter:
-      bjvm_insn_monitorexit: {
-        // TODO
-        checked_pop(frame);
-        NEXT_INSN;
-      }
-      bjvm_insn_pop: {
-        checked_pop(frame);
+      bjvm_obj_header *obj = *((bjvm_obj_header **)ArrayData(array) + index);
+      checked_push(frame, (bjvm_stack_value){.obj = obj});
       NEXT_INSN;
+    }
+    bjvm_insn_aastore: {
+      bjvm_obj_header *value = checked_pop(frame).obj;
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
       }
-      bjvm_insn_pop2: {
-        checked_pop(frame);
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      // Instanceof check against the component type
+      if (value && !bjvm_instanceof(value->descriptor,
+                                    array->descriptor->one_fewer_dim)) {
+        bjvm_array_store_exception(thread);
+        goto done;
+      }
+      bjvm_obj_header **obj = (bjvm_obj_header **)ArrayData(array) + index;
+      *obj = value;
+      NEXT_INSN;
+    }
+    bjvm_insn_aconst_null:
+      checked_push(frame, (bjvm_stack_value){.obj = nullptr});
+      NEXT_INSN;
+    bjvm_insn_arraylength: {
+      bjvm_obj_header *obj = checked_pop(frame).obj;
+      if (!obj) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      assert(obj->descriptor->kind != BJVM_CD_KIND_ORDINARY);
+      checked_push(frame, (bjvm_stack_value){.i = *ArrayLength(obj)});
+      NEXT_INSN;
+    }
+    bjvm_insn_athrow: {
+      bjvm_raise_exception_object(thread, checked_pop(frame).obj);
+      goto done;
+    }
+    bjvm_insn_baload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        // ArrayIndexOutOfBoundsException
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){
+                              .i = *((int8_t *)ArrayData(array) + index)});
+      NEXT_INSN;
+    }
+    bjvm_insn_bastore: {
+      int value = checked_pop(frame).i;
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      *((int8_t *)ArrayData(array) + index) = value;
+      NEXT_INSN;
+    }
+    bjvm_insn_caload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){
+                              .i = *((uint16_t *)ArrayData(array) + index)});
+      NEXT_INSN;
+    }
+    bjvm_insn_sastore:
+    bjvm_insn_castore: {
+      int value = checked_pop(frame).i;
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      *((uint16_t *)ArrayData(array) + index) = value;
+      NEXT_INSN;
+    }
+    bjvm_insn_d2f: {
+      checked_push(frame, (bjvm_stack_value){.f = (float)checked_pop(frame).d});
+      NEXT_INSN;
+    }
+    bjvm_insn_d2i: {
+      checked_push(
+          frame, (bjvm_stack_value){.i = double_to_int(checked_pop(frame).d)});
+      NEXT_INSN;
+    }
+    bjvm_insn_d2l: {
+      checked_push(
+          frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).d)});
+      NEXT_INSN;
+    }
+    bjvm_insn_dadd: {
+      checked_push(frame, (bjvm_stack_value){.d = checked_pop(frame).d +
+                                                  checked_pop(frame).d});
+      NEXT_INSN;
+    }
+    bjvm_insn_dcmpg: {
+      double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
+      if (value1 < value2) {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_dcmpl: {
+      double value2 = checked_pop(frame).d, value1 = checked_pop(frame).d;
+      if (value1 > value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_ddiv: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value){.d = a / b});
+      NEXT_INSN;
+    }
+    bjvm_insn_dmul: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value){.d = a * b});
+      NEXT_INSN;
+    }
+    bjvm_insn_dneg: {
+      double a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value){.d = -a});
+      NEXT_INSN;
+    }
+    bjvm_insn_drem: { // deprecated
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value){.d = fmod(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_dsub: {
+      double b = checked_pop(frame).d, a = checked_pop(frame).d;
+      checked_push(frame, (bjvm_stack_value){.d = a - b});
+      NEXT_INSN;
+    }
+    bjvm_insn_dup: {
+      bjvm_stack_value val = checked_pop(frame);
+      checked_push(frame, val);
+      checked_push(frame, val);
+      NEXT_INSN;
+    }
+    bjvm_insn_dup_x1: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      checked_push(frame, val1);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      NEXT_INSN;
+    }
+    bjvm_insn_dup_x2: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      checked_push(frame, val1);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      NEXT_INSN;
+    }
+    bjvm_insn_dup2: {
+      bjvm_stack_value val1 = checked_pop(frame), val2 = checked_pop(frame);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      NEXT_INSN;
+    }
+    bjvm_insn_dup2_x1: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      NEXT_INSN;
+    }
+    bjvm_insn_dup2_x2: {
+      bjvm_stack_value val1 = checked_pop(frame);
+      bjvm_stack_value val2 = checked_pop(frame);
+      bjvm_stack_value val3 = checked_pop(frame);
+      bjvm_stack_value val4 = checked_pop(frame);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      checked_push(frame, val4);
+      checked_push(frame, val3);
+      checked_push(frame, val2);
+      checked_push(frame, val1);
+      NEXT_INSN;
+    }
+    bjvm_insn_f2d: {
+      checked_push(frame,
+                   (bjvm_stack_value){.d = (double)checked_pop(frame).f});
+      NEXT_INSN;
+    }
+    bjvm_insn_f2i: {
+      float a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.i = double_to_int(a)});
+      NEXT_INSN;
+    }
+    bjvm_insn_f2l:
+      checked_push(
+          frame, (bjvm_stack_value){.l = double_to_long(checked_pop(frame).f)});
+      NEXT_INSN;
+    bjvm_insn_fadd: {
+      float b = checked_pop(frame).f, a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = a + b});
+      NEXT_INSN;
+    }
+    bjvm_insn_fcmpg: {
+      float value2 = checked_pop(frame).f, value1 = checked_pop(frame).f;
+
+      if (value1 < value2) {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      }
+
+      NEXT_INSN;
+    }
+    bjvm_insn_fcmpl: {
+      float value2 = checked_pop(frame).f, value1 = checked_pop(frame).f;
+
+      if (value1 > value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 1});
+      } else if (value1 == value2) {
+        checked_push(frame, (bjvm_stack_value){.i = 0});
+      } else {
+        checked_push(frame, (bjvm_stack_value){.i = -1});
+      }
+
+      NEXT_INSN;
+    }
+    bjvm_insn_fdiv: {
+      float b = checked_pop(frame).f, a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = a / b});
+      NEXT_INSN;
+    }
+    bjvm_insn_fmul: {
+      float a = checked_pop(frame).f, b = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = a * b});
+      NEXT_INSN;
+    }
+    bjvm_insn_fneg: {
+      float a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = -a});
+      NEXT_INSN;
+    }
+    bjvm_insn_frem: { // deprecated
+      float b = checked_pop(frame).f, a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = fmodf(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_fsub: {
+      float b = checked_pop(frame).f, a = checked_pop(frame).f;
+      checked_push(frame, (bjvm_stack_value){.f = a - b});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2b: {
+      checked_push(frame,
+                   (bjvm_stack_value){.i = (int8_t)checked_pop(frame).i});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2c: {
+      checked_push(frame,
+                   (bjvm_stack_value){.i = checked_pop(frame).i & 0xffff});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2d: {
+      checked_push(frame,
+                   (bjvm_stack_value){.d = (double)checked_pop(frame).i});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2f: {
+      int a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.f = (float)a});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2l: {
+      int a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.l = (int64_t)a});
+      NEXT_INSN;
+    }
+    bjvm_insn_i2s: {
+      checked_push(frame,
+                   (bjvm_stack_value){.i = (int16_t)checked_pop(frame).i});
+      NEXT_INSN;
+    }
+    bjvm_insn_iadd: {
+      uint32_t a = checked_pop(frame).i, b = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a + b});
+      NEXT_INSN;
+    }
+    bjvm_insn_faload:
+    bjvm_insn_iaload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){
+                              .i = *((int32_t *)ArrayData(array) + index)});
+      NEXT_INSN;
+    }
+    bjvm_insn_iand: {
+      int a = checked_pop(frame).i, b = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a & b});
+      NEXT_INSN;
+    }
+    bjvm_insn_fastore:
+    bjvm_insn_iastore: {
+      int value = checked_pop(frame).i;
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      *((int32_t *)ArrayData(array) + index) = value;
+      NEXT_INSN;
+    }
+    bjvm_insn_idiv: {
+      int b = checked_pop(frame).i, a = checked_pop(frame).i;
+      if (b == 0) {
+        bjvm_arithmetic_exception(thread, STR("/ by zero"));
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){.i = java_idiv(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_imul: {
+      int a = checked_pop(frame).i, b = checked_pop(frame).i, c;
+      __builtin_mul_overflow(a, b, &c);
+      checked_push(frame, (bjvm_stack_value){.i = c});
+      NEXT_INSN;
+    }
+    bjvm_insn_ineg: {
+      uint32_t a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = -a});
+      NEXT_INSN;
+    }
+    bjvm_insn_ior: {
+      int a = checked_pop(frame).i, b = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a | b});
+      NEXT_INSN;
+    }
+    bjvm_insn_irem: {
+      int32_t b = checked_pop(frame).i, a = checked_pop(frame).i;
+      if (b == 0) {
+        bjvm_arithmetic_exception(thread, STR("/ by zero"));
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){.i = java_irem(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_dreturn:
+    bjvm_insn_areturn:
+    bjvm_insn_lreturn:
+    bjvm_insn_freturn:
+    bjvm_insn_ireturn: {
+      // Look at the frame before and store it there
+      bjvm_stack_value r = checked_pop(frame);
+      if (thread->frames_count > 1) {
+        bjvm_stack_frame *prev_frame = thread->frames[thread->frames_count - 2];
+        *bjvm_get_frame_result_of_next(prev_frame) = r;
+      }
+      if (result) {
+        *result = r;
+      }
+      goto done;
+    }
+    bjvm_insn_ishl: {
+      int b = checked_pop(frame).i, a = checked_pop(frame).i;
+      uint32_t c = (uint32_t)a << (b & 0x1f); // fuck u UB
+      checked_push(frame, (bjvm_stack_value){.i = (int)c});
+      NEXT_INSN;
+    }
+    bjvm_insn_ishr: {
+      int b = checked_pop(frame).i, a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a >> b});
+      NEXT_INSN;
+    }
+    bjvm_insn_isub: {
+      uint32_t b = checked_pop(frame).i, a = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a - b});
+      NEXT_INSN;
+    }
+    bjvm_insn_iushr: {
+      int b = checked_pop(frame).i, a = checked_pop(frame).i;
+      uint32_t c = (uint32_t)a >> (b & 0x1f);
+      checked_push(frame, (bjvm_stack_value){.i = (int)c});
+      NEXT_INSN;
+    }
+    bjvm_insn_ixor: {
+      int a = checked_pop(frame).i, b = checked_pop(frame).i;
+      checked_push(frame, (bjvm_stack_value){.i = a ^ b});
+      NEXT_INSN;
+    }
+    bjvm_insn_l2d: {
+      checked_push(frame,
+                   (bjvm_stack_value){.d = (double)checked_pop(frame).l});
+      NEXT_INSN;
+    }
+    bjvm_insn_l2f: {
+      checked_push(frame, (bjvm_stack_value){.f = (float)checked_pop(frame).l});
+      NEXT_INSN;
+    }
+    bjvm_insn_l2i: {
+      checked_push(frame, (bjvm_stack_value){.i = (int)checked_pop(frame).l});
+      NEXT_INSN;
+    }
+    bjvm_insn_ladd: {
+      uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a + b});
+      NEXT_INSN;
+    }
+    bjvm_insn_laload:
+    bjvm_insn_daload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){
+                              .l = *((int64_t *)ArrayData(array) + index)});
+      NEXT_INSN;
+    }
+    bjvm_insn_land: {
+      int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a & b});
+      NEXT_INSN;
+    }
+    bjvm_insn_lastore:
+    bjvm_insn_dastore: {
+      int64_t value = checked_pop(frame).l;
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
+      }
+      *((int64_t *)ArrayData(array) + index) = value;
+      NEXT_INSN;
+    }
+    bjvm_insn_lcmp: {
+      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      int sign = a > b ? 1 : a == b ? 0 : -1;
+      checked_push(frame, (bjvm_stack_value){.i = sign});
+      NEXT_INSN;
+    }
+    bjvm_insn_ldiv: {
+      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      if (b == 0) {
+        bjvm_arithmetic_exception(thread, STR("/ by zero"));
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){.l = java_ldiv(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_lmul: {
+      uint64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a * b});
+      NEXT_INSN;
+    }
+    bjvm_insn_lneg: {
+      uint64_t a = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = -a});
+      NEXT_INSN;
+    }
+    bjvm_insn_lor: {
+      int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a | b});
+      NEXT_INSN;
+    }
+    bjvm_insn_lrem: {
+      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      if (b == 0) {
+        bjvm_arithmetic_exception(thread, STR("/ by zero"));
+        goto done;
+      }
+      checked_push(frame, (bjvm_stack_value){.l = java_lrem(a, b)});
+      NEXT_INSN;
+    }
+    bjvm_insn_lshl: {
+      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      uint64_t c = (uint64_t)a << (b & 0x3f); // fuck u UB
+      checked_push(frame, (bjvm_stack_value){.l = (int64_t)c});
+      NEXT_INSN;
+    }
+    bjvm_insn_lshr: {
+      int64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      checked_push(frame,
+                   (bjvm_stack_value){.l = a >> (b & 0x3f)}); // fuck u UB
+      NEXT_INSN;
+    }
+    bjvm_insn_lsub: {
+      uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a - b});
+      NEXT_INSN;
+    }
+    bjvm_insn_lushr: {
+      uint64_t b = checked_pop(frame).l, a = checked_pop(frame).l;
+      checked_push(frame,
+                   (bjvm_stack_value){.l = a >> (b & 0x3f)}); // fuck u UB
+      NEXT_INSN;
+    }
+    bjvm_insn_lxor: {
+      int64_t a = checked_pop(frame).l, b = checked_pop(frame).l;
+      checked_push(frame, (bjvm_stack_value){.l = a ^ b});
+      NEXT_INSN;
+    }
+    bjvm_insn_monitorenter:
+    bjvm_insn_monitorexit: {
+      // TODO
       checked_pop(frame);
       NEXT_INSN;
-        }
-      bjvm_insn_return: { goto done; }
-      bjvm_insn_saload: {
-        int index = checked_pop(frame).i;
-        bjvm_obj_header *array = checked_pop(frame).obj;
-        if (!array) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        int len = *ArrayLength(array);
-        if (index < 0 || index >= len) {
-          bjvm_array_index_oob_exception(thread, index, len);
-          goto done;
-        }
-        checked_push(frame, (bjvm_stack_value){
-                                .i = *((int16_t *)ArrayData(array) + index)});
-        NEXT_INSN;
+    }
+    bjvm_insn_pop: {
+      checked_pop(frame);
+      NEXT_INSN;
+    }
+    bjvm_insn_pop2: {
+      checked_pop(frame);
+      checked_pop(frame);
+      NEXT_INSN;
+    }
+    bjvm_insn_return: { goto done; }
+    bjvm_insn_saload: {
+      int index = checked_pop(frame).i;
+      bjvm_obj_header *array = checked_pop(frame).obj;
+      if (!array) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
       }
-      bjvm_insn_swap: {
-        bjvm_stack_value a = checked_pop(frame), b = checked_pop(frame);
-        checked_push(frame, a);
-        checked_push(frame, b);
-        NEXT_INSN;
+      int len = *ArrayLength(array);
+      if (index < 0 || index >= len) {
+        bjvm_array_index_oob_exception(thread, index, len);
+        goto done;
       }
-      bjvm_insn_anewarray: {
-        bjvm_cp_class_info *info = &insn->cp->class_info;
-        if (bjvm_resolve_class(thread, info))
-          goto done;
-        assert(info->classdesc);
-        if (bjvm_link_class(thread, info->classdesc))
-          goto done;
-        insn->classdesc = info->classdesc;
-        insn->kind = bjvm_insn_anewarray_resolved;
-        JMP_INSN;
+      checked_push(frame, (bjvm_stack_value){
+                              .i = *((int16_t *)ArrayData(array) + index)});
+      NEXT_INSN;
+    }
+    bjvm_insn_swap: {
+      bjvm_stack_value a = checked_pop(frame), b = checked_pop(frame);
+      checked_push(frame, a);
+      checked_push(frame, b);
+      NEXT_INSN;
+    }
+    bjvm_insn_anewarray: {
+      bjvm_cp_class_info *info = &insn->cp->class_info;
+      if (bjvm_resolve_class(thread, info))
+        goto done;
+      assert(info->classdesc);
+      if (bjvm_link_class(thread, info->classdesc))
+        goto done;
+      insn->classdesc = info->classdesc;
+      insn->kind = bjvm_insn_anewarray_resolved;
+      JMP_INSN;
+    }
+    bjvm_insn_anewarray_resolved: {
+      int count = checked_pop(frame).i;
+      if (count < 0) {
+        bjvm_negative_array_size_exception(thread, count);
+        goto done;
       }
-      bjvm_insn_anewarray_resolved: {
-        int count = checked_pop(frame).i;
-        if (count < 0) {
-          bjvm_negative_array_size_exception(thread, count);
-          goto done;
-        }
-        bjvm_obj_header *array = CreateObjectArray1D(thread, insn->classdesc, count);
-        if (array) {
-          checked_push(frame, (bjvm_stack_value){.obj = array});
-        } else {
-          goto done; // failed to create array
-        }
-        NEXT_INSN;
+      bjvm_obj_header *array =
+          CreateObjectArray1D(thread, insn->classdesc, count);
+      if (array) {
+        checked_push(frame, (bjvm_stack_value){.obj = array});
+      } else {
+        goto done; // failed to create array
       }
-      bjvm_insn_checkcast: {
-        bjvm_cp_class_info *info = &insn->cp->class_info;
-        int error = bjvm_resolve_class(thread, info);
+      NEXT_INSN;
+    }
+    bjvm_insn_checkcast: {
+      bjvm_cp_class_info *info = &insn->cp->class_info;
+      int error = bjvm_resolve_class(thread, info);
+      if (error)
+        goto done;
+      insn->classdesc = info->classdesc;
+      insn->kind = bjvm_insn_checkcast_resolved;
+      JMP_INSN;
+    }
+    bjvm_insn_checkcast_resolved: {
+      bjvm_obj_header *obj = frame->values[sd - 1].obj;
+      if (obj && unlikely(!bjvm_instanceof(obj->descriptor, insn->classdesc))) {
+        INIT_STACK_STRING(complaint, 1000);
+        complaint = bprintf(complaint, "Expected instance of %.*s, got %.*s",
+                            fmt_slice(insn->classdesc->name),
+                            fmt_slice(obj->descriptor->name));
+        bjvm_raise_exception(thread, STR("java/lang/ClassCastException"),
+                             complaint);
+        goto done;
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_instanceof: {
+      bjvm_cp_class_info *info = &insn->cp->class_info;
+      int error = bjvm_resolve_class(thread, info);
+      if (error)
+        goto done;
+      insn->classdesc = info->classdesc;
+      insn->kind = bjvm_insn_instanceof_resolved;
+      JMP_INSN;
+    }
+    bjvm_insn_instanceof_resolved: {
+      bjvm_obj_header *obj = checked_pop(frame).obj;
+      checked_push(
+          frame, (bjvm_stack_value){.i = obj ? bjvm_instanceof(obj->descriptor,
+                                                               insn->classdesc)
+                                             : 0});
+      NEXT_INSN;
+    }
+    bjvm_insn_invokedynamic: {
+      status = bjvm_invokedynamic(thread, frame, insn, &sd);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+      NEXT_INSN;
+    }
+    bjvm_insn_new: {
+      bjvm_cp_class_info *info = &insn->cp->class_info;
+      int error = bjvm_resolve_class(thread, info);
+      if (error)
+        goto done;
+      error = bjvm_initialize_class(thread, info->classdesc);
+      if (error)
+        goto done;
+      insn->kind = bjvm_insn_new_resolved;
+      insn->classdesc = info->classdesc;
+      JMP_INSN;
+    }
+    bjvm_insn_new_resolved: {
+      // Create an instance of the class
+      bjvm_obj_header *obj = new_object(thread, insn->classdesc);
+      if (!obj)
+        goto done;
+      checked_push(frame, (bjvm_stack_value){.obj = obj});
+      NEXT_INSN;
+    }
+    bjvm_insn_getfield:
+    bjvm_insn_putfield: {
+      bool putfield = insn->kind == bjvm_insn_putfield;
+      bjvm_obj_header *obj = frame->values[sd - 1 - putfield].obj;
+      if (!obj) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      bjvm_cp_field_info *field_info = &insn->cp->field;
+      int error = bjvm_resolve_field(thread, field_info);
+      if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
+        INIT_STACK_STRING(complaint, 1000);
+        bprintf(complaint, "Expected nonstatic field %.*s on class %.*s",
+                fmt_slice(field_info->nat->name),
+                fmt_slice(field_info->class_info->name));
+
+        bjvm_incompatible_class_change_error(thread, complaint);
+        goto done;
+      }
+      switch (field_to_kind(field_info->parsed_descriptor)) {
+      case BJVM_TYPE_KIND_BOOLEAN:
+        insn->kind = putfield ? bjvm_insn_putfield_B : bjvm_insn_getfield_B;
+        break;
+      case BJVM_TYPE_KIND_CHAR:
+        insn->kind = putfield ? bjvm_insn_putfield_C : bjvm_insn_getfield_C;
+        break;
+      case BJVM_TYPE_KIND_FLOAT:
+        insn->kind = putfield ? bjvm_insn_putfield_F : bjvm_insn_getfield_F;
+        break;
+      case BJVM_TYPE_KIND_DOUBLE:
+        insn->kind = putfield ? bjvm_insn_putfield_D : bjvm_insn_getfield_D;
+        break;
+      case BJVM_TYPE_KIND_BYTE:
+        insn->kind = putfield ? bjvm_insn_putfield_B : bjvm_insn_getfield_B;
+        break;
+      case BJVM_TYPE_KIND_SHORT:
+        insn->kind = putfield ? bjvm_insn_putfield_S : bjvm_insn_getfield_S;
+        break;
+      case BJVM_TYPE_KIND_INT:
+        insn->kind = putfield ? bjvm_insn_putfield_I : bjvm_insn_getfield_I;
+        break;
+      case BJVM_TYPE_KIND_LONG:
+        insn->kind = putfield ? bjvm_insn_putfield_J : bjvm_insn_getfield_J;
+        break;
+      case BJVM_TYPE_KIND_VOID:
+        UNREACHABLE();
+        break;
+      case BJVM_TYPE_KIND_REFERENCE:
+        insn->kind = putfield ? bjvm_insn_putfield_L : bjvm_insn_getfield_L;
+        break;
+      }
+      insn->ic = field_info->field;
+      insn->ic2 = (void *)field_info->field->byte_offset;
+      JMP_INSN;
+    }
+    bjvm_insn_getstatic:
+    bjvm_insn_putstatic: {
+      bjvm_cp_field_info *field_info = &insn->cp->field;
+      if (!field_info->field) {
+        bjvm_cp_class_info *class = field_info->class_info;
+        int error = bjvm_resolve_class(thread, class);
         if (error)
           goto done;
-        insn->classdesc = info->classdesc;
-        insn->kind = bjvm_insn_checkcast_resolved;
-        JMP_INSN;
-      }
-      bjvm_insn_checkcast_resolved: {
-        bjvm_obj_header *obj = frame->values[sd - 1].obj;
-        if (obj && unlikely(!bjvm_instanceof(obj->descriptor, insn->classdesc))) {
+
+        error = bjvm_initialize_class(thread, class->classdesc);
+        if (error)
+          goto done;
+        bjvm_cp_field *field =
+            bjvm_field_lookup(class->classdesc, field_info->nat->name,
+                              field_info->nat->descriptor);
+        field_info->field = field;
+        if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
           INIT_STACK_STRING(complaint, 1000);
-          complaint = bprintf(complaint, "Expected instance of %.*s, got %.*s",
-                              fmt_slice(insn->classdesc->name),
-                              fmt_slice(obj->descriptor->name));
-          bjvm_raise_exception(thread, STR("java/lang/ClassCastException"),
-                               complaint);
-          goto done;
-        }
-        NEXT_INSN;
-      }
-      bjvm_insn_instanceof: {
-        bjvm_cp_class_info *info = &insn->cp->class_info;
-        int error = bjvm_resolve_class(thread, info);
-        if (error)
-          goto done;
-        insn->classdesc = info->classdesc;
-        insn->kind = bjvm_insn_instanceof_resolved;
-        JMP_INSN;
-      }
-      bjvm_insn_instanceof_resolved: {
-        bjvm_obj_header *obj = checked_pop(frame).obj;
-        checked_push(
-            frame, (bjvm_stack_value){.i = obj ? bjvm_instanceof(obj->descriptor,
-                                                                 insn->classdesc)
-                                               : 0});
-        NEXT_INSN;
-      }
-      bjvm_insn_invokedynamic: {
-        status = bjvm_invokedynamic(thread, frame, insn, &sd);
-        if (status != BJVM_INTERP_RESULT_OK)
-          goto done;
-        NEXT_INSN;
-      }
-      bjvm_insn_new: {
-        bjvm_cp_class_info *info = &insn->cp->class_info;
-        int error = bjvm_resolve_class(thread, info);
-        if (error)
-          goto done;
-        error = bjvm_initialize_class(thread, info->classdesc);
-        if (error)
-          goto done;
-        insn->kind = bjvm_insn_new_resolved;
-        insn->classdesc = info->classdesc;
-        JMP_INSN;
-      }
-      bjvm_insn_new_resolved: {
-        // Create an instance of the class
-        bjvm_obj_header *obj = new_object(thread, insn->classdesc);
-        if (!obj)
-          goto done;
-        checked_push(frame, (bjvm_stack_value){.obj = obj});
-        NEXT_INSN;
-      }
-      bjvm_insn_getfield:
-      bjvm_insn_putfield: {
-        bool putfield = insn->kind == bjvm_insn_putfield;
-        bjvm_obj_header *obj = frame->values[sd - 1 - putfield].obj;
-        if (!obj) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        bjvm_cp_field_info *field_info = &insn->cp->field;
-        int error = bjvm_resolve_field(thread, field_info);
-        if (error || field_info->field->access_flags & BJVM_ACCESS_STATIC) {
-          INIT_STACK_STRING(complaint, 1000);
-          bprintf(complaint, "Expected nonstatic field %.*s on class %.*s",
+          bprintf(complaint, "Expected static field %.*s on class %.*s",
                   fmt_slice(field_info->nat->name),
                   fmt_slice(field_info->class_info->name));
-
           bjvm_incompatible_class_change_error(thread, complaint);
           goto done;
         }
-        switch (field_to_kind(field_info->parsed_descriptor)) {
-        case BJVM_TYPE_KIND_BOOLEAN:
-          insn->kind = putfield ? bjvm_insn_putfield_B : bjvm_insn_getfield_B;
-          break;
-        case BJVM_TYPE_KIND_CHAR:
-          insn->kind = putfield ? bjvm_insn_putfield_C : bjvm_insn_getfield_C;
-          break;
-        case BJVM_TYPE_KIND_FLOAT:
-          insn->kind = putfield ? bjvm_insn_putfield_F : bjvm_insn_getfield_F;
-          break;
-        case BJVM_TYPE_KIND_DOUBLE:
-          insn->kind = putfield ? bjvm_insn_putfield_D : bjvm_insn_getfield_D;
-          break;
-        case BJVM_TYPE_KIND_BYTE:
-          insn->kind = putfield ? bjvm_insn_putfield_B : bjvm_insn_getfield_B;
-          break;
-        case BJVM_TYPE_KIND_SHORT:
-          insn->kind = putfield ? bjvm_insn_putfield_S : bjvm_insn_getfield_S;
-          break;
-        case BJVM_TYPE_KIND_INT:
-          insn->kind = putfield ? bjvm_insn_putfield_I : bjvm_insn_getfield_I;
-          break;
-        case BJVM_TYPE_KIND_LONG:
-          insn->kind = putfield ? bjvm_insn_putfield_J : bjvm_insn_getfield_J;
-          break;
-        case BJVM_TYPE_KIND_VOID:
-          UNREACHABLE();
-          break;
-        case BJVM_TYPE_KIND_REFERENCE:
-          insn->kind = putfield ? bjvm_insn_putfield_L : bjvm_insn_getfield_L;
-          break;
-        }
-        insn->ic = field_info->field;
-        insn->ic2 = (void*)field_info->field->byte_offset;
-        JMP_INSN;
       }
-      bjvm_insn_getstatic:
-      bjvm_insn_putstatic: {
-        bjvm_cp_field_info *field_info = &insn->cp->field;
-        if (!field_info->field) {
-          bjvm_cp_class_info *class = field_info->class_info;
-          int error = bjvm_resolve_class(thread, class);
-          if (error)
-            goto done;
 
-          error = bjvm_initialize_class(thread, class->classdesc);
-          if (error)
-            goto done;
-          bjvm_cp_field *field =
-              bjvm_field_lookup(class->classdesc, field_info->nat->name,
-                                field_info->nat->descriptor);
-          field_info->field = field;
-          if (!field || !(field->access_flags & BJVM_ACCESS_STATIC)) {
-            INIT_STACK_STRING(complaint, 1000);
-            bprintf(complaint, "Expected static field %.*s on class %.*s",
-                    fmt_slice(field_info->nat->name),
-                    fmt_slice(field_info->class_info->name));
-            bjvm_incompatible_class_change_error(thread, complaint);
-            goto done;
-          }
-        }
-
-        bjvm_cp_field *field = field_info->field;
-        void *field_location =
-            &field->my_class->static_fields[field->byte_offset];
-        bjvm_type_kind kind = field_to_kind(field_info->parsed_descriptor);
-        if (insn->kind == bjvm_insn_putstatic) {
-          store_stack_value(field_location, checked_pop(frame), kind);
-        } else {
-          checked_push(frame, load_stack_value(field_location, kind));
-        }
-
-        NEXT_INSN;
+      bjvm_cp_field *field = field_info->field;
+      void *field_location =
+          &field->my_class->static_fields[field->byte_offset];
+      bjvm_type_kind kind = field_to_kind(field_info->parsed_descriptor);
+      if (insn->kind == bjvm_insn_putstatic) {
+        store_stack_value(field_location, checked_pop(frame), kind);
+      } else {
+        checked_push(frame, load_stack_value(field_location, kind));
       }
-      bjvm_insn_invokespecial: {
-        bjvm_cp_method_info *method_info = &insn->cp->methodref;
-        int argc = insn->args = method_info->descriptor->args_count + 1;
-        assert(argc <= sd);
-        bjvm_obj_header *target = frame->values[sd - argc].obj;
-        if (!target) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        status = resolve_methodref(thread, method_info);
-        if (status != BJVM_INTERP_RESULT_OK)
-          goto done;
 
-        bjvm_classdesc *lookup_on = method_info->resolved->my_class;
+      NEXT_INSN;
+    }
+    bjvm_insn_invokespecial: {
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
 
-        // "If all of the following are true, let C [the class to look up the
-        // method upon] be the direct superclass of the current class:
-        //
-        // The resolved method is not an instance initialization method;
-        // If the symbolic reference names a class (not an interface), then that
-        // class is a superclass of the current class."
-        if (!utf8_equals(method_info->resolved->name, "<init>") &&
-          (lookup_on->access_flags & BJVM_ACCESS_INTERFACE || (
-            method->my_class != lookup_on &&
+      bjvm_classdesc *lookup_on = method_info->resolved->my_class;
+
+      // "If all of the following are true, let C [the class to look up the
+      // method upon] be the direct superclass of the current class:
+      //
+      // The resolved method is not an instance initialization method;
+      // If the symbolic reference names a class (not an interface), then that
+      // class is a superclass of the current class."
+      if (!utf8_equals(method_info->resolved->name, "<init>") &&
+          (lookup_on->access_flags & BJVM_ACCESS_INTERFACE ||
+           (method->my_class != lookup_on &&
             bjvm_instanceof(method->my_class, lookup_on)))) {
-          lookup_on = method->my_class->super_class->classdesc;
-            }
-
-        // Look at the class and its superclasses first
-        bjvm_cp_method *candidate = bjvm_method_lookup(
-            lookup_on, method_info->resolved->name,
-            method_info->resolved->unparsed_descriptor,
-            true, false);
-        if (!candidate) {
-          // Then perform an itable lookup (I rly don't think this is correct...)
-          if (method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE) {
-            candidate = bjvm_itable_lookup(lookup_on,
-              method_info->resolved->my_class, method_info->resolved->itable_index);
-          }
-          if (!candidate) {
-            bjvm_abstract_method_error(thread, method_info->resolved);
-            goto done;
-          }
-        } else if (candidate->access_flags & BJVM_ACCESS_ABSTRACT) {
-          bjvm_abstract_method_error(thread, candidate);
-          goto done;
-        }
-
-        insn->kind = bjvm_insn_invokespecial_resolved;
-        insn->ic = candidate;
-        JMP_INSN;
+        lookup_on = method->my_class->super_class->classdesc;
       }
-      bjvm_insn_invokeinterface: {
-        bjvm_cp_method_info *method_info = &insn->cp->methodref;
-        int argc = insn->args = method_info->descriptor->args_count + 1;
-        assert(argc <= sd);
-        bjvm_obj_header *target = frame->values[sd - argc].obj;
-        if (!target) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
+
+      // Look at the class and its superclasses first
+      bjvm_cp_method *candidate = bjvm_method_lookup(
+          lookup_on, method_info->resolved->name,
+          method_info->resolved->unparsed_descriptor, true, false);
+      if (!candidate) {
+        // Then perform an itable lookup (I rly don't think this is correct...)
+        if (method_info->resolved->my_class->access_flags &
+            BJVM_ACCESS_INTERFACE) {
+          candidate =
+              bjvm_itable_lookup(lookup_on, method_info->resolved->my_class,
+                                 method_info->resolved->itable_index);
         }
-        status = resolve_methodref(thread, method_info);
-        if (status != BJVM_INTERP_RESULT_OK)
-          goto done;
-        if (!(method_info->resolved->my_class->access_flags &
-              BJVM_ACCESS_INTERFACE)) {
-          insn->kind = bjvm_insn_invokevirtual;
-          JMP_INSN;
-              }
-        insn->kind = bjvm_insn_invokeitable_monomorphic;
-        insn->ic = bjvm_itable_lookup(target->descriptor,
-                                      method_info->resolved->my_class,
-                                      method_info->resolved->itable_index);
-        insn->ic2 = target->descriptor;
-        if (!insn->ic) {
+        if (!candidate) {
           bjvm_abstract_method_error(thread, method_info->resolved);
           goto done;
         }
+      } else if (candidate->access_flags & BJVM_ACCESS_ABSTRACT) {
+        bjvm_abstract_method_error(thread, candidate);
+        goto done;
+      }
+
+      insn->kind = bjvm_insn_invokespecial_resolved;
+      insn->ic = candidate;
+      JMP_INSN;
+    }
+    bjvm_insn_invokeinterface: {
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+      if (!(method_info->resolved->my_class->access_flags &
+            BJVM_ACCESS_INTERFACE)) {
+        insn->kind = bjvm_insn_invokevirtual;
         JMP_INSN;
       }
-      bjvm_insn_invokevirtual: {
-        bjvm_cp_method_info *method_info = &insn->cp->methodref;
-        int argc = insn->args = method_info->descriptor->args_count + 1;
-        assert(argc <= sd);
-        bjvm_obj_header *target = frame->values[sd - argc].obj;
-        if (!target) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        status = resolve_methodref(thread, method_info);
+      insn->kind = bjvm_insn_invokeitable_monomorphic;
+      insn->ic = bjvm_itable_lookup(target->descriptor,
+                                    method_info->resolved->my_class,
+                                    method_info->resolved->itable_index);
+      insn->ic2 = target->descriptor;
+      if (!insn->ic) {
+        bjvm_abstract_method_error(thread, method_info->resolved);
+        goto done;
+      }
+      JMP_INSN;
+    }
+    bjvm_insn_invokevirtual: {
+      bjvm_cp_method_info *method_info = &insn->cp->methodref;
+      int argc = insn->args = method_info->descriptor->args_count + 1;
+      assert(argc <= sd);
+      bjvm_obj_header *target = frame->values[sd - argc].obj;
+      if (!target) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      status = resolve_methodref(thread, method_info);
+      if (status != BJVM_INTERP_RESULT_OK)
+        goto done;
+      if (method_info->resolved->is_signature_polymorphic) {
+        status = bjvm_invokevirtual_signature_polymorphic(
+            thread, frame, &sd, method,
+            bjvm_resolve_method_type(thread, method_info->descriptor), target);
         if (status != BJVM_INTERP_RESULT_OK)
           goto done;
-        if (method_info->resolved->is_signature_polymorphic) {
-          status = bjvm_invokevirtual_signature_polymorphic(
-              thread, frame, &sd, method,
-              bjvm_resolve_method_type(thread, method_info->descriptor), target);
-          if (status != BJVM_INTERP_RESULT_OK)
-            goto done;
-          NEXT_INSN;
-        }
+        NEXT_INSN;
+      }
 
-        // If we found an interface method, transmogrify into a invokeinterface
-        if (method_info->resolved->my_class->access_flags &
-            BJVM_ACCESS_INTERFACE) {
-          insn->kind = bjvm_insn_invokeinterface;
-          JMP_INSN;
-            }
-
-        insn->kind = bjvm_insn_invokevtable_monomorphic;
-        insn->ic = bjvm_vtable_lookup(target->descriptor,
-                                      method_info->resolved->vtable_index);
-        assert(method);
-        insn->ic2 = target->descriptor;
+      // If we found an interface method, transmogrify into a invokeinterface
+      if (method_info->resolved->my_class->access_flags &
+          BJVM_ACCESS_INTERFACE) {
+        insn->kind = bjvm_insn_invokeinterface;
         JMP_INSN;
       }
-      bjvm_insn_invokestatic: {
-        bjvm_cp_method_info *info = &insn->cp->methodref;
-        bjvm_interpreter_result_t status = resolve_methodref(thread, info);
-        if (status != BJVM_INTERP_RESULT_OK) {
-          return status;
-        }
-        insn->kind = bjvm_insn_invokestatic_resolved;
-        insn->ic = info->resolved;
-        insn->args = info->descriptor->args_count;
-        JMP_INSN;
+
+      insn->kind = bjvm_insn_invokevtable_monomorphic;
+      insn->ic = bjvm_vtable_lookup(target->descriptor,
+                                    method_info->resolved->vtable_index);
+      assert(method);
+      insn->ic2 = target->descriptor;
+      JMP_INSN;
+    }
+    bjvm_insn_invokestatic: {
+      bjvm_cp_method_info *info = &insn->cp->methodref;
+      bjvm_interpreter_result_t status = resolve_methodref(thread, info);
+      if (status != BJVM_INTERP_RESULT_OK) {
+        return status;
       }
-      bjvm_insn_invokestatic_resolved: {
-        bjvm_cp_method *method = insn->ic;
-        bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
-        if (frame->state < INVOKE_STATE_MADE_FRAME) {
-          bjvm_stack_frame *invoked_frame;
-          if (method->is_signature_polymorphic) {
-            invoked_frame = bjvm_push_native_frame(thread, method, insn->cp->methodref.descriptor,
-                                                   frame->values + sd - insn->args, insn->args);
-          } else {
-            invoked_frame =
-                bjvm_push_frame(thread, method, frame->values + sd - insn->args, insn->args);
-          }
-          status = bjvm_interpret(thread, invoked_frame, &frame->values[sd - insn->args]);
-          if (status != BJVM_INTERP_RESULT_OK) {
-            if (status == BJVM_INTERP_RESULT_INT)
-              frame->state = INVOKE_STATE_MADE_FRAME;
-            goto done;
-          }
+      insn->kind = bjvm_insn_invokestatic_resolved;
+      insn->ic = info->resolved;
+      insn->args = info->descriptor->args_count;
+      JMP_INSN;
+    }
+    bjvm_insn_invokestatic_resolved: {
+      bjvm_cp_method *method = insn->ic;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (frame->state < INVOKE_STATE_MADE_FRAME) {
+        bjvm_stack_frame *invoked_frame;
+        if (method->is_signature_polymorphic) {
+          invoked_frame = bjvm_push_native_frame(
+              thread, method, insn->cp->methodref.descriptor,
+              frame->values + sd - insn->args, insn->args);
         } else {
-          if (returns) {
-            frame->values[sd - insn->args] = frame->result_of_next;
-          }
+          invoked_frame = bjvm_push_frame(
+              thread, method, frame->values + sd - insn->args, insn->args);
         }
+        status = bjvm_interpret(thread, invoked_frame,
+                                &frame->values[sd - insn->args]);
+        if (status != BJVM_INTERP_RESULT_OK) {
+          if (status == BJVM_INTERP_RESULT_INT)
+            frame->state = INVOKE_STATE_MADE_FRAME;
+          goto done;
+        }
+      } else {
+        if (returns) {
+          frame->values[sd - insn->args] = frame->result_of_next;
+        }
+      }
 
-        frame->state = INVOKE_STATE_ENTRY;
-        sd -= insn->args;
-        sd += returns;
-        NEXT_INSN;
+      frame->state = INVOKE_STATE_ENTRY;
+      sd -= insn->args;
+      sd += returns;
+      NEXT_INSN;
+    }
+    bjvm_insn_ldc: {
+      bjvm_cp_entry *ent = insn->cp;
+      switch (ent->kind) {
+      case BJVM_CP_KIND_INTEGER:
+        checked_push(frame, (bjvm_stack_value){.i = ent->integral.value});
+        break;
+      case BJVM_CP_KIND_FLOAT:
+        checked_push(frame, (bjvm_stack_value){.f = ent->floating.value});
+        break;
+      case BJVM_CP_KIND_CLASS: {
+        // Initialize the class, then get its Java mirror
+        int error = bjvm_resolve_class(thread, &ent->class_info);
+        if (error)
+          goto done;
+        error = bjvm_link_class(thread, ent->class_info.classdesc);
+        if (error)
+          goto done;
+        bjvm_obj_header *obj =
+            (void *)bjvm_get_class_mirror(thread, ent->class_info.classdesc);
+        checked_push(frame, (bjvm_stack_value){.obj = obj});
+        break;
       }
-      bjvm_insn_ldc: {
-        bjvm_cp_entry *ent = insn->cp;
-        switch (ent->kind) {
-        case BJVM_CP_KIND_INTEGER:
-          checked_push(frame, (bjvm_stack_value){.i = ent->integral.value});
-          break;
-        case BJVM_CP_KIND_FLOAT:
-          checked_push(frame, (bjvm_stack_value){.f = ent->floating.value});
-          break;
-        case BJVM_CP_KIND_CLASS: {
-          // Initialize the class, then get its Java mirror
-          int error = bjvm_resolve_class(thread, &ent->class_info);
-          if (error)
-            goto done;
-          error = bjvm_link_class(thread, ent->class_info.classdesc);
-          if (error)
-            goto done;
-          bjvm_obj_header *obj =
-              (void *)bjvm_get_class_mirror(thread, ent->class_info.classdesc);
-          checked_push(frame, (bjvm_stack_value){.obj = obj});
-          break;
-        }
-        case BJVM_CP_KIND_STRING: {
-          bjvm_utf8 s = ent->string.chars;
-          bjvm_obj_header *obj = bjvm_intern_string(thread, s);
-          checked_push(frame, (bjvm_stack_value){.obj = obj});
-          break;
-        }
-        default:
-          UNREACHABLE();
-        }
-        NEXT_INSN;
+      case BJVM_CP_KIND_STRING: {
+        bjvm_utf8 s = ent->string.chars;
+        bjvm_obj_header *obj = bjvm_intern_string(thread, s);
+        checked_push(frame, (bjvm_stack_value){.obj = obj});
+        break;
       }
-      bjvm_insn_ldc2_w: {
-        const bjvm_cp_entry *ent = insn->cp;
-        switch (ent->kind) {
-        case BJVM_CP_KIND_LONG:
-          checked_push(frame, (bjvm_stack_value){.l = ent->integral.value});
-          break;
-        case BJVM_CP_KIND_DOUBLE:
-          checked_push(frame, (bjvm_stack_value){.d = ent->floating.value});
-          break;
-        default:
-          UNREACHABLE();
-        }
-        NEXT_INSN;
+      default:
+        UNREACHABLE();
       }
-      bjvm_insn_aload:
-      bjvm_insn_lload:
-      bjvm_insn_iload:
-      bjvm_insn_fload:
-      bjvm_insn_dload: {
-        checked_push(frame, frame->values[frame->max_stack + insn->index]);
-        NEXT_INSN;
+      NEXT_INSN;
+    }
+    bjvm_insn_ldc2_w: {
+      const bjvm_cp_entry *ent = insn->cp;
+      switch (ent->kind) {
+      case BJVM_CP_KIND_LONG:
+        checked_push(frame, (bjvm_stack_value){.l = ent->integral.value});
+        break;
+      case BJVM_CP_KIND_DOUBLE:
+        checked_push(frame, (bjvm_stack_value){.d = ent->floating.value});
+        break;
+      default:
+        UNREACHABLE();
       }
-      bjvm_insn_dstore:
-      bjvm_insn_fstore:
-      bjvm_insn_astore:
-      bjvm_insn_lstore:
-      bjvm_insn_istore: {
-        frame->values[frame->max_stack + insn->index] = checked_pop(frame);
-        NEXT_INSN;
-      }
-      bjvm_insn_goto: {
+      NEXT_INSN;
+    }
+    bjvm_insn_aload:
+    bjvm_insn_lload:
+    bjvm_insn_iload:
+    bjvm_insn_fload:
+    bjvm_insn_dload: {
+      checked_push(frame, frame->values[frame->max_stack + insn->index]);
+      NEXT_INSN;
+    }
+    bjvm_insn_dstore:
+    bjvm_insn_fstore:
+    bjvm_insn_astore:
+    bjvm_insn_lstore:
+    bjvm_insn_istore: {
+      frame->values[frame->max_stack + insn->index] = checked_pop(frame);
+      NEXT_INSN;
+    }
+    bjvm_insn_goto: {
+      frame->program_counter = insn->index;
+      JMP_INSN;
+    }
+    bjvm_insn_jsr:
+      UNREACHABLE("bjvm_insn_jsr");
+      NEXT_INSN;
+    bjvm_insn_if_acmpeq: {
+      bjvm_obj_header *a = checked_pop(frame).obj, *b = checked_pop(frame).obj;
+      if (a == b) {
         frame->program_counter = insn->index;
         JMP_INSN;
       }
-      bjvm_insn_jsr:
-        UNREACHABLE("bjvm_insn_jsr");
       NEXT_INSN;
-      bjvm_insn_if_acmpeq: {
-        bjvm_obj_header *a = checked_pop(frame).obj, *b = checked_pop(frame).obj;
-        if (a == b) {
-          frame->program_counter = insn->index;
-          JMP_INSN;
-        }
-        NEXT_INSN;
+    }
+    bjvm_insn_if_acmpne: {
+      bjvm_obj_header *a = checked_pop(frame).obj, *b = checked_pop(frame).obj;
+      if (a != b) {
+        frame->program_counter = insn->index;
+        JMP_INSN;
       }
-      bjvm_insn_if_acmpne: {
-        bjvm_obj_header *a = checked_pop(frame).obj, *b = checked_pop(frame).obj;
-        if (a != b) {
-          frame->program_counter = insn->index;
-          JMP_INSN;
-        }
-        NEXT_INSN;
-      }
+      NEXT_INSN;
+    }
 
 #define MAKE_INT_COMPARE(op)                                                   \
-{                                                                            \
-int b = checked_pop(frame).i, a = checked_pop(frame).i;                    \
-if (a op b) {                                                              \
-frame->program_counter = insn->index;                                    \
-JMP_INSN;                                                                \
-}                                                                          \
-NEXT_INSN;                                                                 \
-}
-      bjvm_insn_if_icmpeq:
-        MAKE_INT_COMPARE(==);
-      bjvm_insn_if_icmpne:
-        MAKE_INT_COMPARE(!=);
-      bjvm_insn_if_icmplt:
-        MAKE_INT_COMPARE(<);
-      bjvm_insn_if_icmpge:
-        MAKE_INT_COMPARE(>=);
-      bjvm_insn_if_icmpgt:
-        MAKE_INT_COMPARE(>);
-      bjvm_insn_if_icmple:
-        MAKE_INT_COMPARE(<=);
+  {                                                                            \
+    int b = checked_pop(frame).i, a = checked_pop(frame).i;                    \
+    if (a op b) {                                                              \
+      frame->program_counter = insn->index;                                    \
+      JMP_INSN;                                                                \
+    }                                                                          \
+    NEXT_INSN;                                                                 \
+  }
+    bjvm_insn_if_icmpeq:
+      MAKE_INT_COMPARE(==);
+    bjvm_insn_if_icmpne:
+      MAKE_INT_COMPARE(!=);
+    bjvm_insn_if_icmplt:
+      MAKE_INT_COMPARE(<);
+    bjvm_insn_if_icmpge:
+      MAKE_INT_COMPARE(>=);
+    bjvm_insn_if_icmpgt:
+      MAKE_INT_COMPARE(>);
+    bjvm_insn_if_icmple:
+      MAKE_INT_COMPARE(<=);
 
 #undef MAKE_INT_COMPARE
 #define MAKE_INT_COMPARE(op)                                                   \
-{                                                                            \
-int a = checked_pop(frame).i;                                              \
-if (a op 0) {                                                              \
-frame->program_counter = insn->index;                                    \
-JMP_INSN;                                                                \
-}                                                                          \
-NEXT_INSN;                                                                 \
-}
+  {                                                                            \
+    int a = checked_pop(frame).i;                                              \
+    if (a op 0) {                                                              \
+      frame->program_counter = insn->index;                                    \
+      JMP_INSN;                                                                \
+    }                                                                          \
+    NEXT_INSN;                                                                 \
+  }
 
-      bjvm_insn_ifeq:
-        MAKE_INT_COMPARE(==);
-      bjvm_insn_ifne:
-        MAKE_INT_COMPARE(!=);
-      bjvm_insn_iflt:
-        MAKE_INT_COMPARE(<);
-      bjvm_insn_ifge:
-        MAKE_INT_COMPARE(>=);
-      bjvm_insn_ifgt:
-        MAKE_INT_COMPARE(>);
-      bjvm_insn_ifle:
-        MAKE_INT_COMPARE(<=);
-      bjvm_insn_ifnonnull:
-        MAKE_INT_COMPARE(!=);
-      bjvm_insn_ifnull:
-        MAKE_INT_COMPARE(==)
+    bjvm_insn_ifeq:
+      MAKE_INT_COMPARE(==);
+    bjvm_insn_ifne:
+      MAKE_INT_COMPARE(!=);
+    bjvm_insn_iflt:
+      MAKE_INT_COMPARE(<);
+    bjvm_insn_ifge:
+      MAKE_INT_COMPARE(>=);
+    bjvm_insn_ifgt:
+      MAKE_INT_COMPARE(>);
+    bjvm_insn_ifle:
+      MAKE_INT_COMPARE(<=);
+    bjvm_insn_ifnonnull:
+      MAKE_INT_COMPARE(!=);
+    bjvm_insn_ifnull:
+      MAKE_INT_COMPARE(==)
 
-  #undef MAKE_INT_COMPARE
-      bjvm_insn_iconst: {
-        checked_push(frame, (bjvm_stack_value){.i = (int)insn->integer_imm});
-        NEXT_INSN;
-      }
-      bjvm_insn_dconst: {
-        checked_push(frame, (bjvm_stack_value){.d = (int)insn->d_imm});
-        NEXT_INSN;
-      }
-      bjvm_insn_fconst: {
-        checked_push(frame, (bjvm_stack_value){.f = (int)insn->f_imm});
-        NEXT_INSN;
-      }
-      bjvm_insn_lconst: {
-        checked_push(frame, (bjvm_stack_value){.l = insn->integer_imm});
-        NEXT_INSN;
-      }
-      bjvm_insn_iinc: {
-        frame->values[frame->max_stack + insn->iinc.index].i += insn->iinc.const_;
-        NEXT_INSN;
-      }
-      bjvm_insn_multianewarray: {
-        if (bjvm_multianewarray(thread, frame, &insn->multianewarray, &sd))
-          goto done;
-        NEXT_INSN;
-      }
-      bjvm_insn_newarray: {
-        int count = checked_pop(frame).i;
+#undef MAKE_INT_COMPARE
+    bjvm_insn_iconst: {
+      checked_push(frame, (bjvm_stack_value){.i = (int)insn->integer_imm});
+      NEXT_INSN;
+    }
+    bjvm_insn_dconst: {
+      checked_push(frame, (bjvm_stack_value){.d = (int)insn->d_imm});
+      NEXT_INSN;
+    }
+    bjvm_insn_fconst: {
+      checked_push(frame, (bjvm_stack_value){.f = (int)insn->f_imm});
+      NEXT_INSN;
+    }
+    bjvm_insn_lconst: {
+      checked_push(frame, (bjvm_stack_value){.l = insn->integer_imm});
+      NEXT_INSN;
+    }
+    bjvm_insn_iinc: {
+      frame->values[frame->max_stack + insn->iinc.index].i += insn->iinc.const_;
+      NEXT_INSN;
+    }
+    bjvm_insn_multianewarray: {
+      if (bjvm_multianewarray(thread, frame, &insn->multianewarray, &sd))
+        goto done;
+      NEXT_INSN;
+    }
+    bjvm_insn_newarray: {
+      int count = checked_pop(frame).i;
 
-        if (count < 0) {
-          bjvm_negative_array_size_exception(thread, count);
+      if (count < 0) {
+        bjvm_negative_array_size_exception(thread, count);
+        goto done;
+      }
+
+      bjvm_obj_header *array =
+          CreatePrimitiveArray1D(thread, insn->array_type, count);
+      if (array) {
+        checked_push(frame, (bjvm_stack_value){.obj = array});
+      } else {
+        goto done; // OOM
+      }
+      NEXT_INSN;
+    }
+    bjvm_insn_tableswitch: {
+      int value = checked_pop(frame).i;
+      struct bjvm_bc_tableswitch_data data = insn->tableswitch;
+      if (value < data.low || value > data.high) {
+        frame->program_counter = data.default_target;
+        JMP_INSN;
+      }
+      frame->program_counter = data.targets[value - data.low];
+      JMP_INSN;
+    }
+    bjvm_insn_lookupswitch: {
+      int value = checked_pop(frame).i;
+      struct bjvm_bc_lookupswitch_data data = insn->lookupswitch;
+      bool found = false;
+      for (int i = 0; i < data.keys_count; ++i) {
+        if (data.keys[i] == value) {
+          frame->program_counter = data.targets[i];
+          found = true;
+          break;
+        }
+      }
+
+      if (!found)
+        frame->program_counter = data.default_target;
+      JMP_INSN;
+    }
+    bjvm_insn_ret:
+      UNREACHABLE("bjvm_insn_ret");
+      NEXT_INSN;
+    bjvm_insn_invokevtable_monomorphic:
+    bjvm_insn_invokeitable_monomorphic: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
           goto done;
         }
-
-        bjvm_obj_header *array =
-            CreatePrimitiveArray1D(thread, insn->array_type, count);
-        if (array) {
-          checked_push(frame, (bjvm_stack_value){.obj = array});
-        } else {
-          goto done; // OOM
-        }
-        NEXT_INSN;
-      }
-      bjvm_insn_tableswitch: {
-        int value = checked_pop(frame).i;
-        struct bjvm_bc_tableswitch_data data = insn->tableswitch;
-        if (value < data.low || value > data.high) {
-          frame->program_counter = data.default_target;
+        if (target->descriptor != insn->ic2) {
+          if (insn->kind == bjvm_insn_invokevtable_monomorphic)
+            make_invokevtable_polymorphic(insn);
+          else
+            make_invokeitable_polymorphic(insn);
           JMP_INSN;
         }
-        frame->program_counter = data.targets[value - data.low];
-        JMP_INSN;
-      }
-      bjvm_insn_lookupswitch: {
-        int value = checked_pop(frame).i;
-        struct bjvm_bc_lookupswitch_data data = insn->lookupswitch;
-        bool found = false;
-        for (int i = 0; i < data.keys_count; ++i) {
-          if (data.keys[i] == value) {
-            frame->program_counter = data.targets[i];
-            found = true;
-            break;
-          }
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, insn->ic, frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
+          frame->state = INVOKE_STATE_ENTRY;
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
         }
-
-        if (!found)
-          frame->program_counter = data.default_target;
-        JMP_INSN;
       }
-      bjvm_insn_ret:
-        UNREACHABLE("bjvm_insn_ret");
       NEXT_INSN;
-      bjvm_insn_invokevtable_monomorphic:
-      bjvm_insn_invokeitable_monomorphic: {
-        bjvm_obj_header *target = frame->values[sd - insn->args].obj;
-        bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
-                       BJVM_TYPE_KIND_VOID;
-        if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
-          if (target == nullptr) {
-            bjvm_null_pointer_exception(thread);
+    }
+    bjvm_insn_invokevtable_polymorphic:
+    bjvm_insn_invokeitable_polymorphic: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
+          goto done;
+        }
+        bjvm_cp_method *target_method;
+        if (insn->kind == bjvm_insn_invokevtable_polymorphic)
+          target_method =
+              bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
+        else {
+          target_method =
+              bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
+          if (!target_method) {
+            bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
             goto done;
-          }
-          if (target->descriptor != insn->ic2) {
-            if (insn->kind == bjvm_insn_invokevtable_monomorphic)
-              make_invokevtable_polymorphic(insn);
-            else
-              make_invokeitable_polymorphic(insn);
-            JMP_INSN;
-          }
-          bjvm_stack_frame *new_frame = bjvm_push_frame(
-              thread, insn->ic, frame->values + sd - insn->args, insn->args);
-          if (!new_frame)
-            goto done;
-          frame->state = INVOKE_STATE_MADE_FRAME;
-          status =
-              bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
-          if (status < BJVM_INTERP_RESULT_INT)
-            frame->state = INVOKE_STATE_ENTRY;
-          if (status != BJVM_INTERP_RESULT_OK)
-            goto done;
-          sd -= insn->args;
-          sd += returns;
-        } else {
-          sd -= insn->args;
-          if (returns) {
-            frame->values[sd] = frame->result_of_next;
-            sd++;
           }
         }
-        NEXT_INSN;
-      }
-      bjvm_insn_invokevtable_polymorphic:
-      bjvm_insn_invokeitable_polymorphic: {
-        bjvm_obj_header *target = frame->values[sd - insn->args].obj;
-        bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
-                       BJVM_TYPE_KIND_VOID;
-        if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
-          if (target == nullptr) {
-            bjvm_null_pointer_exception(thread);
-            goto done;
-          }
-          bjvm_cp_method *target_method;
-          if (insn->kind == bjvm_insn_invokevtable_polymorphic)
-            target_method =
-                bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
-          else {
-            target_method =
-                bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
-            if (!target_method) {
-              bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
-              goto done;
-            }
-          }
-          assert(target_method);
-          bjvm_stack_frame *new_frame = bjvm_push_frame(
-              thread, target_method, frame->values + sd - insn->args, insn->args);
-          if (!new_frame)
-            goto done;
-          frame->state = INVOKE_STATE_MADE_FRAME;
-          status =
-              bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
-          if (status < BJVM_INTERP_RESULT_INT)
-            frame->state = INVOKE_STATE_ENTRY;
-          if (status != BJVM_INTERP_RESULT_OK)
-            goto done;
+        assert(target_method);
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, target_method, frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_ENTRY;
-          sd -= insn->args;
-          sd += returns;
-        } else {
-          sd -= insn->args;
-          if (returns) {
-            frame->values[sd] = frame->result_of_next;
-            sd++;
-          }
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        frame->state = INVOKE_STATE_ENTRY;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
         }
-        NEXT_INSN;
       }
-      bjvm_insn_invokespecial_resolved: {
-        bjvm_obj_header *target = frame->values[sd - insn->args].obj;
-        bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
-                       BJVM_TYPE_KIND_VOID;
-        if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
-          if (target == nullptr) {
-            bjvm_null_pointer_exception(thread);
-            goto done;
-          }
-          bjvm_cp_method *target_method = insn->ic;
-          bjvm_stack_frame *new_frame = bjvm_push_frame(
-              thread, target_method, frame->values + sd - insn->args, insn->args);
-          if (!new_frame)
-            goto done;
-          frame->state = INVOKE_STATE_MADE_FRAME;
-          status =
-              bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
-          if (status < BJVM_INTERP_RESULT_INT)
-            frame->state = INVOKE_STATE_ENTRY;
-          if (status != BJVM_INTERP_RESULT_OK)
-            goto done;
+      NEXT_INSN;
+    }
+    bjvm_insn_invokespecial_resolved: {
+      bjvm_obj_header *target = frame->values[sd - insn->args].obj;
+      bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
+                     BJVM_TYPE_KIND_VOID;
+      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
+        if (target == nullptr) {
+          bjvm_null_pointer_exception(thread);
+          goto done;
+        }
+        bjvm_cp_method *target_method = insn->ic;
+        bjvm_stack_frame *new_frame = bjvm_push_frame(
+            thread, target_method, frame->values + sd - insn->args, insn->args);
+        if (!new_frame)
+          goto done;
+        frame->state = INVOKE_STATE_MADE_FRAME;
+        status =
+            bjvm_interpret(thread, new_frame, &frame->values[sd - insn->args]);
+        if (status < BJVM_INTERP_RESULT_INT)
           frame->state = INVOKE_STATE_ENTRY;
-          sd -= insn->args;
-          sd += returns;
-        } else {
-          sd -= insn->args;
-          if (returns) {
-            frame->values[sd] = frame->result_of_next;
-            sd++;
-          }
+        if (status != BJVM_INTERP_RESULT_OK)
+          goto done;
+        frame->state = INVOKE_STATE_ENTRY;
+        sd -= insn->args;
+        sd += returns;
+      } else {
+        sd -= insn->args;
+        if (returns) {
+          frame->values[sd] = frame->result_of_next;
+          sd++;
         }
-        NEXT_INSN;
       }
-
-#define GETFIELD_IMPL(kind) { \
-bjvm_obj_header *obj = checked_pop(frame).obj; \
-if (!obj) { \
-bjvm_null_pointer_exception(thread); \
-goto done; \
-} \
-checked_push(frame, load_stack_value((void *)obj + (int)insn->ic2, \
-kind)); \
-NEXT_INSN; \
+      NEXT_INSN;
     }
 
-#define PUTFIELD_IMPL(kind) { \
-  bjvm_stack_value value = checked_pop(frame); \
-  bjvm_obj_header *obj = checked_pop(frame).obj; \
-  if (!obj) { \
-        bjvm_null_pointer_exception(thread); \
-        goto done; \
-        } \
-        store_stack_value((void *)obj + (int)insn->ic2, value, kind); \
-        NEXT_INSN; \
-        }
-  
+#define GETFIELD_IMPL(kind)                                                    \
+  {                                                                            \
+    bjvm_obj_header *obj = checked_pop(frame).obj;                             \
+    if (!obj) {                                                                \
+      bjvm_null_pointer_exception(thread);                                     \
+      goto done;                                                               \
+    }                                                                          \
+    checked_push(frame, load_stack_value((void *)obj + (int)insn->ic2, kind)); \
+    NEXT_INSN;                                                                 \
+  }
+
+#define PUTFIELD_IMPL(kind)                                                    \
+  {                                                                            \
+    bjvm_stack_value value = checked_pop(frame);                               \
+    bjvm_obj_header *obj = checked_pop(frame).obj;                             \
+    if (!obj) {                                                                \
+      bjvm_null_pointer_exception(thread);                                     \
+      goto done;                                                               \
+    }                                                                          \
+    store_stack_value((void *)obj + (int)insn->ic2, value, kind);              \
+    NEXT_INSN;                                                                 \
+  }
+
     bjvm_insn_getfield_B:
       GETFIELD_IMPL(BJVM_TYPE_KIND_BYTE);
     bjvm_insn_getfield_C:
       GETFIELD_IMPL(BJVM_TYPE_KIND_CHAR);
     bjvm_insn_getfield_F:
       GETFIELD_IMPL(BJVM_TYPE_KIND_FLOAT);
-        bjvm_insn_getfield_D:
+    bjvm_insn_getfield_D:
       GETFIELD_IMPL(BJVM_TYPE_KIND_DOUBLE);
-        bjvm_insn_getfield_I:
+    bjvm_insn_getfield_I:
       GETFIELD_IMPL(BJVM_TYPE_KIND_INT);
-        bjvm_insn_getfield_J:
+    bjvm_insn_getfield_J:
       GETFIELD_IMPL(BJVM_TYPE_KIND_LONG);
-        bjvm_insn_getfield_S:
+    bjvm_insn_getfield_S:
       GETFIELD_IMPL(BJVM_TYPE_KIND_SHORT);
-        bjvm_insn_getfield_L:
+    bjvm_insn_getfield_L:
       GETFIELD_IMPL(BJVM_TYPE_KIND_REFERENCE);
-        bjvm_insn_getfield_Z:
+    bjvm_insn_getfield_Z:
       GETFIELD_IMPL(BJVM_TYPE_KIND_BOOLEAN);
-      bjvm_insn_putfield_B:
+    bjvm_insn_putfield_B:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_BYTE);
     bjvm_insn_putfield_C:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_CHAR);
     bjvm_insn_putfield_F:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_FLOAT);
-        bjvm_insn_putfield_D:
+    bjvm_insn_putfield_D:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_DOUBLE);
-        bjvm_insn_putfield_I:
+    bjvm_insn_putfield_I:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_INT);
-        bjvm_insn_putfield_J:
+    bjvm_insn_putfield_J:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_LONG);
-        bjvm_insn_putfield_S:
+    bjvm_insn_putfield_S:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_SHORT);
-        bjvm_insn_putfield_L:
+    bjvm_insn_putfield_L:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_REFERENCE);
-        bjvm_insn_putfield_Z:
+    bjvm_insn_putfield_Z:
       PUTFIELD_IMPL(BJVM_TYPE_KIND_BOOLEAN);
     }
 
@@ -4284,7 +4290,7 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
     assert(!error);
 
     bjvm_cp_method *init = bjvm_method_lookup(ThreadGroup, STR("<init>"),
-                                                   STR("()V"), false, false);
+                                              STR("()V"), false, false);
 
     assert(init);
 

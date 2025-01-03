@@ -149,8 +149,8 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   case BJVM_MH_KIND_INVOKE_INTERFACE:
     struct bjvm_native_MethodType *mt = (void *)M->type;
     heap_string descriptor = unparse_method_type(mt);
-    bjvm_cp_method *method = bjvm_method_lookup(
-        search_on, hslc(search_for), hslc(descriptor), true, false);
+    bjvm_cp_method *method = bjvm_method_lookup(search_on, hslc(search_for),
+                                                hslc(descriptor), true, false);
     free_heap_str(descriptor);
 
     if (!method) {

@@ -1,8 +1,8 @@
 // Garbage collection
 
-#include "bjvm.h"
-#include "arrays.h"
 #include "analysis.h"
+#include "arrays.h"
+#include "bjvm.h"
 
 typedef struct bjvm_gc_ctx {
   bjvm_vm *vm;

@@ -90,9 +90,8 @@ bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
 bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
                              int const *dim_sizes, int total_dimensions);
 
-static inline bjvm_obj_header *CreateObjectArray1D(bjvm_thread *thread,
-                                                   bjvm_classdesc *inner_type,
-                                                   int size) {
+static inline bjvm_obj_header *
+CreateObjectArray1D(bjvm_thread *thread, bjvm_classdesc *inner_type, int size) {
   auto desc = make_array_classdesc(thread, inner_type);
   return CreateArray(thread, desc, &size, 1);
 }

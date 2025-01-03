@@ -400,10 +400,9 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
                                        const bjvm_utf8 name);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
-                                        const bjvm_utf8 name,
-                                        const bjvm_utf8 descriptor,
-                                        bool superclasses,
-                                        bool superinterfaces);
+                                   const bjvm_utf8 name,
+                                   const bjvm_utf8 descriptor,
+                                   bool superclasses, bool superinterfaces);
 
 // Run the interpreter, getting stuck if we hit an asynchronous function. This
 // should only be used when you know that you're not going to be calling any
@@ -469,7 +468,8 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
 void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
 void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
-void bjvm_incompatible_class_change_error(bjvm_thread *thread, bjvm_utf8 complaint);
+void bjvm_incompatible_class_change_error(bjvm_thread *thread,
+                                          bjvm_utf8 complaint);
 void bjvm_unsatisfied_link_error(bjvm_thread *thread,
                                  const bjvm_cp_method *method);
 void bjvm_abstract_method_error(bjvm_thread *thread,

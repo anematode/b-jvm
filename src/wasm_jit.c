@@ -258,7 +258,7 @@ bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
                                                     bjvm_bytecode_insn *insn) {
   // printf("invokestatic called!\n");
   int sd = stack_depth(frame);
-  return 0; //bjvm_invokestatic(thread, frame, insn, &sd);
+  return 0; // bjvm_invokestatic(thread, frame, insn, &sd);
 }
 
 EMSCRIPTEN_KEEPALIVE

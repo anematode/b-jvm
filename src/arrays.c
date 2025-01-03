@@ -123,8 +123,8 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
       thread, bjvm_primitive_classdesc(thread, array_type));
   assert(array_desc);
 
-  bjvm_obj_header *array = AllocateObject(
-      thread, array_desc, kArrayHeaderSize + count * size);
+  bjvm_obj_header *array =
+      AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
   if (array)
     *ArrayLength(array) = count;
 
@@ -167,9 +167,8 @@ bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
   auto arr = create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
 
   for (int i = 0; i < dim_sizes[0]; i++) {
-    bjvm_obj_header *subarray =
-        CreateArray(thread, desc->one_fewer_dim, dim_sizes + 1,
-                    total_dimensions - 1);
+    bjvm_obj_header *subarray = CreateArray(
+        thread, desc->one_fewer_dim, dim_sizes + 1, total_dimensions - 1);
     if (!subarray)
       return nullptr;
     ReferenceArrayStore(arr, i, subarray);

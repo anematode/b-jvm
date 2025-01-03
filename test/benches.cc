@@ -17,11 +17,12 @@ TEST_CASE("Benchmarks", "[bench]") {
   };
 
   BENCHMARK("JSON startup") {
-    auto result =
-      run_test_case("test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
-    "json/jackson-core-2.18.2.jar:test_files/json/"
-    "jackson-annotations-2.18.2.jar:test_files/json/"
-    "jackson-databind-2.18.2.jar", true, "GsonExample");
+    auto result = run_test_case(
+        "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+        "json/jackson-core-2.18.2.jar:test_files/json/"
+        "jackson-annotations-2.18.2.jar:test_files/json/"
+        "jackson-databind-2.18.2.jar",
+        true, "GsonExample");
   };
 
   BENCHMARK("Advanced lambda") {
