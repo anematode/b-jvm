@@ -40,12 +40,12 @@ else ()
     set(EmscriptenFlags "")
 endif ()
 
-if (TRUE)
+if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 endif ()
 
-if (FALSE) # NOT EMSCRIPTEN)
+if (TRUE) # NOT EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
@@ -53,14 +53,7 @@ endif ()
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
 
-add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
-        src/arm64_jit.c
-        src/arm64_jit.h
-        src/natives/java/util/TimeZone.c
-        src/vtable.c
-        src/vtable.h
-        src/ir.c
-        src/ir.h)
+add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES})
 target_include_directories(bjvm PRIVATE src)
 
 if (NOT EMSCRIPTEN)

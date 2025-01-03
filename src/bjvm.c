@@ -204,8 +204,10 @@ bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread,
   frame->plain.state = 0;
 
   // Copy in the arguments
-  memcpy(frame->plain.values + code->max_stack, args,
-         argc * sizeof(bjvm_stack_value));
+  if (likely(argc)) {
+    memcpy(frame->plain.values + code->max_stack, args,
+           argc * sizeof(bjvm_stack_value));
+  }
 
   return frame;
 }
@@ -1263,6 +1265,7 @@ bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread,
     }
 
     class = bjvm_define_class(thread, chars, bytes, cf_len);
+    free(bytes);
     (void)bjvm_hash_table_delete(&vm->inchoate_classes, chars.chars, chars.len);
     if (!class)
       return nullptr;

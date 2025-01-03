@@ -64,8 +64,10 @@ static bjvm_itable copy_itable(const bjvm_itable *src) {
   result.interface = src->interface;
   result.method_count = result.method_cap = src->method_count;
   result.methods = malloc(src->method_count * sizeof(bjvm_cp_method *));
-  memcpy(result.methods, src->methods,
-         src->method_count * sizeof(bjvm_cp_method *));
+  if (src->method_count) {
+    memcpy(result.methods, src->methods,
+           src->method_count * sizeof(bjvm_cp_method *));
+  }
   return result;
 }
 
