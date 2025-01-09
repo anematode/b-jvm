@@ -18,11 +18,10 @@ typedef struct bjvm_classdesc bjvm_classdesc;
 typedef struct bjvm_cp_method bjvm_cp_method;
 
 typedef struct bjvm_vtable {
-  int method_count;
   // The first methods will always be the same methods as those of the super-
   // class. That way, an invokevirtual call can be resolved by simply looking
   // at a constant offset into this table. (This is standard.)
-  bjvm_cp_method **methods __attribute__((__counted_by__(method_count)));
+  bjvm_cp_method **methods;
 } bjvm_vtable;
 
 typedef uintptr_t bjvm_itable_method_t; // bjvm_cp_method*
@@ -41,7 +40,6 @@ enum {
 // write WASM stubs for this.)
 typedef struct {
   bjvm_classdesc *interface;
-  int method_count, method_cap;
 
   // All methods in the interface are found in at a consistent index, as
   // prescribed by the order in the original interface.
@@ -49,16 +47,14 @@ typedef struct {
   // The lower two bits of the method have significance, as explained above,
   // and the method is only valid in the context of an invokeinterface call if
   // the last bit is 0.
-  bjvm_itable_method_t *methods __attribute__((__counted_by__(method_count)));
+  bjvm_itable_method_t *methods;
 } bjvm_itable;
 
 typedef struct {
-  int interface_count, interface_cap, entries_count, entries_cap;
-
   // Scan this vector for the interface in question ...
-  bjvm_classdesc **interfaces __attribute__((__counted_by__(interface_count)));
+  bjvm_classdesc **interfaces;
   // ... and look for the matching itable here
-  bjvm_itable *entries __attribute__((__counted_by__(interface_count)));
+  bjvm_itable *entries;
 } bjvm_itables;
 
 // Set up a class descriptor's itables and vtable, assuming all of its

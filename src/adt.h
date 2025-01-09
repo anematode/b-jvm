@@ -5,12 +5,41 @@
 #ifndef BJVM_ADT_H
 #define BJVM_ADT_H
 
+#include "util.h"
+
+#include <stddef.h>
+#include <stdint.h>
+#include <limits.h>
+#include "../vendor/stb_ds.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stddef.h>
-#include <stdint.h>
+typedef struct {
+  int capacity;
+  char _Alignas(_Alignof(max_align_t)) data[];
+} arena_segment;
+
+typedef struct {
+  arena_segment **segments;
+  int segment_size;
+  int last_used;
+} arena;
+  /*
+void arena_init(arena *a) {
+  a->segments = nullptr;
+  a->segment_size = 1 << 10;
+  a->last_used = 0;
+}
+
+// Free the arena and its contents
+void arena_uninit(arena *a) {
+  for (ptrdiff_t i = 0; i < arrlen(a->segments); ++i) {
+    free(a->segments[i]);
+  }
+  arrfree(a->segments);
+}*/
 
 typedef struct {
   union {

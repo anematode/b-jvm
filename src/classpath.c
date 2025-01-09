@@ -304,7 +304,7 @@ void bjvm_free_classpath(bjvm_classpath *cp) {
 
 enum jar_lookup_result { NOT_FOUND, FOUND, CORRUPT };
 
-// Returns true if found the bytes
+// Returns true if found
 enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
                                   uint8_t **bytes, size_t *len) {
   bjvm_jar_entry *jar_entry =

@@ -4,7 +4,7 @@
 // instruction. This messes up the debug dumps but can lead to slightly better
 // performance because the branch predictor has more information about pairs
 // of instructions which tend to follow another.
-#define ONE_GOTO_PER_INSN 1
+#define ONE_GOTO_PER_INSN 0
 // Skip the memset(...) call to clear each frame's locals/stack. This messes
 // up the debug dumps, but makes setting up frames faster.
 #define SKIP_CLEARING_FRAME 1
@@ -1112,7 +1112,7 @@ void bjvm_class_circularity_error(bjvm_thread *thread,
 
 bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
                                   bjvm_utf8 chars,
-                                  uint8_t *classfile_bytes,
+                                  const uint8_t *classfile_bytes,
                                   size_t classfile_len) {
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
@@ -2507,6 +2507,8 @@ get_top_frame:
          fmt_slice(method->name), fmt_slice(method->unparsed_descriptor),
          fmt_slice(method->my_class->name));
 #endif
+
+
 
   // Interpret the current frame.
 interpret_frame:

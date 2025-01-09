@@ -380,7 +380,7 @@ void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread, bjvm_utf8 name);
 bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
                                 bjvm_utf8 chars,
-                                uint8_t *classfile_bytes,
+                                const uint8_t *classfile_bytes,
                                 size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,

@@ -221,7 +221,7 @@ void free_method(bjvm_cp_method *method) {
 }
 
 typedef struct {
-  uint8_t *bytes;
+  const uint8_t *bytes;
   size_t len;
 } cf_byteslice;
 
@@ -276,7 +276,7 @@ READER_NEXT_IMPL(reader_next_f64, double)
 
 cf_byteslice reader_get_slice(cf_byteslice *reader, size_t len,
                               const char *reason) {
-  if (reader->len < len) {
+  if (unlikely(reader->len < len)) {
     char *msg = malloc(strlen(reason) + 100);
     strcpy(stpcpy(msg, "End of slice while reading "), reason);
     format_error_dynamic(msg);
@@ -1740,7 +1740,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
   uint16_t max_locals = reader_next_u16(&attr_reader, "max locals");
   uint32_t code_length = reader_next_u32(&attr_reader, "code length");
 
-  uint8_t *code_start = attr_reader.bytes;
+  const uint8_t *code_start = attr_reader.bytes;
 
   cf_byteslice code_reader =
       reader_get_slice(&attr_reader, code_length, "code");
@@ -2011,40 +2011,40 @@ char *parse_field_descriptor(const char **chars, size_t len,
     char c = **chars;
     (*chars)++;
     switch (c) {
-    case L'B':
+    case 'B':
       result->base_kind = BJVM_TYPE_KIND_BYTE;
       return nullptr;
-    case L'C':
+    case 'C':
       result->base_kind = BJVM_TYPE_KIND_CHAR;
       return nullptr;
-    case L'D':
+    case 'D':
       result->base_kind = BJVM_TYPE_KIND_DOUBLE;
       return nullptr;
-    case L'F':
+    case 'F':
       result->base_kind = BJVM_TYPE_KIND_FLOAT;
       return nullptr;
-    case L'I':
+    case 'I':
       result->base_kind = BJVM_TYPE_KIND_INT;
       return nullptr;
-    case L'J':
+    case 'J':
       result->base_kind = BJVM_TYPE_KIND_LONG;
       return nullptr;
-    case L'S':
+    case 'S':
       result->base_kind = BJVM_TYPE_KIND_SHORT;
       return nullptr;
-    case L'Z':
+    case 'Z':
       result->base_kind = BJVM_TYPE_KIND_BOOLEAN;
       return nullptr;
-    case L'V': {
+    case 'V': {
       result->base_kind = BJVM_TYPE_KIND_VOID;
       if (dimensions > 0)
         return strdup("void cannot have dimensions");
       return nullptr; // lol, check this later
     }
-    case L'[':
+    case '[':
       ++dimensions;
       break;
-    case L'L': {
+    case 'L': {
       const char *start = *chars;
       while (*chars < end && **chars != ';')
         ++*chars;
@@ -2127,7 +2127,7 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
   }
 }
 
-parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
+parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
                                     bjvm_classdesc *result) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;

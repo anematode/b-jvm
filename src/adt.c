@@ -182,6 +182,8 @@ bjvm_hash_table_entry *
 bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,
                            size_t len, bool *equal, bool *on_chain,
                            bjvm_hash_table_entry **prev_entry) {
+  if (unlikely(tbl->entries_cap == 0))
+    return nullptr;
   uint32_t hash = fxhash_string(key, len);
   size_t index = hash % tbl->entries_cap;
   bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = nullptr;

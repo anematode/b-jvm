@@ -39,13 +39,14 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   if (i == -1) {
     // Not a lang exception, skip frames involved in constructing the object
     // TODO cleaner way of doing this?
-    i = (int)thread->frames_count - 1;
+    i = (int)thread->frames_count - 2;
     for (; i >= 0; --i) {
       bjvm_stack_frame *frame = thread->frames[i];
       // The first frame in which the exception object is not mentioned
       if (!frame_mentions_object(frame, obj->obj))
         break;
     }
+    ++i;
   }
 
   // Create stack trace of the appropriate height

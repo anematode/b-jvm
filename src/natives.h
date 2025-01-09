@@ -57,7 +57,7 @@ extern bjvm_native_t *bjvm_natives;
                         method_descriptor_, modifier, async)                   \
   DECLARE(class_name_, method_name_, modifier);                                \
   DEFINE_NATIVE_INFO(package_path, class_name_, method_name_,                  \
-                     method_descriptor_, modifier, async);                     \
+                     method_descriptor_, modifier, async)                      \
   DECLARE(class_name_, method_name_, modifier)
 
 #define DECLARE_NATIVE(package_path, class_name_, method_name_,                \

@@ -62,11 +62,9 @@ static bjvm_itable_method_t make(const bjvm_cp_method *m) {
 static bjvm_itable copy_itable(const bjvm_itable *src) {
   bjvm_itable result = {0};
   result.interface = src->interface;
-  result.method_count = result.method_cap = src->method_count;
-  result.methods = malloc(src->method_count * sizeof(bjvm_cp_method *));
-  if (src->method_count) {
-    memcpy(result.methods, src->methods,
-           src->method_count * sizeof(bjvm_cp_method *));
+  ptrdiff_t c = arrlen(src->methods);
+  if (c) {
+    memcpy(arraddnptr(result.methods, c), src->methods, c * sizeof(bjvm_itable_method_t));
   }
   return result;
 }
@@ -87,7 +85,7 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
   INIT_STACK_STRING(scratch, 1024);
   assert(dst->interface == src->interface);
   assert(dst->method_count == src->method_count);
-  for (int i = 0; i < src->method_count; ++i) {
+  for (int i = 0; i < arrlen(src->methods); ++i) {
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
     assert(s != 0 && "i-table method must not be null");
     assert(d != 0 && "i-table method must not be null");
@@ -145,10 +143,10 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
     else
       iface = super;
     assert(iface && "Superclass or -interface not resolved");
-    for (int itable_i = 0; itable_i < iface->itables.interface_count;
+    for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       bjvm_itable *super_itable = iface->itables.entries + itable_i;
-      for (int method_i = 0; method_i < super_itable->method_count;
+      for (int method_i = 0; method_i < arrlen(super_itable->methods);
            ++method_i) {
         bjvm_itable_method_t ref = super_itable->methods[method_i];
         bjvm_cp_method *underlying = get_unambiguous_method(ref);
@@ -184,13 +182,13 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
                 ? classdesc->interfaces[iface_i]->classdesc
                 : super;
     assert(iface && "Superclass or -interface not resolved");
-    for (int itable_i = 0; itable_i < iface->itables.interface_count;
+    for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       // Look if we already implement this interface, and if so, merge with
       // what we have.
       const bjvm_itable *super_itable = iface->itables.entries + itable_i;
       bjvm_itable *merge_with;
-      for (int k = 0; k < itables->interface_count; ++k) {
+      for (int k = 0; k < arrlen(itables->interfaces); ++k) {
         if (itables->interfaces[k] == super_itable->interface) {
           merge_with = itables->entries + k;
           assert(merge_with->interface == super_itable->interface);
@@ -199,10 +197,8 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
       }
 
       // New interface for this class, push a copy of it
-      *VECTOR_PUSH(itables->interfaces, itables->interface_count,
-                   itables->interface_cap) = super_itable->interface;
-      merge_with = VECTOR_PUSH(itables->entries, itables->entries_count,
-                               itables->entries_cap);
+      arrput(itables->interfaces, super_itable->interface);
+      merge_with = arraddnptr(itables->entries, 1);
       *merge_with = copy_itable(super_itable);
 
     merge:
@@ -219,13 +215,12 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
 void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   bjvm_vtable *vtable = &classdesc->vtable;
   assert(!vtable->methods && "v-table already set up");
-  int methods_cap = 0;
 
   // If the class has a superclass, copy its vtable, replacing methods which
   // are overridden.
   if (classdesc->super_class) {
     bjvm_classdesc *super = classdesc->super_class->classdesc;
-    for (int i = 0; i < super->vtable.method_count; ++i) {
+    for (int i = 0; i < arrlen(super->vtable.methods); ++i) {
       bjvm_cp_method *method = super->vtable.methods[i];
       bjvm_cp_method *replacement = bjvm_method_lookup(
           classdesc, method->name, method->unparsed_descriptor, false, false);
@@ -235,7 +230,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
         method = replacement;
         replacement->overrides = true;
       }
-      *VECTOR_PUSH(vtable->methods, vtable->method_count, methods_cap) = method;
+      arrpush(vtable->methods, method);
     }
 
     setup_itables(super, classdesc);
@@ -249,16 +244,13 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
     for (int i = 0; i < classdesc->methods_count; ++i) {
       bjvm_cp_method *method = classdesc->methods + i;
       if (itable_include(method)) {
-        method->itable_index = itable.method_count;
-        *VECTOR_PUSH(itable.methods, itable.method_count, itable.method_cap) =
-            make(method);
+        method->itable_index = arrlen(itable.methods);
+        arrpush(itable.methods, make(method));
       }
     }
     bjvm_itables *itables = &classdesc->itables;
-    *VECTOR_PUSH(itables->interfaces, itables->interface_count,
-                 itables->interface_cap) = classdesc;
-    *VECTOR_PUSH(itables->entries, itables->entries_count,
-                 itables->entries_cap) = itable;
+    arrput(itables->interfaces, classdesc);
+    arrput(itables->entries, itable);
   }
 
   // Then push all new methods which are not represented in a vtable into the
@@ -266,19 +258,19 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   for (int i = 0; i < classdesc->methods_count; ++i) {
     bjvm_cp_method *method = classdesc->methods + i;
     if (vtable_include(method)) {
-      method->vtable_index = vtable->method_count;
-      *VECTOR_PUSH(vtable->methods, vtable->method_count, methods_cap) = method;
+      method->vtable_index = arrlen(vtable->methods);
+      arrpush(vtable->methods, method);
     }
   }
 }
 
 void bjvm_free_function_tables(bjvm_classdesc *classdesc) {
-  free(classdesc->vtable.methods);
-  for (int i = 0; i < classdesc->itables.interface_count; ++i) {
-    free(classdesc->itables.entries[i].methods);
+  arrfree(classdesc->vtable.methods);
+  for (int i = 0; i < arrlen(classdesc->itables.entries); ++i) {
+    arrfree(classdesc->itables.entries[i].methods);
   }
-  free(classdesc->itables.interfaces);
-  free(classdesc->itables.entries);
+  arrfree(classdesc->itables.interfaces);
+  arrfree(classdesc->itables.entries);
 }
 
 bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc *classdesc, int index) {
@@ -289,7 +281,7 @@ bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc *classdesc, int index) {
 
 bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc *classdesc,
                                    bjvm_classdesc *interface, int index) {
-  for (int i = 0; i < classdesc->itables.interface_count; ++i) {
+  for (int i = 0; i < arrlen(classdesc->itables.interfaces); ++i) {
     if (classdesc->itables.interfaces[i] == interface) {
       bjvm_itable itable = classdesc->itables.entries[i];
       assert(index >= 0 && index < itable.method_count &&

@@ -50,7 +50,7 @@ typedef struct {
 [[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path);
 void bjvm_free_classpath(bjvm_classpath *cp);
 int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
-                          uint8_t **bytes, size_t *len);
+  uint8_t **bytes, size_t *len);
 
 #ifdef __cplusplus
 }

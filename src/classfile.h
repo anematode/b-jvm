@@ -783,7 +783,7 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @return nullptr on success, otherwise an error message (which is the caller's
  * responsibility to free).
  */
-parse_result_t bjvm_parse_classfile(uint8_t *bytes, size_t len,
+parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
                                     bjvm_classdesc *result);
 
 #ifdef __cplusplus
