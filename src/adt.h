@@ -89,6 +89,15 @@ typedef struct bjvm_string_hash_table {
   double load_factor;
 } bjvm_string_hash_table;
 
+typedef struct bjvm_string_builder {
+  char* data;
+  int write_pos;
+} bjvm_string_builder;
+
+void bjvm_string_builder_init(bjvm_string_builder* builder);
+void bjvm_string_builder_append(bjvm_string_builder* builder, const char* fmt, ...);
+void bjvm_string_builder_free(bjvm_string_builder* builder);
+
 bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
                                             double load_factor,
                                             size_t initial_capacity);

@@ -196,6 +196,9 @@ typedef enum {
   bjvm_insn_lookupswitch,
   bjvm_insn_ret,
 
+  /** Instruction failed with a LinkageError */
+  // bjvm_insn_linkage_error,
+
   /** Resolved versions of misc instructions */
   bjvm_insn_anewarray_resolved,
   bjvm_insn_checkcast_resolved,

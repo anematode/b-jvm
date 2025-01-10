@@ -30,17 +30,17 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
 
   bjvm_utf8 name = STR("java/lang/Object");
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
-  info->classdesc = bootstrap_class_create(thread, name);
+  info->classdesc = must_create_class(thread, name);
   info->name = name;
   base->super_class = info;
 
   bjvm_cp_class_info *Cloneable = calloc(2, sizeof(bjvm_cp_class_info)),
                      *Serializable = Cloneable + 1;
   Cloneable->classdesc =
-      bootstrap_class_create(thread, STR("java/lang/Cloneable"));
+      must_create_class(thread, STR("java/lang/Cloneable"));
   Cloneable->name = STR("java/lang/Cloneable");
   Serializable->classdesc =
-      bootstrap_class_create(thread, STR("java/io/Serializable"));
+      must_create_class(thread, STR("java/io/Serializable"));
   Serializable->name = STR("java/io/Serializable");
 
   base->interfaces_count = 2;

@@ -217,7 +217,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   bjvm_utf8 m{.chars = (char *)main_class.c_str(),
               .len = (int)main_class.size()};
 
-  bjvm_classdesc *desc = bootstrap_class_create(thr, m);
+  bjvm_classdesc *desc = must_create_class(thr, m);
   if (!desc) {
     return result;
   }

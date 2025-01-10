@@ -174,6 +174,9 @@ typedef struct bjvm_vm {
   // fillInStackTrace allocates stuff. The reserved space is a constant in
   // bjvm.c.
   size_t true_heap_capacity;
+
+  // Handles referenced from JS
+  bjvm_obj_header **js_handles;
 } bjvm_vm;
 
 typedef struct {
@@ -279,6 +282,13 @@ bjvm_plain_frame *bjvm_get_plain_frame(bjvm_stack_frame *frame);
 bjvm_cp_method *bjvm_get_frame_method(bjvm_stack_frame *frame);
 bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame);
 
+EMSCRIPTEN_KEEPALIVE
+bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm* vm, int index);
+EMSCRIPTEN_KEEPALIVE
+int bjvm_make_js_handle(bjvm_vm* vm, bjvm_obj_header *obj);
+EMSCRIPTEN_KEEPALIVE
+void bjvm_drop_js_handle(bjvm_vm* vm, int index);
+
 typedef struct bjvm_thread {
   // Global VM corresponding to this thread
   bjvm_vm *vm;
@@ -377,7 +387,7 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 void bjvm_free_vm(bjvm_vm *vm);
 
 void free_field_descriptor(bjvm_field_descriptor descriptor);
-bjvm_classdesc *bootstrap_class_create(bjvm_thread *thread, bjvm_utf8 name);
+bjvm_classdesc *must_create_class(bjvm_thread *thread, bjvm_utf8 name);
 bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
                                 bjvm_utf8 chars,
                                 const uint8_t *classfile_bytes,
@@ -403,6 +413,7 @@ typedef struct {
 
 // Get an asynchronous running context. The caller should repeatedly call
 // bjvm_async_run_step() until it returns true.
+EMSCRIPTEN_KEEPALIVE
 bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
                                           bjvm_cp_method *method,
                                           bjvm_stack_value *args,

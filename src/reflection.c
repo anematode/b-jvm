@@ -28,7 +28,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_cp_field *field) {
 
   bjvm_classdesc *reflect_Field =
-      bootstrap_class_create(thread, STR("java/lang/reflect/Field"));
+      must_create_class(thread, STR("java/lang/reflect/Field"));
   bjvm_initialize_class(thread, reflect_Field);
   bjvm_handle *field_mirror =
       bjvm_make_handle(thread, new_object(thread, reflect_Field));
@@ -69,7 +69,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   assert(utf8_equals(method->name, "<init>"));
 
   bjvm_classdesc *reflect_Constructor =
-      bootstrap_class_create(thread, STR("java/lang/reflect/Constructor"));
+      must_create_class(thread, STR("java/lang/reflect/Constructor"));
   bjvm_initialize_class(thread, reflect_Constructor);
 
   method->reflection_ctor = (void *)new_object(thread, reflect_Constructor);
@@ -81,7 +81,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   C->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   C->modifiers = method->access_flags;
   C->parameterTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
+      thread, must_create_class(thread, STR("java/lang/Class")),
       method->descriptor->args_count);
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
@@ -99,7 +99,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method) {
   bjvm_classdesc *reflect_Method =
-      bootstrap_class_create(thread, STR("java/lang/reflect/Method"));
+      must_create_class(thread, STR("java/lang/reflect/Method"));
   bjvm_initialize_class(thread, reflect_Method);
 
   bjvm_handle *result =
@@ -143,7 +143,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   }
 
   M->parameterTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")),
+      thread, must_create_class(thread, STR("java/lang/Class")),
       method->descriptor->args_count);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
@@ -158,7 +158,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
   M->exceptionTypes = CreateObjectArray1D(
-      thread, bootstrap_class_create(thread, STR("java/lang/Class")), 0);
+      thread, must_create_class(thread, STR("java/lang/Class")), 0);
   // TODO parse these ^^
 
   method->reflection_method = (void *)M;

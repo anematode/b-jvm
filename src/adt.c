@@ -111,6 +111,29 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
   return test;
 }
 
+void bjvm_string_builder_init(bjvm_string_builder *builder) {
+  builder->data = nullptr;
+}
+
+void bjvm_string_builder_append(bjvm_string_builder *builder, const char *fmt,
+    ...) {
+  va_list args;
+  va_start(args, fmt);
+  int len = vsnprintf(nullptr, 0, fmt, args);
+  va_end(args);
+
+  bool is_first = !builder->data;
+  char* write = arraddnptr(builder->data, len + is_first);
+  write -= !is_first;
+  va_start(args, fmt);
+  vsnprintf(write, len + 1, fmt, args);
+  va_end(args);
+}
+
+void bjvm_string_builder_free(bjvm_string_builder *builder) {
+  arrfree(builder->data);
+}
+
 bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
                                             double load_factor,
                                             size_t initial_capacity) {

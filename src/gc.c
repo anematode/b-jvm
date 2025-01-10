@@ -112,6 +112,11 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     }
   }
 
+  // JS Handles
+  for (int i = 0; i < arrlen(vm->js_handles); ++i) {
+    PUSH_ROOT(&vm->js_handles[i]);
+  }
+
   // Static fields of bootstrap-loaded classes
   bjvm_hash_table_iterator it = bjvm_hash_table_get_iterator(&vm->classes);
   char *key;

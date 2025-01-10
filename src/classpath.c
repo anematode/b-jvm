@@ -33,7 +33,7 @@ static struct loaded_bytes read_file(FILE *f) {
 }
 
 #ifdef EMSCRIPTEN
-struct loaded_bytes emscripten_read_file(const char *filename) {
+struct loaded_bytes node_read_file(const char *filename) {
   struct loaded_bytes result = {0};
   bool exists = EM_ASM_INT(
       {
@@ -81,7 +81,7 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
 #elif EMSCRIPTEN
   int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
-    struct loaded_bytes load = emscripten_read_file(filename);
+    struct loaded_bytes load = node_read_file(filename);
     if (!load.bytes)
       goto missing;
 
@@ -399,18 +399,23 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const bjvm_utf8 filename,
     assert(search.chars[search.len] == '\0' && "Must be null terminated");
 
 #ifdef EMSCRIPTEN
-    struct loaded_bytes lb = emscripten_read_file(search.chars);
-    free_heap_str(search);
-    if (!lb.bytes)
-      continue;
-#else
-    FILE *f = fopen(search.chars, "rb");
-    free_heap_str(search);
-    if (!f)
-      continue;
-    struct loaded_bytes lb = read_file(f);
-    fclose(f);
+    int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
+    struct loaded_bytes lb;
+    if (is_node) {
+      lb = node_read_file(search.chars);
+      free_heap_str(search);
+      if (!lb.bytes)
+        continue;
+    } else
 #endif
+    {
+      FILE *f = fopen(search.chars, "rb");
+      free_heap_str(search);
+      if (!f)
+        continue;
+      lb = read_file(f);
+      fclose(f);
+    }
     *bytes = (uint8_t *)lb.bytes;
     *len = lb.length;
     return 0;

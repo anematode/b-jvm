@@ -1,4 +1,4 @@
-
+import java.util.ArrayList;
 
 public class Main {
     static int p = 10;
@@ -13,6 +13,13 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public static ArrayList<Integer> add(int a, int b) {
+        ArrayList<Integer> lst = new ArrayList<>();
+        lst.add(a);
+        lst.add(b);
+        return lst;
     }
 
     static void throwz() {

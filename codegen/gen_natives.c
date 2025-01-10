@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
   printf("/** BEGIN CODEGEN SECTION (gen_natives.c) */\n");
 
   for (int i = 0; i < class_count; ++i) {
-    bjvm_classdesc *desc = bootstrap_class_create(thread, (bjvm_utf8) { .chars = classes[i].name, .len = strlen(classes[i].name) });
+    bjvm_classdesc *desc = must_create_class(thread, (bjvm_utf8) { .chars = classes[i].name, .len = strlen(classes[i].name) });
     assert(desc);
     bjvm_link_class(thread, desc);
 
