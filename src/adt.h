@@ -16,6 +16,7 @@
 extern "C" {
 #endif
 
+  /*
 typedef struct {
   int capacity;
   char _Alignas(_Alignof(max_align_t)) data[];
@@ -26,7 +27,6 @@ typedef struct {
   int segment_size;
   int last_used;
 } arena;
-  /*
 void arena_init(arena *a) {
   a->segments = nullptr;
   a->segment_size = 1 << 10;
