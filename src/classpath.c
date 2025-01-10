@@ -398,9 +398,9 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const bjvm_utf8 filename,
     heap_string search = concat_path(entry->name, filename);
     assert(search.chars[search.len] == '\0' && "Must be null terminated");
 
+    struct loaded_bytes lb;
 #ifdef EMSCRIPTEN
     int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
-    struct loaded_bytes lb;
     if (is_node) {
       lb = node_read_file(search.chars);
       free_heap_str(search);
