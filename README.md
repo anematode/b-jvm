@@ -1,5 +1,7 @@
 
-A JVM for the web.
+A JVM for the web. Bring back the applet!
+
+Message me on Discord if you are interested in collaborating: forevermilk#0001
 
 ## Style guide
 

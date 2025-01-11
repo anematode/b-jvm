@@ -520,12 +520,6 @@ int primitive_order(bjvm_type_kind kind) {
   }
 }
 
-void primitive_type_kind_to_array_info(bjvm_type_kind kind,
-                                       const bjvm_utf8 *type, int *size);
-
-struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
-                                                bjvm_classdesc *classdesc);
-
 #if 0
 bjvm_obj_header *make_string(bjvm_thread *thread, const bjvm_utf8 chars) {
   bjvm_obj_header *byte_array = make_byte_array(thread, chars.len);
@@ -586,7 +580,7 @@ bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
   case 'F':
   case 'D':
   case 'V':
-    return bjvm_primitive_class_mirror(thread, chars[0])->reflected_class;
+    return bjvm_primitive_classdesc(thread, chars[0]);
   default:
     UNREACHABLE();
   }

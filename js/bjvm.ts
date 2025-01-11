@@ -180,24 +180,25 @@ function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): any {
     // Static methods
     const staticMethods: string[] = [];
     const instanceMethods: string[] = [];
-    let i = 0;
-    for (const method of classInfo.methods) {
-        let m = method;
+    for (let i = 0 ; i < classInfo.methods.length; ++i) {
+        let method = classInfo.methods[i];
         const argNames = method.parameterNames.join(", ");
+        if (!(method.accessFlags & 0x0001)) {
+            continue;
+        }
         if (method.accessFlags & 0x0008) {
-            staticMethods.push(`static async ${m.name} (${argNames}) {
+            staticMethods.push(`static async ${method.name} (${argNames}) {
                 const thread = vm.createThread();
                 const result = await thread._runMethod(methods[${i}], ${argNames});
                 return result;
             }`);
         } else {
-            instanceMethods.push(`async ${m.name} (${argNames}) {
+            instanceMethods.push(`async ${method.name} (${argNames}) {
                 const thread = vm.createThread();
                 const result = await thread._runMethod(methods[${i}], this, ${argNames});
                 return result;
             }`);
         }
-        ++i;
     }
 
     const cow = classInfo.binaryName.replaceAll('/', "_");
