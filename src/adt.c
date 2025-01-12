@@ -54,6 +54,47 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
   return existing_buf;
 }
 
+void arena_init(arena *a) {
+  a->begin = nullptr;
+}
+
+const size_t ARENA_REGION_BYTES = 1 << 12;
+void *arena_alloc(arena *a, size_t count, size_t bytes) {
+  size_t allocate = (count * bytes + 7) & ~7;
+  if (allocate > ARENA_REGION_BYTES) {
+    arena_region *region = calloc(1, sizeof(arena_region) + allocate);
+    region->used = region->capacity = allocate;
+    if (a->begin) {
+      region->next = a->begin->next;
+      a->begin->next = region;
+    } else {
+      a->begin = region;
+    }
+    return region->data;
+  }
+  if (!a->begin || a->begin->used + allocate > a->begin->capacity) {
+    arena_region *new = calloc(1, sizeof(arena_region) + ARENA_REGION_BYTES);
+    new->capacity = ARENA_REGION_BYTES;
+    new->next = a->begin;
+    a->begin = new;
+    return arena_alloc(a, count, bytes);
+  }
+  char *result = a->begin->data + a->begin->used;
+  a->begin->used += allocate;
+  return result;
+}
+
+void arena_uninit(arena *a) {
+  // Walk the list of regions and free them
+  arena_region *region = a->begin;
+  while (region) {
+    arena_region *next = region->next;
+    free(region);
+    region = next;
+  }
+  a->begin = nullptr;
+}
+
 void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs,
                                  int bits_capacity) {
   if (bits_capacity > 63) {

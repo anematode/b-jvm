@@ -16,30 +16,20 @@
 extern "C" {
 #endif
 
-  /*
-typedef struct {
-  int capacity;
-  char _Alignas(_Alignof(max_align_t)) data[];
-} arena_segment;
+typedef struct arena_region {
+  struct arena_region *next;  // null if final segment
+  size_t used, capacity;
+  char _Alignas(8) data[];
+} arena_region;
 
 typedef struct {
-  arena_segment **segments;
-  int segment_size;
-  int last_used;
+  arena_region *begin;
 } arena;
-void arena_init(arena *a) {
-  a->segments = nullptr;
-  a->segment_size = 1 << 10;
-  a->last_used = 0;
-}
 
-// Free the arena and its contents
-void arena_uninit(arena *a) {
-  for (ptrdiff_t i = 0; i < arrlen(a->segments); ++i) {
-    free(a->segments[i]);
-  }
-  arrfree(a->segments);
-}*/
+void arena_init(arena *a);
+__attribute__((malloc, alloc_size(2, 3)))
+void *arena_alloc(arena *a, size_t count, size_t bytes);
+void arena_uninit(arena *a);
 
 typedef struct {
   union {
