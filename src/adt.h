@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdalign.h>
 #include <limits.h>
 #include "../vendor/stb_ds.h"
 
@@ -19,7 +20,7 @@ extern "C" {
 typedef struct arena_region {
   struct arena_region *next;  // null if final segment
   size_t used, capacity;
-  char _Alignas(8) data[];
+  __attribute((aligned (8))) char data[];
 } arena_region;
 
 typedef struct {
@@ -29,6 +30,7 @@ typedef struct {
 void arena_init(arena *a);
 __attribute__((malloc, alloc_size(2, 3)))
 void *arena_alloc(arena *a, size_t count, size_t bytes);
+bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len);
 void arena_uninit(arena *a);
 
 typedef struct {

@@ -64,7 +64,7 @@ TEST_CASE("Test classfile parsing") {
 
     // std::cout << "Reading " << file << "\n";
     bjvm_classdesc cf = {};
-    parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf);
+    parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
     if (error != PARSE_SUCCESS) {
       std::cerr << "Error parsing classfile: " << error << '\n';
       // abort();
@@ -83,7 +83,7 @@ TEST_CASE("Test classfile parsing") {
         for (int j = 0; j < 256; ++j) {
           copy[i] += 1;
           parse_result_t error =
-              bjvm_parse_classfile(copy.data(), copy.size(), &cf);
+              bjvm_parse_classfile(copy.data(), copy.size(), &cf, nullptr);
           if (error != PARSE_SUCCESS) {
 
           } else {
@@ -105,7 +105,7 @@ TEST_CASE("Test classfile parsing") {
 
     meter.measure([&] {
       parse_result_t error =
-          bjvm_parse_classfile(read.data(), read.size(), &cf);
+          bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
       if (error != PARSE_SUCCESS)
         abort();
       bjvm_free_classfile(cf);
@@ -165,19 +165,22 @@ TEST_CASE("parse_field_descriptor valid cases") {
       "Lcom/example/Example;[I[[[JLjava/lang/String;[[Ljava/lang/Object;BVCZ";
   bjvm_field_descriptor com_example_Example, Iaaa, Jaa, java_lang_String,
       java_lang_Object, B, V, C, Z;
-  REQUIRE(
-      !parse_field_descriptor(&fields, strlen(fields), &com_example_Example));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Iaaa));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Jaa));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_String));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_Object));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &B));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &V));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &C));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Z));
+  arena arena;
+  arena_init(&arena);
 
   REQUIRE(
-      utf8_equals(hslc(com_example_Example.class_name), "com/example/Example"));
+      !parse_field_descriptor(&fields, strlen(fields), &com_example_Example, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Iaaa, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Jaa, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_String, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_Object, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &B, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &V, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &C, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Z, &arena));
+
+  REQUIRE(
+      utf8_equals(com_example_Example.class_name, "com/example/Example"));
   REQUIRE(com_example_Example.dimensions == 0);
   REQUIRE(com_example_Example.base_kind == BJVM_TYPE_KIND_REFERENCE);
 
@@ -187,10 +190,10 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(Jaa.base_kind == BJVM_TYPE_KIND_LONG);
   REQUIRE(Jaa.dimensions == 3);
 
-  REQUIRE(utf8_equals(hslc(java_lang_String.class_name), "java/lang/String"));
+  REQUIRE(utf8_equals(java_lang_String.class_name, "java/lang/String"));
   REQUIRE(java_lang_String.dimensions == 0);
 
-  REQUIRE(utf8_equals(hslc(java_lang_Object.class_name), "java/lang/Object"));
+  REQUIRE(utf8_equals(java_lang_Object.class_name, "java/lang/Object"));
   REQUIRE(java_lang_Object.dimensions == 2);
 
   REQUIRE(B.base_kind == BJVM_TYPE_KIND_BYTE);
@@ -198,9 +201,7 @@ TEST_CASE("parse_field_descriptor valid cases") {
   REQUIRE(V.base_kind == BJVM_TYPE_KIND_VOID);
   REQUIRE(Z.base_kind == BJVM_TYPE_KIND_BOOLEAN);
 
-  free_field_descriptor(com_example_Example);
-  free_field_descriptor(java_lang_Object);
-  free_field_descriptor(java_lang_String);
+  arena_uninit(&arena);
 }
 
 TEST_CASE("String hash table") {
@@ -442,7 +443,7 @@ TEST_CASE("Analysis") {
 TEST_CASE("Immediate dominators computation on cursed CFG") {
   bjvm_classdesc desc;
   auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();
-  bjvm_parse_classfile(cursed_file.data(), cursed_file.size(), &desc);
+  bjvm_parse_classfile(cursed_file.data(), cursed_file.size(), &desc, nullptr);
   REQUIRE(utf8_equals(hslc(desc.name), "Main"));
 
   bjvm_cp_method *m = desc.methods + 4;

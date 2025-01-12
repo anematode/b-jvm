@@ -15,7 +15,7 @@ TEST_CASE("Analysis passes on valid bytecode") {
     auto contents = ReadFile(file).value();
     bjvm_classdesc cls;
     parse_result_t result =
-        bjvm_parse_classfile(contents.data(), contents.size(), &cls);
+        bjvm_parse_classfile(contents.data(), contents.size(), &cls, nullptr);
     assert(result == 0);
 
     for (int i = 0; i < cls.methods_count; ++i) {

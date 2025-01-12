@@ -553,6 +553,8 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
   S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_CHAR, len);
+  if (!S->value)
+    return nullptr;
   memcpy(ArrayData(S->value), chars, len * sizeof(short));
   free(chars);
 
@@ -593,6 +595,8 @@ bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
   if (str)
     return str;
   bjvm_obj_header *new_str = make_string(thread, chars);
+  if (!new_str)
+    return nullptr;  // OOM
   (void)bjvm_hash_table_insert(&thread->vm->interned_strings, chars.chars,
                                chars.len, new_str);
   return new_str;
@@ -1140,7 +1144,7 @@ bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
-  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class);
+  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class, nullptr);
   if (error != PARSE_SUCCESS) {
     // Raise VerifyError
     UNREACHABLE();

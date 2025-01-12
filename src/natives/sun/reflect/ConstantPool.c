@@ -22,7 +22,7 @@ DECLARE_NATIVE("sun/reflect", ConstantPool, getUTF8At0,
     return (bjvm_stack_value){.obj = nullptr};
   }
   return (bjvm_stack_value){.obj =
-                                bjvm_intern_string(thread, hslc(entry->utf8))};
+                                bjvm_intern_string(thread, entry->utf8)};
 }
 
 DECLARE_NATIVE("sun/reflect", ConstantPool, getIntAt0,

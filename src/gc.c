@@ -65,8 +65,8 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
   }
 
   // Push all CallSite objects
-  for (int i = 0; i < desc->indy_insns_count; ++i) {
-    bjvm_bytecode_insn *insn = *(desc->indy_insns + i);
+  for (int i = 0; i < arrlen(desc->indy_insns); ++i) {
+    bjvm_bytecode_insn *insn = desc->indy_insns[i];
     PUSH_ROOT(&insn->ic);
   }
 }

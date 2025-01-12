@@ -386,7 +386,6 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 
 void bjvm_free_vm(bjvm_vm *vm);
 
-void free_field_descriptor(bjvm_field_descriptor descriptor);
 bjvm_classdesc *must_create_class(bjvm_thread *thread, bjvm_utf8 name);
 bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
                                 bjvm_utf8 chars,

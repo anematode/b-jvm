@@ -48,176 +48,25 @@ static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   }
 }
 
-void free_field_descriptor(bjvm_field_descriptor descriptor);
-void free_method_descriptor(void *descriptor_);
-
-void free_constant_pool_entry(bjvm_cp_entry *entry) {
-  switch (entry->kind) {
-  case BJVM_CP_KIND_UTF8:
-    free_heap_str(entry->utf8);
-    break;
-  case BJVM_CP_KIND_FIELD_REF: {
-    bjvm_field_descriptor *desc = entry->field.parsed_descriptor;
-    free_field_descriptor(*desc);
-    free(desc);
-    break;
-  }
-  case BJVM_CP_KIND_INVOKE_DYNAMIC: {
-    free_method_descriptor(entry->indy_info.method_descriptor);
-    break;
-  }
-  case BJVM_CP_KIND_METHOD_REF:
-  case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    free_method_descriptor(entry->methodref.descriptor);
-    break;
-  }
-  case BJVM_CP_KIND_METHOD_TYPE: {
-    free_method_descriptor(entry->method_type.parsed_descriptor);
-    break;
-  }
-  default: // TODO will need to add more as we resolve descriptors
-    break;
-  }
-}
-
-void free_method(bjvm_cp_method *method);
-void free_field(bjvm_cp_field *field);
-
-void bjvm_free_constant_pool(bjvm_constant_pool *pool) {
-  if (!pool)
-    return;
-  for (int i = 0; i < pool->entries_len; ++i)
-    free_constant_pool_entry(&pool->entries[i]);
-  free(pool);
-}
-
-void free_bytecode_instruction(bjvm_bytecode_insn insn) {
-  switch (insn.kind) {
-  case bjvm_insn_tableswitch:
-    free(insn.tableswitch.targets);
-    break;
-  case bjvm_insn_lookupswitch:
-    free(insn.lookupswitch.keys);
-    free(insn.lookupswitch.targets);
-    break;
-  default:
-    break;
-  }
-}
-
-void bjvm_free_attribute(bjvm_attribute *attribute);
-
-void bjvm_free_code_attribute(bjvm_attribute_code *code) {
-  for (int i = 0; i < code->insn_count; ++i) {
-    free_bytecode_instruction(code->code[i]);
-  }
-  if (code->exception_table) {
-    free(code->exception_table->entries);
-    free(code->exception_table);
-  }
-  for (int i = 0; i < code->attributes_count; ++i) {
-    bjvm_free_attribute(code->attributes + i);
-  }
-  free(code->attributes);
-  free(code->code);
-}
-
-void bjvm_free_bootstrap_methods_attribute(
-    bjvm_attribute_bootstrap_methods *bm) {
-  for (int i = 0; i < bm->count; ++i) {
-    free(bm->methods[i].args);
-  }
-  free(bm->methods);
-}
-
-void bjvm_free_attribute(bjvm_attribute *attribute) {
-  switch (attribute->kind) {
-  case BJVM_ATTRIBUTE_KIND_CODE:
-    bjvm_free_code_attribute(&attribute->code);
-    break;
-  case BJVM_ATTRIBUTE_KIND_BOOTSTRAP_METHODS:
-    bjvm_free_bootstrap_methods_attribute(&attribute->bootstrap_methods);
-    break;
-  case BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE:
-    free(attribute->lnt.entries);
-    break;
-  case BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS:
-    free(attribute->method_parameters.params);
-    break;
-  case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
-    free(attribute->annotations.data);
-    break;
-  case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS:
-    free(attribute->type_annotations.data);
-    break;
-  case BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
-    free(attribute->parameter_annotations.data);
-    break;
-  case BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
-    free(attribute->annotation_default.data);
-    break;
-  case BJVM_ATTRIBUTE_KIND_CONSTANT_VALUE:
-  case BJVM_ATTRIBUTE_KIND_UNKNOWN:
-  case BJVM_ATTRIBUTE_KIND_ENCLOSING_METHOD:
-  case BJVM_ATTRIBUTE_KIND_SOURCE_FILE:
-  case BJVM_ATTRIBUTE_KIND_SIGNATURE:
-    break;
-  }
+void free_method(bjvm_cp_method *method) {
+  free_code_analysis(method->code_analysis);
+  free_wasm_compiled_method(method->compiled_method);
 }
 
 void bjvm_free_classfile(bjvm_classdesc cf) {
-  bjvm_free_constant_pool(cf.pool);
-  free(cf.interfaces);
-  for (int i = 0; i < cf.attributes_count; ++i)
-    bjvm_free_attribute(&cf.attributes[i]);
   for (int i = 0; i < cf.methods_count; ++i)
     free_method(&cf.methods[i]);
-  for (int i = 0; i < cf.fields_count; ++i)
-    free_field(&cf.fields[i]);
   free_heap_str(cf.name);
   free(cf.static_fields);
-  free(cf.fields);
-  free(cf.methods);
-  free(cf.attributes);
-  free(cf.indy_insns);
+  arrfree(cf.indy_insns);
   bjvm_free_compressed_bitset(cf.static_references);
   bjvm_free_compressed_bitset(cf.instance_references);
+  arena_uninit(&cf.arena);
 }
 
 bjvm_cp_entry *get_constant_pool_entry(bjvm_constant_pool *pool, int index) {
   assert(index >= 0 && index < pool->entries_len);
   return &pool->entries[index];
-}
-
-void free_field_descriptor(bjvm_field_descriptor descriptor) {
-  if (descriptor.base_kind == BJVM_TYPE_KIND_REFERENCE) {
-    free_heap_str(descriptor.class_name);
-  }
-}
-
-void free_field(bjvm_cp_field *field) {
-  for (int i = 0; i < field->attributes_count; ++i)
-    bjvm_free_attribute(&field->attributes[i]);
-  free_field_descriptor(field->parsed_descriptor);
-  free(field->attributes);
-}
-
-void free_method_descriptor(void *descriptor_) {
-  bjvm_method_descriptor *descriptor = descriptor_;
-  for (int i = 0; i < descriptor->args_count; ++i)
-    free_field_descriptor(descriptor->args[i]);
-  free_field_descriptor(descriptor->return_type);
-  free(descriptor->args);
-  free(descriptor);
-}
-
-void free_method(bjvm_cp_method *method) {
-  for (int i = 0; i < method->attributes_count; ++i)
-    bjvm_free_attribute(&method->attributes[i]);
-  free_code_analysis(method->code_analysis);
-  free_wasm_compiled_method(method->compiled_method);
-  free_method_descriptor(method->descriptor);
-  free(method->attributes);
 }
 
 typedef struct {
@@ -288,61 +137,17 @@ cf_byteslice reader_get_slice(cf_byteslice *reader, size_t len,
 }
 
 typedef struct {
-  // Free these pointers if a format error happens, to avoid memory leaks. Pairs
-  // of (void*, free_fn)
-  void **free_on_error;
-  int free_on_error_cap;
-  int free_on_error_count;
-
-  int current_code_max_pc;
-
   bjvm_constant_pool *cp;
+  arena *arena;
+  int current_code_max_pc;
 } bjvm_classfile_parse_ctx;
 
-/**
- * Used to unmark an otherwise to-be-freed pointer in the format-checking
- * context.
- */
-typedef struct {
-  bjvm_classfile_parse_ctx *ctx;
-  size_t offset;
-} ctx_free_ticket;
-
-void free_ticket(ctx_free_ticket ticket) {
-  ticket.ctx->free_on_error[ticket.offset] = nullptr;
-}
-
-#define PUSH_FREE                                                              \
-  *VECTOR_PUSH(ctx->free_on_error, ctx->free_on_error_count,                   \
-               ctx->free_on_error_cap)
-
-/**
- * Record that this pointer needs to be freed if we encounter a VerifyError
- * while parsing the classfile.
- */
-ctx_free_ticket free_on_format_error(bjvm_classfile_parse_ctx *ctx, void *ptr) {
-  if (!ctx)
-    return (ctx_free_ticket){};
-  PUSH_FREE = ptr;
-  PUSH_FREE = free;
-  return (ctx_free_ticket){.ctx = ctx, .offset = ctx->free_on_error_count - 2};
-}
-
-ctx_free_ticket complex_free_on_format_error(bjvm_classfile_parse_ctx *ctx,
-                                             void *ptr,
-                                             void (*free_fn)(void *)) {
-  if (!ctx)
-    return (ctx_free_ticket){};
-  PUSH_FREE = ptr;
-  PUSH_FREE = free_fn;
-  return (ctx_free_ticket){.ctx = ctx, .offset = ctx->free_on_error_count - 2};
-}
-
-#undef PUSH_FREE
-
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
-heap_string parse_modified_utf8(const uint8_t *bytes, int len) {
-  return make_heap_str_from((bjvm_utf8){.chars = (char *)bytes, .len = len});
+bjvm_utf8 parse_modified_utf8(const uint8_t *bytes, int len, arena *arena) {
+  char *result = arena_alloc(arena, len + 1, sizeof(char));
+  memcpy(result, bytes, len);
+  result[len] = '\0';
+  return (bjvm_utf8){.chars = result, .len = len};
 }
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
@@ -378,23 +183,16 @@ bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
 
 bjvm_utf8 checked_get_utf8(bjvm_constant_pool *pool, int index,
                            const char *reason) {
-  return hslc(checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8);
+  return checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8;
 }
-
-char *parse_field_descriptor(const char **chars, size_t len,
-                             bjvm_field_descriptor *result);
-char *parse_method_descriptor(const bjvm_utf8 descriptor,
-                              bjvm_method_descriptor *result);
 
 char *parse_complete_field_descriptor(const bjvm_utf8 entry,
                                       bjvm_field_descriptor *result,
                                       bjvm_classfile_parse_ctx *ctx) {
   const char *chars = entry.chars;
-  char *error = parse_field_descriptor(&chars, entry.len, result);
+  char *error = parse_field_descriptor(&chars, entry.len, result, ctx->arena);
   if (error)
     return error;
-  if (result->base_kind == BJVM_TYPE_KIND_REFERENCE)
-    free_on_format_error(ctx, result->class_name.chars);
   if (chars != entry.chars + entry.len) {
     char buf[64];
     snprintf(buf, sizeof(buf), "trailing character(s): '%c'", *chars);
@@ -526,14 +324,10 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
   case CONSTANT_Utf8: {
     uint16_t length = reader_next_u16(reader, "utf8 length");
     cf_byteslice bytes_reader = reader_get_slice(reader, length, "utf8 data");
-
-    heap_string utf8 = {0};
-
+    bjvm_utf8 utf8 = {nullptr};
     if (skip_linking) {
-      utf8 = parse_modified_utf8(bytes_reader.bytes, length);
-      free_on_format_error(ctx, utf8.chars);
+      utf8 = parse_modified_utf8(bytes_reader.bytes, length, ctx->arena);
     }
-
     return (bjvm_cp_entry){.kind = BJVM_CP_KIND_UTF8, .utf8 = utf8};
   }
   case CONSTANT_MethodHandle: {
@@ -583,8 +377,8 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
   }
 }
 
-bjvm_constant_pool *init_constant_pool(uint16_t count) {
-  bjvm_constant_pool *pool = calloc(1, sizeof(bjvm_constant_pool) +
+bjvm_constant_pool *init_constant_pool(uint16_t count, arena *arena) {
+  bjvm_constant_pool *pool = arena_alloc(arena, 1, sizeof(bjvm_constant_pool) +
                                            (count + 1) * sizeof(bjvm_cp_entry));
   pool->entries_len = count + 1;
   return pool;
@@ -598,9 +392,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     bjvm_cp_name_and_type *name_and_type = entry->field.nat;
 
     entry->field.parsed_descriptor = parsed_descriptor =
-        calloc(1, sizeof(bjvm_field_descriptor));
-    free_on_format_error(ctx, parsed_descriptor);
-
+        arena_alloc(ctx->arena, 1, sizeof(bjvm_field_descriptor));
     char *error = parse_complete_field_descriptor(name_and_type->descriptor,
                                                   parsed_descriptor, ctx);
     if (error)
@@ -608,10 +400,9 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_INVOKE_DYNAMIC: {
-    bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
-    free_on_format_error(ctx, desc);
+    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
     char *error = parse_method_descriptor(
-        entry->indy_info.name_and_type->descriptor, desc);
+        entry->indy_info.name_and_type->descriptor, desc, ctx->arena);
     if (error)
       format_error_dynamic(error);
     entry->indy_info.method_descriptor = desc;
@@ -619,11 +410,10 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
-    free_on_format_error(ctx, desc);
+    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
     bjvm_cp_name_and_type *nat = entry->methodref.nat;
     char *error = parse_method_descriptor(nat->descriptor,
-                                          desc); // TODO free on FormatError
+                                          desc, ctx->arena);
     if (error) {
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%.*s' has invalid descriptor '%.*s': %s",
@@ -634,10 +424,9 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
-    bjvm_method_descriptor *desc = malloc(sizeof(bjvm_method_descriptor));
-    free_on_format_error(ctx, desc);
+    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
     char *error = parse_method_descriptor(entry->method_type.descriptor,
-                                          desc); // TODO free on FormatError
+                                          desc, ctx->arena);
     if (error)
       format_error_dynamic(error);
     entry->method_type.parsed_descriptor = desc;
@@ -656,9 +445,8 @@ bjvm_constant_pool *parse_constant_pool(cf_byteslice *reader,
                                         bjvm_classfile_parse_ctx *ctx) {
   uint16_t cp_count = reader_next_u16(reader, "constant pool count");
 
-  bjvm_constant_pool *pool = init_constant_pool(cp_count);
+  bjvm_constant_pool *pool = init_constant_pool(cp_count, ctx->arena);
   ctx->cp = pool;
-  free_on_format_error(ctx, pool);
 
   get_constant_pool_entry(pool, 0)->kind =
       BJVM_CP_KIND_INVALID; // entry at 0 is always invalid
@@ -725,12 +513,11 @@ bjvm_bytecode_insn parse_tableswitch_insn(cf_byteslice *reader, int pc,
     format_error_static("tableswitch high < low");
   }
 
-  int *targets = malloc(targets_count * sizeof(int));
+  int *targets = arena_alloc(ctx->arena, targets_count, sizeof(int));
   for (int i = 0; i < targets_count; ++i) {
     targets[i] = checked_pc(original_pc,
                             reader_next_i32(reader, "tableswitch target"), ctx);
   }
-  free_on_format_error(ctx, targets);
   return (bjvm_bytecode_insn){.kind = bjvm_insn_tableswitch,
                               .original_pc = original_pc,
                               .tableswitch = {.default_target = default_target,
@@ -756,10 +543,8 @@ bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
     format_error_static("lookupswitch instruction is too large");
   }
 
-  int *keys = malloc(pairs_count * sizeof(int));
-  int *targets = malloc(pairs_count * sizeof(int));
-  free_on_format_error(ctx, keys);
-  free_on_format_error(ctx, targets);
+  int *keys = arena_alloc(ctx->arena, pairs_count, sizeof(int));
+  int *targets = arena_alloc(ctx->arena, pairs_count, sizeof(int));
 
   for (int i = 0; i < pairs_count; ++i) {
     keys[i] = reader_next_i32(reader, "lookupswitch key");
@@ -1705,8 +1490,8 @@ void parse_bootstrap_methods_attribute(cf_byteslice attr_reader,
   uint16_t count = attr->bootstrap_methods.count =
       reader_next_u16(&attr_reader, "bootstrap methods count");
   bjvm_bootstrap_method *methods = attr->bootstrap_methods.methods =
-      calloc(count, sizeof(bjvm_bootstrap_method));
-  free_on_format_error(ctx, methods);
+      arena_alloc(ctx->arena, count, sizeof(bjvm_bootstrap_method));
+
   for (int i = 0; i < count; ++i) {
     bjvm_bootstrap_method *method = methods + i;
     method->ref =
@@ -1717,8 +1502,7 @@ void parse_bootstrap_methods_attribute(cf_byteslice attr_reader,
     uint16_t arg_count =
         reader_next_u16(&attr_reader, "bootstrap method arg count");
     method->args_count = arg_count;
-    method->args = calloc(arg_count, sizeof(bjvm_cp_entry *));
-    free_on_format_error(ctx, method->args);
+    method->args = arena_alloc(ctx->arena, arg_count, sizeof(bjvm_cp_entry *));
     for (int j = 0; j < arg_count; ++j) {
       const int allowed = BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER |
                           BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_LONG |
@@ -1744,15 +1528,13 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
 
   cf_byteslice code_reader =
       reader_get_slice(&attr_reader, code_length, "code");
-  bjvm_bytecode_insn *code = malloc(code_length * sizeof(bjvm_bytecode_insn));
+  bjvm_bytecode_insn *code = arena_alloc(ctx->arena, code_length, sizeof(bjvm_bytecode_insn));
 
-  free_on_format_error(ctx, code);
   ctx->current_code_max_pc = code_length;
 
   int *pc_to_insn =
       malloc(code_length *
              sizeof(int)); // -1 = no corresponding instruction to that PC
-  ctx_free_ticket ticket = free_on_format_error(ctx, pc_to_insn);
   memset(pc_to_insn, -1, code_length * sizeof(int));
 
   int insn_count = 0;
@@ -1769,11 +1551,9 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
       reader_next_u16(&attr_reader, "exception table length");
   bjvm_attribute_exception_table *table = nullptr;
   if (exception_table_length) {
-    table = calloc(1, sizeof(bjvm_attribute_exception_table));
-    free_on_format_error(ctx, table);
-    table->entries = calloc(table->entries_count = exception_table_length,
+    table = arena_alloc(ctx->arena, 1, sizeof(bjvm_attribute_exception_table));
+    table->entries = arena_alloc(ctx->arena, table->entries_count = exception_table_length,
                             sizeof(bjvm_exception_table_entry));
-    free_on_format_error(ctx, table->entries);
 
     for (int i = 0; i < exception_table_length; ++i) {
       bjvm_exception_table_entry *ent = table->entries + i;
@@ -1806,12 +1586,11 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
   }
 
   free(pc_to_insn);
-  free_ticket(ticket);
 
   uint16_t attributes_count =
       reader_next_u16(&attr_reader, "code attributes count");
   bjvm_attribute *attributes =
-      malloc(attributes_count * sizeof(bjvm_attribute));
+      arena_alloc(ctx->arena, attributes_count, sizeof(bjvm_attribute));
 
   bjvm_attribute_line_number_table *lnt = NULL;
   for (int i = 0; i < attributes_count; ++i) {
@@ -1873,18 +1652,15 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   } else if (utf8_equals(attr->name, "SourceFile")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_SOURCE_FILE;
     attr->source_file.name =
-        hslc(checked_cp_entry(
+        checked_cp_entry(
                  ctx->cp, reader_next_u16(&attr_reader, "source file index"),
                  BJVM_CP_KIND_UTF8, "source file")
-                 ->utf8);
+                 ->utf8;
   } else if (utf8_equals(attr->name, "LineNumberTable")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE;
     uint16_t count = attr->lnt.entry_count =
         reader_next_u16(&attr_reader, "line number table count");
-
-    attr->lnt.entries = calloc(count, sizeof(bjvm_line_number_table_entry));
-    free_on_format_error(ctx, attr->lnt.entries);
-
+    attr->lnt.entries = arena_alloc(ctx->arena, count, sizeof(bjvm_line_number_table_entry));
     for (int i = 0; i < count; ++i) {
       bjvm_line_number_table_entry *entry = attr->lnt.entries + i;
       entry->start_pc = reader_next_u16(&attr_reader, "line number start pc");
@@ -1895,8 +1671,8 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     int count = attr->method_parameters.count =
         reader_next_u8(&attr_reader, "method parameters count");
     bjvm_method_parameter_info *params = attr->method_parameters.params =
-        calloc(count, sizeof(bjvm_method_parameter_info));
-    free_on_format_error(ctx, params);
+        arena_alloc(ctx->arena, count, sizeof(bjvm_method_parameter_info));
+
     for (int i = 0; i < count; ++i) {
       params[i].name = checked_get_utf8(
           ctx->cp, reader_next_u16(&attr_reader, "method parameter name"),
@@ -1907,8 +1683,7 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
 #define BYTE_ARRAY_ANNOTATION(attr_kind, union_member)                         \
   attr->kind = attr_kind;                                                      \
-  uint8_t *data = attr->annotations.data = malloc(attr_reader.len);            \
-  free_on_format_error(ctx, data);                                             \
+  uint8_t *data = attr->annotations.data = arena_alloc(ctx->arena, attr_reader.len, sizeof(uint8_t));            \
   memcpy(data, attr_reader.bytes, attr_reader.len);                            \
   attr->annotations.length = attr_reader.len;
 
@@ -1947,18 +1722,13 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
       checked_get_utf8(ctx->cp, reader_next_u16(reader, "method descriptor"),
                        "method descriptor");
   method.attributes_count = reader_next_u16(reader, "method attributes count");
-
-  method.attributes = malloc(method.attributes_count * sizeof(bjvm_attribute));
-  free_on_format_error(ctx, method.attributes);
-
-  method.descriptor = calloc(1, sizeof(bjvm_method_descriptor));
+  method.attributes = arena_alloc(ctx->arena, method.attributes_count, sizeof(bjvm_attribute));
+  method.descriptor = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
   char *error =
-      parse_method_descriptor(method.unparsed_descriptor, method.descriptor);
+      parse_method_descriptor(method.unparsed_descriptor, method.descriptor, ctx->arena);
   if (error) {
-    free(method.descriptor);
     format_error_dynamic(error);
   }
-  complex_free_on_format_error(ctx, method.descriptor, free_method_descriptor);
 
   for (int i = 0; i < method.attributes_count; i++) {
     bjvm_attribute *attrib = &method.attributes[i];
@@ -1980,8 +1750,7 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
           checked_get_utf8(ctx->cp, reader_next_u16(reader, "field descriptor"),
                            "field descriptor"),
       .attributes_count = reader_next_u16(reader, "field attributes count")};
-  field.attributes = calloc(field.attributes_count, sizeof(bjvm_attribute));
-  free_on_format_error(ctx, field.attributes);
+  field.attributes = arena_alloc(ctx->arena, field.attributes_count, sizeof(bjvm_attribute));
 
   for (int i = 0; i < field.attributes_count; i++) {
     parse_attribute(reader, ctx, field.attributes + i);
@@ -2001,46 +1770,28 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
  * if there was an error.
  */
 char *parse_field_descriptor(const char **chars, size_t len,
-                             bjvm_field_descriptor *result) {
+                             bjvm_field_descriptor *result, arena *arena) {
   const char *end = *chars + len;
   int dimensions = 0;
   while (*chars < end) {
     result->dimensions = dimensions;
     if (dimensions > 255)
       return strdup("too many dimensions (max 255)");
-    char c = **chars;
-    (*chars)++;
+    char c = *(*chars)++;
     switch (c) {
     case 'B':
-      result->base_kind = BJVM_TYPE_KIND_BYTE;
-      return nullptr;
     case 'C':
-      result->base_kind = BJVM_TYPE_KIND_CHAR;
-      return nullptr;
     case 'D':
-      result->base_kind = BJVM_TYPE_KIND_DOUBLE;
-      return nullptr;
     case 'F':
-      result->base_kind = BJVM_TYPE_KIND_FLOAT;
-      return nullptr;
     case 'I':
-      result->base_kind = BJVM_TYPE_KIND_INT;
-      return nullptr;
     case 'J':
-      result->base_kind = BJVM_TYPE_KIND_LONG;
-      return nullptr;
     case 'S':
-      result->base_kind = BJVM_TYPE_KIND_SHORT;
-      return nullptr;
     case 'Z':
-      result->base_kind = BJVM_TYPE_KIND_BOOLEAN;
-      return nullptr;
-    case 'V': {
-      result->base_kind = BJVM_TYPE_KIND_VOID;
-      if (dimensions > 0)
+    case 'V':
+      result->base_kind = (bjvm_type_kind)c;
+      if (c == 'V' && dimensions > 0)
         return strdup("void cannot have dimensions");
-      return nullptr; // lol, check this later
-    }
+      return nullptr;
     case '[':
       ++dimensions;
       break;
@@ -2050,14 +1801,13 @@ char *parse_field_descriptor(const char **chars, size_t len,
         ++*chars;
       if (*chars == end)
         return strdup("missing ';' in reference type");
-      size_t class_name_len = *chars - start;
+      int class_name_len = *chars - start;
       if (class_name_len == 0) {
         return strdup("missing reference type name");
       }
       ++*chars;
       result->base_kind = BJVM_TYPE_KIND_REFERENCE;
-      result->class_name = make_heap_str_from(
-          (bjvm_utf8){.chars = (char *)start, .len = class_name_len});
+      result->class_name = arena_make_str(arena, start, class_name_len);
       return nullptr;
     }
     default: {
@@ -2074,15 +1824,11 @@ char *parse_field_descriptor(const char **chars, size_t len,
 }
 
 char *err_while_parsing_md(bjvm_method_descriptor *result, char *error) {
-  for (int i = 0; i < result->args_count; ++i) {
-    free_field_descriptor(result->args[i]);
-  }
-  free(result->args);
   return error;
 }
 
 char *parse_method_descriptor(const bjvm_utf8 entry,
-                              bjvm_method_descriptor *result) {
+                              bjvm_method_descriptor *result, arena *arena) {
   // MethodDescriptor:
   // ( { ParameterDescriptor } )
   // ParameterDescriptor:
@@ -2091,25 +1837,28 @@ char *parse_method_descriptor(const bjvm_utf8 entry,
   const char *chars = entry.chars, *end = chars + len;
   if (len < 1 || *chars++ != '(')
     return strdup("Expected '('");
-  result->args = nullptr;
   result->args_cap = result->args_count = 0;
+  bjvm_field_descriptor *fields = nullptr;
   while (chars < end && *chars != ')') {
     bjvm_field_descriptor arg;
 
-    char *error = parse_field_descriptor(&chars, end - chars, &arg);
+    char *error = parse_field_descriptor(&chars, end - chars, &arg, arena);
     if (error || arg.base_kind == BJVM_TYPE_KIND_VOID)
       return err_while_parsing_md(
           result, error ? error : strdup("void as method parameter"));
 
-    *VECTOR_PUSH(result->args, result->args_count, result->args_cap) = arg;
+    *VECTOR_PUSH(fields, result->args_count, result->args_cap) = arg;
   }
-  if (chars >= end)
-    return err_while_parsing_md(result,
-                                strdup("missing ')' in method descriptor"));
+  result->args = arena_alloc(arena, result->args_count, sizeof(bjvm_field_descriptor));
+  memcpy(result->args, fields, result->args_count * sizeof(bjvm_field_descriptor));
+  free(fields);
+  if (chars >= end) {
+    return strdup("missing ')' in method descriptor");
+  }
   chars++; // skip ')'
   char *error =
-      parse_field_descriptor(&chars, end - chars, &result->return_type);
-  return error ? err_while_parsing_md(result, error) : nullptr;
+      parse_field_descriptor(&chars, end - chars, &result->return_type, arena);
+  return error;
 }
 
 // Go through the InvokeDynamic entries and link their bootstrap method pointers
@@ -2128,29 +1877,24 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
 }
 
 parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
-                                    bjvm_classdesc *result) {
+                                    bjvm_classdesc *result, heap_string *error) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
-  bjvm_classfile_parse_ctx ctx = {.free_on_error = nullptr,
-                                  .free_on_error_count = 0,
-                                  .free_on_error_cap = 0,
+  arena_init(&cf->arena);
+  bjvm_classfile_parse_ctx ctx = {.arena = &cf->arena,
                                   .cp = nullptr};
 
   if (setjmp(format_error_jmp_buf)) {
-    for (int i = 0; i < ctx.free_on_error_count; i += 2) {
-      void *to_free = ctx.free_on_error[i];
-      if (to_free) {
-        void (*free_fn)(void *) = ctx.free_on_error[i + 1];
-        free_fn(to_free);
-      }
+    arena_uninit(&cf->arena);  // clean up our shit
+    if (error) {
+      *error = make_heap_str_from((bjvm_utf8) {
+        .chars = format_error_msg,
+        .len = strlen(format_error_msg)});
     }
-
-    free(ctx.free_on_error);
     if (format_error_needs_free)
       free(format_error_msg);
     assert(format_error_msg);
     result->state = BJVM_CD_STATE_LINKAGE_ERROR;
-    // todo: get rid of format_error
     return PARSE_ERR;
   }
 
@@ -2195,8 +1939,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse superinterfaces
   cf->interfaces_count = reader_next_u16(&reader, "interfaces count");
-  cf->interfaces = malloc(cf->interfaces_count * sizeof(bjvm_cp_class_info *));
-  free_on_format_error(&ctx, cf->interfaces);
+  cf->interfaces = arena_alloc(ctx.arena, cf->interfaces_count, sizeof(bjvm_cp_class_info *));
+
   for (int i = 0; i < cf->interfaces_count; i++) {
     cf->interfaces[i] =
         &checked_cp_entry(cf->pool, reader_next_u16(&reader, "interface"),
@@ -2206,8 +1950,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse fields
   cf->fields_count = reader_next_u16(&reader, "fields count");
-  cf->fields = malloc(cf->fields_count * sizeof(bjvm_cp_field));
-  free_on_format_error(&ctx, cf->fields);
+  cf->fields = arena_alloc(ctx.arena, cf->fields_count, sizeof(bjvm_cp_field));
   for (int i = 0; i < cf->fields_count; i++) {
     cf->fields[i] = read_field(&reader, &ctx);
     cf->fields[i].my_class = result;
@@ -2218,12 +1961,10 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse methods
   cf->methods_count = reader_next_u16(&reader, "methods count");
-  cf->methods = malloc(cf->methods_count * sizeof(bjvm_cp_method));
-  free_on_format_error(&ctx, cf->methods);
+  cf->methods = arena_alloc(ctx.arena, cf->methods_count, sizeof(bjvm_cp_method));
 
   cf->bootstrap_methods = nullptr;
   cf->indy_insns = nullptr;
-  cf->indy_insns_count = 0;
 
   bool in_MethodHandle =
       utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle");
@@ -2240,8 +1981,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse attributes
   cf->attributes_count = reader_next_u16(&reader, "class attributes count");
-  cf->attributes = malloc(cf->attributes_count * sizeof(bjvm_attribute));
-  free_on_format_error(&ctx, cf->attributes);
+  cf->attributes = arena_alloc(ctx.arena, cf->attributes_count, sizeof(bjvm_attribute));
   for (int i = 0; i < cf->attributes_count; i++) {
     bjvm_attribute *attr = cf->attributes + i;
     parse_attribute(&reader, &ctx, attr);
@@ -2254,12 +1994,9 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
   }
 
   link_bootstrap_methods(cf);
-
   result->state = BJVM_CD_STATE_LOADED;
-  free(ctx.free_on_error); // we made it :)
 
   // Add indy instruction pointers
-  int indy_insns_cap = 0;
   for (int i = 0; i < cf->methods_count; ++i) {
     bjvm_cp_method *method = cf->methods + i;
     if (method->code) {
@@ -2267,8 +2004,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
       for (int j = 0; j < method->code->insn_count; ++j) {
         bjvm_bytecode_insn *insn = method->code->code + j;
         if (insn->kind == bjvm_insn_invokedynamic) {
-          *VECTOR_PUSH(cf->indy_insns, cf->indy_insns_count, indy_insns_cap) =
-              insn;
+          arrput(cf->indy_insns, insn);
         }
       }
     }

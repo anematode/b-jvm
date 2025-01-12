@@ -19,9 +19,6 @@ typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
                                    const char *reason);
 
-char *parse_field_descriptor(const char **chars, size_t len,
-                             bjvm_field_descriptor *result);
-
 /**
  * Instruction code. Similar instructions like aload_0 are canonicalised to
  * aload with an argument of 0.
@@ -309,7 +306,7 @@ struct bjvm_field_descriptor {
   bjvm_type_kind base_kind;
   // Can be nonzero for any kind
   int dimensions;
-  heap_string class_name; // For reference and array types only
+  bjvm_utf8 class_name; // For reference and array types only
 };
 
 typedef struct bjvm_cp_field bjvm_cp_field;
@@ -406,7 +403,7 @@ typedef struct bjvm_cp_entry {
   int my_index;
 
   union {
-    heap_string utf8;
+    bjvm_utf8 utf8;
     bjvm_cp_string_info string;
 
     bjvm_cp_floating_info floating;
@@ -761,16 +758,23 @@ typedef struct bjvm_classdesc {
   int dimensions;                     // array types only
   bjvm_type_kind primitive_component; // primitives and array types only
 
-  int indy_insns_count;
-  bjvm_bytecode_insn **indy_insns; // used to get GC roots
+  bjvm_bytecode_insn **indy_insns; // used to get GC roots to CallSites
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
 
   bjvm_vtable vtable;
   bjvm_itables itables;
+
+  arena arena;  // most things are allocated in here
 } bjvm_classdesc;
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
+
+char *parse_field_descriptor(const char **chars, size_t len,
+                             bjvm_field_descriptor *result, arena *arena);
+char *parse_method_descriptor(const bjvm_utf8 entry,
+                              bjvm_method_descriptor *result, arena *arena);
+
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
 
@@ -783,11 +787,9 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @param bytes Start byte of the classfile.
  * @param len Length of the classfile in bytes.
  * @param result Where to write the result.
- * @return nullptr on success, otherwise an error message (which is the caller's
- * responsibility to free).
  */
 parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
-                                    bjvm_classdesc *result);
+                                    bjvm_classdesc *result, heap_string *error);
 
 #ifdef __cplusplus
 }

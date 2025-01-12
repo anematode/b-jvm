@@ -201,7 +201,7 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass,
 
   bjvm_classdesc *cd = calloc(1, sizeof(bjvm_classdesc));
   // Pre-parse to get the name of the class
-  bjvm_parse_classfile(bytes, length, cd);
+  bjvm_parse_classfile(bytes, length, cd, nullptr);
 
   INIT_STACK_STRING(random_name, 1000);
   random_name =

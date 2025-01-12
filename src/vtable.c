@@ -84,7 +84,7 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
                          bjvm_classdesc *classdesc) {
   INIT_STACK_STRING(scratch, 1024);
   assert(dst->interface == src->interface);
-  assert(dst->method_count == src->method_count);
+  assert(arrlen(dst->methods) == arrlen(src->methods));
   for (int i = 0; i < arrlen(src->methods); ++i) {
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
     assert(s != 0 && "i-table method must not be null");
@@ -207,7 +207,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
   }
 
   // make sure the lookup vector and the result vector have the same length
-  assert(itables->interface_count == itables->entries_count);
+  assert(arrlen(itables->interfaces) == arrlen(itables->entries));
   bjvm_free_hash_table(ambiguous);
 }
 
@@ -274,7 +274,7 @@ void bjvm_free_function_tables(bjvm_classdesc *classdesc) {
 }
 
 bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc *classdesc, int index) {
-  assert(index >= 0 && index < classdesc->vtable.method_count &&
+  assert(index >= 0 && index < arrlen(classdesc->vtable.methods) &&
          "vtable index out of range");
   return classdesc->vtable.methods[index];
 }
@@ -284,7 +284,7 @@ bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc *classdesc,
   for (int i = 0; i < arrlen(classdesc->itables.interfaces); ++i) {
     if (classdesc->itables.interfaces[i] == interface) {
       bjvm_itable itable = classdesc->itables.entries[i];
-      assert(index >= 0 && index < itable.method_count &&
+      assert(index >= 0 && index < arrlen(itable.methods) &&
              "itable index out of range");
       bjvm_itable_method_t m = itable.methods[index];
       if (m & BJVM_ITABLE_METHOD_BIT_INVALID) {
