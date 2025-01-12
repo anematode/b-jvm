@@ -283,11 +283,11 @@ bjvm_cp_method *bjvm_get_frame_method(bjvm_stack_frame *frame);
 bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame);
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm* vm, int index);
+bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm *vm, int index);
 EMSCRIPTEN_KEEPALIVE
-int bjvm_make_js_handle(bjvm_vm* vm, bjvm_obj_header *obj);
+int bjvm_make_js_handle(bjvm_vm *vm, bjvm_obj_header *obj);
 EMSCRIPTEN_KEEPALIVE
-void bjvm_drop_js_handle(bjvm_vm* vm, int index);
+void bjvm_drop_js_handle(bjvm_vm *vm, int index);
 
 typedef struct bjvm_thread {
   // Global VM corresponding to this thread
@@ -387,10 +387,9 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 void bjvm_free_vm(bjvm_vm *vm);
 
 bjvm_classdesc *must_create_class(bjvm_thread *thread, bjvm_utf8 name);
-bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
-                                bjvm_utf8 chars,
-                                const uint8_t *classfile_bytes,
-                                size_t classfile_len);
+bjvm_classdesc *bjvm_define_class(bjvm_thread *thread, bjvm_utf8 chars,
+                                  const uint8_t *classfile_bytes,
+                                  size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
                                    const bjvm_utf8 name,

@@ -54,9 +54,7 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
   return existing_buf;
 }
 
-void arena_init(arena *a) {
-  a->begin = nullptr;
-}
+void arena_init(arena *a) { a->begin = nullptr; }
 
 const size_t ARENA_REGION_BYTES = 1 << 12;
 void *arena_alloc(arena *a, size_t count, size_t bytes) {
@@ -85,7 +83,7 @@ void *arena_alloc(arena *a, size_t count, size_t bytes) {
 }
 
 bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len) {
-  char* copy = arena_alloc(a, len + 1, sizeof(char));
+  char *copy = arena_alloc(a, len + 1, sizeof(char));
   memcpy(copy, bytes, len);
   copy[len] = '\0';
   return (bjvm_utf8){.chars = copy, .len = len};
@@ -164,14 +162,14 @@ void bjvm_string_builder_init(bjvm_string_builder *builder) {
 }
 
 void bjvm_string_builder_append(bjvm_string_builder *builder, const char *fmt,
-    ...) {
+                                ...) {
   va_list args;
   va_start(args, fmt);
   int len = vsnprintf(nullptr, 0, fmt, args);
   va_end(args);
 
   bool is_first = !builder->data;
-  char* write = arraddnptr(builder->data, len + is_first);
+  char *write = arraddnptr(builder->data, len + is_first);
   write -= !is_first;
   va_start(args, fmt);
   vsnprintf(write, len + 1, fmt, args);

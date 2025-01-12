@@ -7,20 +7,20 @@
 
 #include "util.h"
 
+#include "../vendor/stb_ds.h"
+#include <limits.h>
+#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdalign.h>
-#include <limits.h>
-#include "../vendor/stb_ds.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct arena_region {
-  struct arena_region *next;  // null if final segment
+  struct arena_region *next; // null if final segment
   size_t used, capacity;
-  __attribute((aligned (8))) char data[];
+  __attribute((aligned(8))) char data[];
 } arena_region;
 
 typedef struct {
@@ -28,8 +28,8 @@ typedef struct {
 } arena;
 
 void arena_init(arena *a);
-__attribute__((malloc, alloc_size(2, 3)))
-void *arena_alloc(arena *a, size_t count, size_t bytes);
+__attribute__((malloc, alloc_size(2, 3))) void *
+arena_alloc(arena *a, size_t count, size_t bytes);
 bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len);
 void arena_uninit(arena *a);
 
@@ -82,13 +82,14 @@ typedef struct bjvm_string_hash_table {
 } bjvm_string_hash_table;
 
 typedef struct bjvm_string_builder {
-  char* data;
+  char *data;
   int write_pos;
 } bjvm_string_builder;
 
-void bjvm_string_builder_init(bjvm_string_builder* builder);
-void bjvm_string_builder_append(bjvm_string_builder* builder, const char* fmt, ...);
-void bjvm_string_builder_free(bjvm_string_builder* builder);
+void bjvm_string_builder_init(bjvm_string_builder *builder);
+void bjvm_string_builder_append(bjvm_string_builder *builder, const char *fmt,
+                                ...);
+void bjvm_string_builder_free(bjvm_string_builder *builder);
 
 bjvm_string_hash_table bjvm_make_hash_table(void (*free_fn)(void *),
                                             double load_factor,

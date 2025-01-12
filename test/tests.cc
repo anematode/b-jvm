@@ -64,7 +64,8 @@ TEST_CASE("Test classfile parsing") {
 
     // std::cout << "Reading " << file << "\n";
     bjvm_classdesc cf = {};
-    parse_result_t error = bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
+    parse_result_t error =
+        bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
     if (error != PARSE_SUCCESS) {
       std::cerr << "Error parsing classfile: " << error << '\n';
       // abort();
@@ -168,19 +169,20 @@ TEST_CASE("parse_field_descriptor valid cases") {
   arena arena;
   arena_init(&arena);
 
-  REQUIRE(
-      !parse_field_descriptor(&fields, strlen(fields), &com_example_Example, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &com_example_Example,
+                                  &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Iaaa, &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Jaa, &arena));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_String, &arena));
-  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_Object, &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_String,
+                                  &arena));
+  REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &java_lang_Object,
+                                  &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &B, &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &V, &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &C, &arena));
   REQUIRE(!parse_field_descriptor(&fields, strlen(fields), &Z, &arena));
 
-  REQUIRE(
-      utf8_equals(com_example_Example.class_name, "com/example/Example"));
+  REQUIRE(utf8_equals(com_example_Example.class_name, "com/example/Example"));
   REQUIRE(com_example_Example.dimensions == 0);
   REQUIRE(com_example_Example.base_kind == BJVM_TYPE_KIND_REFERENCE);
 
@@ -508,7 +510,8 @@ TEST_CASE("JSON tests") {
 
 TEST_CASE("ArrayStoreException") {
   auto result = run_test_case("test_files/array_store/", true, "ArrayStore");
-  REQUIRE(result.stdout_ == "java.lang.ArrayStoreException: Bus\n\tat ArrayStore.main(ArrayStore.java:10)\n");
+  REQUIRE(result.stdout_ == "java.lang.ArrayStoreException: Bus\n\tat "
+                            "ArrayStore.main(ArrayStore.java:10)\n");
 }
 
 #if 0
@@ -519,6 +522,5 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 #endif
 
 TEST_CASE("Playground") {
-  auto result =
-  run_test_case("test_files/playground", false);
+  auto result = run_test_case("test_files/playground", false);
 }

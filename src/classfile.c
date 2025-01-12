@@ -378,8 +378,9 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 }
 
 bjvm_constant_pool *init_constant_pool(uint16_t count, arena *arena) {
-  bjvm_constant_pool *pool = arena_alloc(arena, 1, sizeof(bjvm_constant_pool) +
-                                           (count + 1) * sizeof(bjvm_cp_entry));
+  bjvm_constant_pool *pool = arena_alloc(
+      arena, 1,
+      sizeof(bjvm_constant_pool) + (count + 1) * sizeof(bjvm_cp_entry));
   pool->entries_len = count + 1;
   return pool;
 }
@@ -400,7 +401,8 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_INVOKE_DYNAMIC: {
-    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
+    bjvm_method_descriptor *desc =
+        arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
     char *error = parse_method_descriptor(
         entry->indy_info.name_and_type->descriptor, desc, ctx->arena);
     if (error)
@@ -410,10 +412,10 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
   }
   case BJVM_CP_KIND_METHOD_REF:
   case BJVM_CP_KIND_INTERFACE_METHOD_REF: {
-    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
+    bjvm_method_descriptor *desc =
+        arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
     bjvm_cp_name_and_type *nat = entry->methodref.nat;
-    char *error = parse_method_descriptor(nat->descriptor,
-                                          desc, ctx->arena);
+    char *error = parse_method_descriptor(nat->descriptor, desc, ctx->arena);
     if (error) {
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%.*s' has invalid descriptor '%.*s': %s",
@@ -424,9 +426,10 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
     break;
   }
   case BJVM_CP_KIND_METHOD_TYPE: {
-    bjvm_method_descriptor *desc = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
-    char *error = parse_method_descriptor(entry->method_type.descriptor,
-                                          desc, ctx->arena);
+    bjvm_method_descriptor *desc =
+        arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
+    char *error = parse_method_descriptor(entry->method_type.descriptor, desc,
+                                          ctx->arena);
     if (error)
       format_error_dynamic(error);
     entry->method_type.parsed_descriptor = desc;
@@ -1528,7 +1531,8 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
 
   cf_byteslice code_reader =
       reader_get_slice(&attr_reader, code_length, "code");
-  bjvm_bytecode_insn *code = arena_alloc(ctx->arena, code_length, sizeof(bjvm_bytecode_insn));
+  bjvm_bytecode_insn *code =
+      arena_alloc(ctx->arena, code_length, sizeof(bjvm_bytecode_insn));
 
   ctx->current_code_max_pc = code_length;
 
@@ -1552,8 +1556,9 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
   bjvm_attribute_exception_table *table = nullptr;
   if (exception_table_length) {
     table = arena_alloc(ctx->arena, 1, sizeof(bjvm_attribute_exception_table));
-    table->entries = arena_alloc(ctx->arena, table->entries_count = exception_table_length,
-                            sizeof(bjvm_exception_table_entry));
+    table->entries =
+        arena_alloc(ctx->arena, table->entries_count = exception_table_length,
+                    sizeof(bjvm_exception_table_entry));
 
     for (int i = 0; i < exception_table_length; ++i) {
       bjvm_exception_table_entry *ent = table->entries + i;
@@ -1652,15 +1657,16 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   } else if (utf8_equals(attr->name, "SourceFile")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_SOURCE_FILE;
     attr->source_file.name =
-        checked_cp_entry(
-                 ctx->cp, reader_next_u16(&attr_reader, "source file index"),
-                 BJVM_CP_KIND_UTF8, "source file")
-                 ->utf8;
+        checked_cp_entry(ctx->cp,
+                         reader_next_u16(&attr_reader, "source file index"),
+                         BJVM_CP_KIND_UTF8, "source file")
+            ->utf8;
   } else if (utf8_equals(attr->name, "LineNumberTable")) {
     attr->kind = BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE;
     uint16_t count = attr->lnt.entry_count =
         reader_next_u16(&attr_reader, "line number table count");
-    attr->lnt.entries = arena_alloc(ctx->arena, count, sizeof(bjvm_line_number_table_entry));
+    attr->lnt.entries =
+        arena_alloc(ctx->arena, count, sizeof(bjvm_line_number_table_entry));
     for (int i = 0; i < count; ++i) {
       bjvm_line_number_table_entry *entry = attr->lnt.entries + i;
       entry->start_pc = reader_next_u16(&attr_reader, "line number start pc");
@@ -1683,7 +1689,8 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   } else if (utf8_equals(attr->name, "RuntimeVisibleAnnotations")) {
 #define BYTE_ARRAY_ANNOTATION(attr_kind, union_member)                         \
   attr->kind = attr_kind;                                                      \
-  uint8_t *data = attr->annotations.data = arena_alloc(ctx->arena, attr_reader.len, sizeof(uint8_t));            \
+  uint8_t *data = attr->annotations.data =                                     \
+      arena_alloc(ctx->arena, attr_reader.len, sizeof(uint8_t));               \
   memcpy(data, attr_reader.bytes, attr_reader.len);                            \
   attr->annotations.length = attr_reader.len;
 
@@ -1722,10 +1729,12 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
       checked_get_utf8(ctx->cp, reader_next_u16(reader, "method descriptor"),
                        "method descriptor");
   method.attributes_count = reader_next_u16(reader, "method attributes count");
-  method.attributes = arena_alloc(ctx->arena, method.attributes_count, sizeof(bjvm_attribute));
-  method.descriptor = arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
-  char *error =
-      parse_method_descriptor(method.unparsed_descriptor, method.descriptor, ctx->arena);
+  method.attributes =
+      arena_alloc(ctx->arena, method.attributes_count, sizeof(bjvm_attribute));
+  method.descriptor =
+      arena_alloc(ctx->arena, 1, sizeof(bjvm_method_descriptor));
+  char *error = parse_method_descriptor(method.unparsed_descriptor,
+                                        method.descriptor, ctx->arena);
   if (error) {
     format_error_dynamic(error);
   }
@@ -1750,7 +1759,8 @@ bjvm_cp_field read_field(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx) {
           checked_get_utf8(ctx->cp, reader_next_u16(reader, "field descriptor"),
                            "field descriptor"),
       .attributes_count = reader_next_u16(reader, "field attributes count")};
-  field.attributes = arena_alloc(ctx->arena, field.attributes_count, sizeof(bjvm_attribute));
+  field.attributes =
+      arena_alloc(ctx->arena, field.attributes_count, sizeof(bjvm_attribute));
 
   for (int i = 0; i < field.attributes_count; i++) {
     parse_attribute(reader, ctx, field.attributes + i);
@@ -1849,8 +1859,10 @@ char *parse_method_descriptor(const bjvm_utf8 entry,
 
     *VECTOR_PUSH(fields, result->args_count, result->args_cap) = arg;
   }
-  result->args = arena_alloc(arena, result->args_count, sizeof(bjvm_field_descriptor));
-  memcpy(result->args, fields, result->args_count * sizeof(bjvm_field_descriptor));
+  result->args =
+      arena_alloc(arena, result->args_count, sizeof(bjvm_field_descriptor));
+  memcpy(result->args, fields,
+         result->args_count * sizeof(bjvm_field_descriptor));
   free(fields);
   if (chars >= end) {
     return strdup("missing ')' in method descriptor");
@@ -1877,19 +1889,18 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
 }
 
 parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
-                                    bjvm_classdesc *result, heap_string *error) {
+                                    bjvm_classdesc *result,
+                                    heap_string *error) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   bjvm_classdesc *cf = result;
   arena_init(&cf->arena);
-  bjvm_classfile_parse_ctx ctx = {.arena = &cf->arena,
-                                  .cp = nullptr};
+  bjvm_classfile_parse_ctx ctx = {.arena = &cf->arena, .cp = nullptr};
 
   if (setjmp(format_error_jmp_buf)) {
-    arena_uninit(&cf->arena);  // clean up our shit
+    arena_uninit(&cf->arena); // clean up our shit
     if (error) {
-      *error = make_heap_str_from((bjvm_utf8) {
-        .chars = format_error_msg,
-        .len = strlen(format_error_msg)});
+      *error = make_heap_str_from((bjvm_utf8){.chars = format_error_msg,
+                                              .len = strlen(format_error_msg)});
     }
     if (format_error_needs_free)
       free(format_error_msg);
@@ -1938,7 +1949,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse superinterfaces
   cf->interfaces_count = reader_next_u16(&reader, "interfaces count");
-  cf->interfaces = arena_alloc(ctx.arena, cf->interfaces_count, sizeof(bjvm_cp_class_info *));
+  cf->interfaces = arena_alloc(ctx.arena, cf->interfaces_count,
+                               sizeof(bjvm_cp_class_info *));
 
   for (int i = 0; i < cf->interfaces_count; i++) {
     cf->interfaces[i] =
@@ -1960,7 +1972,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse methods
   cf->methods_count = reader_next_u16(&reader, "methods count");
-  cf->methods = arena_alloc(ctx.arena, cf->methods_count, sizeof(bjvm_cp_method));
+  cf->methods =
+      arena_alloc(ctx.arena, cf->methods_count, sizeof(bjvm_cp_method));
 
   cf->bootstrap_methods = nullptr;
   cf->indy_insns = nullptr;
@@ -1980,7 +1993,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   // Parse attributes
   cf->attributes_count = reader_next_u16(&reader, "class attributes count");
-  cf->attributes = arena_alloc(ctx.arena, cf->attributes_count, sizeof(bjvm_attribute));
+  cf->attributes =
+      arena_alloc(ctx.arena, cf->attributes_count, sizeof(bjvm_attribute));
   for (int i = 0; i < cf->attributes_count; i++) {
     bjvm_attribute *attr = cf->attributes + i;
     parse_attribute(&reader, &ctx, attr);

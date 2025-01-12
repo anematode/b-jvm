@@ -63,7 +63,7 @@ bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame) {
                                      : &frame->plain.result_of_next;
 }
 
-bjvm_obj_header * bjvm_deref_js_handle(bjvm_vm *vm, int index) {
+bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm *vm, int index) {
   if (index < 0 || index >= arrlen(vm->js_handles)) {
     return nullptr;
   }
@@ -596,7 +596,7 @@ bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread,
     return str;
   bjvm_obj_header *new_str = make_string(thread, chars);
   if (!new_str)
-    return nullptr;  // OOM
+    return nullptr; // OOM
   (void)bjvm_hash_table_insert(&thread->vm->interned_strings, chars.chars,
                                chars.len, new_str);
   return new_str;
@@ -947,8 +947,7 @@ bjvm_resolve_method_type(bjvm_thread *thread, bjvm_method_descriptor *method) {
   assert(method);
   bjvm_classdesc *MethodHandleNatives = must_create_class(
                      thread, STR("java/lang/invoke/MethodHandleNatives")),
-                 *Class =
-                     must_create_class(thread, STR("java/lang/Class")),
+                 *Class = must_create_class(thread, STR("java/lang/Class")),
                  *MethodType = must_create_class(
                      thread, STR("java/lang/invoke/MethodType"));
 
@@ -1055,8 +1054,7 @@ struct bjvm_native_MethodType *resolve_mh_mt(bjvm_thread *thread,
                          false, false);
   bjvm_stack_value result;
 
-  bjvm_classdesc *Class =
-      must_create_class(thread, STR("java/lang/Class"));
+  bjvm_classdesc *Class = must_create_class(thread, STR("java/lang/Class"));
   bjvm_handle *ptypes_array = bjvm_make_handle(
       thread, CreateObjectArray1D(thread, Class, ptypes_count));
   for (int i = 0; i < ptypes_count; ++i) {
@@ -1099,8 +1097,8 @@ bjvm_resolve_method_handle(bjvm_thread *thread,
     bjvm_reflect_initialize_method(thread, method->class_info->classdesc, m);
 
     // Call DirectMethodHandle.make(method, true)
-    bjvm_classdesc *DirectMethodHandle = must_create_class(
-        thread, STR("java/lang/invoke/DirectMethodHandle"));
+    bjvm_classdesc *DirectMethodHandle =
+        must_create_class(thread, STR("java/lang/invoke/DirectMethodHandle"));
     bjvm_initialize_class(thread, DirectMethodHandle);
     bjvm_cp_method *make =
         bjvm_method_lookup(DirectMethodHandle, STR("make"),
@@ -1137,17 +1135,18 @@ void bjvm_class_circularity_error(bjvm_thread *thread,
   bjvm_raise_exception(thread, STR("java/lang/ClassCircularityError"), message);
 }
 
-bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
-                                  bjvm_utf8 chars,
+bjvm_classdesc *bjvm_define_class(bjvm_thread *thread, bjvm_utf8 chars,
                                   const uint8_t *classfile_bytes,
                                   size_t classfile_len) {
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
   heap_string verify_error;
-  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class, &verify_error);
+  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len,
+                                              class, &verify_error);
   if (error != PARSE_SUCCESS) {
-    bjvm_raise_exception(thread, STR("java/lang/VerifyError"), hslc(verify_error));
+    bjvm_raise_exception(thread, STR("java/lang/VerifyError"),
+                         hslc(verify_error));
     free_heap_str(verify_error);
 
     goto error_1;
@@ -1275,7 +1274,7 @@ bjvm_classdesc *must_create_class(bjvm_thread *thread, const bjvm_utf8 name) {
     uint8_t *bytes;
     size_t cf_len;
     int read_status =
-      bjvm_lookup_classpath(&vm->classpath, filename, &bytes, &cf_len);
+        bjvm_lookup_classpath(&vm->classpath, filename, &bytes, &cf_len);
     if (read_status) {
       // If the file is ClassNotFoundException, abort to avoid stack overflow
       if (utf8_equals(chars, "java/lang/ClassNotFoundException")) {
@@ -1586,8 +1585,8 @@ bool initialize_constant_value_fields(bjvm_thread *thread,
 // and raise it.
 void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
   bjvm_handle *exc = bjvm_make_handle(thread, thread->current_exception);
-  bjvm_classdesc *EIIE = must_create_class(
-      thread, STR("java/lang/ExceptionInInitializerError"));
+  bjvm_classdesc *EIIE =
+      must_create_class(thread, STR("java/lang/ExceptionInInitializerError"));
   bjvm_initialize_class(thread, EIIE);
   bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
   bjvm_cp_method *ctor = bjvm_method_lookup(
@@ -2535,8 +2534,6 @@ get_top_frame:
          fmt_slice(method->name), fmt_slice(method->unparsed_descriptor),
          fmt_slice(method->my_class->name));
 #endif
-
-
 
   // Interpret the current frame.
 interpret_frame:

@@ -360,10 +360,9 @@ DECLARE_NATIVE("java/lang", Class, getRawTypeAnnotations, "()[B") {
 DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   bjvm_handle *array = bjvm_make_handle(
-      thread,
-      CreateObjectArray1D(
-          thread, must_create_class(thread, STR("java/lang/Class")),
-          desc->interfaces_count));
+      thread, CreateObjectArray1D(
+                  thread, must_create_class(thread, STR("java/lang/Class")),
+                  desc->interfaces_count));
 
   for (int i = 0; i < desc->interfaces_count; ++i) {
     bjvm_cp_class_info *info = desc->interfaces[i];

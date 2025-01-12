@@ -765,7 +765,7 @@ typedef struct bjvm_classdesc {
   bjvm_vtable vtable;
   bjvm_itables itables;
 
-  arena arena;  // most things are allocated in here
+  arena arena; // most things are allocated in here
 } bjvm_classdesc;
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
@@ -774,7 +774,6 @@ char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result, arena *arena);
 char *parse_method_descriptor(const bjvm_utf8 entry,
                               bjvm_method_descriptor *result, arena *arena);
-
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
 

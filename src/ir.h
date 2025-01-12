@@ -3,8 +3,8 @@
 #ifndef IR_H
 #define IR_H
 
-#include <stdint.h>
 #include "classfile.h"
+#include <stdint.h>
 
 typedef uint32_t bjvm_var_t;
 typedef uint32_t bjvm_bb_t;
@@ -81,10 +81,8 @@ typedef struct {
 } bjvm_ir_phi;
 
 typedef struct {
-  //bjvm_ir_insn_kind kind;
-  union {
-
-  };
+  // bjvm_ir_insn_kind kind;
+  union {};
 } bjvm_ir_insn;
 
 typedef struct {
@@ -116,4 +114,4 @@ typedef struct {
 
 } bjvm_ir_function;
 
-#endif //IR_H
+#endif // IR_H

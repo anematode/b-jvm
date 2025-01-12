@@ -36,8 +36,7 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
 
   bjvm_cp_class_info *Cloneable = calloc(2, sizeof(bjvm_cp_class_info)),
                      *Serializable = Cloneable + 1;
-  Cloneable->classdesc =
-      must_create_class(thread, STR("java/lang/Cloneable"));
+  Cloneable->classdesc = must_create_class(thread, STR("java/lang/Cloneable"));
   Cloneable->name = STR("java/lang/Cloneable");
   Serializable->classdesc =
       must_create_class(thread, STR("java/io/Serializable"));

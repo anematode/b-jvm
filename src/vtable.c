@@ -64,7 +64,8 @@ static bjvm_itable copy_itable(const bjvm_itable *src) {
   result.interface = src->interface;
   ptrdiff_t c = arrlen(src->methods);
   if (c) {
-    memcpy(arraddnptr(result.methods, c), src->methods, c * sizeof(bjvm_itable_method_t));
+    memcpy(arraddnptr(result.methods, c), src->methods,
+           c * sizeof(bjvm_itable_method_t));
   }
   return result;
 }
