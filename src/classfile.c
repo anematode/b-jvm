@@ -1893,7 +1893,6 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
     }
     if (format_error_needs_free)
       free(format_error_msg);
-    assert(format_error_msg);
     result->state = BJVM_CD_STATE_LINKAGE_ERROR;
     return PARSE_ERR;
   }

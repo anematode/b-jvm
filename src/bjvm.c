@@ -429,9 +429,9 @@ void bjvm_null_pointer_exception(bjvm_thread *thread) {
 }
 
 // Raise an ArrayStoreException.
-void bjvm_array_store_exception(bjvm_thread *thread) {
+void bjvm_array_store_exception(bjvm_thread *thread, bjvm_utf8 class_name) {
   bjvm_raise_exception(thread, STR("java/lang/ArrayStoreException"),
-                       null_str());
+                       class_name);
 }
 
 // Raise an IncompatibleClassChangeError.
@@ -1144,10 +1144,12 @@ bjvm_classdesc *bjvm_define_class(bjvm_thread *thread,
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
-  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class, nullptr);
+  heap_string verify_error;
+  parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len, class, &verify_error);
   if (error != PARSE_SUCCESS) {
-    // Raise VerifyError
-    UNREACHABLE();
+    bjvm_raise_exception(thread, STR("java/lang/VerifyError"), hslc(verify_error));
+    free_heap_str(verify_error);
+
     goto error_1;
   }
 
@@ -2809,7 +2811,7 @@ interpret_frame:
       // Instanceof check against the component type
       if (value && !bjvm_instanceof(value->descriptor,
                                     array->descriptor->one_fewer_dim)) {
-        bjvm_array_store_exception(thread);
+        bjvm_array_store_exception(thread, hslc(value->descriptor->name));
         goto done;
       }
       bjvm_obj_header **obj = (bjvm_obj_header **)ArrayData(array) + index;

@@ -506,6 +506,11 @@ TEST_CASE("JSON tests") {
 {"name":"Goober","age":21})");
 }
 
+TEST_CASE("ArrayStoreException") {
+  auto result = run_test_case("test_files/array_store/", true, "ArrayStore");
+  REQUIRE(result.stdout_ == "java.lang.ArrayStoreException: Bus\n\tat ArrayStore.main(ArrayStore.java:10)\n");
+}
+
 #if 0
 TEST_CASE("java.lang.reflect.Method", "[reflection]") {
   auto result = run_test_case("test_files/reflection_method/", false, "ReflectionMethod");
