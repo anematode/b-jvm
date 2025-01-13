@@ -735,6 +735,7 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   char *error = bjvm_init_classpath(&vm->classpath, classpath);
   if (error) {
     fprintf(stderr, "Classpath error: %s", error);
+    free(error);
     return nullptr;
   }
 

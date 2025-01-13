@@ -1895,8 +1895,10 @@ char *parse_method_descriptor(const bjvm_utf8 entry,
   }
   result->args =
       arena_alloc(arena, result->args_count, sizeof(bjvm_field_descriptor));
-  memcpy(result->args, fields,
-         result->args_count * sizeof(bjvm_field_descriptor));
+  if (result->args_count) {
+    memcpy(result->args, fields,
+           result->args_count * sizeof(bjvm_field_descriptor));
+  }
   free(fields);
   if (chars >= end) {
     return strdup("missing ')' in method descriptor");
