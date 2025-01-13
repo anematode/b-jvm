@@ -55,13 +55,13 @@ static void *create_adapter_to_interpreter_frame(bjvm_type_kind *kinds,
   };
 
   bjvm_wasm_module *module = bjvm_wasm_module_create();
-  bjvm_wasm_type components[kinds_len + 3];
+  bjvm_wasm_value_type components[kinds_len + 3];
   int i = 0;
   for (; i < 3; ++i) {
-    components[i] = bjvm_wasm_int32();  // thread, method, result
+    components[i] = BJVM_WASM_TYPE_KIND_INT32;  // thread, method, result
   }
   for (int j = 0; j < kinds_len; ++j) {
-    components[i] = bjvm_jvm_type_to_wasm(kinds[j]);
+    //components[i] = bjvm_jvm_type_to_wasm(kinds[j]);
   }
 
   bjvm_wasm_type fn_args = bjvm_wasm_make_tuple(module, components, kinds_len + 3);
@@ -168,11 +168,11 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
   }
 
   // Now indirect tail call
-  bjvm_wasm_type args_types[kinds_len + 2];
-  args_types[0] = bjvm_wasm_int32();
-  args_types[1] = bjvm_wasm_int32();
+  bjvm_wasm_value_type args_types[kinds_len + 2];
+  args_types[0] = BJVM_WASM_TYPE_KIND_INT32;
+  args_types[1] = BJVM_WASM_TYPE_KIND_INT32;
   for (int i = 0; i < kinds_len; ++i) {
-    args_types[i + 2] = bjvm_jvm_type_to_wasm(kinds[i]);
+    //args_types[i + 2] = bjvm_jvm_type_to_wasm(kinds[i]);
   }
 
   uint32_t type = bjvm_register_function_type(module, bjvm_wasm_make_tuple(module, args_types, kinds_len + 2), bjvm_wasm_int32());
@@ -180,10 +180,10 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
     bjvm_wasm_local_get(module, FN_PARAM, bjvm_wasm_int32()), args, kinds_len + 2, type);
   call->call_indirect.tail_call = true;
 
-  bjvm_wasm_type locals = bjvm_wasm_make_tuple(module, (bjvm_wasm_type[]){bjvm_wasm_int32()}, 1);
+  bjvm_wasm_type locals; // = bjvm_wasm_make_tuple(module, (bjvm_wasm_type[]){bjvm_wasm_int32()}, 1);
 
   // Now create and export a function called "run"
-  bjvm_wasm_function *fn = bjvm_wasm_add_function(module, bjvm_wasm_make_tuple(module, (bjvm_wasm_type[]){bjvm_wasm_int32(), bjvm_wasm_int32(), bjvm_wasm_int32(), bjvm_wasm_int32()}, 4), bjvm_wasm_int32(), locals, call, "run");
+  bjvm_wasm_function *fn; // = bjvm_wasm_add_function(module, bjvm_wasm_make_tuple(module, (bjvm_wasm_type[]){bjvm_wasm_int32(), bjvm_wasm_int32(), bjvm_wasm_int32(), bjvm_wasm_int32()}, 4), bjvm_wasm_int32(), locals, call, "run");
   bjvm_wasm_export_function(module, fn);
 
   // Now instantiate it
