@@ -57,19 +57,20 @@ TEST_CASE("Simple module", "[wasm]") {
 
 
 TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
-  /*
-  auto example = [](bjvm_thread *thread, bjvm_stack_value *result, double a, long b) -> int {
+  bjvm_thread *thread_param = (bjvm_thread*) 16;
+  auto example = [](bjvm_thread *thread, bjvm_stack_value *result, double a, int64_t b, bjvm_obj_header *obj) -> int {
     result->d = a + b;
+    REQUIRE(obj == nullptr);
+    REQUIRE(16 == (uintptr_t) thread);
     return BJVM_INTERP_RESULT_EXC;
   };
-  bjvm_type_kind args[2] = {BJVM_TYPE_KIND_DOUBLE, BJVM_TYPE_KIND_LONG};
-  auto adapter = create_adapter_to_compiled_method(args, 2);
+  bjvm_type_kind args[3] = {BJVM_TYPE_KIND_DOUBLE, BJVM_TYPE_KIND_LONG, BJVM_TYPE_KIND_REFERENCE};
+  auto adapter = create_adapter_to_compiled_method(args, 3);
   bjvm_stack_value result;
   if (adapter) {
-    bjvm_stack_value args[2] = {(bjvm_stack_value){.d = 1.0}, (bjvm_stack_value){.l = 2}};
-    int n = adapter(nullptr, &result, args, (void*) +example);
+    bjvm_stack_value args[3] = {(bjvm_stack_value){.d = 1.0}, (bjvm_stack_value){.l = 2}, (bjvm_stack_value) {.obj = nullptr}};
+    int n = adapter(thread_param, &result, args, (void*) +example);
     REQUIRE(result.d == 3.0);
     REQUIRE(n == BJVM_INTERP_RESULT_EXC);
   }
-  */
 }
