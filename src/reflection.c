@@ -166,3 +166,57 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
 oom: // OOM while creating the Method
   bjvm_drop_handle(thread, result);
 }
+
+static bjvm_obj_header * get_method_parameters_impl(bjvm_thread * thread, bjvm_cp_method * method, bjvm_attribute_method_parameters mparams) {
+  bjvm_classdesc *Parameter = must_create_class(thread, STR("java/lang/reflect/Parameter"));
+  if (!Parameter)
+    return nullptr;  // OOM
+
+  bjvm_interpreter_result_t status = bjvm_initialize_class(thread, Parameter);
+  if (status != BJVM_INTERP_RESULT_OK)
+    return nullptr;
+
+  bjvm_handle *params = bjvm_make_handle(thread, CreateObjectArray1D(thread, Parameter, mparams.count));
+  if (!params->obj)
+    return nullptr;
+
+  bjvm_handle *parameter = nullptr;
+  bjvm_obj_header *result = nullptr;
+  for (int j = 0; j < mparams.count; ++j) {
+    bjvm_drop_handle(thread, parameter);
+    parameter = bjvm_make_handle(thread, new_object(thread, Parameter));
+
+#define P ((struct bjvm_native_Parameter *)parameter->obj)
+
+    if (!P)
+      goto oom;
+    P->name = bjvm_intern_string(thread, mparams.params[j].name);
+    if (!P->name)
+      goto oom;
+    P->executable = method->reflection_method ? (void*)method->reflection_method : (void*)method->reflection_ctor;
+    assert(P->executable);  // we should have already initialised the method
+
+    P->index = j;
+    P->modifiers = mparams.params[j].access_flags;
+
+    ReferenceArrayStore(params->obj, j, parameter->obj);
+  }
+
+  result = params->obj;  // Success!
+
+  oom:
+  bjvm_drop_handle(thread, params);
+  bjvm_drop_handle(thread, parameter);
+  return result;
+}
+
+bjvm_obj_header *bjvm_reflect_get_method_parameters(bjvm_thread *thread, bjvm_cp_method *method) {
+  for (int i = 0; i < method->attributes_count; ++i) {
+    const bjvm_attribute *attr = method->attributes + i;
+    if (attr->kind == BJVM_ATTRIBUTE_KIND_METHOD_PARAMETERS) {
+      bjvm_attribute_method_parameters mparams = attr->method_parameters;
+      return get_method_parameters_impl(thread, method, mparams);
+    }
+  }
+  return nullptr;  // none to be found :(
+}

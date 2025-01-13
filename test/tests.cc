@@ -519,6 +519,15 @@ TEST_CASE("Random API") {
   REQUIRE(result.stdout_.find("Random Integer (50 to 150)") != std::string::npos);  // Just check that it completes :)
 }
 
+TEST_CASE("Method parameters reflection API") {
+  auto result = run_test_case("test_files/method_parameters/", true, "MethodParameters");
+  REQUIRE(result.stdout_ == R"(Parameter names for method 'exampleMethod':
+param1
+param2
+param3
+)");
+}
+
 #if 0
 TEST_CASE("ITextPDF") {
   auto result = run_test_case("test_files/pdf:test_files/pdf/itextpdf-5.5.13.4.jar"

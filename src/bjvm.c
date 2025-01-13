@@ -105,7 +105,7 @@ bjvm_handle *bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
 }
 
 void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle) {
-  if (handle == &thread->null_handle)
+  if (!handle || handle == &thread->null_handle)
     return;
   assert(handle >= thread->handles &&
          handle < thread->handles + thread->handles_capacity);
