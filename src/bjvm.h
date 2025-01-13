@@ -222,7 +222,7 @@ typedef struct {
   // Used by some instructions for interrupting
   int state;
 
-  bjvm_stack_value values[] __attribute__((__counted_by__(values_count)));
+  bjvm_stack_value values[];
 } bjvm_plain_frame;
 
 // Stack frame associated with a native method. Note that this is stored
@@ -258,7 +258,7 @@ typedef struct {
 
   // Arguments to the native method, including the class instance as the first
   // argument (if the method is not static)
-  bjvm_value values[] __attribute__((__counted_by__(values_count)));
+  bjvm_value values[];
 } bjvm_native_frame;
 
 // A frame is either a native frame or a plain frame. They may be distinguished
@@ -306,7 +306,7 @@ typedef struct bjvm_thread {
 
   // Pointers into the frame_buffer
   bjvm_stack_frame **frames;
-  uint32_t frames_count;
+  int frames_count;
   uint32_t frames_cap;
 
   // Currently propagating exception
@@ -348,6 +348,10 @@ void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
  */
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method,
                                   bjvm_stack_value *args, int argc);
+
+bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread,
+                                      bjvm_cp_method *method,
+                                      bjvm_stack_value *args, int argc);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -433,6 +437,7 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
 // popped off, the result of that frame (if any) is placed in "result", and
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
+EMSCRIPTEN_KEEPALIVE
 bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                          bjvm_stack_frame *final_frame,
                                          bjvm_stack_value *result);

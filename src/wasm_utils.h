@@ -294,6 +294,7 @@ typedef struct {
   bjvm_wasm_function *to_call;
   bjvm_wasm_expression **args;
   int arg_count;
+  bool tail_call;
 } bjvm_wasm_call_expression;
 
 typedef struct {
@@ -301,7 +302,9 @@ typedef struct {
   bjvm_wasm_expression *index;
 
   bjvm_wasm_expression **args;
+  uint32_t function_type;
   int arg_count;
+  bool tail_call;
 } bjvm_wasm_call_indirect_expression;
 
 typedef struct {
@@ -388,6 +391,7 @@ typedef struct {
 
 typedef enum {
   BJVM_WASM_IMPORT_KIND_FUNC = 0x00,
+  BJVM_WASM_IMPORT_KIND_TABLE = 0x01,
   BJVM_WASM_IMPORT_KIND_MEMORY = 0x02,
 } bjvm_wasm_import_kind;
 
@@ -526,7 +530,8 @@ bjvm_wasm_expression *bjvm_wasm_call_indirect(bjvm_wasm_module *module,
                                               int table_index,
                                               bjvm_wasm_expression *index,
                                               bjvm_wasm_expression **args,
-                                              int arg_count);
+                                              int arg_count,
+                                              uint32_t functype);
 bjvm_wasm_expression *bjvm_wasm_load(bjvm_wasm_module *module,
                                      bjvm_wasm_load_op_kind op,
                                      bjvm_wasm_expression *addr, int align,
@@ -543,6 +548,10 @@ bjvm_wasm_expression *bjvm_wasm_if_else(bjvm_wasm_module *module,
                                         bjvm_wasm_type type);
 bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
                                        bjvm_wasm_expression *expr);
+
+  uint32_t bjvm_register_function_type(bjvm_wasm_module *module,
+                                       bjvm_wasm_type params,
+                                       bjvm_wasm_type results);
 
 typedef enum {
   BJVM_WASM_INSTANTIATION_SUCCESS,

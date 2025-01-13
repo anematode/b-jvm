@@ -4156,7 +4156,7 @@ interpret_frame:
       bjvm_null_pointer_exception(thread);                                     \
       goto done;                                                               \
     }                                                                          \
-    checked_push(frame, load_stack_value((void *)obj + (int)insn->ic2, kind)); \
+    checked_push(frame, load_stack_value((void *)obj + (int)(uintptr_t)insn->ic2, kind)); \
     NEXT_INSN;                                                                 \
   }
 
@@ -4168,7 +4168,7 @@ interpret_frame:
       bjvm_null_pointer_exception(thread);                                     \
       goto done;                                                               \
     }                                                                          \
-    store_stack_value((void *)obj + (int)insn->ic2, value, kind);              \
+    store_stack_value((void *)obj + (int)(uintptr_t)insn->ic2, value, kind);   \
     NEXT_INSN;                                                                 \
   }
 

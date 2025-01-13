@@ -167,7 +167,7 @@ bjvm_wasm_module *bjvm_wasm_module_create() {
   return module;
 }
 
-static uint32_t register_function_type(bjvm_wasm_module *module,
+uint32_t bjvm_register_function_type(bjvm_wasm_module *module,
                                        bjvm_wasm_type params,
                                        bjvm_wasm_type results) {
   bjvm_wasm_ser_function_type search = {params, results};
@@ -224,7 +224,7 @@ void serialize_functionsection(bjvm_bytevector *result,
   bjvm_wasm_writeuint(&sect, module->function_count);
   for (int i = 0; i < module->function_count; ++i) {
     bjvm_wasm_function *fn = module->functions[i];
-    uint32_t typeidx = register_function_type(module, fn->params, fn->results);
+    uint32_t typeidx = bjvm_register_function_type(module, fn->params, fn->results);
     bjvm_wasm_writeuint(&sect, typeidx);
     fn->my_index = module->fn_index++;
   }
@@ -235,7 +235,7 @@ void serialize_functionsection(bjvm_bytevector *result,
 
 void serialize_importsection(bjvm_bytevector *result,
                              bjvm_wasm_module *module) {
-  const int PREDEFINED_IMPORT_COUNT = 1; // memory
+  const int PREDEFINED_IMPORT_COUNT = 2; // memory
   write_byte(result, SECTION_ID_IMPORT);
 
   bjvm_bytevector sect = {nullptr};
@@ -246,6 +246,14 @@ void serialize_importsection(bjvm_bytevector *result,
   write_byte(&sect, BJVM_WASM_IMPORT_KIND_MEMORY); // memory
   write_byte(&sect, 0x00);                         // flags
   bjvm_wasm_writeuint(&sect, 1);                   // initial
+  // Import table
+  write_string(&sect, "env2");
+  write_string(&sect, "table");
+  write_byte(&sect, BJVM_WASM_IMPORT_KIND_TABLE);
+  write_byte(&sect, 0x70); // funcref
+  write_byte(&sect, 0x00); // only minimum limit present
+  bjvm_wasm_writeuint(&sect, 1); // initial
+
   for (int i = 0; i < module->import_count; ++i) {
     bjvm_wasm_import *import = module->imports + i;
     write_string(&sect, import->module);
@@ -307,9 +315,10 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
   case BJVM_WASM_EXPR_KIND_CALL_INDIRECT: {
     for (int i = 0; i < expr->call_indirect.arg_count; ++i)
       serialize_expression(ctx, body, expr->call_indirect.args[i]);
-    write_byte(body, 0x11);
-    bjvm_wasm_writeuint(body, expr->call_indirect.table_index);
     serialize_expression(ctx, body, expr->call_indirect.index);
+    write_byte(body, expr->call_indirect.tail_call ? 0x13 : 0x11);
+    bjvm_wasm_writeuint(body, expr->call_indirect.function_type);
+    bjvm_wasm_writeuint(body, expr->call_indirect.table_index);
     break;
   }
   case BJVM_WASM_EXPR_KIND_CONST: {
@@ -669,7 +678,7 @@ bjvm_wasm_import_runtime_function_impl(bjvm_wasm_module *module,
   import->module = "env";
   import->name = name_cpy;
   import->func = (bjvm_wasm_func_import){
-      .type = register_function_type(module, fn->params, fn->results),
+      .type = bjvm_register_function_type(module, fn->params, fn->results),
       .associated = fn,
   };
   return fn;
@@ -815,16 +824,18 @@ bjvm_wasm_expression *bjvm_wasm_call_indirect(bjvm_wasm_module *module,
                                               int table_index,
                                               bjvm_wasm_expression *index,
                                               bjvm_wasm_expression **args,
-                                              int arg_count) {
+                                              int arg_count,
+                                              uint32_t functype) {
   bjvm_wasm_expression *result =
       module_expr(module, BJVM_WASM_EXPR_KIND_CALL_INDIRECT);
   bjvm_wasm_expression **cpy =
-      module_copy(module, args, sizeof(bjvm_wasm_expression) * arg_count);
+      module_copy(module, args, sizeof(bjvm_wasm_expression*) * arg_count);
   result->call_indirect = (bjvm_wasm_call_indirect_expression){
       .table_index = table_index,
       .index = index,
       .args = cpy,
       .arg_count = arg_count,
+      .function_type = functype
   };
   return result;
 }
@@ -923,7 +934,7 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
         try {
           var module = new WebAssembly.Module(slice);
           var instance = new WebAssembly.Instance(
-              module, {env : wasmExports, env2 : {memory : wasmMemory}});
+              module, {env : wasmExports, env2 : {memory : wasmMemory, table : wasmTable }});
           let count = 0;
           for (var exp in instance.exports)
             count++;

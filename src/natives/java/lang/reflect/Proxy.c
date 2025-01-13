@@ -11,6 +11,8 @@ DECLARE_NATIVE(
   int length = args[4].i;
   bjvm_obj_header *loader = args[0].handle->obj;
 
+  (void)loader;
+
   heap_string name_str = read_string_to_utf8(name);
   uint8_t *bytes = ArrayData(data) + offset;
 
@@ -20,9 +22,6 @@ DECLARE_NATIVE(
       name_str.chars[i] = '/';
     }
   }
-
-  INIT_STACK_STRING(cf_name, 1000);
-  cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(name_str));
 
   bjvm_classdesc *result =
       bjvm_define_class(thread, hslc(name_str), bytes, length);

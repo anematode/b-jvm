@@ -3,6 +3,7 @@
 static bjvm_stack_value impl(bjvm_thread *thread, bjvm_obj_header *target,
                              bjvm_obj_header *context) {
   bjvm_classdesc *classdesc = target->descriptor;
+  (void)context;
 
   assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
   bjvm_cp_method *method =

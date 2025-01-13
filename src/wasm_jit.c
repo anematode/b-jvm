@@ -53,7 +53,7 @@ typedef struct {
 
 #define WASM_TYPES_COUNT 4
 
-static bjvm_wasm_type jvm_type_to_wasm(bjvm_type_kind kind) {
+bjvm_wasm_type bjvm_jvm_type_to_wasm(bjvm_type_kind kind) {
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
   case BJVM_TYPE_KIND_CHAR:
@@ -98,10 +98,10 @@ int add_local(compile_ctx *ctx, bjvm_wasm_type val) {
 }
 
 int jvm_stack_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
-  int i = index * WASM_TYPES_COUNT + local_kind(jvm_type_to_wasm(kind));
+  int i = index * WASM_TYPES_COUNT + local_kind(bjvm_jvm_type_to_wasm(kind));
   int *l = &ctx->val_to_local_map[i];
   if (*l == -1) {
-    *l = add_local(ctx, jvm_type_to_wasm(kind));
+    *l = add_local(ctx, bjvm_jvm_type_to_wasm(kind));
   }
   return *l;
 }
@@ -113,7 +113,7 @@ int jvm_local_to_wasm_local(compile_ctx *ctx, int index, bjvm_type_kind kind) {
 expression get_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   return bjvm_wasm_local_get(ctx->module,
                              jvm_stack_to_wasm_local(ctx, index, kind),
-                             jvm_type_to_wasm(kind));
+                             bjvm_jvm_type_to_wasm(kind));
 }
 
 expression set_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
@@ -125,7 +125,7 @@ expression set_stack_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
 expression get_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind) {
   return bjvm_wasm_local_get(ctx->module,
                              jvm_local_to_wasm_local(ctx, index, kind),
-                             jvm_type_to_wasm(kind));
+                             bjvm_jvm_type_to_wasm(kind));
 }
 
 expression set_local_value(compile_ctx *ctx, int index, bjvm_type_kind kind,
@@ -407,7 +407,7 @@ expression wasm_move_value(compile_ctx *ctx, int pc, int from, int to,
   return bjvm_wasm_local_set(
       ctx->module, jvm_stack_to_wasm_local(ctx, to, kind),
       bjvm_wasm_local_get(ctx->module, jvm_stack_to_wasm_local(ctx, from, kind),
-                          jvm_type_to_wasm(kind)));
+                          bjvm_jvm_type_to_wasm(kind)));
 }
 
 expression wasm_lower_array_load_store(compile_ctx *ctx,
@@ -485,7 +485,7 @@ expression wasm_lower_array_load_store(compile_ctx *ctx,
           bjvm_wasm_i32_const(ctx->module, sizeof_type_kind(component))));
 
   expression execute;
-  bjvm_wasm_type dtype = jvm_type_to_wasm(component);
+  bjvm_wasm_type dtype = bjvm_jvm_type_to_wasm(component);
 
   if (is_store) {
     // (<dtype>.store offset=kArrayDataOffset <addr>)
@@ -731,7 +731,7 @@ wasm_lower_getfield_putfield(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
     execute = set_stack_value(ctx, sd - 1, field_kind, execute);
   }
   bjvm_wasm_type result_type =
-      is_putfield ? bjvm_wasm_void() : jvm_type_to_wasm(field_kind);
+      is_putfield ? bjvm_wasm_void() : bjvm_jvm_type_to_wasm(field_kind);
   return bjvm_wasm_if_else(ctx->module, null_check, raise_npe, execute,
                            result_type);
 }

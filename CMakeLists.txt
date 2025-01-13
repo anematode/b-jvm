@@ -29,7 +29,7 @@ endif()
 if (EMSCRIPTEN)
     set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wpedantic -sUSE_ZLIB=1")
     set(CMAKE_CXX_FLAGS "-O2 -Wall -Wpedantic")
-    set(EmscriptenFlags "-O2 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
+    set(EmscriptenFlags "-O2 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
 elseif (APPLE)
     set(CMAKE_C_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
     set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
@@ -56,7 +56,9 @@ file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         vendor/stb_ds.h
         vendor/stb_ds.c
-        src/natives/java/lang/reflect/Executable.c)
+        src/natives/java/lang/reflect/Executable.c
+        src/wasm_adapter.c
+        src/wasm_adapter.h)
 target_include_directories(bjvm PRIVATE src)
 
 if (NOT EMSCRIPTEN)
@@ -68,7 +70,7 @@ endif()
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.c)  # for now
     target_link_libraries(bjvm_main PRIVATE bjvm)
-    set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
+    set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags} -sMODULARIZE -sEXPORT_ES6=1")
 endif()
 
 if (NOT APPLE)

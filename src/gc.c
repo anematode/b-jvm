@@ -107,7 +107,7 @@ void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
 void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
-    for (int i = 0; i < lengthof(vm->primitive_classes); ++i) {
+    for (size_t i = 0; i < lengthof(vm->primitive_classes); ++i) {
       enumerate_reflection_roots(ctx, vm->primitive_classes[i]);
     }
   }

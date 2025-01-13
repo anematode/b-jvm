@@ -20,6 +20,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
 void free_wasm_compiled_method(void *compiled_method);
 
 void bjvm_translate();
+bjvm_wasm_type bjvm_jvm_type_to_wasm(bjvm_type_kind kind);
 
 #ifdef __cplusplus
 }

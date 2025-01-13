@@ -275,6 +275,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
 DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
                "()[Ljava/lang/Class;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
+  (void)classdesc;
 
   printf("Calling incompletely implemented getDeclaredClasses0\n");
 

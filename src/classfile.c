@@ -365,8 +365,9 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     return (bjvm_cp_entry){
         .kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
         .indy_info = {
+          // will be converted into a pointer to the method in link_bootstrap_methods
             .method =
-                (void *)bootstrap_method_attr_index, // will be fixed up later
+                (void *)(uintptr_t)bootstrap_method_attr_index,
             .name_and_type = name_and_type,
             .method_descriptor = nullptr}};
   }

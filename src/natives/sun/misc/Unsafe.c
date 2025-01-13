@@ -88,11 +88,13 @@ DECLARE_NATIVE("sun/misc", Unsafe, putOrderedObject,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
   assert(argc == 3);
   *(void **)((void *)args[0].handle->obj + args[1].l) = args[2].handle->obj;
+  return value_null();
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, putOrderedLong, "(Ljava/lang/Object;JJ)V") {
   assert(argc == 3);
   *(int64_t *)((void *)args[0].handle->obj + args[1].l) = args[2].l;
+  return value_null();
 }
 
 DECLARE_NATIVE("sun/misc", Unsafe, putObject,
@@ -195,6 +197,9 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass,
   bjvm_obj_header *data = args[1].handle->obj;
   bjvm_obj_header *cp_patches = args[2].handle->obj;
 
+  (void)host;
+  (void)cp_patches;  // TODO implement
+
   // Read data into byte array
   int length = *ArrayLength(data);
   uint8_t *bytes = ArrayData(data);
@@ -234,6 +239,9 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineClass,
   int length = args[3].i;
   bjvm_obj_header *loader = args[4].handle->obj;
   bjvm_obj_header *pd = args[5].handle->obj;
+
+  (void)loader;
+  (void)pd;
 
   heap_string name_str = read_string_to_utf8(name);
   uint8_t *bytes = ArrayData(data) + offset;

@@ -117,12 +117,11 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
 
   bjvm_method_handle_kind kind = unpack_mn_kind(M); // TODO validate
   M->flags &= (int)0xFF000000U;
-  bool is_static = false, dynamic_dispatch = true, found = false;
+  bool dynamic_dispatch = true, found = false;
 
   switch (kind) {
   case BJVM_MH_KIND_GET_STATIC:
   case BJVM_MH_KIND_PUT_STATIC:
-    is_static = true;
     [[fallthrough]];
   case BJVM_MH_KIND_GET_FIELD:
   case BJVM_MH_KIND_PUT_FIELD:
@@ -139,8 +138,6 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
     fill_mn_with_field(thread, mn, field);
     break;
   case BJVM_MH_KIND_INVOKE_STATIC:
-    is_static = true;
-    [[fallthrough]];
   case BJVM_MH_KIND_INVOKE_SPECIAL:
   case BJVM_MH_KIND_NEW_INVOKE_SPECIAL:
     dynamic_dispatch = false;
