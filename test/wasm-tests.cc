@@ -90,22 +90,20 @@ TEST_CASE("create_adapter_to_interpreter", "[wasm]") {
   bjvm_classdesc *desc = must_create_class(thr, STR("LongHelper"));
   bjvm_initialize_class(thr, desc);
   bjvm_cp_method *add = bjvm_method_lookup(desc, STR("add"), STR("(JI)J"), false, false);
-
   bjvm_obj_header *obj = new_object(thr, desc);
 
   assert(add);
   assert(obj);
 
 #ifdef EMSCRIPTEN
-  printf("REACHED!\n");
   auto fn = (bjvm_interpreter_result_t (*)(bjvm_thread*, bjvm_cp_method*, bjvm_stack_value*, bjvm_obj_header*, int64_t, int)) add->entry_point;
   bjvm_stack_value result;
-  printf("Result: %p\n", &result);
   bjvm_interpreter_result_t ret_val = fn(thr, add, &result, obj, 100000000000LL, 2);
   REQUIRE(result.l == 100000000002LL);
   REQUIRE(ret_val == BJVM_INTERP_RESULT_OK);
   REQUIRE(thr->frames_count == 0);
 #endif
 
+  bjvm_free_thread(thr);
   bjvm_free_vm(vm);
 }

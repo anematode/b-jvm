@@ -44,6 +44,9 @@ typedef struct {
   int *val_to_local_map;
   int next_local;
 
+  // Local corresponding to the pushed bjvm_stack_frame
+  int frame_local;
+
   bjvm_wasm_value_type *wvars;
   int wvars_count;
   int wvars_cap;
@@ -661,6 +664,12 @@ typedef struct {
   int *visited, *incoming_count;
   int blockc;
 } topo_ctx;
+
+// Construct a de-optimization code path, replacing the frame on the stack with
+// an interpreter frame.
+static bjvm_wasm_expression *deopt(compile_ctx *ctx, int pc, int sd) {
+
+}
 
 static bjvm_wasm_expression *exception_raised(bjvm_wasm_module *module) {
   return bjvm_wasm_return(module,

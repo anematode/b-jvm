@@ -225,6 +225,16 @@ typedef struct {
   bjvm_stack_value values[];
 } bjvm_plain_frame;
 
+// Stack frame associated with a compiled method.
+typedef struct {
+  uint16_t is_native;  // always 2
+  uint16_t references_count;
+  uint16_t program_counter;
+  bjvm_cp_method *method;
+
+  bjvm_stack_value references[];  // for GC
+} bjvm_compiled_frame;
+
 // Stack frame associated with a native method. Note that this is stored
 // separately from the (inaccessible) WebAssembly stack, and merely contains
 // data necessary for correct stack trace recovery and resumption after
@@ -269,6 +279,7 @@ typedef struct {
 typedef union {
   bjvm_plain_frame plain;
   bjvm_native_frame native;
+  bjvm_compiled_frame compiled;
 } bjvm_stack_frame;
 
 // Get the current stack depth of the interpreted frame, based on the program

@@ -173,8 +173,10 @@ void *create_adapter_to_interpreter(bjvm_type_kind *kinds, int kinds_len, bool i
   bprintf(module_name, "interpreteradapter-%s", key);
 
   bjvm_wasm_instantiation_result *result = bjvm_wasm_instantiate_module(module, module_name.chars);
+
   if (result->status == BJVM_WASM_INSTANTIATION_SUCCESS) {
     (void)bjvm_hash_table_insert(&interpreter_adapters, key, key_len, result->run);
+    bjvm_free_wasm_instantiation_result(result);
     return result->run;
   }
   return nullptr;
@@ -257,6 +259,8 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
 
   // Now instantiate it
   bjvm_wasm_instantiation_result *result = bjvm_wasm_instantiate_module(module, "adapter");
+  bjvm_wasm_module_free(module);
+
   if (result->status == BJVM_WASM_INSTANTIATION_SUCCESS) {
     (void)bjvm_hash_table_insert(&compiled_adapters, key, kinds_len, result->run);
     return result->run;
