@@ -711,8 +711,6 @@ typedef struct bjvm_cp_field {
   bjvm_classdesc *my_class;
 } bjvm_cp_field;
 
-typedef bjvm_utf8 cp_string;
-
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
@@ -786,6 +784,7 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @param bytes Start byte of the classfile.
  * @param len Length of the classfile in bytes.
  * @param result Where to write the result.
+ * @param error Where to write the error string. If nullptr, error is ignored.
  */
 parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
                                     bjvm_classdesc *result, heap_string *error);

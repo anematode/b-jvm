@@ -56,7 +56,6 @@ void free_method(bjvm_cp_method *method) {
 void bjvm_free_classfile(bjvm_classdesc cf) {
   for (int i = 0; i < cf.methods_count; ++i)
     free_method(&cf.methods[i]);
-  free_heap_str(cf.name);
   free(cf.static_fields);
   arrfree(cf.indy_insns);
   bjvm_free_compressed_bitset(cf.static_references);
@@ -80,14 +79,12 @@ _Thread_local char *format_error_msg = nullptr;
 _Thread_local bool format_error_needs_free = false;
 
 _Noreturn void format_error_static(const char *reason) {
-  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = (char *)reason;
   format_error_needs_free = false;
   longjmp(format_error_jmp_buf, 1);
 }
 
 _Noreturn void format_error_dynamic(char *reason) {
-  fprintf(stderr, "Format error: %s\n", reason);
   format_error_msg = reason;
   format_error_needs_free = true;
   longjmp(format_error_jmp_buf, 1);
@@ -95,7 +92,7 @@ _Noreturn void format_error_dynamic(char *reason) {
 
 #define READER_NEXT_IMPL(name, type)                                           \
   type name(cf_byteslice *reader, const char *reason) {                        \
-    if (reader->len < sizeof(type)) {                                          \
+    if (unlikely(reader->len < sizeof(type))) {                                \
       format_error_static(reason);                                             \
     }                                                                          \
     char data[sizeof(type)];                                                   \
@@ -140,6 +137,7 @@ typedef struct {
   bjvm_constant_pool *cp;
   arena *arena;
   int current_code_max_pc;
+  void *temp_allocation;
 } bjvm_classfile_parse_ctx;
 
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
@@ -420,6 +418,7 @@ void finish_constant_pool_entry(bjvm_cp_entry *entry,
       char *buf = malloc(1000);
       snprintf(buf, 1000, "Method '%.*s' has invalid descriptor '%.*s': %s",
                fmt_slice(nat->name), fmt_slice(nat->descriptor), error);
+      free(error);
       format_error_dynamic(buf);
     }
     entry->methodref.descriptor = desc;
@@ -1539,6 +1538,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
   int *pc_to_insn =
       malloc(code_length *
              sizeof(int)); // -1 = no corresponding instruction to that PC
+  ctx->temp_allocation = pc_to_insn;
   memset(pc_to_insn, -1, code_length * sizeof(int));
 
   int insn_count = 0;
@@ -1591,6 +1591,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
   }
 
   free(pc_to_insn);
+  ctx->temp_allocation = nullptr;
 
   uint16_t attributes_count =
       reader_next_u16(&attr_reader, "code attributes count");
@@ -1615,6 +1616,31 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
                                .exception_table = table,
                                .line_number_table = lnt,
                                .attributes_count = attributes_count};
+}
+
+// 4.2.2. Unqualified Names
+void check_unqualified_name(bjvm_utf8 name, bool is_method, const char *reading) {
+  // "An unqualified name must contain at least one Unicode code point and must
+  // not contain any of the ASCII characters . ; [ /"
+  // "Method names are further constrained so that ... they must not contain
+  // the ASCII characters < or > (that is, left angle bracket or right angl
+  // bracket)."
+  if (name.len == 0) {
+    char complaint[64];
+    snprintf(complaint, sizeof(complaint), "empty %s name", reading);
+    format_error_dynamic(strdup(complaint));
+  }
+  if (utf8_equals(name, "<init>") || utf8_equals(name, "<clinit>")) {
+    return;  // only valid method names
+  }
+  for (int i = 0; i < name.len; ++i) {
+    char c = name.chars[i];
+    if (c == '.' || c == ';' || c == '[' || c == '/' || (is_method && (c == '<' || c == '>'))) {
+      char complaint[1024];
+      snprintf(complaint, sizeof(complaint), "invalid %s name: '%.*s'", reading, fmt_slice(name));
+      format_error_dynamic(strdup(complaint));
+    }
+  }
 }
 
 void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
@@ -1680,9 +1706,19 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
         arena_alloc(ctx->arena, count, sizeof(bjvm_method_parameter_info));
 
     for (int i = 0; i < count; ++i) {
-      params[i].name = checked_get_utf8(
-          ctx->cp, reader_next_u16(&attr_reader, "method parameter name"),
+      uint16_t name_index = reader_next_u16(&attr_reader, "method parameter name");
+      // "If the value of the name_index item is zero, then this parameters
+      // element indicates a formal parameter with no name"
+      if (name_index) {
+        bjvm_utf8 param_name = checked_get_utf8(
+          ctx->cp, name_index,
           "method parameter name");
+        check_unqualified_name(param_name, false, "method parameter name");
+        params[i].name = param_name;
+      } else {
+        params[i].name = null_str();
+      }
+
       params[i].access_flags =
           reader_next_u16(&attr_reader, "method parameter access flags");
     }
@@ -1833,9 +1869,6 @@ char *parse_field_descriptor(const char **chars, size_t len,
       "Expected field descriptor character, but reached end of string");
 }
 
-char *err_while_parsing_md(bjvm_method_descriptor *result, char *error) {
-  return error;
-}
 
 char *parse_method_descriptor(const bjvm_utf8 entry,
                               bjvm_method_descriptor *result, arena *arena) {
@@ -1853,9 +1886,10 @@ char *parse_method_descriptor(const bjvm_utf8 entry,
     bjvm_field_descriptor arg;
 
     char *error = parse_field_descriptor(&chars, end - chars, &arg, arena);
-    if (error || arg.base_kind == BJVM_TYPE_KIND_VOID)
-      return err_while_parsing_md(
-          result, error ? error : strdup("void as method parameter"));
+    if (error || arg.base_kind == BJVM_TYPE_KIND_VOID) {
+      free(fields);
+      return error ? error : strdup("void as method parameter");
+    }
 
     *VECTOR_PUSH(fields, result->args_count, result->args_cap) = arg;
   }
@@ -1880,6 +1914,9 @@ void link_bootstrap_methods(bjvm_classdesc *cf) {
     if (cp->entries[i].kind == BJVM_CP_KIND_INVOKE_DYNAMIC) {
       bjvm_cp_indy_info *indy = &cp->entries[i].indy_info;
       int index = (int)(uintptr_t)indy->method;
+      if (!cf->bootstrap_methods) {
+        format_error_static("Missing BootstrapMethods attribute");
+      }
       if (index < 0 || index >= cf->bootstrap_methods->count) {
         format_error_static("Invalid bootstrap method index");
       }
@@ -1898,6 +1935,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   if (setjmp(format_error_jmp_buf)) {
     arena_uninit(&cf->arena); // clean up our shit
+    free(ctx.temp_allocation);
     if (error) {
       *error = make_heap_str_from((bjvm_utf8){.chars = format_error_msg,
                                               .len = strlen(format_error_msg)});
@@ -1936,7 +1974,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),
                         BJVM_CP_KIND_CLASS, "this class")
            ->class_info;
-  cf->name = make_heap_str_from(this_class->name);
+  cf->name = (heap_string) {.chars = this_class->name.chars,
+                            .len = this_class->name.len};  // TODO unjank
 
   bool is_primordial_object = utf8_equals(hslc(cf->name), "java/lang/Object");
 
@@ -2004,6 +2043,11 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
     } else if (attr->kind == BJVM_ATTRIBUTE_KIND_SOURCE_FILE) {
       cf->source_file = &attr->source_file;
     }
+  }
+
+  // Check for trailing bytes
+  if (reader.len > 0) {
+    format_error_static("Trailing bytes in classfile");
   }
 
   link_bootstrap_methods(cf);

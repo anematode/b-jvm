@@ -22,6 +22,14 @@ Common abbreviations:
 - Make bytecode_interpret interruptable
 - Variadic arguments collector for MethodHandle
 
+## JITing to WebAssembly
+
+- General method signature: `bjvm_interpreter_result_t (*compiled)(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *result, ... args)`
+- Generated on the fly for each argument type combination
+- Longs are split into two ints to avoid overhead of creating `bigint`s
+- Method is responsible for setting up its own stack frame and in the case of de-opt or interruption, generating all interpreter stack frames
+- Methods which are not compiled will have a generated implementation that delegates appropriately to the interpreter
+
 ### Goals
 
 - Full implementation of the JVM spec (including esoteric things like classfile verification)

@@ -4,9 +4,7 @@
 
 #include <emscripten/emscripten.h>
 #include "../bjvm.h"
-#include "../../test/tests-common.h"
 
-extern "C" {
 EMSCRIPTEN_KEEPALIVE
 bjvm_vm *bjvm_ffi_create_vm(const char* classpath, bjvm_write_byte stdout_, bjvm_write_byte stderr_) {
   bjvm_vm_options options = bjvm_default_vm_options();
@@ -178,7 +176,6 @@ int print_error(void *ctx) {
     bjvm_thread_run(thr, method, args, nullptr);
   }
   return 0;
-}
 }
 
 int main() {

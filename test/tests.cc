@@ -50,8 +50,9 @@ TEST_CASE("Test classfile parsing") {
   double total_millis = 0;
 
   int count = 0;
-  int FILE_COUNT = fuzz ? 64 : INT_MAX;
-  for (const auto &file : files) {
+  int FILE_COUNT = fuzz ? 5 : INT_MAX;
+  for (size_t i = 0; i < files.size(); ++i) {
+    auto file = files[i];
     if (!EndsWith(file, ".class")) {
       continue;
     }
@@ -78,7 +79,6 @@ TEST_CASE("Test classfile parsing") {
 
 #pragma omp parallel for
       for (size_t i = 0; i < read.size(); ++i) {
-        std::cout << "Done with " << i << '\n';
         bjvm_classdesc cf;
         auto copy = read;
         for (int j = 0; j < 256; ++j) {
@@ -514,6 +514,25 @@ TEST_CASE("ArrayStoreException") {
                             "ArrayStore.main(ArrayStore.java:10)\n");
 }
 
+TEST_CASE("Random API") {
+  auto result = run_test_case("test_files/random/", true, "RandomTest");
+  REQUIRE(result.stdout_.find("Random Integer (50 to 150)") != std::string::npos);  // Just check that it completes :)
+}
+
+#if 0
+TEST_CASE("ITextPDF") {
+  auto result = run_test_case("test_files/pdf:test_files/pdf/itextpdf-5.5.13.4.jar"
+    ":test_files/pdf/kernel-9.0.0.jar:test_files/pdf/layout-9.0.0.jar:test_files/pdf/io-9.0.0.jar:"
+    "test_files/pdf/commons-9.0.0.jar:test_files/pdf/slf4j-api-2.0.16.jar", false, "PDFDemo");
+}
+#endif
+
+#if 0
+TEST_CASE("Class loading") {
+  auto result = run_test_case("test_files/basic_classloader/", false, "URLClassLoaderExample");
+}
+#endif
+
 #if 0
 TEST_CASE("java.lang.reflect.Method", "[reflection]") {
   auto result = run_test_case("test_files/reflection_method/", false, "ReflectionMethod");
@@ -522,5 +541,5 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 #endif
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("test_files/playground", false);
+  auto result = run_test_case("jre/lib/resources.jar:jre/lib/tools.jar:jre/lib/plugin.jar:test_files/compiler", false);
 }

@@ -75,6 +75,7 @@ DECLARE_NATIVE("java/io", WinNTFileSystem, getLastModifiedTime,
   if (get_file_path(file_obj, &path) != 0)
     return value_null();
   struct stat st;
-  if (stat(path.chars, &st) != 0)
-    return value_null();
+  bjvm_stack_value result = stat(path.chars, &st) != 0 ? value_null() : (bjvm_stack_value){.l = st.st_mtime};
+  free_heap_str(path);
+  return result;
 }

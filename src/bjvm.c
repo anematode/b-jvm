@@ -1141,13 +1141,13 @@ bjvm_classdesc *bjvm_define_class(bjvm_thread *thread, bjvm_utf8 chars,
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
 
-  heap_string verify_error;
+  heap_string format_error;
   parse_result_t error = bjvm_parse_classfile(classfile_bytes, classfile_len,
-                                              class, &verify_error);
+                                              class, &format_error);
   if (error != PARSE_SUCCESS) {
-    bjvm_raise_exception(thread, STR("java/lang/VerifyError"),
-                         hslc(verify_error));
-    free_heap_str(verify_error);
+    bjvm_raise_exception(thread, STR("java/lang/ClassFormatError"),
+                         hslc(format_error));
+    free_heap_str(format_error);
 
     goto error_1;
   }
@@ -2498,6 +2498,9 @@ bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
 #endif
   }
 #endif
+  if (!final_frame) {
+    return BJVM_INTERP_RESULT_EXC;
+  }
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
   bjvm_cp_method *method = nullptr;
@@ -3677,7 +3680,7 @@ interpret_frame:
       // If the symbolic reference names a class (not an interface), then that
       // class is a superclass of the current class."
       if (!utf8_equals(method_info->resolved->name, "<init>") &&
-          (lookup_on->access_flags & BJVM_ACCESS_INTERFACE ||
+          (!(lookup_on->access_flags & BJVM_ACCESS_INTERFACE) &&
            (method->my_class != lookup_on &&
             bjvm_instanceof(method->my_class, lookup_on)))) {
         lookup_on = method->my_class->super_class->classdesc;
@@ -3795,6 +3798,9 @@ interpret_frame:
         } else {
           invoked_frame = bjvm_push_frame(
               thread, method, frame->values + sd - insn->args, insn->args);
+        }
+        if (unlikely(!invoked_frame)) {
+          goto done;
         }
         status = bjvm_interpret(thread, invoked_frame,
                                 &frame->values[sd - insn->args]);

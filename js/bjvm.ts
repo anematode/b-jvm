@@ -90,21 +90,21 @@ function setJavaType(vm: VM, addr: number, type: JavaType, value: any) {
             case "J":
             module.setValue(addr, value, "i64");
             return;
-            case "S":
-                module.setValue(addr, value, "i16");
-                return;
-                case "B":
-                module.setValue(addr, value, "i8");
-                return;
-                case "C":
-                module.setValue(addr, value.charCodeAt(0), "i16");
-                return;
-                case "Z":
-                module.setValue(addr, value ? 1 : 0, "i8");
-                return;
-                default:
-                    throw new Error("Invalid java type: " + type)
-    }
+        case "S":
+        module.setValue(addr, value, "i16");
+        return;
+        case "B":
+        module.setValue(addr, value, "i8");
+        return;
+        case "C":
+        module.setValue(addr, value.charCodeAt(0), "i16");
+        return;
+        case "Z":
+        module.setValue(addr, value ? 1 : 0, "i8");
+        return;
+        default:
+            throw new Error("Invalid java type: " + type)
+}
 }
 
 type FieldInfo = {
