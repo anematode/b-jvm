@@ -657,6 +657,8 @@ typedef struct bjvm_attribute {
 typedef struct bjvm_code_analysis bjvm_code_analysis;
 
 typedef struct bjvm_cp_method {
+  // Function pointer to either JITed code or adapter to interpreter
+  void *entry_point;
   bjvm_access_flags access_flags;
 
   bjvm_utf8 name;

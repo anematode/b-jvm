@@ -308,7 +308,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
   case BJVM_WASM_EXPR_KIND_CALL: {
     for (int i = 0; i < expr->call.arg_count; ++i)
       serialize_expression(ctx, body, expr->call.args[i]);
-    write_byte(body, 0x10);
+    write_byte(body, expr->call.tail_call ? 0x12 : 0x10);
     bjvm_wasm_writeuint(body, expr->call.to_call->my_index);
     break;
   }

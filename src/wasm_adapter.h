@@ -15,6 +15,7 @@ typedef bjvm_interpreter_result_t (*compiled_method_adapter_t)(bjvm_thread *thre
   bjvm_stack_value *result, bjvm_stack_value* args, void *fn);
 
 compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kinds, int kinds_len);
+void *create_adapter_to_interpreter(bjvm_type_kind *kinds, int kinds_len, bool is_native);
 
 #ifdef __cplusplus
 }

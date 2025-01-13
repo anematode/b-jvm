@@ -9,6 +9,7 @@
 #include "analysis.h"
 #include "classfile.h"
 #include "util.h"
+#include "wasm_adapter.h"
 #include "wasm_jit.h"
 
 static const char *cp_kind_to_string(bjvm_cp_kind kind) {
@@ -1753,6 +1754,19 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
   }
 }
 
+void setup_interpreter_entry(bjvm_cp_method * method) {
+  bool nonstatic = !(method->access_flags & BJVM_ACCESS_STATIC);
+  int argc = method->descriptor->args_count + nonstatic;
+  bjvm_type_kind args[argc];
+  if (nonstatic) {
+    args[0] = BJVM_TYPE_KIND_REFERENCE;
+  }
+  for (int i = 0; i < method->descriptor->args_count; ++i) {
+    args[i + nonstatic] = field_to_kind(method->descriptor->args + i);
+  }
+  method->entry_point = create_adapter_to_interpreter(args, argc, !!(method->access_flags & BJVM_ACCESS_NATIVE));
+}
+
 /**
  * Parse a method in a classfile.
  */
@@ -1783,6 +1797,10 @@ bjvm_cp_method parse_method(cf_byteslice *reader,
       method.code = &attrib->code;
     }
   }
+
+#ifdef EMSCRIPTEN
+  setup_interpreter_entry(&method);
+#endif
 
   return method;
 }

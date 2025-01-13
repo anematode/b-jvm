@@ -1,4 +1,4 @@
-#define AGGRESSIVE_DEBUG 0
+#define AGGRESSIVE_DEBUG 1
 
 // If set, the interpreter will use a goto per instruction to jump to the next
 // instruction. This messes up the debug dumps but can lead to slightly better
@@ -7,7 +7,7 @@
 #define ONE_GOTO_PER_INSN 0
 // Skip the memset(...) call to clear each frame's locals/stack. This messes
 // up the debug dumps, but makes setting up frames faster.
-#define SKIP_CLEARING_FRAME 1
+#define SKIP_CLEARING_FRAME 0
 
 #include <assert.h>
 #include <limits.h>
@@ -2502,6 +2502,7 @@ bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
   if (!final_frame) {
     return BJVM_INTERP_RESULT_EXC;
   }
+  printf("FRAMEEEE: %p\n", final_frame);
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
   bjvm_cp_method *method = nullptr;
