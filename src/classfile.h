@@ -8,6 +8,7 @@
 #include "adt.h"
 #include "util.h"
 #include "vtable.h"
+#include "classloader.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -759,6 +760,8 @@ typedef struct bjvm_classdesc {
   bjvm_bytecode_insn **indy_insns; // used to get GC roots to CallSites
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
+
+  bjvm_classloader *classloader; // parent classloader (static-ish lifetime)
 
   bjvm_vtable vtable;
   bjvm_itables itables;

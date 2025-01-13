@@ -25,7 +25,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass,
   for (int i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
       read.chars[i] = '/';
-  bjvm_classdesc *cd = must_create_class(thread, hslc(read));
+  bjvm_classdesc *cd = bootstrap_lookup_class(thread, hslc(read));
   free_heap_str(read);
   return (bjvm_stack_value){.obj = cd ? (void *)bjvm_get_class_mirror(thread, cd) : nullptr};
 }

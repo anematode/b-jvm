@@ -123,7 +123,6 @@ void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len); // todo: get rid of
 heap_string read_string_to_utf8(bjvm_obj_header *obj);
 
-struct bjvm_class_loader;
 typedef struct bjvm_vm bjvm_vm;
 
 typedef void (*bjvm_write_byte)(int ch, void *param);
@@ -393,8 +392,8 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 
 void bjvm_free_vm(bjvm_vm *vm);
 
-bjvm_classdesc *must_create_class(bjvm_thread *thread, bjvm_utf8 name);
-bjvm_classdesc *bjvm_define_class(bjvm_thread *thread, bjvm_utf8 chars,
+bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread, bjvm_utf8 name);
+bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, bjvm_utf8 chars,
                                   const uint8_t *classfile_bytes,
                                   size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);

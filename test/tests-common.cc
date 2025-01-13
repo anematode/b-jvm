@@ -32,7 +32,7 @@ optional<vector<uint8_t>>
 ResolveClassPath(string const &filename,
                  std::vector<string> const &extra_paths) {
   std::vector<string> paths = extra_paths;
-  paths.emplace_back("jre8/"); // for testing
+  paths.emplace_back("jdk23/"); // for testing
 
   for (const auto &path : paths) {
     optional<vector<uint8_t>> file_data = ReadFile(path + filename);
@@ -217,7 +217,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   bjvm_utf8 m{.chars = (char *)main_class.c_str(),
               .len = (int)main_class.size()};
 
-  bjvm_classdesc *desc = must_create_class(thr, m);
+  bjvm_classdesc *desc = bootstrap_lookup_class(thr, m);
   if (!desc) {
     return result;
   }

@@ -24,7 +24,7 @@ DECLARE_NATIVE(
   }
 
   bjvm_classdesc *result =
-      bjvm_define_class(thread, hslc(name_str), bytes, length);
+      bjvm_define_bootstrap_class(thread, hslc(name_str), bytes, length);
 
   free_heap_str(name_str);
 

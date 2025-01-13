@@ -152,7 +152,7 @@ DECLARE_ASYNC_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
 
   // Look up the field System.out
   bjvm_classdesc *system_class =
-      must_create_class(thread, STR("java/lang/System"));
+      bootstrap_lookup_class(thread, STR("java/lang/System"));
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
       system_class, STR("out"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
@@ -170,7 +170,7 @@ DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") {
 }
 DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
   bjvm_classdesc *system_class =
-      must_create_class(thread, STR("java/lang/System"));
+      bootstrap_lookup_class(thread, STR("java/lang/System"));
   bjvm_cp_field *out_field = bjvm_easy_field_lookup(
       system_class, STR("err"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];

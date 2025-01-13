@@ -72,7 +72,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0,
     return value_null();
   }
   bjvm_obj_header *array = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Object")), 3);
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 3);
   bjvm_obj_header **data = ArrayData(array);
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
   assert(!error);
@@ -157,7 +157,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   for (size_t i = 0; i < len; ++i) {
     name_str.chars[i] = name[i] == '.' ? '/' : name[i];
   }
-  bjvm_classdesc *c = must_create_class(thread, hslc(name_str));
+  bjvm_classdesc *c = bootstrap_lookup_class(thread, hslc(name_str));
   free_heap_str(name_str);
   if (c) {
     return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, c)};
@@ -188,7 +188,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
     }
   }
   bjvm_classdesc *Field =
-      must_create_class(thread, STR("java/lang/reflect/Field"));
+      bootstrap_lookup_class(thread, STR("java/lang/reflect/Field"));
   bjvm_initialize_class(thread, Field);
   bjvm_obj_header *result = CreateObjectArray1D(thread, Field, fields);
   if (!result)
@@ -225,7 +225,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0,
   }
   // Then create the array
   bjvm_classdesc *Ctor =
-      must_create_class(thread, STR("java/lang/reflect/Constructor"));
+      bootstrap_lookup_class(thread, STR("java/lang/reflect/Constructor"));
   bjvm_obj_header *result = CreateObjectArray1D(thread, Ctor, ctors);
   struct bjvm_native_Constructor **data = ArrayData(result);
   int j = 0;
@@ -260,7 +260,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0,
   }
   // Then create the array
   bjvm_classdesc *Method =
-      must_create_class(thread, STR("java/lang/reflect/Method"));
+      bootstrap_lookup_class(thread, STR("java/lang/reflect/Method"));
   bjvm_link_class(thread, Method);
   bjvm_obj_header *result = CreateObjectArray1D(thread, Method, methods);
   struct bjvm_native_Method **data = ArrayData(result);
@@ -282,7 +282,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0,
   int count = 0;
   bjvm_stack_value ret;
   ret.obj = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Class")), count);
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), count);
   // TODO parse inner classes and return them here
   return ret;
 }
@@ -362,7 +362,7 @@ DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   bjvm_handle *array = bjvm_make_handle(
       thread, CreateObjectArray1D(
-                  thread, must_create_class(thread, STR("java/lang/Class")),
+                  thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
                   desc->interfaces_count));
 
   for (int i = 0; i < desc->interfaces_count; ++i) {
