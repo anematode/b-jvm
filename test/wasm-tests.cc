@@ -65,7 +65,8 @@ TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
   auto adapter = create_adapter_to_compiled_method(args, 2);
   bjvm_stack_value result;
   if (adapter) {
-    int n = adapter(nullptr, &result, (bjvm_stack_value[]){(bjvm_stack_value){.d = 1.0}, (bjvm_stack_value){.l = 2}}, (void*) +example);
+    bjvm_stack_value args[2] = {(bjvm_stack_value){.d = 1.0}, (bjvm_stack_value){.l = 2}};
+    int n = adapter(nullptr, &result, args, (void*) +example);
     REQUIRE(result.d == 3.0);
     REQUIRE(n == BJVM_INTERP_RESULT_EXC);
   }
