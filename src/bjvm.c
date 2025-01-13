@@ -28,6 +28,7 @@
 #include "strings.h"
 #include "util.h"
 #include "wasm_jit.h"
+#include "monitor.h"
 
 #define MAX_CF_NAME_LENGTH 1000
 
@@ -2053,18 +2054,19 @@ void bjvm_wrong_method_type_error(bjvm_thread *thread,
   UNREACHABLE(); // TODO
 }
 
-#define checked_pop(frame)                                                     \
-  ({                                                                           \
-    assert(sd > 0);                                                            \
-    frame->values[--sd];                                                       \
-  })
+static inline bjvm_stack_value __checked_pop(bjvm_plain_frame *frame, int *sd) {
+  assert(*sd > 0);
+  return frame->values[--*sd];
+}
 
-#define checked_push(frame, value)                                             \
-  {                                                                            \
-    bjvm_stack_value _value = value;                                           \
-    assert(sd < frame->max_stack);                                             \
-    frame->values[sd++] = _value;                                              \
-  }
+static inline void __checked_push(bjvm_plain_frame *frame, int *sd,
+                                  bjvm_stack_value value) {
+  assert(*sd < frame->max_stack);
+  frame->values[(*sd)++] = value;
+}
+
+#define checked_pop(frame) __checked_pop(frame, &sd)
+#define checked_push(frame, value) __checked_push(frame, &sd, value)
 
 enum {
   INVOKE_STATE_ENTRY = 0,
@@ -3369,10 +3371,20 @@ interpret_frame:
       checked_push(frame, (bjvm_stack_value){.l = a ^ b});
       NEXT_INSN;
     }
-    bjvm_insn_monitorenter:
+    bjvm_insn_monitorenter: {
+        bjvm_monitor_state state = bjvm_acquire_monitor(thread, checked_pop(frame).obj);
+        [[likely]] if (state == BJVM_MONITOR_STATE_ACQUIRED) {
+            NEXT_INSN;
+        } else if (state == BJVM_MONITOR_STATE_WAITING) {
+            status = BJVM_INTERP_RESULT_INT;
+            goto done;
+        } else {
+            UNREACHABLE("unexpected monitor state after acquire");
+        }
+    }
     bjvm_insn_monitorexit: {
       // TODO
-      checked_pop(frame);
+        bjvm_release_monitor(thread, checked_pop(frame).obj);
       NEXT_INSN;
     }
     bjvm_insn_pop: {

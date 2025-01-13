@@ -112,6 +112,9 @@ typedef uint64_t bjvm_mark_word_t;
 
 // Appears at the top of every object -- corresponds to HotSpot's oopDesc
 typedef struct bjvm_obj_header {
+#ifdef BJVM_MULTITHREADED
+
+#endif
   volatile bjvm_mark_word_t mark_word;
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;

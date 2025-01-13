@@ -18,6 +18,19 @@ extern size_t bjvm_native_count;
 extern size_t bjvm_native_capacity;
 extern bjvm_native_t *bjvm_natives;
 
+static void _push_bjvm_native(bjvm_native_t native) {
+  if (bjvm_native_count == bjvm_native_capacity) {
+    bjvm_native_capacity =
+        bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;
+    bjvm_native_t *bjvm_natives_ =
+        realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t));
+    assert(bjvm_natives_ != nullptr);
+
+    bjvm_natives = bjvm_natives_;
+  }
+  bjvm_natives[bjvm_native_count++] = native;
+}
+
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier)           \
   static bjvm_stack_value                                                      \
       bjvm_native_##class_name_##_##method_name_##_cb##modifier(               \
@@ -38,19 +51,13 @@ extern bjvm_native_t *bjvm_natives;
                            method_descriptor_, modifier, async)                \
   __attribute__((constructor)) static void                                     \
       bjvm_native_##class_name_##_##method_name_##_init##modifier() {          \
-    if (bjvm_native_count == bjvm_native_capacity) {                           \
-      bjvm_native_capacity =                                                   \
-          bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;                \
-      bjvm_natives =                                                           \
-          realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t)); \
-    }                                                                          \
-    bjvm_natives[bjvm_native_count++] = (bjvm_native_t){                       \
+    _push_bjvm_native ((bjvm_native_t){                                        \
         .class_path = STR(package_path "/" #class_name_),                      \
         .method_name = STR(#method_name_),                                     \
         .method_descriptor = STR(method_descriptor_),                          \
         .callback = {                                                          \
             async,                                                             \
-            &bjvm_native_##class_name_##_##method_name_##_cb##modifier}};      \
+            &bjvm_native_##class_name_##_##method_name_##_cb##modifier}});     \
   }
 
 #define DECLARE_NATIVE0(DECLARE, package_path, class_name_, method_name_,      \
