@@ -179,6 +179,7 @@ void *create_adapter_to_interpreter(bjvm_type_kind *kinds, int kinds_len, bool i
     bjvm_free_wasm_instantiation_result(result);
     return result->run;
   }
+  bjvm_free_wasm_instantiation_result(result);
   return nullptr;
 }
 

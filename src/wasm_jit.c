@@ -666,7 +666,8 @@ typedef struct {
 } topo_ctx;
 
 // Construct a de-optimization code path, replacing the frame on the stack with
-// an interpreter frame.
+// an interpreter frame. (Eventually we may generate multiple frames in the
+// case of inlining.)
 static bjvm_wasm_expression *deopt(compile_ctx *ctx, int pc, int sd) {
 
 }
