@@ -56,6 +56,7 @@ bool bjvm_test_reset_compressed_bitset(bjvm_compressed_bitset *bits,
                                        size_t bit_index);
 bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
                                      size_t bit_index);
+int bjvm_count_compressed_bitset(bjvm_compressed_bitset bits);
 
 typedef struct bjvm_hash_table_entry {
   struct bjvm_hash_table_entry *next;

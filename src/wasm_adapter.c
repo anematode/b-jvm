@@ -77,7 +77,7 @@ void *create_adapter_to_interpreter(bjvm_type_kind *kinds, int kinds_len, bool i
   key[key_len] = is_native ? 'N' : 'n';
   void *existing = bjvm_hash_table_lookup(&interpreter_adapters, key, key_len);
   if (existing) {
-    return existing;
+    return ((bjvm_wasm_instantiation_result *)existing)->run;
   }
 
   enum {
@@ -175,10 +175,10 @@ void *create_adapter_to_interpreter(bjvm_type_kind *kinds, int kinds_len, bool i
   bjvm_wasm_instantiation_result *result = bjvm_wasm_instantiate_module(module, module_name.chars);
 
   if (result->status == BJVM_WASM_INSTANTIATION_SUCCESS) {
-    (void)bjvm_hash_table_insert(&interpreter_adapters, key, key_len, result->run);
-    bjvm_free_wasm_instantiation_result(result);
+    (void)bjvm_hash_table_insert(&interpreter_adapters, key, key_len, result);
     return result->run;
   }
+
   bjvm_free_wasm_instantiation_result(result);
   return nullptr;
 }
@@ -193,9 +193,9 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
     key[i] = kinds[i];
 
   // Check for existing adapter
-  void *existing = bjvm_hash_table_lookup(&compiled_adapters, key, kinds_len);
+  bjvm_wasm_instantiation_result *existing = bjvm_hash_table_lookup(&compiled_adapters, key, kinds_len);
   if (existing) {
-    return existing;
+    return existing->run;
   }
 
   enum {
@@ -262,10 +262,13 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
   bjvm_wasm_instantiation_result *result = bjvm_wasm_instantiate_module(module, "adapter");
   bjvm_wasm_module_free(module);
 
+  arrfree(args);
+
   if (result->status == BJVM_WASM_INSTANTIATION_SUCCESS) {
-    (void)bjvm_hash_table_insert(&compiled_adapters, key, kinds_len, result->run);
+    (void)bjvm_hash_table_insert(&compiled_adapters, key, kinds_len, result);
     return result->run;
   }
 
+  bjvm_free_wasm_instantiation_result(result);
   return nullptr;
 }

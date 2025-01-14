@@ -341,8 +341,7 @@ bjvm_type_kind inspect_value_type(compile_ctx *ctx, int pc, int stack_i) {
   case 4:
     return BJVM_TYPE_KIND_LONG;
   default:
-    *(char *)1 = 0;
-    UNREACHABLE("No value found here");
+    return BJVM_TYPE_KIND_VOID;
   }
 }
 
@@ -665,11 +664,102 @@ typedef struct {
   int blockc;
 } topo_ctx;
 
+static bjvm_wasm_expression *frame_ptr(compile_ctx *ctx) {
+  return bjvm_wasm_local_get(ctx->module, ctx->frame_local, bjvm_wasm_int32());
+}
+
+int frame_size(const bjvm_attribute_code * code) {
+  return offsetof(bjvm_plain_frame, values) +
+    (code->max_stack + code->max_locals) * sizeof(bjvm_stack_value);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bjvm_compiled_frame *wasm_runtime_push_compiled_frame(bjvm_thread *thread, bjvm_cp_method *method, int references_count, int deopt_size) {
+  if (deopt_size + thread->frame_buffer_used > thread->frame_buffer_capacity) {
+    bjvm_raise_exception_object(thread, thread->stack_overflow_error);
+    return nullptr;
+  }
+
+  bjvm_stack_frame *frame =
+      (bjvm_stack_frame *)(thread->frame_buffer + thread->frame_buffer_used);
+  frame->compiled.is_native = 2;
+  frame->compiled.references_count = references_count;
+  frame->compiled.program_counter = 0;
+  frame->compiled.method = method;
+
+  memset(frame->compiled.references, 0, references_count * sizeof(bjvm_stack_value));
+
+  *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) = frame;
+}
+
+int frame_references_count(compile_ctx *ctx) {
+  int max = 0;
+  for (int pc = 0; pc < ctx->code->insn_count; ++pc) {
+    int count = bjvm_count_compressed_bitset(*ctx->analysis->insn_index_to_references);
+    if (count > max)
+      max = count;
+  }
+  return max;
+}
+
+// Construct a compiled frame, with sufficient padding to hold de-optimized
+// frames.
+static bjvm_wasm_expression *frame_setup(compile_ctx *ctx) {
+  int deopt_size = frame_size(ctx->code);
+  // References count is the maximum # of references live at any given point
+  int references_count = frame_references_count(ctx);
+
+  return nullptr;
+}
+
 // Construct a de-optimization code path, replacing the frame on the stack with
 // an interpreter frame. (Eventually we may generate multiple frames in the
-// case of inlining.)
-static bjvm_wasm_expression *deopt(compile_ctx *ctx, int pc, int sd) {
+// case of inlining.) The path will return BJVM_INTERP_RESULT_INT.
+static bjvm_wasm_expression *deopt(compile_ctx *ctx, int pc, int frame_state) {
+  bjvm_plain_frame dummy = {};
+  dummy.is_native = 0;
+  dummy.max_stack = ctx->code->max_stack;
+  dummy.program_counter = pc;
+  dummy.values_count = ctx->code->max_stack + ctx->code->max_locals;
+  dummy.method = ctx->method;
+  dummy.state = frame_state;
 
+#ifdef EMSCRIPTEN
+  static_assert(offsetof(bjvm_plain_frame, result_of_next) == 16);
+#endif
+
+  uint64_t chunks[2];
+  memcpy(&chunks, &dummy, sizeof(chunks));
+
+  bjvm_wasm_expression **stmts = nullptr;
+  for (int i = 0; i < 2; ++i) {
+    arrput(stmts, bjvm_wasm_store(
+                      ctx->module, BJVM_WASM_OP_KIND_I64_STORE, frame_ptr(ctx),
+                      bjvm_wasm_i64_const(ctx->module, chunks[i]), 0, i * sizeof(uint64_t)));
+  }
+
+  // Now spill all live values
+  for (int stack_i = 0; stack_i < dummy.values_count; ++stack_i) {
+    bjvm_type_kind kind = inspect_value_type(ctx, pc, stack_i);
+    if (kind != BJVM_TYPE_KIND_VOID) {
+      bjvm_wasm_store_op_kind store_op = get_tk_store_op(kind);
+      int wasm_local = jvm_stack_to_wasm_local(ctx, stack_i, kind);
+      expression value = bjvm_wasm_local_get(ctx->module, wasm_local,
+                                             bjvm_jvm_type_to_wasm(kind));
+      int offset = offsetof(bjvm_plain_frame, values) +
+        stack_i * sizeof(bjvm_stack_value);
+      arrput(stmts, bjvm_wasm_store(ctx->module, store_op, frame_ptr(ctx),
+                                    value, 0, offset));
+    }
+  }
+
+  // Now return BJVM_INTERP_RESULT_INT
+  arrput(stmts, bjvm_wasm_return(ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_INT)));
+
+  // Pack things into a block and return
+  bjvm_wasm_expression *block = bjvm_wasm_block(ctx->module, stmts, arrlen(stmts), bjvm_wasm_void(), false);
+  arrfree(stmts);
+  return block;
 }
 
 static bjvm_wasm_expression *exception_raised(bjvm_wasm_module *module) {

@@ -216,11 +216,11 @@ typedef struct {
 
   // The method associated with this frame
   bjvm_cp_method *method;
+  // Used by some instructions for interrupting
+  int state;
   // When the next frame completes in bjvm_bytecode_interpret, and a "result"
   // pointer isn't explicitly passed to the method, the result is stored here.
   bjvm_stack_value result_of_next;
-  // Used by some instructions for interrupting
-  int state;
 
   bjvm_stack_value values[];
 } bjvm_plain_frame;
