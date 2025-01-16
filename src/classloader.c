@@ -3,3 +3,6 @@
 //
 
 #include "classloader.h"
+
+
+bjvm_classloader bjvm_bootstrap_classloader = {};

@@ -16,8 +16,17 @@
 using std::string;
 using std::optional;
 using std::vector;
+using std::basic_string_view;
 
 namespace Bjvm::Tests {
+static inline std::string_view to_string_view(heap_string str) {
+    return {str.chars, (size_t)str.len};
+}
+
+    static inline std::string_view to_string_view(bjvm_utf8 str) {
+        return {str.chars, (size_t)str.len};
+    }
+
 int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
                           size_t *len);
     std::unique_ptr<bjvm_vm, void(*)(bjvm_vm*)> CreateTestVM(bjvm_vm_options options = bjvm_default_vm_options());

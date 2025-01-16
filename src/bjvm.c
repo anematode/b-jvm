@@ -29,6 +29,7 @@
 #include "util.h"
 #include "wasm_jit.h"
 #include "monitor.h"
+#include "classloader.h"
 
 #define MAX_CF_NAME_LENGTH 1000
 
@@ -3561,17 +3562,6 @@ interpret_frame:
     bjvm_insn_getfield:
     bjvm_insn_putfield: {
       bool putfield = insn->kind == bjvm_insn_putfield;
-
-
-      bjvm_cp_name_and_type nt = {.};
-      bjvm_cp_indy_info indy = {
-              .name_and_type = &nt
-      };
-
-      if (indy_resolve(thread, insn, indy)) {
-          goto done;
-      }
-
 
       bjvm_obj_header *obj = frame->values[sd - 1 - putfield].obj;
       if (!obj) {

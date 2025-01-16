@@ -157,7 +157,7 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
   write = write + snprintf(buf, end - write,
                            "Unexpected constant pool entry kind %d at index "
                            "%d (expected one of: [ ",
-                           entry->kind, entry->my_index);
+                           ffs(entry->kind)-1, entry->my_index);
   for (int i = 0; i < 14; ++i)
     if (expected_kinds & 1 << i)
       write += snprintf(write, end - write, "%s ", cp_kind_to_string(1 << i));
@@ -224,6 +224,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     CONSTANT_Utf8 = 1,
     CONSTANT_MethodHandle = 15,
     CONSTANT_MethodType = 16,
+    CONSTANT_Dynamic = 17,
     CONSTANT_InvokeDynamic = 18,
   };
 
@@ -349,6 +350,18 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                                 ? null_str()
                                 : checked_get_utf8(ctx->cp, desc_index,
                                                    "method type descriptor")}};
+  }
+  case CONSTANT_Dynamic: {
+      uint16_t bootstrap_method_attr_index =
+              reader_next_u16(reader, "bootstrap method attr index");
+      uint16_t name_and_type_index =
+              reader_next_u16(reader, "name and type index");
+      bjvm_cp_name_and_type *name_and_type =
+              skip_linking ? nullptr
+                           : &checked_cp_entry(ctx->cp, name_and_type_index,
+                                               BJVM_CP_KIND_NAME_AND_TYPE,
+                                               "indy name and type")
+                      ->name_and_type;
   }
   case CONSTANT_InvokeDynamic: {
     uint16_t bootstrap_method_attr_index =

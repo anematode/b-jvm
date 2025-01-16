@@ -46,7 +46,7 @@ TEST_CASE("Test classfile parsing") {
   bool fuzz = false;
 
   // list all java files in the jre8 directory
-  auto files = ListDirectory("jre8", true);
+  auto files = ListDirectory("jdk23", true);
   double total_millis = 0;
 
   int count = 0;

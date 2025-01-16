@@ -8,7 +8,6 @@
 #include "adt.h"
 #include "util.h"
 #include "vtable.h"
-#include "classloader.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -761,7 +760,7 @@ typedef struct bjvm_classdesc {
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
 
-  bjvm_classloader *classloader; // parent classloader (static-ish lifetime)
+  void *classloader; // parent classloader (static-ish lifetime)
 
   bjvm_vtable vtable;
   bjvm_itables itables;
