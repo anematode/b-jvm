@@ -130,6 +130,24 @@ typedef void (*bjvm_write_byte)(int ch, void *param);
 
 #define BJVM_CARD_BYTES 4096
 
+DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
+  bjvm_initialize_class_t *recursive_call_space;
+  int i;
+  bool error;,
+bjvm_thread *thread, bjvm_classdesc *classdesc);
+
+// Continue execution of a thread.
+//
+// When popping frames off the stack, if the passed frame "final_frame" is
+// popped off, the result of that frame (if any) is placed in "result", and
+// either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
+// whether the frame completed abruptly.
+EMSCRIPTEN_KEEPALIVE
+  DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, int sd; bjvm_initialize_class_t init_class;, bjvm_thread *thread,
+                                           struct bjvm_stack_frame *final_frame,
+                                           bjvm_stack_value *result);
+
+struct bjvm_cached_classdescs;
 typedef struct bjvm_vm {
   // Map class name (e.g. "java/lang/String") to classdesc*
   bjvm_string_hash_table classes;
@@ -180,6 +198,9 @@ typedef struct bjvm_vm {
 
   // Handles referenced from JS
   bjvm_obj_header **js_handles;
+
+  /// Struct containing cached classdescs
+  struct bjvm_cached_classdescs *cached_classdescs;
 } bjvm_vm;
 
 typedef struct {
@@ -269,9 +290,13 @@ typedef struct {
 //
 // Native frames may be consecutive: for example, a native method might invoke
 // another native method, which itself raises an interrupt.
-typedef union {
-  bjvm_plain_frame plain;
-  bjvm_native_frame native;
+typedef struct {
+  bjvm_interpret_t async_frame;
+
+  union {
+    bjvm_plain_frame plain;
+    bjvm_native_frame native;
+  };
 } bjvm_stack_frame;
 
 // Get the current stack depth of the interpreted frame, based on the program
@@ -447,23 +472,6 @@ void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name,
                           const bjvm_utf8 method_name,
                           const bjvm_utf8 method_descriptor,
                           bjvm_native_callback callback);
-
-// Continue execution of a thread.
-//
-// When popping frames off the stack, if the passed frame "final_frame" is
-// popped off, the result of that frame (if any) is placed in "result", and
-// either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
-// whether the frame completed abruptly.
-EMSCRIPTEN_KEEPALIVE
-bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
-                                         bjvm_stack_frame *final_frame,
-                                         bjvm_stack_value *result);
-
-DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
-  bjvm_initialize_class_t *recursive_call_space;
-  int i;
-  bool error;,
-bjvm_thread *thread, bjvm_classdesc *classdesc);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
