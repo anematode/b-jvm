@@ -232,6 +232,7 @@ static char *load_filesystem_jar(const char *filename, bjvm_mapped_jar *jar) {
     goto inval;
   }
 
+  printf("load %s\n", filename);
   specific_error =
       parse_central_directory(jar, eocdr.cd_offset, eocdr.num_entries);
   error_needs_free = true;

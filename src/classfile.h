@@ -395,6 +395,9 @@ typedef enum {
   BJVM_CP_KIND_METHOD_HANDLE = 1 << 11,
   BJVM_CP_KIND_METHOD_TYPE = 1 << 12,
   BJVM_CP_KIND_INVOKE_DYNAMIC = 1 << 13,
+  BJVM_CP_KIND_DYNAMIC_CONSTANT = 1 << 14,
+  BJVM_CP_KIND_MODULE = 1 << 15,
+  BJVM_CP_KIND_PACKAGE = 1 << 16
 } bjvm_cp_kind;
 
 typedef struct bjvm_cp_entry {
@@ -446,7 +449,8 @@ typedef enum {
   BJVM_ACCESS_STRICT = 0x0800,
   BJVM_ACCESS_SYNTHETIC = 0x1000,
   BJVM_ACCESS_ANNOTATION = 0x2000,
-  BJVM_ACCESS_ENUM = 0x4000
+  BJVM_ACCESS_ENUM = 0x4000,
+  BJVM_ACCESS_MODULE = 0x8000
 } bjvm_access_flags;
 
 typedef enum {

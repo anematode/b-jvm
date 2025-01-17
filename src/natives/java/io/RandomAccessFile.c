@@ -24,7 +24,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
   assert(fd);
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
                          hslc(filename));
   } else {
     *get_native_handle(fd) = (int64_t)file;
@@ -38,7 +38,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, read0, "()I") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -51,7 +51,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, seek0, "(J)V") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -65,7 +65,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, getFilePointer, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -89,7 +89,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, length, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }

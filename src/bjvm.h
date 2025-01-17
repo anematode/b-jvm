@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <wchar.h>
+#include <async.h>
 
 #include "adt.h"
 #include "classfile.h"
@@ -291,6 +292,12 @@ int bjvm_make_js_handle(bjvm_vm *vm, bjvm_obj_header *obj);
 EMSCRIPTEN_KEEPALIVE
 void bjvm_drop_js_handle(bjvm_vm *vm, int index);
 
+typedef enum bjvm_vm_level {
+  BJVM_VM_LEVEL_0 = 0, // No JVM is running in this thread yet
+  BJVM_VM_LEVEL_1 = 1, // We're in the root-level VM;  short-lived reentrant calls are permissible
+  BJVM_VM_LEVEL_2 = 2 // reentrant calls are forbidden since we're already in a reentrant call
+} bjvm_vm_level;
+
 typedef struct bjvm_thread {
   // Global VM corresponding to this thread
   bjvm_vm *vm;
@@ -336,6 +343,9 @@ typedef struct bjvm_thread {
   // scanning operations (e.g., GC) are unsound; a mandatory interrupt should
   // be raised before continuing
   bool stack_unsound;
+
+  // The VM level of operation
+  bjvm_vm_level vm_level;
 
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
@@ -402,10 +412,15 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
                                    const bjvm_utf8 descriptor,
                                    bool superclasses, bool superinterfaces);
 
-// Run the interpreter, getting stuck if we hit an asynchronous function. This
+// Run the root-level interpreter, getting stuck if we hit an asynchronous function. This
 // should only be used when you know that you're not going to be calling any
 // asynchronous functions. (e.g., initializing most JDK classes).
-int bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
+// Cannot be called if an interpreter is already running.
+int bjvm_thread_run_root(bjvm_thread *thread, bjvm_cp_method *method,
+                    bjvm_stack_value *args, bjvm_stack_value *result);
+
+// Run a short-lived, second-level interpreter.  The provided method may NEVER block.
+int bjvm_thread_run_leaf(bjvm_thread *thread, bjvm_cp_method *method,
                     bjvm_stack_value *args, bjvm_stack_value *result);
 
 typedef struct {
@@ -443,8 +458,12 @@ EMSCRIPTEN_KEEPALIVE
 bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                          bjvm_stack_frame *final_frame,
                                          bjvm_stack_value *result);
-bjvm_interpreter_result_t bjvm_initialize_class(bjvm_thread *thread,
-                                                bjvm_classdesc *classdesc);
+
+DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class, bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  bjvm_initialize_class_t *recursive_call_space;
+  int i;
+  bool error;
+};
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
@@ -462,7 +481,7 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
                                       const bjvm_utf8 name,
                                       const bjvm_utf8 descriptor);
 bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
-int bjvm_raise_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
+int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                          const bjvm_utf8 exception_string);
 void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);

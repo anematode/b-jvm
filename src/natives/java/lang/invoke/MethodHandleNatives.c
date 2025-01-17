@@ -178,7 +178,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   (void)found;
   if (!found) {
     // Raise LinkageError
-    bjvm_raise_exception(thread, STR("java/lang/LinkageError"),
+    bjvm_raise_vm_exception(thread, STR("java/lang/LinkageError"),
                          STR("Failed to resolve MemberName"));
     return value_null();
   }
@@ -202,7 +202,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
       Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
   bjvm_stack_value result;
-  bjvm_thread_run(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},
+  bjvm_thread_run_root(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},
                   &result);
   data[0] = result.obj;
 

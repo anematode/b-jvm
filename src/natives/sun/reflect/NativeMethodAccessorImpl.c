@@ -21,7 +21,7 @@ DECLARE_NATIVE("sun/reflect", NativeMethodAccessorImpl, invoke0,
   bjvm_stack_value result;
   assert(method->code);
   // TODO make this native async
-  bjvm_thread_run(thread, method, assembled, &result);
+  bjvm_thread_run_root(thread, method, assembled, &result);
 
   return result;
 }

@@ -15,7 +15,7 @@ static bjvm_stack_value impl(bjvm_thread *thread, bjvm_obj_header *target,
 
   bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
   bjvm_stack_value ret;
-  bjvm_thread_run(thread, method, method_args, &ret);
+  bjvm_thread_run_root(thread, method, method_args, &ret);
   return ret;
 }
 
@@ -59,7 +59,7 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
 
   bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
   bjvm_stack_value ret;
-  bjvm_thread_run(thread, method, method_args, &ret);
+  bjvm_thread_run_root(thread, method, method_args, &ret);
   return ret;
 }
 
@@ -81,6 +81,6 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
 
   bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
   bjvm_stack_value ret;
-  bjvm_thread_run(thread, method, method_args, &ret);
+  bjvm_thread_run_root(thread, method, method_args, &ret);
   return ret;
 }

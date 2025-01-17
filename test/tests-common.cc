@@ -229,7 +229,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   method = bjvm_method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"),
                               false, false);
 
-  bjvm_thread_run(thr, method, args, nullptr);
+  bjvm_thread_run_root(thr, method, args, nullptr);
 
   if (thr->current_exception) {
     method =
@@ -237,7 +237,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
                            STR("()Ljava/lang/String;"), true, false);
     bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
     thr->current_exception = nullptr;
-    bjvm_thread_run(thr, method, args, &result);
+    bjvm_thread_run_root(thr, method, args, &result);
     heap_string read = read_string_to_utf8(result.obj);
     std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
     free_heap_str(read);
@@ -245,7 +245,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
     // Then call printStackTrace ()V
     method = bjvm_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
                                 STR("()V"), true, false);
-    bjvm_thread_run(thr, method, args, nullptr);
+    bjvm_thread_run_root(thr, method, args, nullptr);
   }
 
   bjvm_free_thread(thr);

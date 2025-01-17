@@ -954,7 +954,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     bjvm_cp_entry *ent =
         bjvm_check_cp_entry(insn->cp,
                             BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
-                                BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
+                                BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS | BJVM_CP_KIND_DYNAMIC_CONSTANT,
                             "ldc argument");
     PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
               : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT

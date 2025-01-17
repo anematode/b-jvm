@@ -5,13 +5,13 @@
 #include "bjvm.h"
 
 #define ThrowLangException(exception_name)                                     \
-  bjvm_raise_exception(thread, STR("java/lang/" #exception_name), null_str())
+  bjvm_raise_vm_exception(thread, STR("java/lang/" #exception_name), null_str())
 
 #define ThrowLangExceptionM(exception_name, fmt, ...)                          \
   do {                                                                         \
     char msg[1024];                                                            \
     snprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
-    bjvm_raise_exception(thread, L"java/lang/" exception_name, msg);           \
+    bjvm_raise_vm_exception(thread, L"java/lang/" exception_name, msg);           \
   } while (0)
 
 extern size_t bjvm_native_count;

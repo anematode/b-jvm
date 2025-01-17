@@ -26,7 +26,7 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
     // TODO use errno to give a better error message
-    bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
                          hslc(filename));
   } else {
     *get_native_handle(fd) = (int64_t)file;

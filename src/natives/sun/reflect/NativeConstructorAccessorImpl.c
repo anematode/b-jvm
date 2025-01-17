@@ -16,6 +16,6 @@ DECLARE_NATIVE(
           *((bjvm_stack_value *)ArrayData(args[1].handle->obj) + i);
     }
   }
-  bjvm_thread_run(thread, method, forward_args, &result);
+  bjvm_thread_run_root(thread, method, forward_args, &result);
   return (bjvm_stack_value){.obj = instance};
 }

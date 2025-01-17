@@ -44,7 +44,7 @@ DECLARE_NATIVE("java/lang", System, initProperties,
         {.obj = bjvm_intern_string(thread, props[i][1])}};
     bjvm_stack_value result;
     // call put() with String key and value
-    bjvm_thread_run(thread, put, put_args, &result);
+    bjvm_thread_run_root(thread, put, put_args, &result);
   }
   return value_null();
 }

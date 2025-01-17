@@ -18,11 +18,14 @@
 #include "../src/bjvm.h"
 #include "../src/util.h"
 #include "../src/wasm_jit.h"
+#include "catch2/matchers/catch_matchers_container_properties.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
 #include "tests-common.h"
 
 #include <numeric>
 
 using namespace Bjvm::Tests;
+using Catch::Matchers::Equals;
 
 double get_time() {
 #ifdef EMSCRIPTEN
@@ -496,6 +499,13 @@ TEST_CASE("Conflicting defaults") {
   REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 
+
+TEST_CASE("Records") {
+  auto result = run_test_case("test_files/records/", true,
+                              "Records");
+  REQUIRE_THAT(result.stdout_, Equals(R"(true
+true)"));
+}
 TEST_CASE("JSON tests") {
   std::string classpath =
       "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
@@ -503,9 +513,9 @@ TEST_CASE("JSON tests") {
       "jackson-annotations-2.18.2.jar:test_files/json/"
       "jackson-databind-2.18.2.jar";
   auto result = run_test_case(classpath, true, "GsonExample");
-  REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
+  REQUIRE_THAT(result.stdout_, Equals(R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}
-{"name":"Goober","age":21})");
+{"name":"Goober","age":21})"));
 }
 
 TEST_CASE("ArrayStoreException") {
