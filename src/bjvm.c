@@ -44,7 +44,8 @@
   X(string, "java/lang/String")                                                \
   X(method_type, "java/lang/invoke/MethodType")                                \
   X(thread_group, "java/lang/ThreadGroup")                                     \
-  X(method_handle_natives, "java/lang/invoke/MethodHandleNatives")
+  X(method_handle_natives, "java/lang/invoke/MethodHandleNatives") \
+  X(method_handles, "java/lang/invoke/MethodHandles")
 
 struct bjvm_cached_classdescs {
 #define X(name, str) bjvm_classdesc *name;
@@ -2285,61 +2286,68 @@ int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame,
   return 0;
 }
 
-bjvm_value bjvm_resolve_indy_static_argument(bjvm_thread *thread,
+DECLARE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument, bjvm_resolve_method_handle_t resolve;, bjvm_thread *thread,
+                                             bjvm_cp_entry *ent,
+                                             bool *is_object);
+
+DEFINE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument, bjvm_thread *thread,
                                              bjvm_cp_entry *ent,
                                              bool *is_object) {
   *is_object = false;
   switch (ent->kind) {
   case BJVM_CP_KIND_INTEGER:
-    return (bjvm_value){.i = ent->integral.value};
+    ASYNC_RETURN((bjvm_value){.i = ent->integral.value});
   case BJVM_CP_KIND_FLOAT:
-    return (bjvm_value){.f = ent->floating.value};
+    ASYNC_RETURN((bjvm_value){.f = ent->floating.value});
   case BJVM_CP_KIND_LONG:
-    return (bjvm_value){.l = ent->integral.value};
+    ASYNC_RETURN((bjvm_value){.l = ent->integral.value});
   case BJVM_CP_KIND_DOUBLE:
-    return (bjvm_value){.d = ent->floating.value};
+    ASYNC_RETURN((bjvm_value){.d = ent->floating.value});
   case BJVM_CP_KIND_STRING:
     *is_object = true;
     bjvm_obj_header *string = bjvm_intern_string(thread, ent->string.chars);
-    return (bjvm_value){.handle = bjvm_make_handle(thread, string)};
+    ASYNC_RETURN((bjvm_value){.handle = bjvm_make_handle(thread, string)});
   case BJVM_CP_KIND_CLASS:
     *is_object = true;
     bjvm_resolve_class(thread, &ent->class_info);
-    return (bjvm_value){.handle = bjvm_make_handle(
+    ASYNC_RETURN((bjvm_value){.handle = bjvm_make_handle(
                             thread, (void *)bjvm_get_class_mirror(
-                                        thread, ent->class_info.classdesc))};
+                                        thread, ent->class_info.classdesc))});
   case BJVM_CP_KIND_METHOD_TYPE:
     *is_object = true;
     if (!ent->method_type.resolved_mt) {
       ent->method_type.resolved_mt =
           bjvm_resolve_method_type(thread, ent->method_type.parsed_descriptor);
     }
-    return (bjvm_value){.handle = bjvm_make_handle(
-                            thread, (void *)ent->method_type.resolved_mt)};
+    ASYNC_RETURN((bjvm_value){.handle = bjvm_make_handle(
+                            thread, (void *)ent->method_type.resolved_mt)});
   case BJVM_CP_KIND_METHOD_HANDLE:
     *is_object = true;
-    void *result = bjvm_resolve_method_handle(thread, &ent->method_handle);
-    return (bjvm_value){.handle = bjvm_make_handle(thread, result)};
+    AWAIT_UNSAFE(bjvm_resolve_method_handle(&self->resolve, thread, &ent->method_handle));
+    ASYNC_RETURN((bjvm_value){.handle = bjvm_make_handle(thread, (void *)self->resolve._result)});
   default: {
     UNREACHABLE();
   }
   }
+
+  ASYNC_END_VOID();
 }
 
-int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
+DECLARE_ASYNC(int, indy_resolve, bjvm_resolve_method_handle_t mh;, bjvm_thread *thread, bjvm_bytecode_insn *insn,
+                 bjvm_cp_indy_info *indy);
+DEFINE_ASYNC(int, indy_resolve, bjvm_thread *thread, bjvm_bytecode_insn *insn,
                  bjvm_cp_indy_info *indy) {
   int result = 0;
-  bjvm_bootstrap_method *m = indy->method;
 
   // e.g. LambdaMetafactory.metafactory
-  bjvm_handle *bootstrap_handle = bjvm_make_handle(
-      thread, (void *)bjvm_resolve_method_handle(thread, m->ref));
+  AWAIT(bjvm_resolve_method_handle(&self->mh, thread, indy->method->ref));
+  bjvm_handle *bootstrap_handle = bjvm_make_handle(thread, (void*)self->mh._result);
+
+  bjvm_bootstrap_method *m = indy->method;
 
   bjvm_stack_value lookup_obj;
   // MethodHandles class
-  bjvm_classdesc *lookup_class =
-      bootstrap_lookup_class(thread, STR("java/lang/invoke/MethodHandles"));
-  bjvm_initialize_class(thread, lookup_class);
+  bjvm_classdesc *lookup_class = thread->vm->cached_classdescs->method_handles;
   bjvm_cp_method *lookup_factory = bjvm_method_lookup(
       lookup_class, STR("lookup"),
       STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
@@ -2393,20 +2401,21 @@ int indy_resolve(bjvm_thread *thread, bjvm_bytecode_insn *insn,
                                            m->ref->resolved_mt,
                                            (void *)bootstrap_handle->obj);
 
+  int result;
   if (thread->current_exception) {
     result = -1;
-    goto fail;
+  } else {
+    insn->ic = fake_frame->values[0].obj;
+    result = 0;
   }
-  insn->ic = fake_frame->values[0].obj;
 
-fail:
   free(fake_frame);
 
   bjvm_drop_handle(thread, bootstrap_handle);
   bjvm_drop_handle(thread, lookup_handle);
   bjvm_drop_handle(thread, name);
 
-  return result;
+  ASYNC_END(result);
 }
 
 int max_calls = 4251;
