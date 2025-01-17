@@ -1,4 +1,4 @@
-#define AGGRESSIVE_DEBUG 0
+#define AGGRESSIVE_DEBUG 1
 
 // If set, the interpreter will use a goto per instruction to jump to the next
 // instruction. This messes up the debug dumps but can lead to slightly better
@@ -27,6 +27,7 @@
 #include "objects.h"
 #include "strings.h"
 #include "util.h"
+#include "wasm_adapter.h"
 #include "wasm_jit.h"
 
 #define MAX_CF_NAME_LENGTH 1000
@@ -2066,11 +2067,6 @@ void bjvm_wrong_method_type_error(bjvm_thread *thread,
     frame->values[sd++] = _value;                                              \
   }
 
-enum {
-  INVOKE_STATE_ENTRY = 0,
-  // The invoked frame was already created and the result has been written
-  INVOKE_STATE_MADE_FRAME = 2,
-};
 
 bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
     bjvm_thread *thread, bjvm_plain_frame *frame, int *sd,
@@ -2382,10 +2378,10 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_plain_frame *final_frame,
                      bjvm_interpreter_result_t *interp_result) {
   bjvm_cp_method *m = final_frame->method;
   if (!m->compiled_method) {
-    m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
+    m->compiled_method = wasm_jit_compile(thread, m, max_calls == 0);
     if (!m->compiled_method ||
-        ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
-            BJVM_WASM_INSTANTIATION_SUCCESS) {
+        ((wasm_instantiation_result *)m->compiled_method)->status !=
+            WASM_INSTANTIATION_SUCCESS) {
       m->failed_jit = true;
       return 1;
     }
@@ -2398,18 +2394,19 @@ int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_plain_frame *final_frame,
     return 1;
   }
 
-  int (*run)(bjvm_thread *, bjvm_plain_frame *, bjvm_stack_value *) =
-      ((bjvm_wasm_instantiation_result *)m->compiled_method)->run;
-  *interp_result = run(thread, final_frame, result);
-  if (*interp_result != BJVM_INTERP_RESULT_INT) {
-    bjvm_pop_frame(thread, (void *)final_frame);
-  }
+  wasm_instantiation_result *res = m->compiled_method;
+  compiled_method_adapter_t adapter = res->adapter;
+
+  bjvm_pop_frame(thread, (void*) final_frame);  // horrible
+  printf("Calling adapter!!\n");
+  *interp_result = adapter(thread, result, final_frame->values + final_frame->max_stack, res->run);
+  printf("Called adapter!!\n");
+
   return 0;
 }
 
 int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 50 && method->code->insn_count > 10 &&
-         !method->failed_jit; // && utf8_equals(method->name, "testOperation");
+  return method->call_count > 10 && !method->failed_jit;
 }
 
 // Java saturates the conversion
@@ -2476,31 +2473,33 @@ void make_invokeitable_polymorphic(bjvm_bytecode_insn *insn) {
 bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                          bjvm_stack_frame *final_frame,
                                          bjvm_stack_value *result) {
-
-#if ENABLE_JIT
-  if (final_frame == thread->frames[thread->frames_count - 1] &&
-      final_frame->program_counter == 0 &&
-      should_attempt_to_jit(final_frame->method)) {
-    bjvm_interpreter_result_t interp_result;
-#if AGGRESSIVE_DEBUG
-    printf("Running method %.*s with signature %.*s on %.*s as WASM\n",
-           fmt_slice(final_frame->method->name),
-           fmt_slice(final_frame->method->descriptor),
-           fmt_slice(final_frame->method->my_class->name));
-    dump_frame(stdout, final_frame);
-#endif
-    int failed_to_compile =
-        bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
-    if (!failed_to_compile) {
-      return interp_result;
-    }
-#if AGGRESSIVE_DEBUG
-    printf("Continuing...\n");
-#endif
-  }
-#endif
   if (!final_frame) {
     return BJVM_INTERP_RESULT_EXC;
+  }
+
+  // Enter JITed method
+  if (final_frame == thread->frames[thread->frames_count - 1]) {
+    bjvm_plain_frame *pl = &final_frame->plain;
+    if (pl->is_native == 0 && pl->program_counter == 0 && should_attempt_to_jit(pl->method)) {
+      bjvm_interpreter_result_t interp_result;
+#if AGGRESSIVE_DEBUG
+      printf("Running method %.*s with signature %.*s on %.*s as WASM\n",
+             fmt_slice(pl->method->name),
+             fmt_slice(pl->method->unparsed_descriptor),
+             fmt_slice(pl->method->my_class->name));
+      dump_frame(stdout, final_frame);
+#endif
+      int failed_to_compile =
+          bjvm_run_as_wasm(thread, pl, result, &interp_result);
+      if (!failed_to_compile) {
+        printf("Did wasm (method: %.*s)!\n", fmt_slice(pl->method->name));
+        return interp_result;
+      }
+        printf("Did not do wasm!\n");
+#if AGGRESSIVE_DEBUG
+      printf("Continuing...\n");
+#endif
+    }
   }
 
   bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;

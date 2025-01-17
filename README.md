@@ -32,6 +32,7 @@ Common abbreviations:
 
 ### Goals
 
+- Keep the main VM (excluding native functions) under 50,000 lines of C
 - Full implementation of the JVM spec (including esoteric things like classfile verification)
 - Java 17 support (starting with Java 8)
 - Reasonably fast (geomean within factor of 10 of HotSpot in memory and CPU usage across benchmarks)

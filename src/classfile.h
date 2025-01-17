@@ -578,6 +578,8 @@ typedef struct bjvm_bytecode_insn {
 typedef struct {
   uint16_t max_stack;
   uint16_t max_locals;
+  uint16_t total_slots;
+
   int insn_count;
   int max_formal_pc;
 
@@ -657,6 +659,8 @@ typedef struct bjvm_attribute {
 typedef struct bjvm_code_analysis bjvm_code_analysis;
 
 typedef struct bjvm_cp_method {
+  // Function pointer to either JITed code or adapter to interpreter
+  void *entry_point;
   bjvm_access_flags access_flags;
 
   bjvm_utf8 name;
@@ -694,6 +698,8 @@ typedef struct bjvm_cp_method {
   // Already tried and failed
   bool failed_jit;
 } bjvm_cp_method;
+
+int bjvm_argc(const bjvm_cp_method *method);
 
 typedef struct bjvm_cp_field {
   bjvm_access_flags access_flags;

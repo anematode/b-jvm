@@ -157,6 +157,17 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
   return test;
 }
 
+int bjvm_count_compressed_bitset(bjvm_compressed_bitset bits) {
+  if (bjvm_is_bitset_compressed(bits)) {
+    return __builtin_popcountll(bits.bits_inl) - 1;
+  }
+  int count = 0;
+  for (int i = 0; i < bits.ptr.size_words; ++i) {
+    count += __builtin_popcountll(bits.ptr.bits[i]);
+  }
+  return count;
+}
+
 void bjvm_string_builder_init(bjvm_string_builder *builder) {
   builder->data = nullptr;
 }

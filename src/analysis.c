@@ -139,12 +139,16 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(aload)
     CASE(astore)
     CASE(anewarray)
+    CASE(anewarray_resolved)
     CASE(checkcast)
+    CASE(checkcast_resolved)
     CASE(getfield)
     CASE(getstatic)
     CASE(instanceof)
+    CASE(instanceof_resolved)
     CASE(invokedynamic)
     CASE(new)
+    CASE(new_resolved)
     CASE(putfield)
     CASE(putstatic)
     CASE(invokevirtual)
@@ -184,6 +188,8 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(invokeitable_monomorphic)
     CASE(invokeitable_polymorphic)
     CASE(invokespecial_resolved)
+    CASE(invokestatic_resolved)
+    CASE(invokecallsite)
     CASE(getfield_B)
     CASE(getfield_C)
     CASE(getfield_S)
@@ -192,6 +198,34 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(getfield_F)
     CASE(getfield_D)
     CASE(getfield_L)
+    CASE(getfield_Z)
+    CASE(putfield_B)
+    CASE(putfield_C)
+    CASE(putfield_S)
+    CASE(putfield_I)
+    CASE(putfield_J)
+    CASE(putfield_F)
+    CASE(putfield_D)
+    CASE(putfield_Z)
+    CASE(putfield_L)
+    CASE(getstatic_B)
+    CASE(getstatic_C)
+    CASE(getstatic_S)
+    CASE(getstatic_I)
+    CASE(getstatic_J)
+    CASE(getstatic_F)
+    CASE(getstatic_D)
+    CASE(getstatic_Z)
+    CASE(getstatic_L)
+    CASE(putstatic_B)
+    CASE(putstatic_C)
+    CASE(putstatic_S)
+    CASE(putstatic_I)
+    CASE(putstatic_J)
+    CASE(putstatic_F)
+    CASE(putstatic_D)
+    CASE(putstatic_Z)
+    CASE(putstatic_L)
   }
   UNREACHABLE();
 }
@@ -307,6 +341,10 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
     return indy_entry_to_string(&ent->indy_info);
   }
   return strdup(result);
+}
+
+int bjvm_argc(const bjvm_cp_method *method) {
+  return !(method->access_flags & BJVM_ACCESS_STATIC) + method->descriptor->args_count;
 }
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
@@ -1284,6 +1322,7 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
  */
 int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   bjvm_attribute_code *code = method->code;
+  code->total_slots = code->max_stack + code->max_locals;
   if (!code || method->code_analysis) {
     return 0;
   }

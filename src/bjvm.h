@@ -195,6 +195,12 @@ typedef struct {
   bjvm_utf8 classpath;
 } bjvm_vm_options;
 
+typedef enum {
+  INVOKE_STATE_ENTRY = 0,
+  // The invoked frame was already created and the result has been written
+  INVOKE_STATE_MADE_FRAME = 2,
+} bjvm_invoke_state;
+
 // Stack frame associated with a Java method.
 //
 // Frames are aligned to 8 bytes, the natural alignment of a stack value.
@@ -216,14 +222,24 @@ typedef struct {
 
   // The method associated with this frame
   bjvm_cp_method *method;
+  // Used by some instructions for interrupting
+  int state;
   // When the next frame completes in bjvm_bytecode_interpret, and a "result"
   // pointer isn't explicitly passed to the method, the result is stored here.
   bjvm_stack_value result_of_next;
-  // Used by some instructions for interrupting
-  int state;
 
   bjvm_stack_value values[];
 } bjvm_plain_frame;
+
+// Stack frame associated with a compiled method.
+typedef struct {
+  uint16_t is_native;  // always 2
+  uint16_t references_count;
+  uint16_t program_counter;
+  bjvm_cp_method *method;
+
+  bjvm_stack_value references[];  // for GC
+} bjvm_compiled_frame;
 
 // Stack frame associated with a native method. Note that this is stored
 // separately from the (inaccessible) WebAssembly stack, and merely contains
@@ -269,6 +285,7 @@ typedef struct {
 typedef union {
   bjvm_plain_frame plain;
   bjvm_native_frame native;
+  bjvm_compiled_frame compiled;
 } bjvm_stack_frame;
 
 // Get the current stack depth of the interpreted frame, based on the program
