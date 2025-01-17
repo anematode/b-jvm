@@ -5,10 +5,11 @@
 #ifndef ASYNC_H
 #define ASYNC_H
 
-#include <stdalign.h>
-#include <stdbool.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
-#include <stdio.h>
 
 typedef enum { FUTURE_NOT_READY, FUTURE_READY } future_status;
 
@@ -55,8 +56,7 @@ typedef struct future {
     async_wakeup_info *__wakeup = NULL;                                        \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
-      *self = (typeof(*self)){0};                                              \
-      {
+      *self = (typeof(*self)){0};
 
 /// Defines a value-returning async function.  Should be followed by a block
 /// containing the code of the async function.  MUST end with ASYNC_END, or
@@ -69,27 +69,11 @@ typedef struct future {
     async_wakeup_info *__wakeup = NULL;                                        \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
-      *self = (typeof(*self)){0};                                              \
-      {
-
-/// Begins a block of code that will be executed asynchronously.  Must be used
-/// inside an async function.
-#define AWAIT(fut_expr)                                                        \
-  }                                                                            \
-  do {                                                                         \
-    enum { STATE_INDEX = COUNTER - CTR_START };                                \
-  case STATE_INDEX:;                                                           \
-    __fut = (fut_expr);                                                        \
-    if (__fut.status == FUTURE_NOT_READY) {                                    \
-      self->_state = STATE_INDEX;                                              \
-      return __fut;                                                            \
-    }                                                                          \
-  } while (0);                                                                 \
-  {
+      *self = (typeof(*self)){0};
 
 /// Begins a block of code that will be executed asynchronously from inside
 /// another block. DO NOT USE STACK VARIABLES FROM BEFORE AWAIT() AFTER AWAIT.
-#define AWAIT_UNSAFE(fut_expr)                                                 \
+#define AWAIT(fut_expr)                                                        \
   do {                                                                         \
     enum { STATE_INDEX = COUNTER - CTR_START };                                \
   case STATE_INDEX:;                                                           \
@@ -100,6 +84,8 @@ typedef struct future {
     }                                                                          \
   } while (0);
 
+#define AWAIT_UNSAFE AWAIT
+
 /// Ends an async value-returning function, returning the given value.  Must be
 /// used inside an async function.
 #define ASYNC_END(return_value)                                                \
@@ -109,7 +95,6 @@ typedef struct future {
       return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
     }                                                                          \
     }                                                                          \
-    }                                                                          \
     }
 
 /// Ends an async void-returning function.  Must be used inside an async
@@ -117,8 +102,8 @@ typedef struct future {
 #define ASYNC_END_VOID()                                                       \
   default:;                                                                    \
     {                                                                          \
+      self->_state = 0;                                                        \
       return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
-    }                                                                          \
     }                                                                          \
     }                                                                          \
     }
@@ -126,12 +111,14 @@ typedef struct future {
 /// Returns from an async function.
 #define ASYNC_RETURN(return_value)                                             \
   do {                                                                         \
+    self->_state = 0;                                                          \
     self->_result = (return_value);                                            \
     return (future_t){FUTURE_READY, .wakeup = nullptr};                        \
   } while (0)
 
 #define ASYNC_RETURN_VOID()                                                    \
   do {                                                                         \
+    self->_state = 0;                                                          \
     return (future_t){FUTURE_READY, .wakeup = nullptr};                        \
   } while (0)
 
@@ -146,4 +133,7 @@ typedef struct future {
   case STATE_INDEX:;                                                           \
   } while (0)
 
+#ifdef __cplusplus
+}
+#endif
 #endif // ASYNC_H
