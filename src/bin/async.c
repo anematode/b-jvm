@@ -4,10 +4,7 @@ struct async_wakeup_info {
   int delay;
 };
 
-DECLARE_ASYNC(int, my_inner_future, int a) {
-  int _current_value;
-  async_wakeup_info my_wakeup;
-};
+DECLARE_ASYNC(int, my_inner_future, int _current_value; async_wakeup_info my_wakeup;, int a);
 
 DEFINE_ASYNC(int, my_inner_future, int a) {
   for (self->_current_value = 0; self->_current_value < 3; ) {
@@ -15,15 +12,10 @@ DEFINE_ASYNC(int, my_inner_future, int a) {
     ASYNC_YIELD(&self->my_wakeup);
   }
 
-  ASYNC_RETURN(1);
-
   ASYNC_END(5);
 };
 
-DECLARE_ASYNC_VOID(fetch_data) {
-  int _res;
-  my_inner_future_t _inner_future;
-};
+DECLARE_ASYNC_VOID(fetch_data, int _res; my_inner_future_t _inner_future, int a);
 
 DEFINE_ASYNC_VOID(fetch_data)
 {

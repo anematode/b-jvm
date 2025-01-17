@@ -20,83 +20,88 @@ typedef struct future {
   async_wakeup_info *wakeup;
 } future_t;
 
+#define NOARG
+
 /// Declares an async function.  Should be followed by a block containing any
 /// locals that the async function needs (accessibly via self->).
-#define DECLARE_ASYNC(return_type, name, ...)                                  \
+#define DECLARE_ASYNC(return_type, name, locals, ...)                          \
   struct name##_s;                                                             \
   typedef struct name##_s name##_t;                                            \
   future_t name(name##_t *self, ##__VA_ARGS__);                                \
-  struct name##_locals
-
+  struct name##_s {                                                            \
+    int _state;                                                                \
+    return_type _result;                                                       \
+    locals;                                                                    \
+  };
 /// Declares an async function that returns nothing.  Should be followed by a
 /// block containing any locals that the async function needs (accessibly via
 /// self->).
-#define DECLARE_ASYNC_VOID(name, ...)                                          \
+#define DECLARE_ASYNC_VOID(name, locals, ...)                                  \
   struct name##_s;                                                             \
   typedef struct name##_s name##_t;                                            \
   future_t name(name##_t *self, ##__VA_ARGS__);                                \
-  struct name##_locals
+  struct name##_s {                                                            \
+    int _state;                                                                \
+    locals;                                                                    \
+  };
 
 /// Defines a void-returning async function.  Should be followed by a block
-/// containing the code of the async function.  Must end with ASYNC_END_VOID before closing bracket.
+/// containing the code of the async function.  Must end with ASYNC_END_VOID
+/// before closing bracket.
 #define DEFINE_ASYNC_VOID(name, ...)                                           \
-  struct name##_s {                                                            \
-    int _state;                                                                \
-    struct name##_locals;                                                      \
-  };                                                                           \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
     future_t __fut;                                                            \
     async_wakeup_info *__wakeup = NULL;                                        \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
-      *self = (typeof(*self)){0}; {
+      *self = (typeof(*self)){0};                                              \
+      {
 
 /// Defines a value-returning async function.  Should be followed by a block
-/// containing the code of the async function.  MUST end with ASYNC_END, or ASYNC_END_VOID
-/// if the function is guaranteed to call ASYNC_RETURN() before it reaches the end statement.
+/// containing the code of the async function.  MUST end with ASYNC_END, or
+/// ASYNC_END_VOID if the function is guaranteed to call ASYNC_RETURN() before
+/// it reaches the end statement.
 #define DEFINE_ASYNC(return_type, name, ...)                                   \
-  struct name##_s {                                                            \
-    int _state;                                                                \
-    struct name##_locals;                                                      \
-    return_type _result;                                                       \
-  };                                                                           \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
     future_t __fut;                                                            \
     async_wakeup_info *__wakeup = NULL;                                        \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
-      *self = (typeof(*self)){0}; {
+      *self = (typeof(*self)){0};                                              \
+      {
 
 /// Begins a block of code that will be executed asynchronously.  Must be used
 /// inside an async function.
 #define AWAIT(fut_expr)                                                        \
-  } do {                                                                         \
+  }                                                                            \
+  do {                                                                         \
   case __LINE__:;                                                              \
     __fut = (fut_expr);                                                        \
     if (__fut.status == FUTURE_NOT_READY) {                                    \
       self->_state = __LINE__;                                                 \
       return __fut;                                                            \
     }                                                                          \
-  } while (0); {
+  } while (0);                                                                 \
+  {
 
-/// Ends an async value-returning function, returning the given value.  Must be used inside an async
-/// function.
+/// Ends an async value-returning function, returning the given value.  Must be
+/// used inside an async function.
 #define ASYNC_END(return_value)                                                \
-  } default:;                                                                    \
+  default:;                                                                    \
     {                                                                          \
       self->_result = (return_value);                                          \
       return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
-    }                                                                          \
+    }}                                                                          \
     }                                                                          \
     }
 
 /// Ends an async void-returning function.  Must be used inside an async
 /// function.
 #define ASYNC_END_VOID()                                                       \
-  } default:;                                                                    \
+  default:;                                                                    \
     {                                                                          \
       return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
-    }                                                                          \
+    }}                                                                          \
     }                                                                          \
     }
 

@@ -459,11 +459,11 @@ bjvm_interpreter_result_t bjvm_interpret(bjvm_thread *thread,
                                          bjvm_stack_frame *final_frame,
                                          bjvm_stack_value *result);
 
-DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class, bjvm_thread *thread, bjvm_classdesc *classdesc) {
+DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
   bjvm_initialize_class_t *recursive_call_space;
   int i;
-  bool error;
-};
+  bool error;,
+bjvm_thread *thread, bjvm_classdesc *classdesc);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
