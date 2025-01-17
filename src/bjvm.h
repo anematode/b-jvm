@@ -195,6 +195,12 @@ typedef struct {
   bjvm_utf8 classpath;
 } bjvm_vm_options;
 
+typedef enum {
+  INVOKE_STATE_ENTRY = 0,
+  // The invoked frame was already created and the result has been written
+  INVOKE_STATE_MADE_FRAME = 2,
+} bjvm_invoke_state;
+
 // Stack frame associated with a Java method.
 //
 // Frames are aligned to 8 bytes, the natural alignment of a stack value.

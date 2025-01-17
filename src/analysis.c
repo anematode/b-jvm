@@ -343,6 +343,10 @@ char *constant_pool_entry_to_string(const bjvm_cp_entry *ent) {
   return strdup(result);
 }
 
+int bjvm_argc(const bjvm_cp_method *method) {
+  return !(method->access_flags & BJVM_ACCESS_STATIC) + method->descriptor->args_count;
+}
+
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index) {
   heap_string result = make_heap_str(10);
   int write = 0;
@@ -1318,6 +1322,7 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
  */
 int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   bjvm_attribute_code *code = method->code;
+  code->total_slots = code->max_stack + code->max_locals;
   if (!code || method->code_analysis) {
     return 0;
   }

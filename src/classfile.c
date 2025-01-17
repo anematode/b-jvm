@@ -156,9 +156,9 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
     return entry;
   char buf[1000] = {0}, *write = buf, *end = buf + sizeof(buf);
   write = write + snprintf(buf, end - write,
-                           "Unexpected constant pool entry kind %d at index "
+                           "Unexpected constant pool entry kind '%s' at index "
                            "%d (expected one of: [ ",
-                           entry->kind, entry->my_index);
+                           cp_kind_to_string(entry->kind), entry->my_index);
   for (int i = 0; i < 14; ++i)
     if (expected_kinds & 1 << i)
       write += snprintf(write, end - write, "%s ", cp_kind_to_string(1 << i));

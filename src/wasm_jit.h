@@ -14,13 +14,13 @@
 extern "C" {
 #endif
 
-bjvm_wasm_instantiation_result *
-bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
+wasm_instantiation_result *
+wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
                       bool debug);
 void free_wasm_compiled_method(void *compiled_method);
 
 void bjvm_translate();
-bjvm_wasm_type bjvm_jvm_type_to_wasm(bjvm_type_kind kind);
+wasm_type jvm_type_to_wasm(bjvm_type_kind kind);
 
 #ifdef __cplusplus
 }
