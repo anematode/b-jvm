@@ -13,7 +13,7 @@ DECLARE_NATIVE(
 
   (void)loader;
 
-  heap_string name_str = read_string_to_utf8(name);
+  heap_string name_str = AsHeapString(name, on_oom);
   uint8_t *bytes = ArrayData(data) + offset;
 
   // Replace name_str with slashes
@@ -32,4 +32,7 @@ DECLARE_NATIVE(
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};
+
+  on_oom:
+  return value_null();
 }

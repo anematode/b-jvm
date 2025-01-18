@@ -7,7 +7,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, registerNatives, "()V") {
 DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0,
                "(Ljava/lang/String;)Ljava/lang/Class;") {
   assert(argc == 1);
-  heap_string read = read_string_to_utf8(args[0].handle->obj);
+  heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
   for (int i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
@@ -15,12 +15,15 @@ DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0,
   bjvm_classdesc *cd = bjvm_hash_table_lookup(&thread->vm->classes, read.chars, read.len);
   free_heap_str(read);
   return (bjvm_stack_value){.obj = cd ? (void *)bjvm_get_class_mirror(thread, cd) : nullptr};
+
+  on_oom:
+  return value_null();
 }
 
 DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass,
                "(Ljava/lang/String;)Ljava/lang/Class;") {
   assert(argc == 1);
-  heap_string read = read_string_to_utf8(args[0].handle->obj);
+  heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
   for (int i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
@@ -28,6 +31,9 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass,
   bjvm_classdesc *cd = bootstrap_lookup_class(thread, hslc(read));
   free_heap_str(read);
   return (bjvm_stack_value){.obj = cd ? (void *)bjvm_get_class_mirror(thread, cd) : nullptr};
+
+  on_oom:
+  return value_null();
 }
 
 DECLARE_NATIVE("java/lang", ClassLoader, findBuiltinLib,

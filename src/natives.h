@@ -11,8 +11,35 @@
   do {                                                                         \
     char msg[1024];                                                            \
     snprintf(msg, 1024, fmt, __VA_ARGS__);                                     \
-    bjvm_raise_vm_exception(thread, L"java/lang/" exception_name, msg);           \
+    bjvm_raise_vm_exception(thread, L"java/lang/" exception_name, msg);        \
   } while (0)
+
+static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) {
+  return thing;
+}
+
+#define AsHeapString(expr, on_oom)                                             \
+  ({                                                                           \
+    bjvm_obj_header *__val = check_is_object(expr);                            \
+    heap_string __hstr;                                                        \
+    if (read_string_to_utf8(thread, &__hstr, __val) !=                         \
+        BJVM_INTERP_RESULT_OK) {                                               \
+      assert(thread->current_exception);                                       \
+      goto on_oom;                                                             \
+    }                                                                          \
+    __hstr;                                                                    \
+  })
+
+#define LoadFieldObject(receiver, name, desc)                                  \
+  ({                                                                           \
+    _Static_assert((desc)[0] == 'L', "descriptor must be an object type");     \
+    bjvm_cp_field *field =                                                     \
+        bjvm_easy_field_lookup(receiver->descriptor, STR(name), STR(desc));    \
+    assert(field && name);                                                     \
+    bjvm_get_field(receiver, field).obj;                                       \
+  })
+
+#define HandleIsNull(expr) ((expr)->obj == nullptr)
 
 extern size_t bjvm_native_count;
 extern size_t bjvm_native_capacity;
@@ -20,8 +47,7 @@ extern bjvm_native_t *bjvm_natives;
 
 static void _push_bjvm_native(bjvm_native_t native) {
   if (bjvm_native_count == bjvm_native_capacity) {
-    bjvm_native_capacity =
-        bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;
+    bjvm_native_capacity = bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;
     bjvm_native_t *bjvm_natives_ =
         realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t));
     assert(bjvm_natives_ != nullptr);
@@ -51,7 +77,7 @@ static void _push_bjvm_native(bjvm_native_t native) {
                            method_descriptor_, modifier, async)                \
   __attribute__((constructor)) static void                                     \
       bjvm_native_##class_name_##_##method_name_##_init##modifier() {          \
-    _push_bjvm_native ((bjvm_native_t){                                        \
+    _push_bjvm_native((bjvm_native_t){                                         \
         .class_path = STR(package_path "/" #class_name_),                      \
         .method_name = STR(#method_name_),                                     \
         .method_descriptor = STR(method_descriptor_),                          \

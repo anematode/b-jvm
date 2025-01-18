@@ -109,9 +109,15 @@ void fill_mn_with_method(bjvm_thread *thread, bjvm_handle *mn,
   M->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
-bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
+typedef enum {
+  METHOD_RESOLVE_OK,
+  METHOD_RESOLVE_NOT_FOUND,
+  METHOD_RESOLVE_EXCEPTION
+} method_resolve_result;
+
+method_resolve_result resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   heap_string search_for =
-      M->name ? read_string_to_utf8(M->name) : make_heap_str(0);
+      M->name ? AsHeapString(M->name, on_oom) : make_heap_str(0);
   bjvm_classdesc *search_on =
       ((struct bjvm_native_Class *)M->clazz)->reflected_class;
 
@@ -164,6 +170,9 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
 
   free_heap_str(search_for);
   return found;
+
+  on_oom:
+  return METHOD_RESOLVE_EXCEPTION;
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
@@ -174,9 +183,12 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   struct bjvm_native_Class *caller = (void *)args[1].handle->obj;
   bjvm_handle *mn = (void *)args[0].handle;
 
-  bool found = resolve_mn(thread, mn);
-  (void)found;
-  if (!found) {
+  method_resolve_result found = resolve_mn(thread, mn);
+  if (unlikely(found == METHOD_RESOLVE_EXCEPTION)) {
+    return value_null();
+  }
+
+  if (unlikely(found == METHOD_RESOLVE_NOT_FOUND)) {
     // Raise LinkageError
     bjvm_raise_vm_exception(thread, STR("java/lang/LinkageError"),
                          STR("Failed to resolve MemberName"));

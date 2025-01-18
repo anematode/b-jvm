@@ -5,9 +5,9 @@
 #ifndef BJVM_H
 #define BJVM_H
 
+#include <async.h>
 #include <stdint.h>
 #include <wchar.h>
-#include <async.h>
 
 #include "adt.h"
 #include "classfile.h"
@@ -122,19 +122,22 @@ typedef struct bjvm_obj_header {
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len); // todo: get rid of
-heap_string read_string_to_utf8(bjvm_obj_header *obj);
-
+bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread,
+                                              heap_string *result,
+                                              bjvm_obj_header *obj);
 typedef struct bjvm_vm bjvm_vm;
 
 typedef void (*bjvm_write_byte)(int ch, void *param);
 
 #define BJVM_CARD_BYTES 4096
 
-DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
-  bjvm_initialize_class_t *recursive_call_space;
-  int i;
-  bool error;,
-bjvm_thread *thread, bjvm_classdesc *classdesc);
+DECLARE_ASYNC(
+    bjvm_interpreter_result_t, bjvm_initialize_class,
+    union {
+      bjvm_initialize_class_t *recursive_call_space;
+      struct bjvm_interpret_s *interpret;
+    };
+    uint16_t i;, bjvm_thread *thread, bjvm_classdesc *classdesc);
 
 // Continue execution of a thread.
 //
@@ -143,9 +146,10 @@ bjvm_thread *thread, bjvm_classdesc *classdesc);
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
 EMSCRIPTEN_KEEPALIVE
-  DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, int sd; bjvm_initialize_class_t init_class;, bjvm_thread *thread,
-                                           struct bjvm_stack_frame *final_frame,
-                                           bjvm_stack_value *result);
+DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, int sd;
+              bjvm_initialize_class_t init_class;
+              , bjvm_thread *thread, struct bjvm_stack_frame *final_frame,
+              bjvm_stack_value *result);
 
 struct bjvm_cached_classdescs;
 typedef struct bjvm_vm {
@@ -319,8 +323,10 @@ void bjvm_drop_js_handle(bjvm_vm *vm, int index);
 
 typedef enum bjvm_vm_level {
   BJVM_VM_LEVEL_0 = 0, // No JVM is running in this thread yet
-  BJVM_VM_LEVEL_1 = 1, // We're in the root-level VM;  short-lived reentrant calls are permissible
-  BJVM_VM_LEVEL_2 = 2 // reentrant calls are forbidden since we're already in a reentrant call
+  BJVM_VM_LEVEL_1 = 1, // We're in the root-level VM;  short-lived reentrant
+                       // calls are permissible
+  BJVM_VM_LEVEL_2 =
+      2 // reentrant calls are forbidden since we're already in a reentrant call
 } bjvm_vm_level;
 
 typedef struct bjvm_thread {
@@ -387,8 +393,8 @@ bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method,
                                   bjvm_stack_value *args, int argc);
 
 bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread,
-                                      bjvm_cp_method *method,
-                                      bjvm_stack_value *args, int argc);
+                                        bjvm_cp_method *method,
+                                        bjvm_stack_value *args, int argc);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -428,25 +434,27 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 void bjvm_free_vm(bjvm_vm *vm);
 
 bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread, bjvm_utf8 name);
-bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, bjvm_utf8 chars,
-                                  const uint8_t *classfile_bytes,
-                                  size_t classfile_len);
+bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread,
+                                            bjvm_utf8 chars,
+                                            const uint8_t *classfile_bytes,
+                                            size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc,
                                    const bjvm_utf8 name,
                                    const bjvm_utf8 descriptor,
                                    bool superclasses, bool superinterfaces);
 
-// Run the root-level interpreter, getting stuck if we hit an asynchronous function. This
-// should only be used when you know that you're not going to be calling any
-// asynchronous functions. (e.g., initializing most JDK classes).
+// Run the root-level interpreter, getting stuck if we hit an asynchronous
+// function. This should only be used when you know that you're not going to be
+// calling any asynchronous functions. (e.g., initializing most JDK classes).
 // Cannot be called if an interpreter is already running.
 int bjvm_thread_run_root(bjvm_thread *thread, bjvm_cp_method *method,
-                    bjvm_stack_value *args, bjvm_stack_value *result);
+                         bjvm_stack_value *args, bjvm_stack_value *result);
 
-// Run a short-lived, second-level interpreter.  The provided method may NEVER block.
+// Run a short-lived, second-level interpreter.  The provided method may NEVER
+// block.
 int bjvm_thread_run_leaf(bjvm_thread *thread, bjvm_cp_method *method,
-                    bjvm_stack_value *args, bjvm_stack_value *result);
+                         bjvm_stack_value *args, bjvm_stack_value *result);
 
 typedef struct {
   bjvm_thread *thread;
@@ -490,7 +498,7 @@ bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc,
                                       const bjvm_utf8 descriptor);
 bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
 int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
-                         const bjvm_utf8 exception_string);
+                            const bjvm_utf8 exception_string);
 void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
 void bjvm_null_pointer_exception(bjvm_thread *thread);
 void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
@@ -532,7 +540,8 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method);
-bjvm_obj_header *bjvm_reflect_get_method_parameters(bjvm_thread *thread, bjvm_cp_method *method);
+bjvm_obj_header *bjvm_reflect_get_method_parameters(bjvm_thread *thread,
+                                                    bjvm_cp_method *method);
 bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread,
                                                bjvm_utf8 name);
 int bjvm_get_line_number(const bjvm_attribute_code *method, uint16_t pc);

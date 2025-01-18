@@ -44,38 +44,32 @@ static heap_string canonicalize_path(bjvm_utf8 path) {
 DECLARE_NATIVE("java/io", WinNTFileSystem, canonicalize0,
                "(Ljava/lang/String;)Ljava/lang/String;") {
   // Concatenate the current working directory with the given path
-  bjvm_obj_header *path_obj = args[0].handle->obj;
-  heap_string path = read_string_to_utf8(path_obj);
+  heap_string path = AsHeapString(args[0].handle->obj, on_oom);
 
-  heap_string canonical = canonicalize_path(hslc(path));
+  heap_string canonical = canonicalize_path(hslc(path)); // todo: deal with oom here
 
   bjvm_obj_header *result = make_string(thread, hslc(canonical));
   free_heap_str(canonical);
   free_heap_str(path);
 
   return (bjvm_stack_value){.obj = result};
-}
 
-static int get_file_path(bjvm_obj_header *obj, heap_string *result) {
-  bjvm_cp_field *field = bjvm_easy_field_lookup(obj->descriptor, STR("path"),
-                                                STR("Ljava/lang/String;"));
-  if (!field)
-    return -1;
-  bjvm_obj_header *str = bjvm_get_field(obj, field).obj;
-  if (!str)
-    return -1;
-  *result = read_string_to_utf8(str);
-  return 0;
+  on_oom:
+  return value_null();
 }
 
 DECLARE_NATIVE("java/io", WinNTFileSystem, getLastModifiedTime,
                "(Ljava/io/File;)J") {
   bjvm_obj_header *file_obj = args[0].handle->obj;
-  heap_string path;
-  if (get_file_path(file_obj, &path) != 0)
-    return value_null();
+  bjvm_obj_header *path = LoadFieldObject(file_obj, "path", "Ljava/lang/String;");
+
+  heap_string path_str = AsHeapString(path, on_oom);
+
   struct stat st;
-  bjvm_stack_value result = stat(path.chars, &st) != 0 ? value_null() : (bjvm_stack_value){.l = st.st_mtime};
-  free_heap_str(path);
+  bjvm_stack_value result = stat(path_str.chars, &st) != 0 ? value_null() : (bjvm_stack_value){.l = st.st_mtime};
+  free_heap_str(path_str);
   return result;
+
+  on_oom:
+  return value_null();
 }

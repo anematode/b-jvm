@@ -20,7 +20,9 @@ static int64_t *get_native_handle(bjvm_obj_header *obj) {
 DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
   if (!args[0].handle->obj)
     return value_null();
-  heap_string filename = read_string_to_utf8(args[0].handle->obj);
+
+  heap_string filename = AsHeapString(args[0].handle->obj, on_oom);
+
   bjvm_obj_header *fd = *get_fd(obj->obj);
   assert(fd);
   FILE *file = fopen(filename.chars, "r");
@@ -32,6 +34,9 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
     *get_native_handle(fd) = (int64_t)file;
   }
   free_heap_str(filename);
+  return value_null();
+
+  on_oom:
   return value_null();
 }
 

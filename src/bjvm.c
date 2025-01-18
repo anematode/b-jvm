@@ -33,26 +33,35 @@
 
 #include "cached_classdescs.h"
 
-DECLARE_ASYNC_VOID(init_cached_classdescs, bjvm_initialize_class_t ic;
+DECLARE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs, bjvm_initialize_class_t ic;
                    , bjvm_thread *thread);
 
-DEFINE_ASYNC_VOID(init_cached_classdescs, bjvm_thread *thread) {
+DEFINE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs, bjvm_thread *thread) {
   bjvm_vm *vm = thread->vm;
 
   assert(!vm->cached_classdescs);
 
   bjvm_classdesc **cached_classdescs = malloc(cached_classdesc_count * sizeof(bjvm_classdesc*));
+
+  if  (!cached_classdescs) {
+    thread->current_exception = thread->out_of_mem_error;
+    ASYNC_RETURN(BJVM_INTERP_RESULT_EXC);
+  }
+
   for (int i = 0; i < cached_classdesc_count; i++) {
     char constexpr* name = cached_classdesc_paths[i];
-
     cached_classdescs[i] = bootstrap_lookup_class(thread, str_to_utf8(name));
+
     AWAIT(bjvm_initialize_class(&self->ic, thread, cached_classdescs[i]));
-    assert(self->ic._result == BJVM_INTERP_RESULT_OK);
+
+    if(self->ic._result != BJVM_INTERP_RESULT_OK) {
+      free(cached_classdescs);
+      ASYNC_RETURN(self->ic._result);
+    }
   }
 
   thread->vm->cached_classdescs = (struct bjvm_cached_classdescs *)cached_classdescs;
-
-  ASYNC_END_VOID();
+  ASYNC_END(BJVM_INTERP_RESULT_OK);
 }
 
 #define MAX_CF_NAME_LENGTH 1000
@@ -491,16 +500,24 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
   *len = *ArrayLength(array);
 }
 
-heap_string read_string_to_utf8(bjvm_obj_header *obj) {
+bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread, heap_string *result, bjvm_obj_header *obj) {
   short *buf;
   size_t len;
   read_string(nullptr, obj, &buf, &len);
   char *cbuf = malloc(len + 1);
+
+  if (!cbuf) {
+    thread->current_exception = thread->out_of_mem_error;
+    return BJVM_INTERP_RESULT_EXC;
+  }
+
   for (size_t i = 0; i < len; ++i) {
     cbuf[i] = buf[i];
   }
   cbuf[len] = 0;
-  return (heap_string){.chars = cbuf, .len = len};
+  *result = (heap_string){.chars = cbuf, .len = len};
+
+  return BJVM_INTERP_RESULT_OK;
 }
 
 void *ArrayData(bjvm_obj_header *array);
@@ -1601,6 +1618,8 @@ void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
 // Call <clinit> on the class, if it hasn't already been called.
 DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
              bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  bool error; // this is a local, but it's ok because we don't use it between awaits
+
   assert(classdesc);
   if (classdesc->state >= BJVM_CD_STATE_INITIALIZING) {
     // Class is already initialized, or currently being initialized.
@@ -1610,7 +1629,7 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
   }
 
   if (classdesc->state != BJVM_CD_STATE_LINKED) {
-    int error = bjvm_link_class(thread, classdesc);
+    error = bjvm_link_class(thread, classdesc);
     if (error) {
       assert(thread->current_exception);
       ASYNC_RETURN(BJVM_INTERP_RESULT_OK);
@@ -1627,35 +1646,40 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
   if (classdesc->super_class) {
     AWAIT(bjvm_initialize_class(self->recursive_call_space, thread,
                                 classdesc->super_class->classdesc));
-    if (self->error = self->recursive_call_space->_result)
+    if (error = self->recursive_call_space->_result)
       goto done;
   }
 
   for (self->i = 0; self->i < classdesc->interfaces_count; ++self->i) {
     AWAIT(bjvm_initialize_class(self->recursive_call_space, thread,
                                 classdesc->interfaces[self->i]->classdesc));
-    if (self->error = self->recursive_call_space->_result)
+    if (error = self->recursive_call_space->_result)
       goto done;
   }
+  free(self->recursive_call_space);
+  self->recursive_call_space = nullptr;
 
-  if (initialize_constant_value_fields(thread, classdesc)) {
+  if (error = initialize_constant_value_fields(thread, classdesc)) {
+    thread->current_exception = thread->out_of_mem_error;
     goto done;
   }
 
   bjvm_cp_method *clinit =
       bjvm_method_lookup(classdesc, STR("<clinit>"), STR("()V"), false, false);
   if (clinit) {
-    self->error = bjvm_thread_run_root(thread, clinit, nullptr, nullptr);
-    if (self->error && !is_error(thread->current_exception->descriptor)) {
+    error = bjvm_thread_run_root(thread, clinit, nullptr, nullptr);
+    if (error && !is_error(thread->current_exception->descriptor)) {
       wrap_in_exception_in_initializer_error(thread);
+      goto done;
     }
   }
 
+  error = 0;
 done:
   free(self->recursive_call_space);
   classdesc->state =
-      self->error ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
-  ASYNC_END(self->error);
+      error ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
+  ASYNC_END(error);
 }
 
 int32_t java_idiv(int32_t a, int32_t b) {
@@ -1743,6 +1767,10 @@ bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
                                           bjvm_stack_value *result) {
   assert(method && "Method is null");
   bjvm_async_run_ctx *ctx = malloc(sizeof(bjvm_async_run_ctx));
+  if (!ctx) {
+    thread->current_exception = thread->out_of_mem_error;
+    return nullptr;
+  }
 
   int nonstatic = !(method->access_flags & BJVM_ACCESS_STATIC);
   int argc = method->descriptor->args_count + nonstatic;
@@ -2062,7 +2090,10 @@ heap_string debug_dump_string(bjvm_thread *thread, bjvm_obj_header *header) {
   bjvm_stack_value result;
   bjvm_thread_run_root(thread, toString, (bjvm_stack_value[]){{.obj = header}},
                        &result);
-  return read_string_to_utf8(result.obj);
+  return AsHeapString(result.obj, on_oom);
+
+  on_oom:
+  UNREACHABLE();
 }
 
 void bjvm_wrong_method_type_error(bjvm_thread *thread,
@@ -3580,7 +3611,7 @@ interpret_frame:
         goto done;
       INTERPRETER_AWAIT(bjvm_initialize_class(&self->init_class, thread,
                                          insn->cp->class_info.classdesc));
-      if (self->init_class.error)
+      if (self->init_class._result == INTERPRE)
         goto done;
       insn->kind = bjvm_insn_new_resolved;
       insn->classdesc = info->classdesc;
