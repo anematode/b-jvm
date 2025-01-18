@@ -31,27 +31,7 @@
 #include "util.h"
 #include "wasm_jit.h"
 
-#define CACHED_CLASSDESCS(X)                                                   \
-  X(array_store_exception, "java/lang/ArrayStoreException")                    \
-  X(class_cast_exception, "java/lang/ClassCastException")                      \
-  X(null_pointer_exception, "java/lang/NullPointerException")                  \
-  X(negative_array_size_exception, "java/lang/NegativeArraySizeException")     \
-  X(oom_error, "java/lang/OutOfMemoryError")                                   \
-  X(stack_overflow_error, "java/lang/StackOverflowError")                      \
-  X(thread, "java/lang/Thread")                                                \
-  X(klass, "java/lang/Class")                                                  \
-  X(system, "java/lang/System")                                                \
-  X(string, "java/lang/String")                                                \
-  X(method_type, "java/lang/invoke/MethodType")                                \
-  X(thread_group, "java/lang/ThreadGroup")                                     \
-  X(method_handle_natives, "java/lang/invoke/MethodHandleNatives") \
-  X(method_handles, "java/lang/invoke/MethodHandles")
-
-struct bjvm_cached_classdescs {
-#define X(name, str) bjvm_classdesc *name;
-  CACHED_CLASSDESCS(X)
-#undef X
-};
+#include "cached_classdescs.h"
 
 DECLARE_ASYNC_VOID(init_cached_classdescs, bjvm_initialize_class_t ic;
                    , bjvm_thread *thread);
@@ -61,17 +41,16 @@ DEFINE_ASYNC_VOID(init_cached_classdescs, bjvm_thread *thread) {
 
   assert(!vm->cached_classdescs);
 
-  vm->cached_classdescs = malloc(sizeof(struct bjvm_cached_classdescs));
+  bjvm_classdesc **cached_classdescs = malloc(cached_classdesc_count * sizeof(bjvm_classdesc*));
+  for (int i = 0; i < cached_classdesc_count; i++) {
+    char constexpr* name = cached_classdesc_paths[i];
 
-#define X(name, str)                                                           \
-  thread->vm->cached_classdescs->name =                                        \
-      bootstrap_lookup_class(thread, STR(str));                                \
-  AWAIT(bjvm_initialize_class(&self->ic, thread,                               \
-                              thread->vm->cached_classdescs->name));           \
-  assert(self->ic._result == BJVM_INTERP_RESULT_OK);
+    cached_classdescs[i] = bootstrap_lookup_class(thread, str_to_utf8(name));
+    AWAIT(bjvm_initialize_class(&self->ic, thread, cached_classdescs[i]));
+    assert(self->ic._result == BJVM_INTERP_RESULT_OK);
+  }
 
-  CACHED_CLASSDESCS(X);
-#undef X
+  thread->vm->cached_classdescs = (struct bjvm_cached_classdescs *)cached_classdescs;
 
   ASYNC_END_VOID();
 }

@@ -136,6 +136,11 @@ static inline bjvm_utf8 hslc(heap_string str) {
   return (bjvm_utf8){.chars = str.chars, .len = str.len};
 }
 
+/// Converts the given null-terminated string to a slice. Use the STR macro for literals.
+static inline bjvm_utf8 str_to_utf8(const char *str) {
+  return (bjvm_utf8){.chars = (char *)str, .len = strlen(str)};
+}
+
 #define fmt_slice(slice) (int)(slice).len, (slice).chars
 
 #define STR(literal)                                                           \
