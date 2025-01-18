@@ -21,7 +21,14 @@ typedef struct future {
   async_wakeup_info *wakeup;
 } future_t;
 
-#define COUNTER __COUNTER__
+#define future_not_ready(wakeup)                                               \
+  (future_t) { FUTURE_NOT_READY, (wakeup) }
+#define future_ready()                                                         \
+  (future_t) { FUTURE_READY, nullptr }
+
+#define start_counter(counter_name) enum { counter_name = __COUNTER__ };
+#define get_counter_value(counter_name, target_name)                           \
+  enum { target_name = __COUNTER__ - counter_name };
 
 /// Declares an async function.  Should be followed by a block containing any
 /// locals that the async function needs (accessibly via self->).
@@ -51,9 +58,7 @@ typedef struct future {
 /// before closing bracket.
 #define DEFINE_ASYNC_VOID(name, ...)                                           \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
-    enum { CTR_START = COUNTER };                                              \
-    future_t __fut;                                                            \
-    async_wakeup_info *__wakeup = NULL;                                        \
+    start_counter(label_counter);                                              \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
       *self = (typeof(*self)){0};
@@ -64,9 +69,7 @@ typedef struct future {
 /// it reaches the end statement.
 #define DEFINE_ASYNC(return_type, name, ...)                                   \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
-    enum { CTR_START = COUNTER };                                              \
-    future_t __fut;                                                            \
-    async_wakeup_info *__wakeup = NULL;                                        \
+    start_counter(label_counter);                                              \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
       *self = (typeof(*self)){0};
@@ -75,36 +78,33 @@ typedef struct future {
 /// another block. DO NOT USE STACK VARIABLES FROM BEFORE AWAIT() AFTER AWAIT.
 #define AWAIT(fut_expr)                                                        \
   do {                                                                         \
-    enum { STATE_INDEX = COUNTER - CTR_START };                                \
-  case STATE_INDEX:;                                                           \
-    __fut = (fut_expr);                                                        \
+    get_counter_value(label_counter, state_index);                             \
+  case state_index:                                                            \
+    future_t __fut = (fut_expr);                                               \
     if (__fut.status == FUTURE_NOT_READY) {                                    \
-      self->_state = STATE_INDEX;                                              \
+      self->_state = state_index;                                              \
       return __fut;                                                            \
     }                                                                          \
-  } while (0);
+  } while (0)
 
 #define AWAIT_UNSAFE AWAIT
 
 /// Ends an async value-returning function, returning the given value.  Must be
 /// used inside an async function.
 #define ASYNC_END(return_value)                                                \
-  default:;                                                                    \
-    {                                                                          \
-      self->_result = (return_value);                                          \
-      return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
-    }                                                                          \
+  default:                                                                     \
+    self->_result = (return_value);                                            \
+    self->_state = 0;                                                          \
+    return future_ready();                                                     \
     }                                                                          \
     }
 
 /// Ends an async void-returning function.  Must be used inside an async
 /// function.
 #define ASYNC_END_VOID()                                                       \
-  default:;                                                                    \
-    {                                                                          \
-      self->_state = 0;                                                        \
-      return (future_t){FUTURE_READY, .wakeup = nullptr};                      \
-    }                                                                          \
+  default:                                                                     \
+    self->_state = 0;                                                          \
+    return future_ready();                                                     \
     }                                                                          \
     }
 
@@ -126,11 +126,10 @@ typedef struct future {
 /// Takes a pointer to the runtime-specific async_wakeup_info struct.
 #define ASYNC_YIELD(waker)                                                     \
   do {                                                                         \
-    enum { STATE_INDEX = COUNTER - CTR_START };                                \
-    __wakeup = (waker);                                                        \
-    self->_state = STATE_INDEX;                                                \
-    return (future_t){FUTURE_NOT_READY, .wakeup = __wakeup};                   \
-  case STATE_INDEX:;                                                           \
+    get_counter_value(label_counter, state_index);                             \
+    self->_state = state_index;                                                \
+    return future_not_ready((waker));                                            \
+  case state_index:;                                                            \
   } while (0)
 
 #ifdef __cplusplus

@@ -1,4 +1,5 @@
 #include <async.h>
+#include <stdio.h>
 
 struct async_wakeup_info {
   int delay;

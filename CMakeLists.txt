@@ -32,7 +32,7 @@ if (EMSCRIPTEN)
     set(EmscriptenFlags "-O2 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
 elseif (APPLE)
     set(CMAKE_C_FLAGS "-O0 -fms-extensions -Wall -Wextra  -fsanitize=address,undefined -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
-    set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
+    set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -fsanitize=address,undefined -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
     set(EmscriptenFlags "")
 else ()
     set(CMAKE_C_FLAGS "-O3 -fms-extensions -Wall -Wextra -g -fsanitize=address,undefined -march=native -fno-strict-aliasing -lm")
@@ -60,9 +60,6 @@ add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         src/wasm_adapter.c
         src/wasm_adapter.h)
 target_include_directories(bjvm PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR})
-
-add_subdirectory(src/classes)
-add_dependencies(bjvm build_jar)
 
 if (NOT EMSCRIPTEN)
 target_link_libraries(bjvm PRIVATE zlibstatic)
