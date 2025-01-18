@@ -77,14 +77,7 @@ typedef enum {
   BJVM_INTERP_RESULT_OK,
   // An exception was thrown and the frame completed abruptly, so
   // thread->current_exception is set.
-  BJVM_INTERP_RESULT_EXC,
-  // An interrupt occurred and the interpreter should be called again at some
-  // point. e.g. an interrupt for thread-switching purposes.
-  BJVM_INTERP_RESULT_INT,
-  // An interrupt occurred and the interpreter should be called again at some
-  // point, AND calling this function again without executing something else
-  // is a logical error. e.g. an interrupt of a JS async function
-  BJVM_INTERP_RESULT_MANDATORY_INT
+  BJVM_INTERP_RESULT_EXC
 } bjvm_interpreter_result_t;
 
 typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
@@ -139,6 +132,31 @@ DECLARE_ASYNC(
     };
     uint16_t i;, bjvm_thread *thread, bjvm_classdesc *classdesc);
 
+DECLARE_ASYNC(struct bjvm_native_MethodType *, resolve_mh_mt,
+              bjvm_initialize_class_t ic;
+              , bjvm_thread *thread, bjvm_cp_method_handle_info *info);
+
+DECLARE_ASYNC(
+    struct bjvm_native_MethodHandle *, bjvm_resolve_method_handle,
+    union {
+      bjvm_initialize_class_t init_class_state;
+      resolve_mh_mt_t resolve;
+    };
+    bjvm_classdesc * DirectMethodHandle; bjvm_cp_method * m;
+    , bjvm_thread *thread, bjvm_cp_method_handle_info *info);
+
+DECLARE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument,
+              bjvm_resolve_method_handle_t resolve;
+              , bjvm_thread *thread, bjvm_cp_entry *ent, bool *is_object);
+
+DECLARE_ASYNC(
+    int, indy_resolve,
+    int static_i;
+    union {
+      bjvm_resolve_method_handle_t mh;
+      bjvm_resolve_indy_static_argument_t static_arg;
+    };
+    , bjvm_thread *thread, bjvm_bytecode_insn *insn, bjvm_cp_indy_info *indy);
 // Continue execution of a thread.
 //
 // When popping frames off the stack, if the passed frame "final_frame" is
@@ -146,10 +164,13 @@ DECLARE_ASYNC(
 // either INTERP_RESULT_OK or INTERP_RESULT_EXC is returned, depending on
 // whether the frame completed abruptly.
 EMSCRIPTEN_KEEPALIVE
-DECLARE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, int sd;
-              bjvm_initialize_class_t init_class;
-              , bjvm_thread *thread, struct bjvm_stack_frame *final_frame,
-              bjvm_stack_value *result);
+DECLARE_ASYNC(
+    bjvm_interpreter_result_t, bjvm_interpret, int sd; union {
+      bjvm_initialize_class_t init_class;
+      indy_resolve_t indy_resolve;
+    };
+    , bjvm_thread *thread, struct bjvm_stack_frame *final_frame,
+    bjvm_stack_value *result);
 
 struct bjvm_cached_classdescs;
 typedef struct bjvm_vm {

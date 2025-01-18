@@ -26,9 +26,10 @@ typedef struct future {
 #define future_ready()                                                         \
   (future_t) { FUTURE_READY, nullptr }
 
-#define start_counter(counter_name) enum { counter_name = __COUNTER__ };
+#define start_counter(counter_name, start_value)                               \
+  enum { counter_name = __COUNTER__ - (start_value) };
 #define get_counter_value(counter_name, target_name)                           \
-  enum { target_name = __COUNTER__ - counter_name };
+  enum { target_name = __COUNTER__ - (counter_name) - 1 };
 
 /// Declares an async function.  Should be followed by a block containing any
 /// locals that the async function needs (accessibly via self->).
@@ -53,26 +54,41 @@ typedef struct future {
     locals;                                                                    \
   };
 
-/// Defines a void-returning async function.  Should be followed by a block
-/// containing the code of the async function.  Must end with ASYNC_END_VOID
-/// before closing bracket.
-#define DEFINE_ASYNC_VOID(name, ...)                                           \
+/// Defines a void-returning async function, with a custom starting label idx
+/// for cases. Should be followed by a block containing the code of the async
+/// function.  Must end with ASYNC_END_VOID before closing bracket.
+#define DEFINE_ASYNC_VOID_SL(name, start_idx, ...)                             \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
-    start_counter(label_counter);                                              \
+    start_counter(label_counter, start_idx);                                   \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
       *self = (typeof(*self)){0};
 
-/// Defines a value-returning async function.  Should be followed by a block
-/// containing the code of the async function.  MUST end with ASYNC_END, or
-/// ASYNC_END_VOID if the function is guaranteed to call ASYNC_RETURN() before
-/// it reaches the end statement.
-#define DEFINE_ASYNC(return_type, name, ...)                                   \
+/// Defines a void-returning async function. Should be followed by a block
+/// containing the code of the async
+/// function.  Must end with ASYNC_END_VOID before closing bracket.  Use
+/// DEFINE_ASYNC_VOID_SL if this is nested in another switch/case
+#define DEFINE_ASYNC_VOID(name, ...)                                           \
+  DEFINE_ASYNC_VOID_SL(name, 1, ##__VA_ARGS__)
+
+/// Defines a value-returning async function, with a custom starting label idx
+/// for cases. Should be followed by a block containing the code of the async
+/// function.  MUST end with ASYNC_END, or ASYNC_END_VOID if the function is
+/// guaranteed to call ASYNC_RETURN() before it reaches the end statement.
+#define DEFINE_ASYNC_SL(return_type, name, start_idx, ...)                     \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
-    start_counter(label_counter);                                              \
+    start_counter(label_counter, start_idx);                                   \
     switch (self->_state) {                                                    \
     case 0:                                                                    \
       *self = (typeof(*self)){0};
+
+/// Defines a value-returning async function. Should be followed by a block
+/// containing the code of the async function.  MUST end with ASYNC_END, or
+/// ASYNC_END_VOID if the function is guaranteed to call ASYNC_RETURN() before
+/// it reaches the end statement. Use DEFINE_ASYNC_SL if this is nested in
+/// another switch/case
+#define DEFINE_ASYNC(return_type, name, ...)                                   \
+  DEFINE_ASYNC_SL(return_type, name, 1, ##__VA_ARGS__)
 
 /// Begins a block of code that will be executed asynchronously from inside
 /// another block. DO NOT USE STACK VARIABLES FROM BEFORE AWAIT() AFTER AWAIT.
@@ -126,8 +142,8 @@ typedef struct future {
   do {                                                                         \
     get_counter_value(label_counter, state_index);                             \
     self->_state = state_index;                                                \
-    return future_not_ready((waker));                                            \
-  case state_index:;                                                            \
+    return future_not_ready((waker));                                          \
+  case state_index:;                                                           \
   } while (0)
 
 #ifdef __cplusplus
