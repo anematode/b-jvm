@@ -28,7 +28,9 @@ DECLARE_NATIVE(
 
   free_heap_str(name_str);
 
-  bjvm_initialize_class(thread, result);
+  bjvm_initialize_class_t pox;
+  future_t f = bjvm_initialize_class(&pox, thread, result); // TODO convert
+  assert(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};

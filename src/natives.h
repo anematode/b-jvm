@@ -23,7 +23,7 @@ static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) {
     bjvm_obj_header *__val = check_is_object(expr);                            \
     heap_string __hstr;                                                        \
     if (read_string_to_utf8(thread, &__hstr, __val) !=                         \
-        BJVM_INTERP_RESULT_OK) {                                               \
+        0) {                                               \
       assert(thread->current_exception);                                       \
       goto on_oom;                                                             \
     }                                                                          \
@@ -48,7 +48,7 @@ extern bjvm_native_t *bjvm_natives;
 static void _push_bjvm_native(bjvm_native_t native) {
   if (bjvm_native_count == bjvm_native_capacity) {
     bjvm_native_capacity = bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;
-    bjvm_native_t *bjvm_natives_ =
+    bjvm_native_t *bjvm_natives_ = (bjvm_native_t *)
         realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t));
     assert(bjvm_natives_ != nullptr);
 

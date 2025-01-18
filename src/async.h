@@ -38,8 +38,8 @@ typedef struct future {
   typedef struct name##_s name##_t;                                            \
   future_t name(name##_t *self, ##__VA_ARGS__);                                \
   struct name##_s {                                                            \
-    int _state;                                                                \
     return_type _result;                                                       \
+    int _state;                                                                \
     locals;                                                                    \
   };
 /// Declares an async function that returns nothing.  Should be followed by a

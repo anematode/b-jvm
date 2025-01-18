@@ -71,25 +71,16 @@ static inline bjvm_stack_value value_null() {
 
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target);
 
-typedef enum {
-  // Execution of the frame completed successfully and it has been removed
-  // from the stack.
-  BJVM_INTERP_RESULT_OK,
-  // An exception was thrown and the frame completed abruptly, so
-  // thread->current_exception is set.
-  BJVM_INTERP_RESULT_EXC
-} bjvm_interpreter_result_t;
-
 typedef bjvm_stack_value (*bjvm_sync_native_callback)(bjvm_thread *vm,
                                                       bjvm_handle *obj,
                                                       bjvm_value *args,
                                                       int argc);
-typedef bjvm_interpreter_result_t (*bjvm_async_native_callback)(
-    bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc,
-    bjvm_stack_value *result, void **sm_state);
+typedef future_t (*bjvm_async_native_callback)(void *ctx,
+    bjvm_thread *vm, bjvm_handle *obj, bjvm_value *args, int argc);
 
 typedef struct {
-  bool is_async;
+  // Number of bytes needed for the context struct allocation (0 if sync)
+  size_t async_ctx_bytes;
   // either bjvm_sync_native_callback or bjvm_async_native_callback
   void *ptr;
 } bjvm_native_callback;
@@ -115,7 +106,7 @@ typedef struct bjvm_obj_header {
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
                  size_t *len); // todo: get rid of
-bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread,
+int read_string_to_utf8(bjvm_thread *thread,
                                               heap_string *result,
                                               bjvm_obj_header *obj);
 typedef struct bjvm_vm bjvm_vm;
@@ -124,8 +115,16 @@ typedef void (*bjvm_write_byte)(int ch, void *param);
 
 #define BJVM_CARD_BYTES 4096
 
+typedef struct bjvm_plain_frame bjvm_plain_frame;
+typedef struct bjvm_stack_frame bjvm_stack_frame;
+typedef struct bjvm_native_frame bjvm_native_frame;
+
+
+DECLARE_ASYNC(bjvm_stack_value, bjvm_run_native, void *native_struct;, bjvm_thread *thread,
+              bjvm_native_frame *frame);
+
 DECLARE_ASYNC(
-    bjvm_interpreter_result_t, bjvm_initialize_class,
+    int, bjvm_initialize_class,
     union {
       bjvm_initialize_class_t *recursive_call_space;
       struct bjvm_interpret_s *interpret;
@@ -145,6 +144,14 @@ DECLARE_ASYNC(
     bjvm_classdesc * DirectMethodHandle; bjvm_cp_method * m;
     , bjvm_thread *thread, bjvm_cp_method_handle_info *info);
 
+typedef struct bjvm_interpret_s bjvm_interpret_t;
+
+DECLARE_ASYNC_VOID(bjvm_invokevirtual_signature_polymorphic,
+bjvm_interpret_t *interpreter_ctx; bjvm_cp_method *method; int argc;,
+bjvm_thread *thread, bjvm_plain_frame *frame, int *sd,
+  bjvm_cp_method *method, struct bjvm_native_MethodType *provider_mt,
+  bjvm_obj_header *target);
+
 DECLARE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument,
               bjvm_resolve_method_handle_t resolve;
               , bjvm_thread *thread, bjvm_cp_entry *ent, bool *is_object);
@@ -152,11 +159,19 @@ DECLARE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument,
 DECLARE_ASYNC(
     int, indy_resolve,
     int static_i;
+    bjvm_plain_frame *fake_frame;
     union {
       bjvm_resolve_method_handle_t mh;
       bjvm_resolve_indy_static_argument_t static_arg;
+      bjvm_invokevirtual_signature_polymorphic_t invoke;
     };
-    , bjvm_thread *thread, bjvm_bytecode_insn *insn, bjvm_cp_indy_info *indy);
+    , bjvm_thread *thread, bjvm_bytecode_insn *insn, bjvm_cp_indy_info *indy)
+  ;
+
+DECLARE_ASYNC(int, resolve_methodref,
+  bjvm_cp_class_info *klass; bjvm_initialize_class_t initializer_ctx;,
+  bjvm_thread *thread, bjvm_cp_method_info *info);
+
 // Continue execution of a thread.
 //
 // When popping frames off the stack, if the passed frame "final_frame" is
@@ -165,12 +180,14 @@ DECLARE_ASYNC(
 // whether the frame completed abruptly.
 EMSCRIPTEN_KEEPALIVE
 DECLARE_ASYNC(
-    bjvm_interpreter_result_t, bjvm_interpret, int sd; union {
+    bjvm_stack_value, bjvm_interpret, int sd; bjvm_stack_frame *invoked_frame; union {
       bjvm_initialize_class_t init_class;
       indy_resolve_t indy_resolve;
+      bjvm_run_native_t native;
+      resolve_methodref_t methodref_resolve;
+      bjvm_invokevirtual_signature_polymorphic_t invoke_sigpoly;
     };
-    , bjvm_thread *thread, struct bjvm_stack_frame *final_frame,
-    bjvm_stack_value *result);
+    , bjvm_thread *thread, bjvm_stack_frame *final_frame);
 
 struct bjvm_cached_classdescs;
 typedef struct bjvm_vm {
@@ -257,7 +274,7 @@ typedef struct {
 //
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
-typedef struct {
+typedef struct bjvm_plain_frame {
   uint16_t is_native; // always 0
   uint16_t values_count;
   uint16_t program_counter; // in instruction indices
@@ -265,11 +282,6 @@ typedef struct {
 
   // The method associated with this frame
   bjvm_cp_method *method;
-  // When the next frame completes in bjvm_bytecode_interpret, and a "result"
-  // pointer isn't explicitly passed to the method, the result is stored here.
-  bjvm_stack_value result_of_next;
-  // Used by some instructions for interrupting
-  int state;
 
   bjvm_stack_value values[];
 } bjvm_plain_frame;
@@ -278,7 +290,7 @@ typedef struct {
 // separately from the (inaccessible) WebAssembly stack, and merely contains
 // data necessary for correct stack trace recovery and resumption after
 // interrupts.
-typedef struct {
+typedef struct bjvm_native_frame {
   uint16_t is_native;    // always 1
   uint16_t values_count; // number of args passed into the native method
 
@@ -287,23 +299,9 @@ typedef struct {
 
   // see bjvm_plain_frame
   bjvm_cp_method *method;
-  bjvm_stack_value result_of_next;
   // Descriptor on the instruction itself. Unequal to method->descriptor only
   // in the situation of signature-polymorphic methods.
   const bjvm_method_descriptor *method_shape;
-
-  // Used by async native methods to store custom state
-  void *async_native_data;
-  // Called when the thread is destroyed while the async native method is
-  // in progress; the function is not called if the method completes normally,
-  // or if an exception is thrown in an inner frame and it propagates to the
-  // native method. (The native method is invoked again in that case.)
-  //
-  // A well-behaved method should place a clean-up destructor here which will be
-  // passed the pointer in async_native_data. The destructor should not attempt
-  // to invoke any VM functions (i.e., it should only clean up things like
-  // mallocated pointers).
-  void (*free_async_native_data)(void *);
 
   // Arguments to the native method, including the class instance as the first
   // argument (if the method is not static)
@@ -315,7 +313,7 @@ typedef struct {
 //
 // Native frames may be consecutive: for example, a native method might invoke
 // another native method, which itself raises an interrupt.
-typedef struct {
+typedef struct bjvm_stack_frame {
   bjvm_interpret_t async_frame;
 
   union {
@@ -333,7 +331,6 @@ bool bjvm_is_frame_native(const bjvm_stack_frame *frame);
 bjvm_native_frame *bjvm_get_native_frame(bjvm_stack_frame *frame);
 bjvm_plain_frame *bjvm_get_plain_frame(bjvm_stack_frame *frame);
 bjvm_cp_method *bjvm_get_frame_method(bjvm_stack_frame *frame);
-bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame);
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm *vm, int index);
@@ -341,14 +338,6 @@ EMSCRIPTEN_KEEPALIVE
 int bjvm_make_js_handle(bjvm_vm *vm, bjvm_obj_header *obj);
 EMSCRIPTEN_KEEPALIVE
 void bjvm_drop_js_handle(bjvm_vm *vm, int index);
-
-typedef enum bjvm_vm_level {
-  BJVM_VM_LEVEL_0 = 0, // No JVM is running in this thread yet
-  BJVM_VM_LEVEL_1 = 1, // We're in the root-level VM;  short-lived reentrant
-                       // calls are permissible
-  BJVM_VM_LEVEL_2 =
-      2 // reentrant calls are forbidden since we're already in a reentrant call
-} bjvm_vm_level;
 
 typedef struct bjvm_thread {
   // Global VM corresponding to this thread
@@ -391,13 +380,11 @@ typedef struct bjvm_thread {
   // Handle for null
   bjvm_handle null_handle;
 
-  // At least one JIT compiled method is on the stack, so certain stack
-  // scanning operations (e.g., GC) are unsound; a mandatory interrupt should
-  // be raised before continuing
-  bool stack_unsound;
-
-  // The VM level of operation
-  bjvm_vm_level vm_level;
+  // If true, the call stack must fully unwind because we are e.g. waiting for
+  // a JS Promise. This should only be cleared by the top-level scheduler.
+  // This function is used in bjvm_thread_run, which attempts to run code in
+  // a synchronous manner.
+  bool must_unwind;
 
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
@@ -477,11 +464,18 @@ int bjvm_thread_run_root(bjvm_thread *thread, bjvm_cp_method *method,
 int bjvm_thread_run_leaf(bjvm_thread *thread, bjvm_cp_method *method,
                          bjvm_stack_value *args, bjvm_stack_value *result);
 
+typedef enum {
+  BJVM_ASYNC_RUN_RESULT_OK,
+  BJVM_ASYNC_RUN_RESULT_EXC,
+  BJVM_ASYNC_RUN_RESULT_INT,
+} bjvm_async_run_result;
+
 typedef struct {
   bjvm_thread *thread;
   bjvm_stack_frame *frame;
   bjvm_stack_value *result;
-  bjvm_interpreter_result_t status;
+  bjvm_interpret_t interpreter_state;
+  bjvm_async_run_result status;
 } bjvm_async_run_ctx;
 
 // Get an asynchronous running context. The caller should repeatedly call
@@ -530,7 +524,7 @@ void bjvm_unsatisfied_link_error(bjvm_thread *thread,
                                  const bjvm_cp_method *method);
 void bjvm_abstract_method_error(bjvm_thread *thread,
                                 const bjvm_cp_method *method);
-bjvm_interpreter_result_t bjvm_invokestatic(bjvm_thread *thread,
+int bjvm_invokestatic(bjvm_thread *thread,
                                             bjvm_plain_frame *frame,
                                             bjvm_bytecode_insn *insn, int *sd);
 void dump_frame(FILE *stream, const bjvm_plain_frame *frame);

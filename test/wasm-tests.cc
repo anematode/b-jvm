@@ -59,7 +59,7 @@ TEST_CASE("Simple module", "[wasm]") {
 TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
   auto example = [](bjvm_thread *thread, bjvm_stack_value *result, double a, long b) -> int {
     result->d = a + b;
-    return BJVM_INTERP_RESULT_EXC;
+    return 1;
   };
   bjvm_type_kind args[2] = {BJVM_TYPE_KIND_DOUBLE, BJVM_TYPE_KIND_LONG};
   auto adapter = create_adapter_to_compiled_method(args, 2);
@@ -67,6 +67,6 @@ TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
   if (adapter) {
     int n = adapter(nullptr, &result, (bjvm_stack_value[]){(bjvm_stack_value){.d = 1.0}, (bjvm_stack_value){.l = 2}}, (void*) +example);
     REQUIRE(result.d == 3.0);
-    REQUIRE(n == BJVM_INTERP_RESULT_EXC);
+    REQUIRE(n == 1);
   }
 }

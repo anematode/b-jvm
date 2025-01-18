@@ -33,12 +33,12 @@
 
 #include "cached_classdescs.h"
 
-DECLARE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs,
+DECLARE_ASYNC(int, init_cached_classdescs,
               bjvm_initialize_class_t ic;
               bjvm_classdesc **cached_classdescs;
               , bjvm_thread *thread);
 
-DEFINE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs,
+DEFINE_ASYNC(int, init_cached_classdescs,
              bjvm_thread *thread) {
   assert(!thread->vm->cached_classdescs);
 
@@ -47,16 +47,16 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs,
 
   if (!self->cached_classdescs) {
     thread->current_exception = thread->out_of_mem_error;
-    ASYNC_RETURN(BJVM_INTERP_RESULT_EXC);
+    ASYNC_RETURN(-1);
   }
 
   for (int i = 0; i < cached_classdesc_count; i++) {
-    char constexpr *name = cached_classdesc_paths[i];
+    char const *name = cached_classdesc_paths[i];
     self->cached_classdescs[i] = bootstrap_lookup_class(thread, str_to_utf8(name));
 
     AWAIT(bjvm_initialize_class(&self->ic, thread, self->cached_classdescs[i]));
 
-    if (self->ic._result != BJVM_INTERP_RESULT_OK) {
+    if (self->ic._result != 0) {
       free(self->cached_classdescs);
       ASYNC_RETURN(self->ic._result);
     }
@@ -64,7 +64,7 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, init_cached_classdescs,
 
   thread->vm->cached_classdescs =
       (struct bjvm_cached_classdescs *)self->cached_classdescs;
-  ASYNC_END(BJVM_INTERP_RESULT_OK);
+  ASYNC_END(0);
 }
 
 #define MAX_CF_NAME_LENGTH 1000
@@ -94,11 +94,6 @@ bjvm_plain_frame *bjvm_get_plain_frame(bjvm_stack_frame *frame) {
 bjvm_cp_method *bjvm_get_frame_method(bjvm_stack_frame *frame) {
   return bjvm_is_frame_native(frame) ? frame->native.method
                                      : frame->plain.method;
-}
-
-bjvm_stack_value *bjvm_get_frame_result_of_next(bjvm_stack_frame *frame) {
-  return bjvm_is_frame_native(frame) ? &frame->native.result_of_next
-                                     : &frame->plain.result_of_next;
 }
 
 bjvm_obj_header *bjvm_deref_js_handle(bjvm_vm *vm, int index) {
@@ -219,10 +214,7 @@ bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *method,
   frame->native.values_count = argc;
   frame->native.method = method;
   frame->native.method_shape = descriptor;
-  frame->native.result_of_next = value_null();
   frame->native.state = 0;
-  frame->native.async_native_data = nullptr;
-  frame->native.free_async_native_data = nullptr;
 
   // Now wrap arguments in handles and copy them into the frame
   make_handles_array(thread, descriptor,
@@ -267,8 +259,6 @@ bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread,
   frame->plain.program_counter = 0;
   frame->plain.max_stack = code->max_stack;
   frame->plain.method = method;
-  frame->plain.result_of_next = value_null();
-  frame->plain.state = 0;
 
   // Copy in the arguments
   if (likely(argc)) {
@@ -503,7 +493,7 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, short **buf,
   *len = *ArrayLength(array);
 }
 
-bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread,
+int read_string_to_utf8(bjvm_thread *thread,
                                               heap_string *result,
                                               bjvm_obj_header *obj) {
   short *buf;
@@ -513,7 +503,7 @@ bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread,
 
   if (!cbuf) {
     thread->current_exception = thread->out_of_mem_error;
-    return BJVM_INTERP_RESULT_EXC;
+    return -1;
   }
 
   for (size_t i = 0; i < len; ++i) {
@@ -522,7 +512,7 @@ bjvm_interpreter_result_t read_string_to_utf8(bjvm_thread *thread,
   cbuf[len] = 0;
   *result = (heap_string){.chars = cbuf, .len = len};
 
-  return BJVM_INTERP_RESULT_OK;
+  return 0;
 }
 
 void *ArrayData(bjvm_obj_header *array);
@@ -872,8 +862,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->handles_capacity = HANDLES_CAPACITY;
   thr->lang_exception_frame = -1;
 
-  init_cached_classdescs_t init_cached_classdescs;
-  future_t result = ::init_cached_classdescs(&init_cached_classdescs, thr);
+  init_cached_classdescs_t init;
+  future_t result = init_cached_classdescs(&init, thr);
   assert(result.status == FUTURE_READY);
 
   bjvm_vm_init_primitive_classes(thr);
@@ -1073,7 +1063,7 @@ DEFINE_ASYNC_SL(struct bjvm_native_MethodType *, resolve_mh_mt,
           {.i = 1}},
       &result);
 
-  ASYNC_END(result.obj);
+  ASYNC_END((void*) result.obj);
 }
 
 DEFINE_ASYNC_SL(struct bjvm_native_MethodHandle *, bjvm_resolve_method_handle,
@@ -1606,9 +1596,7 @@ bool initialize_constant_value_fields(bjvm_thread *thread,
 // and raise it.
 void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
   bjvm_handle *exc = bjvm_make_handle(thread, thread->current_exception);
-  bjvm_classdesc *EIIE = bootstrap_lookup_class(
-      thread, STR("java/lang/ExceptionInInitializerError"));
-  bjvm_initialize_class(thread, EIIE);
+  bjvm_classdesc *EIIE = thread->vm->cached_classdescs->exception_in_initializer_error;
   bjvm_handle *eiie = bjvm_make_handle(thread, new_object(thread, EIIE));
   bjvm_cp_method *ctor = bjvm_method_lookup(
       EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
@@ -1625,7 +1613,7 @@ void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
 }
 
 // Call <clinit> on the class, if it hasn't already been called.
-DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
+DEFINE_ASYNC(int, bjvm_initialize_class,
              bjvm_thread *thread, bjvm_classdesc *classdesc) {
   bool error; // this is a local, but it's ok because we don't use it between
               // awaits
@@ -1635,14 +1623,14 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
     // Class is already initialized, or currently being initialized.
     // TODO In a multithreaded model, we would need to wait for the other
     // thread to finish initializing the class.
-    ASYNC_RETURN(BJVM_INTERP_RESULT_OK);
+    ASYNC_RETURN(0);
   }
 
   if (classdesc->state != BJVM_CD_STATE_LINKED) {
     error = bjvm_link_class(thread, classdesc);
     if (error) {
       assert(thread->current_exception);
-      ASYNC_RETURN(BJVM_INTERP_RESULT_OK);
+      ASYNC_RETURN(0);
     }
   }
 
@@ -1650,20 +1638,20 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_initialize_class,
   self->recursive_call_space = malloc(sizeof(bjvm_initialize_class_t));
   if (!self->recursive_call_space) {
     thread->current_exception = thread->out_of_mem_error;
-    ASYNC_RETURN(BJVM_INTERP_RESULT_EXC);
+    ASYNC_RETURN(-1);
   }
 
   if (classdesc->super_class) {
     AWAIT(bjvm_initialize_class(self->recursive_call_space, thread,
                                 classdesc->super_class->classdesc));
-    if (error = self->recursive_call_space->_result)
+    if ((error = self->recursive_call_space->_result))
       goto done;
   }
 
   for (self->i = 0; self->i < classdesc->interfaces_count; ++self->i) {
     AWAIT(bjvm_initialize_class(self->recursive_call_space, thread,
                                 classdesc->interfaces[self->i]->classdesc));
-    if (error = self->recursive_call_space->_result)
+    if ((error = self->recursive_call_space->_result))
       goto done;
   }
   free(self->recursive_call_space);
@@ -1788,33 +1776,37 @@ bjvm_async_run_ctx *bjvm_thread_async_run(bjvm_thread *thread,
   ctx->thread = thread;
   ctx->frame = bjvm_push_frame(thread, method, args, argc);
   ctx->result = result;
-  ctx->status = BJVM_INTERP_RESULT_EXC;
+  ctx->status = BJVM_ASYNC_RUN_RESULT_EXC;
   if (!ctx->frame) // failed to allocate a frame
     return ctx;
-  ctx->status = BJVM_INTERP_RESULT_INT;
+  ctx->status = BJVM_ASYNC_RUN_RESULT_OK;
   return ctx;
 }
 
 bool bjvm_async_run_step(bjvm_async_run_ctx *ctx) {
-  if (ctx->status < BJVM_INTERP_RESULT_INT) {
+  if (ctx->status != BJVM_ASYNC_RUN_RESULT_INT) {
     return true; // done
   }
-  ctx->status = bjvm_interpret(ctx->thread, ctx->frame, ctx->result);
-  return ctx->status < BJVM_INTERP_RESULT_INT;
+  future_t result = bjvm_interpret(&ctx->interpreter_state, ctx->thread, ctx->frame);
+  if (ctx->thread->current_exception) {
+    ctx->status = BJVM_ASYNC_RUN_RESULT_EXC;
+  } else if (result.status == FUTURE_NOT_READY) {
+    ctx->status = BJVM_ASYNC_RUN_RESULT_INT;
+  } else {
+    *ctx->result = ctx->interpreter_state._result;
+    ctx->status = BJVM_ASYNC_RUN_RESULT_OK;
+  }
+  return ctx->status != BJVM_ASYNC_RUN_RESULT_INT;
 }
 
 void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx) { free(ctx); }
 
 static int _bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
                             bjvm_stack_value *args, bjvm_stack_value *result) {
-  assert((thread->vm_level != BJVM_VM_LEVEL_2) &&
-         "Illegal reentry from second-level guest");
-
-  ++thread->vm_level;
   bjvm_async_run_ctx *ctx = bjvm_thread_async_run(thread, method, args, result);
   int ret;
   while (!bjvm_async_run_step(ctx)) {
-    if (ctx->status == BJVM_INTERP_RESULT_MANDATORY_INT) {
+    if (thread->must_unwind) {
       bjvm_raise_vm_exception(
           thread, STR("java/lang/InternalError"),
           STR("Attempted to execute an async function while "
@@ -1823,26 +1815,20 @@ static int _bjvm_thread_run(bjvm_thread *thread, bjvm_cp_method *method,
       goto done;
     }
   }
-  assert(ctx->status < BJVM_INTERP_RESULT_INT);
-  ret = -(ctx->status == BJVM_INTERP_RESULT_EXC);
+  ret = -(ctx->status == BJVM_ASYNC_RUN_RESULT_EXC);
 
 done:
   bjvm_free_async_run_ctx(ctx);
-  --thread->vm_level;
   return ret;
 }
 
 int bjvm_thread_run_root(bjvm_thread *thread, bjvm_cp_method *method,
                          bjvm_stack_value *args, bjvm_stack_value *result) {
-  assert(thread->vm_level == BJVM_VM_LEVEL_0);
-
   return _bjvm_thread_run(thread, method, args, result);
 }
 
 int bjvm_thread_run_leaf(bjvm_thread *thread, bjvm_cp_method *method,
                          bjvm_stack_value *args, bjvm_stack_value *result) {
-  assert(thread->vm_level == BJVM_VM_LEVEL_1);
-
   return _bjvm_thread_run(thread, method, args, result);
 }
 
@@ -1893,11 +1879,11 @@ void store_stack_value(void *field_location, bjvm_stack_value value,
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
   case BJVM_TYPE_KIND_BYTE:
-    *(int8_t *)field_location = value.i;
+    *(int8_t *)field_location = (int8_t)value.i;
     break;
   case BJVM_TYPE_KIND_CHAR:
   case BJVM_TYPE_KIND_SHORT:
-    *(int16_t *)field_location = value.i;
+    *(int16_t *)field_location = (int16_t)value.i;
     break;
   case BJVM_TYPE_KIND_FLOAT:
     *(float *)field_location = value.f;
@@ -2003,9 +1989,7 @@ bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc) {
     return nullptr;
   if (classdesc->cp_mirror)
     return classdesc->cp_mirror;
-  bjvm_classdesc *java_lang_ConstantPool =
-      bootstrap_lookup_class(thread, STR("sun/reflect/ConstantPool"));
-  bjvm_initialize_class(thread, java_lang_ConstantPool);
+  bjvm_classdesc *java_lang_ConstantPool = thread->vm->cached_classdescs->constant_pool;
   struct bjvm_native_ConstantPool *cp_mirror = classdesc->cp_mirror =
       (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = classdesc;
@@ -2019,8 +2003,7 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
   if (classdesc->mirror)
     return classdesc->mirror;
 
-  bjvm_classdesc *java_lang_Class =
-      bootstrap_lookup_class(thread, STR("java/lang/Class"));
+  bjvm_classdesc *java_lang_Class = thread->vm->cached_classdescs->klass;
   struct bjvm_native_Class *class_mirror = classdesc->mirror =
       (void *)new_object(thread, java_lang_Class);
   if (class_mirror)
@@ -2126,13 +2109,7 @@ static inline void __checked_push(bjvm_plain_frame *frame, int *sd,
 #define checked_pop(frame) __checked_pop(frame, &sd)
 #define checked_push(frame, value) __checked_push(frame, &sd, value)
 
-enum {
-  INVOKE_STATE_ENTRY = 0,
-  // The invoked frame was already created and the result has been written
-  INVOKE_STATE_MADE_FRAME = 2,
-};
-
-bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
+DEFINE_ASYNC_VOID_SL(bjvm_invokevirtual_signature_polymorphic, 100,
     bjvm_thread *thread, bjvm_plain_frame *frame, int *sd,
     bjvm_cp_method *method, struct bjvm_native_MethodType *provider_mt,
     bjvm_obj_header *target) {
@@ -2155,7 +2132,7 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
   if (is_invoke_exact) {
     if (!mts_are_same) {
       bjvm_wrong_method_type_error(thread, provider_mt, targ);
-      return BJVM_INTERP_RESULT_EXC;
+      ASYNC_RETURN_VOID();
     }
   }
 
@@ -2173,8 +2150,8 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
         thread, asType,
         (bjvm_stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}},
         &result);
-    if (status != BJVM_INTERP_RESULT_OK) // asType failed
-      return status;
+    if (status != 0) // asType failed
+      ASYNC_RETURN_VOID();
     mh = (void *)result.obj;
   }
 
@@ -2200,27 +2177,24 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
     UNREACHABLE();
     break;
   case BJVM_MH_KIND_INVOKE_STATIC: {
-    bjvm_cp_method *method = name->vmtarget;
+    self->method = name->vmtarget;
     assert(method);
-    bjvm_stack_value result;
-    if (frame->state < INVOKE_STATE_MADE_FRAME) {
-      bjvm_stack_frame *new_frame = bjvm_push_frame(
-          thread, method, frame->values + *sd - method->descriptor->args_count,
-          method->descriptor->args_count);
-      bjvm_interpreter_result_t status =
-          bjvm_interpret(thread, new_frame, &result);
-      if (status != BJVM_INTERP_RESULT_OK) {
-        if (status == BJVM_INTERP_RESULT_INT)
-          frame->state = INVOKE_STATE_MADE_FRAME;
-        return status;
-      }
-    }
-    frame->state = INVOKE_STATE_ENTRY;
-    if (method->descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
-      frame->values[*sd - method->descriptor->args_count] = result;
+    self->argc = method->descriptor->args_count;
+    bjvm_stack_frame *new_frame = bjvm_push_frame(
+        thread, method, frame->values + *sd - self->argc,
+        self->argc);
+    // TODO arena allocate this in the VM so that it gets freed appropriately
+    // if the VM is deleted
+    self->interpreter_ctx = malloc(sizeof(bjvm_interpret_t));
+    AWAIT(bjvm_interpret(self->interpreter_ctx, thread, new_frame));
+    // This many arguments were consumed
+    *sd -= self->argc;
+    if (self->method->descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
+      // Store the result in the frame and increment the stack pointer
+      frame->values[*sd - self->argc] = self->interpreter_ctx->_result;
       (*sd)++;
     }
-    *sd -= method->descriptor->args_count;
+    free(self->interpreter_ctx);
     break;
   }
   case BJVM_MH_KIND_INVOKE_SPECIAL:
@@ -2235,30 +2209,21 @@ bjvm_interpreter_result_t bjvm_invokevirtual_signature_polymorphic(
   default:
     UNREACHABLE();
   }
-  return BJVM_INTERP_RESULT_OK;
+  ASYNC_END_VOID();
 }
 
-static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread,
-                                                   bjvm_cp_method_info *info) {
+DEFINE_ASYNC(int, resolve_methodref, bjvm_thread *thread, bjvm_cp_method_info *info) {
   if (info->resolved) {
-    return BJVM_INTERP_RESULT_OK;
+    ASYNC_RETURN(0);
   }
-
-  bjvm_cp_class_info *class = info->class_info;
-  int status = bjvm_resolve_class(thread, class);
+  self->klass = info->class_info;
+  int status = bjvm_resolve_class(thread, self->klass);
   if (status) {
     // Failed to resolve the class in question
-    return BJVM_INTERP_RESULT_EXC;
+    ASYNC_RETURN(status);
   }
-
-  status = bjvm_initialize_class(thread, class->classdesc);
-  if (status) {
-    // <clinit> might get interrupted, that's ok -- steps until here are
-    // idempotent
-    return status;
-  }
-
-  info->resolved = bjvm_method_lookup(class->classdesc, info->nat->name,
+  AWAIT(bjvm_initialize_class(&self->initializer_ctx, thread, self->klass->classdesc));
+  info->resolved = bjvm_method_lookup(self->klass->classdesc, info->nat->name,
                                       info->nat->descriptor, true, true);
   if (!info->resolved) {
     INIT_STACK_STRING(complaint, 1000);
@@ -2266,12 +2231,11 @@ static bjvm_interpreter_result_t resolve_methodref(bjvm_thread *thread,
         bprintf(complaint,
                 "Could not find method %.*s with descriptor %.*s on class %.*s",
                 fmt_slice(info->nat->name), fmt_slice(info->nat->descriptor),
-                fmt_slice(class->name));
+                fmt_slice(self->klass->name));
     bjvm_incompatible_class_change_error(thread, complaint);
-    return -1;
+    ASYNC_RETURN(1);
   }
-
-  return BJVM_INTERP_RESULT_OK;
+  ASYNC_END(0);
 }
 
 int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame,
@@ -2352,59 +2316,57 @@ DEFINE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument, bjvm_thread *thread,
   ASYNC_END_VOID();
 }
 
+_Thread_local bjvm_value handles[256];
+_Thread_local bool is_handle[256];
 
 DEFINE_ASYNC(int, indy_resolve, bjvm_thread *thread, bjvm_bytecode_insn *insn,
              bjvm_cp_indy_info *indy) {
   // e.g. LambdaMetafactory.metafactory
-  {
-    AWAIT(bjvm_resolve_method_handle(&self->mh, thread, indy->method->ref));
-    bjvm_handle *bootstrap_handle =
-        bjvm_make_handle(thread, (void *)self->mh._result);
+  AWAIT(bjvm_resolve_method_handle(&self->mh, thread, indy->method->ref));
+  bjvm_handle *bootstrap_handle =
+      bjvm_make_handle(thread, (void *)self->mh._result);
 
 #define m (indy->method)
 
-    bjvm_stack_value lookup_obj;
-    // MethodHandles class
-    bjvm_classdesc *lookup_class = thread->vm->cached_classdescs->method_handles;
-    bjvm_cp_method *lookup_factory = bjvm_method_lookup(
-        lookup_class, STR("lookup"),
-        STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
+  bjvm_stack_value lookup_obj;
+  // MethodHandles class
+  bjvm_classdesc *lookup_class = thread->vm->cached_classdescs->method_handles;
+  bjvm_cp_method *lookup_factory = bjvm_method_lookup(
+      lookup_class, STR("lookup"),
+      STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
 
-    bjvm_thread_run_root(thread, lookup_factory, (bjvm_stack_value[]){},
-                         &lookup_obj);
-    bjvm_handle *lookup_handle = bjvm_make_handle(thread, lookup_obj.obj);
+  bjvm_thread_run_root(thread, lookup_factory, (bjvm_stack_value[]){},
+                       &lookup_obj);
+  bjvm_handle *lookup_handle = bjvm_make_handle(thread, lookup_obj.obj);
 
-    bjvm_plain_frame *fake_frame =
-        calloc(1, sizeof(bjvm_plain_frame) +
-                      sizeof(bjvm_stack_value) * (m->args_count + 4));
-    fake_frame->max_stack = fake_frame->values_count = m->args_count + 4;
+  self->fake_frame =
+      calloc(1, sizeof(bjvm_plain_frame) +
+                    sizeof(bjvm_stack_value) * (m->args_count + 4));
+  self->fake_frame->max_stack = self->fake_frame->values_count = m->args_count + 4;
 
-    bjvm_value handles[256]; // TODO: these are UB in async
-    bool is_handle[256];
-    self->static_i = 0;
-    for (; self->static_i < m->args_count; ++self->static_i) {
-      bjvm_cp_entry *arg = m->args[self->static_i];
-      AWAIT(bjvm_resolve_indy_static_argument(&self->static_arg, thread, arg, &is_handle[self->static_i]));
-      handles[self->static_i] = self->static_arg._result;
-    }
+  self->static_i = 0;
+  for (; self->static_i < m->args_count; ++self->static_i) {
+    bjvm_cp_entry *arg = m->args[self->static_i];
+    AWAIT(bjvm_resolve_indy_static_argument(&self->static_arg, thread, arg, &is_handle[self->static_i]));
+    handles[self->static_i] = self->static_arg._result;
   }
 
   bjvm_handle *name = bjvm_make_handle(
       thread, bjvm_intern_string(thread, indy->name_and_type->name));
   indy->resolved_mt = bjvm_resolve_method_type(thread, indy->method_descriptor);
 
-  fake_frame->values[0] = (bjvm_stack_value){.obj = bootstrap_handle->obj};
-  fake_frame->values[1] = (bjvm_stack_value){.obj = lookup_handle->obj};
-  fake_frame->values[2] = (bjvm_stack_value){.obj = name->obj};
-  fake_frame->values[3] = (bjvm_stack_value){.obj = (void *)indy->resolved_mt};
+  self->fake_frame->values[0] = (bjvm_stack_value){.obj = bootstrap_handle->obj};
+  self->fake_frame->values[1] = (bjvm_stack_value){.obj = lookup_handle->obj};
+  self->fake_frame->values[2] = (bjvm_stack_value){.obj = name->obj};
+  self->fake_frame->values[3] = (bjvm_stack_value){.obj = (void *)indy->resolved_mt};
 
-  for (int i = 0; i < static_i; ++i) {
+  for (int i = 0; i < self->static_i; ++i) {
     if (is_handle[i]) {
-      fake_frame->values[i + 4] =
+      self->fake_frame->values[i + 4] =
           (bjvm_stack_value){.obj = handles[i].handle->obj};
       bjvm_drop_handle(thread, handles[i].handle);
     } else {
-      memcpy(fake_frame->values + i + 4, handles + i, sizeof(bjvm_stack_value));
+      memcpy(self->fake_frame->values + i + 4, handles + i, sizeof(bjvm_stack_value));
     }
   }
 
@@ -2415,20 +2377,20 @@ DEFINE_ASYNC(int, indy_resolve, bjvm_thread *thread, bjvm_bytecode_insn *insn,
           "Object;"),
       true, false);
 
-  int sd = static_i + 4;
-  bjvm_invokevirtual_signature_polymorphic(thread, fake_frame, &sd, invokeExact,
+  int sd = self->static_i + 4;
+  AWAIT(bjvm_invokevirtual_signature_polymorphic(&self->invoke, thread, self->fake_frame, &sd, invokeExact,
                                            m->ref->resolved_mt,
-                                           (void *)bootstrap_handle->obj);
+                                           (void *)bootstrap_handle->obj));
 
   int result;
   if (thread->current_exception) {
     result = -1;
   } else {
-    insn->ic = fake_frame->values[0].obj;
+    insn->ic = self->fake_frame->values[0].obj;
     result = 0;
   }
 
-  free(fake_frame);
+  free(self->fake_frame);
 
   bjvm_drop_handle(thread, bootstrap_handle);
   bjvm_drop_handle(thread, lookup_handle);
@@ -2444,39 +2406,6 @@ EMSCRIPTEN_KEEPALIVE
 int set_max_calls(int calls) {
   max_calls = calls;
   return 0;
-}
-
-int bjvm_run_as_wasm(bjvm_thread *thread, bjvm_plain_frame *final_frame,
-                     bjvm_stack_value *result,
-                     bjvm_interpreter_result_t *interp_result) {
-  bjvm_cp_method *m = final_frame->method;
-  if (!m->compiled_method) {
-    m->compiled_method = bjvm_wasm_jit_compile(thread, m, max_calls == 0);
-    if (!m->compiled_method ||
-        ((bjvm_wasm_instantiation_result *)m->compiled_method)->status !=
-            BJVM_WASM_INSTANTIATION_SUCCESS) {
-      m->failed_jit = true;
-      return 1;
-    }
-  }
-
-  // printf("%d", max_calls);
-
-  if (max_calls-- < 0) {
-    // printf("Skipping call to method: %.*s\n", fmt_slice(m->name));
-    return 1;
-  }
-
-  int (*run)(bjvm_thread *, bjvm_plain_frame *, bjvm_stack_value *) =
-      ((bjvm_wasm_instantiation_result *)m->compiled_method)->run;
-  *interp_result = run(thread, final_frame, result);
-  bjvm_pop_frame(thread, (void *)final_frame);
-  return 0;
-}
-
-int should_attempt_to_jit(bjvm_cp_method *method) {
-  return method->call_count > 50 && method->code->insn_count > 10 &&
-         !method->failed_jit; // && utf8_equals(method->name, "testOperation");
 }
 
 // Java saturates the conversion
@@ -2501,9 +2430,8 @@ static int64_t double_to_long(double x) {
   return (int64_t)x;
 }
 
-bjvm_interpreter_result_t bjvm_run_native(bjvm_thread *thread,
-                                          bjvm_native_frame *frame,
-                                          bjvm_stack_value *result) {
+DEFINE_ASYNC(bjvm_stack_value, bjvm_run_native, bjvm_thread *thread,
+                                          bjvm_native_frame *frame) {
   assert(frame && "frame is null");
 
   bjvm_native_callback *handle = frame->method->native_handle;
@@ -2511,17 +2439,20 @@ bjvm_interpreter_result_t bjvm_run_native(bjvm_thread *thread,
   bjvm_handle *target_handle = is_static ? nullptr : frame->values[0].handle;
   bjvm_value *native_args = frame->values + (is_static ? 0 : 1);
 
-  if (!handle->is_async) {
-    *result = ((bjvm_sync_native_callback)handle->ptr)(
+  if (!handle->async_ctx_bytes) {
+    bjvm_stack_value result = ((bjvm_sync_native_callback)handle->ptr)(
         thread, target_handle, native_args, frame->values_count - !is_static);
-    return thread->current_exception ? BJVM_INTERP_RESULT_EXC
-                                     : BJVM_INTERP_RESULT_OK;
+    ASYNC_RETURN(result);
   }
 
-  bjvm_interpreter_result_t status = ((bjvm_async_native_callback)handle->ptr)(
-      thread, target_handle, native_args, frame->values_count - is_static,
-      result, &frame->async_native_data);
-  return status;
+  self->native_struct = malloc(handle->async_ctx_bytes);
+  AWAIT(((bjvm_async_native_callback) handle->ptr)(self->native_struct, thread, target_handle,
+                                   native_args, frame->values_count - !is_static));
+  // We've laid out the context struct so that the result is always at offset 0
+  bjvm_stack_value result = *(bjvm_stack_value*) self->native_struct;
+  free(self->native_struct);
+
+  ASYNC_END(result);
 }
 
 void make_invokevtable_polymorphic(bjvm_bytecode_insn *insn) {
@@ -2540,39 +2471,20 @@ void make_invokeitable_polymorphic(bjvm_bytecode_insn *insn) {
 }
 
 // Main interpreter
-#pragma GCC diagnostic push
-#pragma GCC diagnostic error "-Wdeclaration-after-statement"
-DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, bjvm_thread *thread,
-             bjvm_stack_frame *final_frame, bjvm_stack_value *result) {
-
-#if ENABLE_JIT
-  if (final_frame == thread->frames[thread->frames_count - 1] &&
-      final_frame->program_counter == 0 &&
-      should_attempt_to_jit(final_frame->method)) {
-    bjvm_interpreter_result_t interp_result;
-#if AGGRESSIVE_DEBUG
-    printf("Running method %.*s with signature %.*s on %.*s as WASM\n",
-           fmt_slice(final_frame->method->name),
-           fmt_slice(final_frame->method->descriptor),
-           fmt_slice(final_frame->method->my_class->name));
-    dump_frame(stdout, final_frame);
-#endif
-    int failed_to_compile =
-        bjvm_run_as_wasm(thread, final_frame, result, &interp_result);
-    if (!failed_to_compile) {
-      return interp_result;
-    }
-#if AGGRESSIVE_DEBUG
-    printf("Continuing...\n");
-#endif
-  }
-#endif
+// #pragma GCC diagnostic push
+// #pragma GCC diagnostic error "-Wdeclaration-after-statement"
+DEFINE_ASYNC(bjvm_stack_value, bjvm_interpret, bjvm_thread *thread,
+             bjvm_stack_frame *final_frame) {
   // these are worth caching, so reload them after every await
   bjvm_bytecode_insn *insn;
   bjvm_plain_frame *frame;
 
+  // Not used across awaits
+  bjvm_stack_value result;
+
 #define RELOAD_STACK_LOCALS()                                                  \
-  frame = bjvm_get_plain_frame(*(thread->frames + thread->frames_count - 1));  \
+  raw_frame = *(thread->frames + thread->frames_count - 1); \
+  frame = bjvm_get_plain_frame(raw_frame);  \
   insn = &frame->method->code->code[frame->program_counter];
 
 #define INTERPRETER_AWAIT(expr)                                                \
@@ -2580,19 +2492,17 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, bjvm_thread *thread,
   RELOAD_STACK_LOCALS();
 
   if (!final_frame) {
-    ASYNC_RETURN(BJVM_INTERP_RESULT_EXC);
+    ASYNC_RETURN(value_null());
   }
-
-  bjvm_interpreter_result_t status = BJVM_INTERP_RESULT_OK;
 
   // Go to the top-most frame on the execution stack and set things up.
 get_top_frame:
   if (thread->frames_count == 0)
-    ASYNC_RETURN(status);
+    ASYNC_RETURN(value_null());
 
   bjvm_stack_frame *raw_frame = *(thread->frames + thread->frames_count - 1);
   if (bjvm_is_frame_native(raw_frame)) {
-    status = bjvm_run_native(thread, bjvm_get_native_frame(raw_frame), result);
+    INTERPRETER_AWAIT(bjvm_run_native(&self->native, thread, bjvm_get_native_frame(raw_frame)));
     goto done;
   }
 
@@ -3284,14 +3194,7 @@ interpret_frame:
     bjvm_insn_freturn:
     bjvm_insn_ireturn: {
       // Look at the frame before and store it there
-      bjvm_stack_value r = checked_pop(frame);
-      if (thread->frames_count > 1) {
-        bjvm_stack_frame *prev_frame = thread->frames[thread->frames_count - 2];
-        *bjvm_get_frame_result_of_next(prev_frame) = r;
-      }
-      if (result) {
-        *result = r;
-      }
+      result = checked_pop(frame);
       goto done;
     }
     bjvm_insn_ishl: {
@@ -3597,10 +3500,11 @@ interpret_frame:
         if (!invoked) {
           goto done;
         }
-        status = bjvm_interpret(thread, invoked,
-                                returns ? &frame->values[sd - insn->args + 1]
-                                        : nullptr);
-        if (status != BJVM_INTERP_RESULT_OK) {
+        INTERPRETER_AWAIT(bjvm_interpret(&invoked->async_frame, thread, invoked));
+        if (returns) {
+          frame->values[sd - insn->args + 1] = invoked->async_frame._result;
+        }
+        if (thread->current_exception) {
           goto done;
         }
         sd -= insn->args - 1;
@@ -3619,7 +3523,7 @@ interpret_frame:
         goto done;
       INTERPRETER_AWAIT(bjvm_initialize_class(&self->init_class, thread,
                                               insn->cp->class_info.classdesc));
-      if (self->init_class._result == BJVM_INTERP_RESULT_EXC)
+      if (thread->current_exception)
         goto done;
       insn->kind = bjvm_insn_new_resolved;
       insn->classdesc = info->classdesc;
@@ -3759,10 +3663,11 @@ interpret_frame:
         bjvm_null_pointer_exception(thread);
         goto done;
       }
-      status = resolve_methodref(thread, method_info);
-      if (status != BJVM_INTERP_RESULT_OK)
+      INTERPRETER_AWAIT(resolve_methodref(&self->methodref_resolve, thread, &insn->cp->methodref));
+      if (thread->current_exception)
         goto done;
 
+      method_info = &insn->cp->methodref;
       bjvm_classdesc *lookup_on = method_info->resolved->my_class;
       bjvm_cp_method *method = frame->method;
 
@@ -3813,9 +3718,10 @@ interpret_frame:
         bjvm_null_pointer_exception(thread);
         goto done;
       }
-      status = resolve_methodref(thread, method_info);
-      if (status != BJVM_INTERP_RESULT_OK)
+      INTERPRETER_AWAIT(resolve_methodref(&self->methodref_resolve, thread, &insn->cp->methodref));
+      if (thread->current_exception)
         goto done;
+      method_info = &insn->cp->methodref;
       if (!(method_info->resolved->my_class->access_flags &
             BJVM_ACCESS_INTERFACE)) {
         insn->kind = bjvm_insn_invokevirtual;
@@ -3842,14 +3748,15 @@ interpret_frame:
         bjvm_null_pointer_exception(thread);
         goto done;
       }
-      status = resolve_methodref(thread, method_info);
-      if (status != BJVM_INTERP_RESULT_OK)
+      INTERPRETER_AWAIT(resolve_methodref(&self->methodref_resolve, thread, &insn->cp->methodref));
+      if (thread->current_exception)
         goto done;
+      method_info = &insn->cp->methodref;
       if (method_info->resolved->is_signature_polymorphic) {
-        status = bjvm_invokevirtual_signature_polymorphic(
+        INTERPRETER_AWAIT(bjvm_invokevirtual_signature_polymorphic(&self->invoke_sigpoly,
             thread, frame, &sd, method,
-            bjvm_resolve_method_type(thread, method_info->descriptor), target);
-        if (status != BJVM_INTERP_RESULT_OK)
+            bjvm_resolve_method_type(thread, method_info->descriptor), target));
+        if (thread->current_exception)
           goto done;
         NEXT_INSN;
       }
@@ -3870,10 +3777,10 @@ interpret_frame:
     }
     bjvm_insn_invokestatic: {
       bjvm_cp_method_info *info = &insn->cp->methodref;
-      bjvm_interpreter_result_t status = resolve_methodref(thread, info);
-      if (status != BJVM_INTERP_RESULT_OK) {
-        ASYNC_RETURN(status);
-      }
+      INTERPRETER_AWAIT(resolve_methodref(&self->methodref_resolve, thread, &insn->cp->methodref));
+      if (thread->current_exception)
+        goto done;
+      info = &insn->cp->methodref;
       insn->kind = bjvm_insn_invokestatic_resolved;
       insn->ic = info->resolved;
       insn->args = info->descriptor->args_count;
@@ -3883,34 +3790,28 @@ interpret_frame:
       bjvm_cp_method *method = insn->ic;
       bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
                      BJVM_TYPE_KIND_VOID;
-      if (frame->state < INVOKE_STATE_MADE_FRAME) {
-        bjvm_stack_frame *invoked_frame;
-        if (method->is_signature_polymorphic) {
-          invoked_frame = bjvm_push_native_frame(
-              thread, method, insn->cp->methodref.descriptor,
-              frame->values + sd - insn->args, insn->args);
-        } else {
-          invoked_frame = bjvm_push_frame(
-              thread, method, frame->values + sd - insn->args, insn->args);
-        }
-        if (unlikely(!invoked_frame)) {
-          goto done;
-        }
-
-        bjvm_interpret(&invoked_frame->async_frame, thread, invoked_frame,
-                       &frame->values[sd - insn->args]);
-
-        status = invoked_frame->async_frame._result;
-        if (status != BJVM_INTERP_RESULT_OK) {
-          goto done;
-        }
+      bjvm_stack_frame *invoked_frame;
+      if (method->is_signature_polymorphic) {
+        invoked_frame = bjvm_push_native_frame(
+            thread, method, insn->cp->methodref.descriptor,
+            frame->values + sd - insn->args, insn->args);
       } else {
-        if (returns) {
-          frame->values[sd - insn->args] = frame->result_of_next;
-        }
+        invoked_frame = bjvm_push_frame(
+            thread, method, frame->values + sd - insn->args, insn->args);
+      }
+      if (unlikely(!invoked_frame)) {
+        goto done;
       }
 
-      frame->state = INVOKE_STATE_ENTRY;
+      self->invoked_frame = invoked_frame;
+      INTERPRETER_AWAIT(bjvm_interpret(&raw_frame->async_frame, thread, self->invoked_frame));
+      if (thread->current_exception) {
+        goto done;
+      }
+      if (returns) {
+        frame->values[sd - insn->args] = raw_frame->async_frame._result;
+      }
+
       sd -= insn->args;
       sd += returns;
       NEXT_INSN;
@@ -4129,40 +4030,30 @@ interpret_frame:
       bjvm_obj_header *target = frame->values[sd - insn->args].obj;
       bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
                      BJVM_TYPE_KIND_VOID;
-      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
-        if (target == nullptr) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        if (target->descriptor != insn->ic2) {
-          if (insn->kind == bjvm_insn_invokevtable_monomorphic)
-            make_invokevtable_polymorphic(insn);
-          else
-            make_invokeitable_polymorphic(insn);
-          JMP_INSN;
-        }
-        bjvm_stack_frame *new_frame = bjvm_push_frame(
-            thread, insn->ic, frame->values + sd - insn->args, insn->args);
-        if (!new_frame)
-          goto done;
-        frame->state = INVOKE_STATE_MADE_FRAME;
-        INTERPRETER_AWAIT(bjvm_interpret(&new_frame->async_frame, thread,
-                                         new_frame,
-                                         &frame->values[sd - insn->args]));
-        status = new_frame->async_frame._result;
-
-        frame->state = INVOKE_STATE_ENTRY;
-        if (status != BJVM_INTERP_RESULT_OK)
-          goto done;
-        sd -= insn->args;
-        sd += returns;
-      } else {
-        sd -= insn->args;
-        if (returns) {
-          frame->values[sd] = frame->result_of_next;
-          sd++;
-        }
+      if (target == nullptr) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
       }
+      if (target->descriptor != insn->ic2) {
+        if (insn->kind == bjvm_insn_invokevtable_monomorphic)
+          make_invokevtable_polymorphic(insn);
+        else
+          make_invokeitable_polymorphic(insn);
+        JMP_INSN;
+      }
+      bjvm_stack_frame *invoked_frame = self->invoked_frame = bjvm_push_frame(
+          thread, insn->ic, frame->values + sd - insn->args, insn->args);
+      if (!invoked_frame)
+        goto done;
+      INTERPRETER_AWAIT(bjvm_interpret(&raw_frame->async_frame, thread,
+                                       self->invoked_frame));
+      if (thread->current_exception)
+        goto done;
+      if (returns) {
+        frame->values[sd - insn->args] = raw_frame->async_frame._result;
+      }
+      sd -= insn->args;
+      sd += returns;
       NEXT_INSN;
     }
     bjvm_insn_invokevtable_polymorphic:
@@ -4170,7 +4061,6 @@ interpret_frame:
       bjvm_obj_header *target = frame->values[sd - insn->args].obj;
       bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
                      BJVM_TYPE_KIND_VOID;
-      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
         if (target == nullptr) {
           bjvm_null_pointer_exception(thread);
           goto done;
@@ -4188,64 +4078,46 @@ interpret_frame:
           }
         }
         assert(target_method);
-        bjvm_stack_frame *new_frame = bjvm_push_frame(
+        bjvm_stack_frame *invoked_frame = self->invoked_frame = bjvm_push_frame(
             thread, target_method, frame->values + sd - insn->args, insn->args);
-        if (!new_frame)
+        if (!invoked_frame)
           goto done;
-        frame->state = INVOKE_STATE_MADE_FRAME;
-        INTERPRETER_AWAIT(bjvm_interpret(&new_frame->async_frame, thread,
-                                         new_frame,
-                                         &frame->values[sd - insn->args]));
-        status = new_frame->async_frame._result;
+        INTERPRETER_AWAIT(bjvm_interpret(&raw_frame->async_frame, thread,
+                                         self->invoked_frame));
 
-        frame->state = INVOKE_STATE_ENTRY;
-        if (status != BJVM_INTERP_RESULT_OK)
+        if (thread->current_exception)
           goto done;
-        frame->state = INVOKE_STATE_ENTRY;
+      if (returns) {
+        frame->values[sd - insn->args] = self->invoked_frame->async_frame._result;
+      }
         sd -= insn->args;
         sd += returns;
-      } else {
-        sd -= insn->args;
-        if (returns) {
-          frame->values[sd] = frame->result_of_next;
-          sd++;
-        }
-      }
       NEXT_INSN;
     }
     bjvm_insn_invokespecial_resolved: {
       bjvm_obj_header *target = frame->values[sd - insn->args].obj;
       bool returns = insn->cp->methodref.descriptor->return_type.base_kind !=
                      BJVM_TYPE_KIND_VOID;
-      if (likely(frame->state < INVOKE_STATE_MADE_FRAME)) {
-        if (target == nullptr) {
-          bjvm_null_pointer_exception(thread);
-          goto done;
-        }
-        bjvm_cp_method *target_method = insn->ic;
-        bjvm_stack_frame *new_frame = bjvm_push_frame(
-            thread, target_method, frame->values + sd - insn->args, insn->args);
-        if (!new_frame)
-          goto done;
-        frame->state = INVOKE_STATE_MADE_FRAME;
-        INTERPRETER_AWAIT(bjvm_interpret(&new_frame->async_frame, thread,
-                                         new_frame,
-                                         &frame->values[sd - insn->args]));
-        status = new_frame->async_frame._result;
-
-        frame->state = INVOKE_STATE_ENTRY;
-        if (status != BJVM_INTERP_RESULT_OK)
-          goto done;
-
-        sd -= insn->args;
-        sd += returns;
-      } else {
-        sd -= insn->args;
-        if (returns) {
-          frame->values[sd] = frame->result_of_next;
-          sd++;
-        }
+      if (target == nullptr) {
+        bjvm_null_pointer_exception(thread);
+        goto done;
       }
+      bjvm_cp_method *target_method = insn->ic;
+      bjvm_stack_frame *invoked_frame = self->invoked_frame = bjvm_push_frame(
+          thread, target_method, frame->values + sd - insn->args, insn->args);
+      if (!invoked_frame)
+        goto done;
+      INTERPRETER_AWAIT(bjvm_interpret(&raw_frame->async_frame, thread,
+                                       self->invoked_frame));
+      if (thread->current_exception)
+        goto done;
+
+      if (returns) {
+        frame->values[sd - insn->args] = self->invoked_frame->async_frame._result;
+      }
+
+      sd -= insn->args;
+      sd += returns;
       NEXT_INSN;
     }
 
@@ -4367,7 +4239,6 @@ done:;
   bjvm_cp_method *method = frame->method;
   if (thread->current_exception != nullptr && method) {
     bjvm_attribute_exception_table *table = method->code->exception_table;
-    status = BJVM_INTERP_RESULT_EXC;
     if (table) {
       int pc = frame->program_counter;
       for (int i = 0; i < table->entries_count; ++i) {
@@ -4386,7 +4257,6 @@ done:;
             frame->values[0] =
                 (bjvm_stack_value){.obj = thread->current_exception};
             thread->current_exception = nullptr;
-            status = BJVM_INTERP_RESULT_OK;
 
             goto interpret_frame;
           }
@@ -4397,17 +4267,16 @@ done:;
 
   if (raw_frame == final_frame) {
     bjvm_pop_frame(thread, raw_frame);
-    ASYNC_RETURN(thread->current_exception != nullptr ? BJVM_INTERP_RESULT_EXC
-                                                      : status);
+    ASYNC_RETURN(value_null());
   }
 
   // If there is a previous frame to go to, go to it
   bjvm_pop_frame(thread, raw_frame);
   goto get_top_frame;
 
-  ASYNC_END_VOID();
+  ASYNC_END(value_null());
 }
-#pragma GCC diagnostic pop
+// #pragma GCC diagnostic pop
 
 int bjvm_get_line_number(const bjvm_attribute_code *code, uint16_t pc) {
   assert(code && "code is null");

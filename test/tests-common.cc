@@ -226,7 +226,10 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
-  bjvm_initialize_class(thread, desc);
+
+  bjvm_initialize_class_t pox;
+  future_t f = bjvm_initialize_class(&pox, thread, desc);
+  assert(f.status == FUTURE_READY);
 
   method = bjvm_method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"),
                               false, false);

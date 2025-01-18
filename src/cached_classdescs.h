@@ -13,7 +13,9 @@
   X(null_pointer_exception, "java/lang/NullPointerException")                  \
   X(negative_array_size_exception, "java/lang/NegativeArraySizeException")     \
   X(oom_error, "java/lang/OutOfMemoryError")                                   \
-  X(stack_overflow_error, "java/lang/StackOverflowError")
+  X(stack_overflow_error, "java/lang/StackOverflowError")                      \
+  X(exception_in_initializer_error, "java/lang/ExceptionInInitializerError")
+
 
 #define __CACHED_REFLECTION_CLASSES(X)                                         \
   X(klass, "java/lang/Class")                                                  \
@@ -21,10 +23,10 @@
   X(method, "java/lang/reflect/Method")                                        \
   X(parameter, "java/lang/reflect/Parameter")                                  \
   X(constructor, "java/lang/reflect/Constructor")                              \
-  X(parameter, "java/lang/reflect/Parameter")                                  \
   X(method_handle_natives, "java/lang/invoke/MethodHandleNatives")             \
   X(method_handles, "java/lang/invoke/MethodHandles")                          \
-  X(method_type, "java/lang/invoke/MethodType")
+  X(method_type, "java/lang/invoke/MethodType") \
+  X(constant_pool, "sun/reflect/ConstantPool")
 
 #define __CACHED_GENERAL_CLASSES(X)                                            \
   X(object, "java/lang/Object")                                                \
@@ -41,7 +43,7 @@
 /// A list of the names of classes that are cached in the VM.
 /// This list is in the same order as the fields of the bjvm_cached_classdescs
 /// struct.
-static constexpr char *const cached_classdesc_paths[] = {
+static const char *const cached_classdesc_paths[] = {
 #define X(name, str) str,
     CACHED_CLASSDESCS(X)
 #undef X

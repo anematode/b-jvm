@@ -1,3 +1,6 @@
+#include "cached_classdescs.h"
+
+
 #include <natives.h>
 
 static bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc,
@@ -187,9 +190,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0,
       ++fields;
     }
   }
-  bjvm_classdesc *Field =
-      bootstrap_lookup_class(thread, STR("java/lang/reflect/Field"));
-  bjvm_initialize_class(thread, Field);
+  bjvm_classdesc *Field = thread->vm->cached_classdescs->field;
   bjvm_obj_header *result = CreateObjectArray1D(thread, Field, fields);
   if (!result)
     return value_null();

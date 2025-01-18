@@ -144,12 +144,7 @@ DECLARE_NATIVE("java/lang", System, arraycopy,
   return value_null();
 }
 
-DECLARE_ASYNC_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
-  if (*sm_state == nullptr) {
-    *sm_state = (void *)1;
-    return BJVM_INTERP_RESULT_INT;
-  }
-
+DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   // Look up the field System.out
   bjvm_classdesc *system_class =
       bootstrap_lookup_class(thread, STR("java/lang/System"));
@@ -157,9 +152,7 @@ DECLARE_ASYNC_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
       system_class, STR("out"), STR("Ljava/io/PrintStream;"));
   void *field = &system_class->static_fields[out_field->byte_offset];
   *(bjvm_obj_header **)field = args[0].handle->obj;
-
-  *result = value_null();
-  return BJVM_INTERP_RESULT_OK;
+  return value_null();
 }
 
 DECLARE_NATIVE("java/lang", System, registerNatives, "()V") {

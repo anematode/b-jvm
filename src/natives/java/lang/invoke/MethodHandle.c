@@ -20,12 +20,10 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToVirtual,
                        : load_stack_value(&args[i], kind);
   }
 
-  bjvm_stack_frame *new_frame =
-      bjvm_push_frame(thread, method, unhandled, argc - 1);
-  free(unhandled);
 
   bjvm_stack_value result;
-  bjvm_interpret(thread, new_frame, &result);
+  bjvm_thread_run_root(thread, method, unhandled, &result);
+  free(unhandled);
   return result;
 }
 
@@ -42,11 +40,8 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandle, linkToStatic,
                        : load_stack_value(&args[i], kind);
   }
 
-  bjvm_stack_frame *new_frame =
-      bjvm_push_frame(thread, method, unhandled, argc - 1);
-  free(unhandled);
-
   bjvm_stack_value result;
-  bjvm_interpret(thread, new_frame, &result);
+  bjvm_thread_run_root(thread, method, unhandled, &result);
+  free(unhandled);
   return result;
 }

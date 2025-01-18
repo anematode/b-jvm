@@ -22,7 +22,9 @@ DECLARE_NATIVE("sun/misc", Unsafe, ensureClassInitialized,
                "(Ljava/lang/Class;)V") {
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   if (desc->state != BJVM_CD_STATE_INITIALIZED) {
-    bjvm_initialize_class(thread, desc);
+    bjvm_initialize_class_t pox;
+    future_t f = bjvm_initialize_class(&pox, thread, desc);
+    assert(f.status == FUTURE_READY);
   }
   return value_null();
 }
@@ -220,7 +222,10 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineAnonymousClass,
 
   bjvm_classdesc *result =
       bjvm_define_bootstrap_class(thread, random_name, bytes, length);
-  bjvm_initialize_class(thread, result);
+
+  bjvm_initialize_class_t pox;
+  future_t f = bjvm_initialize_class(&pox, thread, result);
+  assert(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};
@@ -263,7 +268,10 @@ DECLARE_NATIVE("sun/misc", Unsafe, defineClass,
 
   free_heap_str(name_str);
 
-  bjvm_initialize_class(thread, result);
+
+  bjvm_initialize_class_t pox;
+  future_t f = bjvm_initialize_class(&pox, thread, result);
+  assert(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};
