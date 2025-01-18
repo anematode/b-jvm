@@ -227,7 +227,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   bjvm_cp_method *method;
 
-  bjvm_initialize_class_t pox;
+  bjvm_initialize_class_t pox = { 0 };
   future_t f = bjvm_initialize_class(&pox, thread, desc);
   assert(f.status == FUTURE_READY);
 
