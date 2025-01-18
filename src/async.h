@@ -87,8 +87,6 @@ typedef struct future {
     }                                                                          \
   } while (0)
 
-#define AWAIT_UNSAFE AWAIT
-
 /// Ends an async value-returning function, returning the given value.  Must be
 /// used inside an async function.
 #define ASYNC_END(return_value)                                                \

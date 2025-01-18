@@ -2302,7 +2302,7 @@ DEFINE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument, bjvm_thread *thread,
                             thread, (void *)ent->method_type.resolved_mt)});
   case BJVM_CP_KIND_METHOD_HANDLE:
     *is_object = true;
-    AWAIT_UNSAFE(bjvm_resolve_method_handle(&self->resolve, thread, &ent->method_handle));
+    AWAIT(bjvm_resolve_method_handle(&self->resolve, thread, &ent->method_handle));
     ASYNC_RETURN((bjvm_value){.handle = bjvm_make_handle(thread, (void *)self->resolve._result)});
   default: {
     UNREACHABLE();
@@ -2316,8 +2316,6 @@ DECLARE_ASYNC(int, indy_resolve, bjvm_resolve_method_handle_t mh;, bjvm_thread *
                  bjvm_cp_indy_info *indy);
 DEFINE_ASYNC(int, indy_resolve, bjvm_thread *thread, bjvm_bytecode_insn *insn,
                  bjvm_cp_indy_info *indy) {
-  int result = 0;
-
   // e.g. LambdaMetafactory.metafactory
   AWAIT(bjvm_resolve_method_handle(&self->mh, thread, indy->method->ref));
   bjvm_handle *bootstrap_handle = bjvm_make_handle(thread, (void*)self->mh._result);
@@ -2537,7 +2535,7 @@ DEFINE_ASYNC(bjvm_interpreter_result_t, bjvm_interpret, bjvm_thread *thread,
   insn = &frame->method->code->code[frame->program_counter];
 
 #define INTERPRETER_AWAIT(expr)                                                \
-  AWAIT_UNSAFE(expr);                                                          \
+  AWAIT(expr);                                                          \
   RELOAD_STACK_LOCALS();
 
   if (!final_frame) {
