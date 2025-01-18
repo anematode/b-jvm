@@ -77,6 +77,8 @@ typedef struct future {
 /// guaranteed to call ASYNC_RETURN() before it reaches the end statement.
 #define DEFINE_ASYNC_SL(return_type, name, start_idx, ...)                     \
   future_t name(name##_t *self, ##__VA_ARGS__) {                               \
+    printf("Self: %p\n", self); \
+    if ((uintptr_t) self < 9) *(char*)1 = 0; \
     start_counter(label_counter, start_idx);                                   \
     switch (self->_state) {                                                    \
     case 0:                                                                    \

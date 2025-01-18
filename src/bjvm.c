@@ -43,7 +43,9 @@ DEFINE_ASYNC(int, init_cached_classdescs,
   assert(!thread->vm->cached_classdescs);
 
   self->cached_classdescs =
-      malloc(cached_classdesc_count * sizeof(bjvm_classdesc *));
+    malloc(cached_classdesc_count * sizeof(bjvm_classdesc *));
+  thread->vm->cached_classdescs =
+      (struct bjvm_cached_classdescs *)self->cached_classdescs;
 
   if (!self->cached_classdescs) {
     thread->current_exception = thread->out_of_mem_error;
@@ -61,9 +63,6 @@ DEFINE_ASYNC(int, init_cached_classdescs,
       ASYNC_RETURN(self->ic._result);
     }
   }
-
-  thread->vm->cached_classdescs =
-      (struct bjvm_cached_classdescs *)self->cached_classdescs;
   ASYNC_END(0);
 }
 
@@ -615,6 +614,7 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj) {
 int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
                             const bjvm_utf8 exception_string) {
   bjvm_classdesc *classdesc = bootstrap_lookup_class(thread, exception_name);
+  printf("Exception name: %.*s\n", fmt_slice(exception_name));
   assert(classdesc->state == BJVM_CD_STATE_INITIALIZED &&
          "VM-generated exceptions should be initialised at VM boot");
 
@@ -862,11 +862,11 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->handles_capacity = HANDLES_CAPACITY;
   thr->lang_exception_frame = -1;
 
+  bjvm_vm_init_primitive_classes(thr);
+
   init_cached_classdescs_t init;
   future_t result = init_cached_classdescs(&init, thr);
   assert(result.status == FUTURE_READY);
-
-  bjvm_vm_init_primitive_classes(thr);
 
   // Pre-allocate OOM and stack overflow errors
   thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
@@ -1286,6 +1286,7 @@ bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread,
     int read_status =
         bjvm_lookup_classpath(&vm->classpath, filename, &bytes, &cf_len);
     if (read_status) {
+      printf("Searching for: %.*s\n", fmt_slice(chars));
       // If the file is ClassNotFoundException, abort to avoid stack overflow
       if (utf8_equals(chars, "java/lang/ClassNotFoundException")) {
         printf("Could not find class %.*s\n", fmt_slice(chars));
@@ -1615,6 +1616,7 @@ void wrap_in_exception_in_initializer_error(bjvm_thread *thread) {
 // Call <clinit> on the class, if it hasn't already been called.
 DEFINE_ASYNC(int, bjvm_initialize_class,
              bjvm_thread *thread, bjvm_classdesc *classdesc) {
+  printf("Initing: %.*s\n", fmt_slice(classdesc->name));
   bool error; // this is a local, but it's ok because we don't use it between
               // awaits
 
@@ -1635,15 +1637,15 @@ DEFINE_ASYNC(int, bjvm_initialize_class,
   }
 
   classdesc->state = BJVM_CD_STATE_INITIALIZING;
-  self->recursive_call_space = malloc(sizeof(bjvm_initialize_class_t));
+  self->recursive_call_space = calloc(1, sizeof(bjvm_initialize_class_t));
   if (!self->recursive_call_space) {
     thread->current_exception = thread->out_of_mem_error;
     ASYNC_RETURN(-1);
   }
 
   if (classdesc->super_class) {
-    AWAIT(bjvm_initialize_class(self->recursive_call_space, thread,
-                                classdesc->super_class->classdesc));
+    printf("Calling with: %p\n", self->recursive_call_space);
+    AWAIT(bjvm_initialize_class(self->recursive_call_space, thread, classdesc->super_class->classdesc));
     if ((error = self->recursive_call_space->_result))
       goto done;
   }
@@ -1657,7 +1659,7 @@ DEFINE_ASYNC(int, bjvm_initialize_class,
   free(self->recursive_call_space);
   self->recursive_call_space = nullptr;
 
-  if (error = initialize_constant_value_fields(thread, classdesc)) {
+  if ((error = initialize_constant_value_fields(thread, classdesc))) {
     thread->current_exception = thread->out_of_mem_error;
     goto done;
   }

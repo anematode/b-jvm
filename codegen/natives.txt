@@ -3,7 +3,7 @@ java/lang/StackTraceElement
 java/lang/Throwable
 java/lang/invoke/LambdaForm
 java/lang/invoke/CallSite
-sun/reflect/ConstantPool
+jdk/reflect/internal/ConstantPool
   bjvm_classdesc *reflected_class;
 java/lang/Class
   bjvm_classdesc *reflected_class;

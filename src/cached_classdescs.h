@@ -8,6 +8,9 @@
 #include "bjvm.h"
 
 #define __CACHED_EXCEPTION_CLASSES(X)                                          \
+  X(string, "java/lang/String")                                                \
+  X(class_not_found_exception, "java/lang/ClassNotFoundException") \
+  X(stack_trace_element, "java/lang/StackTraceElement") \
   X(array_store_exception, "java/lang/ArrayStoreException")                    \
   X(class_cast_exception, "java/lang/ClassCastException")                      \
   X(null_pointer_exception, "java/lang/NullPointerException")                  \
@@ -26,11 +29,10 @@
   X(method_handle_natives, "java/lang/invoke/MethodHandleNatives")             \
   X(method_handles, "java/lang/invoke/MethodHandles")                          \
   X(method_type, "java/lang/invoke/MethodType") \
-  X(constant_pool, "sun/reflect/ConstantPool")
+  X(constant_pool, "jdk/internal/reflect/ConstantPool")
 
 #define __CACHED_GENERAL_CLASSES(X)                                            \
   X(object, "java/lang/Object")                                                \
-  X(string, "java/lang/String")                                                \
   X(thread, "java/lang/Thread")                                                \
   X(thread_group, "java/lang/ThreadGroup")                                     \
   X(system, "java/lang/System")
