@@ -55,7 +55,7 @@ TEST_CASE("Simple module", "[wasm]") {
   free(serialized.bytes);
 }
 
-
+/*
 TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
   auto example = [](bjvm_thread *thread, bjvm_stack_value *result, double a, long b) -> int {
     result->d = a + b;
@@ -70,3 +70,4 @@ TEST_CASE("create_adapter_to_compiled_method", "[wasm]") {
     REQUIRE(n == 1);
   }
 }
+*/

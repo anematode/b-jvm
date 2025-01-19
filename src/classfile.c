@@ -1766,6 +1766,11 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     attr->signature.utf8 = checked_get_utf8(
         ctx->cp, reader_next_u16(&attr_reader, "Signature index"),
         "Signature index");
+  } else if (utf8_equals(attr->name, "NestHost")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_NEST_HOST;
+    attr->nest_host = &checked_cp_entry(
+            ctx->cp, reader_next_u16(&attr_reader, "NestHost index"),
+            BJVM_CP_KIND_CLASS, "NestHost index")->class_info;
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
@@ -2062,6 +2067,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
       cf->bootstrap_methods = &attr->bootstrap_methods;
     } else if (attr->kind == BJVM_ATTRIBUTE_KIND_SOURCE_FILE) {
       cf->source_file = &attr->source_file;
+    } else if (attr->kind ==BJVM_ATTRIBUTE_KIND_NEST_HOST) {
+      cf->nest_host = attr->nest_host;
     }
   }
 

@@ -358,7 +358,7 @@ short1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 long1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 float1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 double1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
-java.lang.Integer17nullfalsefalsetruefalsefalsefalse1152class java.lang.Numberfalsenull
+java.lang.Integer17nullfalsefalsetruefalsefalsefalse861class java.lang.Numberfalsenull
 [Ljava.lang.Integer;1041class java.lang.Integertruefalsefalsetruefalsefalse00class java.lang.Objectfalsenull
 [[Ljava.lang.Integer;1041class [Ljava.lang.Integer;truefalsefalsefalsefalsefalse00class java.lang.Objectfalsenull
 [I1041inttruefalsefalsefalsetruefalse00class java.lang.Objectfalsenull
@@ -508,7 +508,7 @@ true)"));
 }
 TEST_CASE("JSON tests") {
   std::string classpath =
-      "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+      "test_files/json:test_files/json/gson-2.11.0.jar:test_files/"
       "json/jackson-core-2.18.2.jar:test_files/json/"
       "jackson-annotations-2.18.2.jar:test_files/json/"
       "jackson-databind-2.18.2.jar";

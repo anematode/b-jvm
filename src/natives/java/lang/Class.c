@@ -20,7 +20,7 @@ DECLARE_NATIVE("java/lang", Class, registerNatives, "()V") {
 DECLARE_NATIVE("java/lang", Class, getPrimitiveClass,
                "(Ljava/lang/String;)Ljava/lang/Class;") {
   assert(argc == 1);
-  short *chars;
+  int8_t *chars;
   size_t len;
   read_string(thread, args[0].handle->obj, &chars, &len);
   if (len > 10) {
@@ -136,7 +136,12 @@ DECLARE_NATIVE("java/lang", Class, getClassLoader,
   return value_null(); // TODO
 }
 
-DECLARE_NATIVE("java/lang", Class, getName0, "()Ljava/lang/String;") {
+DECLARE_NATIVE("java/lang", Class, getPermittedSubclasses0,
+               "()[Ljava/lang/Class;") {
+  return value_null(); // TODO
+}
+
+DECLARE_NATIVE("java/lang", Class, initClassName, "()Ljava/lang/String;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
   INIT_STACK_STRING(name, 1000);
   bprintf(name, "%.*s", fmt_slice(classdesc->name));
@@ -152,7 +157,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
                "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
   bjvm_obj_header *name_obj = args[0].handle->obj;
-  short *name;
+  int8_t *name;
   size_t len;
   read_string(thread, name_obj, &name, &len);
 
@@ -324,8 +329,24 @@ DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
                                  desc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY};
 }
 
+DECLARE_NATIVE("java/lang", Class, isHidden, "()Z") { // TODO
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
+  return (bjvm_stack_value){.i = 0};
+}
+
+DECLARE_NATIVE("java/lang", Class, getNestHost0, "()Ljava/lang/Class;") {
+  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
+  bjvm_cp_class_info *nest_host = desc->nest_host;
+  if (!nest_host || !bjvm_resolve_class(thread, nest_host)) {
+    return value_null();
+  }
+
+  return (bjvm_stack_value){
+      .obj = (void *)bjvm_get_class_mirror(thread, nest_host->classdesc)};
+}
+
 DECLARE_NATIVE("java/lang", Class, getConstantPool,
-               "()Lsun/reflect/ConstantPool;") {
+               "()Ljdk/internal/reflect/ConstantPool;") {
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   return (bjvm_stack_value){
       .obj = (void *)bjvm_get_constant_pool_mirror(thread, desc)};

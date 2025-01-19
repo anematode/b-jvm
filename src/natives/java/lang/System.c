@@ -9,46 +9,6 @@
 #define USE_SYS_TIME
 #endif
 
-// TODO read the properties from the VM instead of hardcoding them
-DECLARE_NATIVE("java/lang", System, initProperties,
-               "(Ljava/util/Properties;)Ljava/util/Properties;") {
-  bjvm_obj_header *props_obj = args[0].handle->obj;
-  INIT_STACK_STRING(cwd, 1024);
-  getcwd(cwd.chars, 1024);
-  cwd.len = (int)strlen(cwd.chars);
-
-  INIT_STACK_STRING(jre, 1024);
-  jre = bprintf(jre, "%.*s/jre", fmt_slice(cwd));
-
-  const bjvm_utf8 props[][2] = {
-      {STR("file.encoding"), STR("UTF-8")},
-      {STR("stdout.encoding"), STR("UTF-8")},
-      {STR("native.encoding"), STR("UTF-8")},
-      {STR("stderr.encoding"), STR("UTF-8")},
-      {STR("java.home"), jre},
-      {STR("line.separator"), STR("\n")},
-      {STR("path.separator"), STR(":")},
-      {STR("sun.boot.class.path"),
-       hslc(thread->vm->classpath.as_colon_separated)},
-      {STR("os.name"), STR("Windows")},
-      {STR("user.dir"), cwd},
-      {STR("file.separator"), STR("/")}};
-  bjvm_cp_method *put = bjvm_method_lookup(
-      props_obj->descriptor, STR("put"),
-      STR("(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), true,
-      false);
-  for (size_t i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
-    bjvm_stack_value put_args[3] = {
-        {.obj = props_obj},
-        {.obj = bjvm_intern_string(thread, props[i][0])},
-        {.obj = bjvm_intern_string(thread, props[i][1])}};
-    bjvm_stack_value result;
-    // call put() with String key and value
-    bjvm_thread_run_root(thread, put, put_args, &result);
-  }
-  return value_null();
-}
-
 DECLARE_NATIVE("java/lang", System, mapLibraryName,
                "(Ljava/lang/String;)Ljava/lang/String;") {
   return (bjvm_stack_value){.obj = args[0].handle->obj};

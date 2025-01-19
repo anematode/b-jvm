@@ -17,7 +17,17 @@
   X(negative_array_size_exception, "java/lang/NegativeArraySizeException")     \
   X(oom_error, "java/lang/OutOfMemoryError")                                   \
   X(stack_overflow_error, "java/lang/StackOverflowError")                      \
-  X(exception_in_initializer_error, "java/lang/ExceptionInInitializerError")
+  X(exception_in_initializer_error, "java/lang/ExceptionInInitializerError")   \
+  X(unsatisfied_link_error, "java/lang/UnsatisfiedLinkError") \
+  X(array_index_out_of_bounds_exception, "java/lang/ArrayIndexOutOfBoundsException") \
+  X(class_circle_error, "java/lang/ClassCircularityError") \
+  X(incompatible_class_change_error, "java/lang/IncompatibleClassChangeError") \
+  X(abstract_method_error, "java/lang/AbstractMethodError") \
+  X(illegal_access_error, "java/lang/IllegalAccessError") \
+  X(illegal_argument_exception, "java/lang/IllegalArgumentException") \
+  X(arithmetic_exception, "java/lang/ArithmeticException") \
+  X(direct_method_handles_holder, "java/lang/invoke/DirectMethodHandle$Holder") \
+  X(illegal_state_exception, "java/lang/IllegalStateException")
 
 
 #define __CACHED_REFLECTION_CLASSES(X)                                         \

@@ -2,11 +2,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-DECLARE_NATIVE("java/io", WinNTFileSystem, initIDs, "()V") {
+DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") {
   return value_null();
 }
 
-DECLARE_NATIVE("java/io", WinNTFileSystem, getBooleanAttributes,
+DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") {
+  return value_null();
+}
+
+DECLARE_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
                "(Ljava/io/File;)I") {
   return value_null();
 }
@@ -41,7 +45,7 @@ static heap_string canonicalize_path(bjvm_utf8 path) {
   return result;
 }
 
-DECLARE_NATIVE("java/io", WinNTFileSystem, canonicalize0,
+DECLARE_NATIVE("java/io", UnixFileSystem, canonicalize0,
                "(Ljava/lang/String;)Ljava/lang/String;") {
   // Concatenate the current working directory with the given path
   heap_string path = AsHeapString(args[0].handle->obj, on_oom);
@@ -58,7 +62,7 @@ DECLARE_NATIVE("java/io", WinNTFileSystem, canonicalize0,
   return value_null();
 }
 
-DECLARE_NATIVE("java/io", WinNTFileSystem, getLastModifiedTime,
+DECLARE_NATIVE("java/io", UnixFileSystem, getLastModifiedTime,
                "(Ljava/io/File;)J") {
   bjvm_obj_header *file_obj = args[0].handle->obj;
   bjvm_obj_header *path = LoadFieldObject(file_obj, "path", "Ljava/lang/String;");

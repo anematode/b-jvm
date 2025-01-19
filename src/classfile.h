@@ -467,7 +467,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_SIGNATURE,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS,
-  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT
+  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT,
+  BJVM_ATTRIBUTE_KIND_NEST_HOST
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -656,6 +657,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_runtime_visible_type_annotations type_annotations;
     bjvm_attribute_annotation_default annotation_default;
     bjvm_attribute_signature signature;
+    bjvm_cp_class_info *nest_host;
   };
 } bjvm_attribute;
 
@@ -725,6 +727,7 @@ typedef struct bjvm_classdesc {
   bjvm_access_flags access_flags;
   heap_string name;
   bjvm_cp_class_info *super_class;
+  bjvm_cp_class_info *nest_host;
 
   int interfaces_count;
   bjvm_cp_class_info **interfaces;

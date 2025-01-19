@@ -104,7 +104,7 @@ typedef struct bjvm_obj_header {
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
 
-void read_string(bjvm_thread *thread, bjvm_obj_header *obj, short **buf,
+void read_string(bjvm_thread *thread, bjvm_obj_header *obj, int8_t **buf,
                  size_t *len); // todo: get rid of
 int read_string_to_utf8(bjvm_thread *thread,
                                               heap_string *result,
@@ -141,13 +141,13 @@ DECLARE_ASYNC(
       bjvm_initialize_class_t init_class_state;
       resolve_mh_mt_t resolve;
     };
-    bjvm_classdesc * DirectMethodHandle; bjvm_cp_method * m;
+    bjvm_classdesc *DirectMethodHandle; bjvm_classdesc *MemberName; bjvm_cp_method * m;
     , bjvm_thread *thread, bjvm_cp_method_handle_info *info);
 
 typedef struct bjvm_interpret_s bjvm_interpret_t;
 
 DECLARE_ASYNC_VOID(bjvm_invokevirtual_signature_polymorphic,
-bjvm_interpret_t *interpreter_ctx; bjvm_cp_method *method; int argc;,
+bjvm_interpret_t *interpreter_ctx; bjvm_cp_method *method; int argc; bjvm_stack_frame * frame;,
 bjvm_thread *thread, bjvm_plain_frame *frame, int *sd,
   bjvm_cp_method *method, struct bjvm_native_MethodType *provider_mt,
   bjvm_obj_header *target);
@@ -160,6 +160,7 @@ DECLARE_ASYNC(
     int, indy_resolve,
     int static_i;
     bjvm_plain_frame *fake_frame;
+    bjvm_handle *bootstrap_handle;
     union {
       bjvm_resolve_method_handle_t mh;
       bjvm_resolve_indy_static_argument_t static_arg;
@@ -243,6 +244,8 @@ typedef struct bjvm_vm {
 
   /// Struct containing cached classdescs
   struct bjvm_cached_classdescs *cached_classdescs;
+
+  int next_thread_id;
 } bjvm_vm;
 
 typedef struct {
@@ -544,6 +547,7 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread,
 struct bjvm_native_ConstantPool *
 bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc);
 
+int read_string_to_utf8(bjvm_thread *thread, heap_string *result, bjvm_obj_header *obj);
 bjvm_utf8 bjvm_unparse_field_descriptor(bjvm_utf8 str,
                                         const bjvm_field_descriptor *desc);
 void bjvm_reflect_initialize_field(bjvm_thread *thread,

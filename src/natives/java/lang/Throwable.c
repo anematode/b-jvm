@@ -30,7 +30,6 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   // Called in the constructor of Throwable. We therefore need to ignore
   // frames which are constructing the current object, which we can do by
   // inspecting the stack.
-
   bjvm_classdesc *StackTraceElement =
       bootstrap_lookup_class(thread, STR("java/lang/StackTraceElement"));
   bjvm_link_class(thread, StackTraceElement);
@@ -55,6 +54,8 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   if (!stack_trace->obj) // Failed to allocate
     return value_null();
 
+  ((struct bjvm_native_Throwable *)obj->obj)->depth = i + 1;
+
   for (int j = 0; i >= 0; --i, ++j) {
     // Check that all frames have an non-null method
     for (int i = 0; i < thread->frames_count; ++i) {
@@ -75,6 +76,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
         bjvm_is_frame_native(frame)
             ? -1
             : bjvm_get_line_number(method->code, frame->plain.program_counter);
+    E->declaringClassObject = (void*) bjvm_get_class_mirror(thread, method->my_class);
     E->declaringClass =
         bjvm_intern_string(thread, hslc(method->my_class->name));
     E->methodName = bjvm_intern_string(thread, method->name);
@@ -95,7 +97,6 @@ cleanup:
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
   assert(argc == 0);
-
   return (bjvm_stack_value){.i = *ArrayLength(*backtrace_object(obj->obj))};
 }
 
@@ -110,4 +111,18 @@ DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
   bjvm_obj_header *element =
       *((bjvm_obj_header **)ArrayData(stack_trace) + index);
   return (bjvm_stack_value){.obj = element};
+}
+
+DECLARE_NATIVE("java/lang", StackTraceElement, initStackTraceElements, "([Ljava/lang/StackTraceElement;Ljava/lang/Object;I)V") {
+  bjvm_handle *stack_trace = args[1].handle;
+  int depth = *ArrayLength(stack_trace->obj);
+  int array_length = *ArrayLength(args[0].handle->obj);
+  if (array_length < depth) {
+    depth = array_length;
+  }
+  for (int i = 0; i < depth; ++i) {
+    bjvm_obj_header *element = *((bjvm_obj_header **)ArrayData(stack_trace->obj) + i);
+    ReferenceArrayStore(args[0].handle->obj, i, element);
+  }
+  return value_null();
 }

@@ -63,6 +63,11 @@ DECLARE_NATIVE("java/security", AccessController, doPrivileged,
   return ret;
 }
 
+DECLARE_NATIVE("java/security", AccessController, ensureMaterializedForStackWalk,
+               "(Ljava/lang/Object;)V") {
+  return value_null();
+}
+
 DECLARE_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;") {
   // Look up method "run" on obj
