@@ -3,6 +3,10 @@ A JVM for the web. Bring back the applet!
 
 Message me on Discord if you are interested in collaborating: forevermilk#0001
 
+## JDK
+
+Download the JDK from https://www.oracle.com/java/technologies/downloads/  (Linux x64, JDK 23.0.1). Extract it to `test_files/jdk23`.
+
 ## Style guide
 
 Always use `int64_t` instead of `long` because Emscripten has `sizeof(long) == 4`. `int` can be assumed to be 32 bits.
