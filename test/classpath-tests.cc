@@ -32,13 +32,13 @@ TEST_CASE("Folder in classpath", "[classpath]") {
   bjvm_classpath cp;
   char *error = bjvm_init_classpath(
       &cp,
-      STR("./jre/lib/rt.jar:test_files/circularity:test_files/classpath_test"));
+      STR("./jdk23.jar:test_files/circularity:test_files/classpath_test"));
   REQUIRE(error == nullptr);
 
   uint8_t *bytes;
   size_t len;
   int ret_val =
-      bjvm_lookup_classpath(&cp, STR("sun/misc/Unsafe.class"), &bytes, &len);
+      bjvm_lookup_classpath(&cp, STR("jdk/internal/misc/Unsafe.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
   REQUIRE(ret_val == 0);
   free(bytes);
@@ -61,7 +61,7 @@ TEST_CASE("Folder in classpath", "[classpath]") {
 
   BENCHMARK("init classpath") {
     (void)bjvm_init_classpath(&cp,
-                              STR("./jre/lib/rt.jar:test_files/"
+                              STR("./jdk23.jar:test_files/"
                                   "circularity:test_files/classpath_test"));
     bjvm_free_classpath(&cp);
   };

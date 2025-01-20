@@ -718,6 +718,8 @@ typedef struct bjvm_cp_field {
   bjvm_classdesc *my_class;
 } bjvm_cp_field;
 
+typedef struct bjvm_module bjvm_module;
+
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
@@ -768,6 +770,7 @@ typedef struct bjvm_classdesc {
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
 
+  bjvm_module *module;
   void *classloader; // parent classloader (static-ish lifetime)
 
   bjvm_vtable vtable;

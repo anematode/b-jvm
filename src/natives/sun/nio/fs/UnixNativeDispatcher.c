@@ -4,6 +4,7 @@
 #include <sys/fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 static bjvm_obj_header* create_unix_exception(bjvm_thread *thread, int errno_code) {
   bjvm_classdesc *classdesc = bootstrap_lookup_class(thread, STR("sun/nio/fs/UnixException"));
@@ -83,4 +84,36 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, open0, "(JII)I") {
 
   thread->current_exception = create_unix_exception(thread, errno);
   return value_null();
+}
+
+DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, size0, "(Ljava/io/FileDescriptor;)J") {
+  assert(args[0].handle->obj);
+  int fd = LoadFieldInt(args[0].handle->obj, "fd");
+  struct stat st;
+  int result = fstat(fd, &st);
+  if (result) {
+    thread->current_exception = create_unix_exception(thread, errno);
+    return value_null();
+  }
+  return (bjvm_stack_value){.l = st.st_size};
+}
+
+DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, allocationGranularity0, "()J") {
+  return (bjvm_stack_value){.l = 4096};
+}
+
+// (fd: FileDescriptor, prot:Int, pos: Long, len: Long, isSync: Boolean) -> Long
+DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, map0, "(Ljava/io/FileDescriptor;IJJZ)J") {
+  assert(args[0].handle->obj);
+  int fd = LoadFieldInt(args[0].handle->obj, "fd");
+  int prot = args[1].i;
+  off_t pos = args[2].l;
+  off_t len = args[3].l;
+  int flags = args[4].i ? MAP_SHARED : MAP_PRIVATE;
+  void* result = mmap(nullptr, len, prot | PROT_READ, flags, fd, pos);
+  if (result == MAP_FAILED) {
+    thread->current_exception = create_unix_exception(thread, errno);
+    return value_null();
+  }
+  return (bjvm_stack_value){.l = (int64_t)result};
 }

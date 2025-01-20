@@ -6,7 +6,7 @@ DECLARE_NATIVE(
   bjvm_cp_method *method = *bjvm_unmirror_ctor(args[0].handle->obj);
   bjvm_stack_value result;
 
-  bjvm_initialize_class_t pox;
+  bjvm_initialize_class_t pox = {};
   future_t f = bjvm_initialize_class(&pox, thread, method->my_class);
   assert(f.status == FUTURE_READY);
   if (thread->current_exception)

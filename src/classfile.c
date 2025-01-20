@@ -243,7 +243,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
 
     uint16_t index = reader_next_u16(reader, "class index");
     return (bjvm_cp_entry){
-        .kind = BJVM_CP_KIND_CLASS,
+        .kind = entry_kind,
         .class_info = {
             .name = skip_linking
                         ? null_str()
@@ -480,6 +480,10 @@ bjvm_constant_pool *parse_constant_pool(cf_byteslice *reader,
         // TODO fix ^^ this is janky af
       }
       ent->my_index = cp_i;
+
+      if (ent->kind == BJVM_CP_KIND_PACKAGE) {
+        printf("PACKAGE: %.*s\n", fmt_slice(ent->class_info.name));
+      }
 
       if (ent->kind == BJVM_CP_KIND_LONG || ent->kind == BJVM_CP_KIND_DOUBLE) {
         get_constant_pool_entry(pool, cp_i + 1)->kind = BJVM_CP_KIND_INVALID;

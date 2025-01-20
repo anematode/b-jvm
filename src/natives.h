@@ -50,7 +50,7 @@ static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) { return 
   ({                                                                                                                   \
     bjvm_cp_field *field = bjvm_easy_field_lookup(receiver->descriptor, STR(name), STR("I"));                          \
     assert(field && name);                                                                                             \
-    bjvm_get_field(receiver, field).l;                                                                                 \
+    bjvm_get_field(receiver, field).i;                                                                                 \
   })
 
 static inline void StoreField(bjvm_obj_header *thing, bjvm_utf8 field_name, bjvm_stack_value value, bjvm_utf8 desc) {

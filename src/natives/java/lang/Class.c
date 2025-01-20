@@ -152,7 +152,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   }
   bjvm_classdesc *c = bootstrap_lookup_class(thread, hslc(name_str));
 
-  if (args[1].i) {
+  if (c && args[1].i) {
     bjvm_initialize_class_t ctx = {};
     future_t f = bjvm_initialize_class(&ctx, thread, c);
     assert(f.status == FUTURE_READY);

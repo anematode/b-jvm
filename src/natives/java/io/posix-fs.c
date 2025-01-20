@@ -67,8 +67,6 @@ fs_result posix_fs_get_attributes(bjvm_utf8 file_name, boolean_attributes *attrs
   struct stat st;
   int err;
 
-  printf("file %.*s\n", fmt_slice(file_name));
-
   attributes *self = unix_get_active_fs()->inherited_data;
   if (self->original_get_attributes) {
     err = self->original_get_attributes(file_name, attrs);

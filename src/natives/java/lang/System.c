@@ -24,6 +24,8 @@ DECLARE_NATIVE("java/lang", System, mapLibraryName,
     goto on_oom;
   }
 
+  free_heap_str(str);
+
   return (bjvm_stack_value) {.obj = result };
 
 on_oom:

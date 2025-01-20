@@ -145,7 +145,7 @@ DECLARE_ASYNC(bjvm_value, bjvm_resolve_indy_static_argument, bjvm_resolve_method
               , bjvm_thread *thread, bjvm_cp_entry *ent, bool *is_object);
 
 DECLARE_ASYNC(
-    int, indy_resolve, int static_i; bjvm_plain_frame * fake_frame; bjvm_handle * bootstrap_handle; union {
+    int, indy_resolve, int static_i; bjvm_plain_frame *fake_frame; bjvm_handle *bootstrap_handle; union {
       bjvm_resolve_method_handle_t mh;
       bjvm_resolve_indy_static_argument_t static_arg;
       bjvm_invokevirtual_signature_polymorphic_t invoke;
@@ -165,7 +165,7 @@ EMSCRIPTEN_KEEPALIVE
 DECLARE_ASYNC(
     bjvm_stack_value, bjvm_interpret, int sd; bjvm_stack_frame * invoked_frame; union {
       bjvm_initialize_class_t init_class;
-      indy_resolve_t indy_resolve;
+      indy_resolve_t *indy_resolve;
       bjvm_run_native_t native;
       resolve_methodref_t methodref_resolve;
       bjvm_invokevirtual_signature_polymorphic_t invoke_sigpoly;
@@ -194,6 +194,9 @@ typedef struct bjvm_vm {
   // Classes with implementation-required padding before other fields (map class
   // name -> padding bytes)
   bjvm_string_hash_table class_padding;
+
+  // Defined moules  (name -> bjvm_module *)
+  bjvm_string_hash_table modules;
 
   // Write byte of stdout/stderr (if nullptr, uses the default implementation)
   bjvm_write_byte write_stdout;
@@ -229,6 +232,16 @@ typedef struct bjvm_vm {
 
   int next_thread_id;
 } bjvm_vm;
+
+// Java Module
+typedef struct bjvm_module {
+  // Pointer to the java.lang.Module object corresponding to this Module
+  bjvm_obj_header *reflection_object;
+
+  // TODO add exports, imports, yada yada
+} bjvm_module;
+
+int bjvm_define_module(bjvm_vm *vm, bjvm_utf8 module_name, bjvm_obj_header *module);
 
 typedef struct {
   // Write byte of stdout/stderr (if nullptr, uses the default implementation)
@@ -424,6 +437,7 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 void bjvm_free_vm(bjvm_vm *vm);
 
 bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread, bjvm_utf8 name);
+bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, bjvm_utf8 name, bool raise_class_not_found);
 bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, bjvm_utf8 chars, const uint8_t *classfile_bytes,
                                             size_t classfile_len);
 int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);

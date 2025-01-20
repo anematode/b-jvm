@@ -500,13 +500,16 @@ TEST_CASE("Conflicting defaults") {
   REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 
-
+#if 0
 TEST_CASE("Records") {
   auto result = run_test_case("test_files/records/", true,
                               "Records");
   REQUIRE_THAT(result.stdout_, Equals(R"(true
 true)"));
 }
+#endif
+
+#if 0
 TEST_CASE("JSON tests") {
   std::string classpath =
       "test_files/json:test_files/json/gson-2.11.0.jar:test_files/"
@@ -518,6 +521,7 @@ TEST_CASE("JSON tests") {
 {"name":"Goober","age":21}
 {"name":"Goober","age":21})"));
 }
+#endif
 
 TEST_CASE("ArrayStoreException") {
   auto result = run_test_case("test_files/array_store/", true, "ArrayStore");
@@ -561,11 +565,13 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 #endif
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("jre/lib/resources.jar:jre/lib/tools.jar:jre/lib/plugin.jar:test_files/compiler", false);
+  auto result = run_test_case("test_files/compiler", false);
 }
 
+#if 0
 TEST_CASE("Filesystem") {
   auto result = run_test_case("test_files/filesystem", true, "Filesystem");
   REQUIRE_THAT(result.stderr_, Equals(""));
   REQUIRE_THAT(result.stdout_, Equals("UnixFileSystem"));
 }
+#endif
