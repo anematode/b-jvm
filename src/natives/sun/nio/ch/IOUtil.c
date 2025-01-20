@@ -1,4 +1,6 @@
 #include <natives.h>
+#include <stdio.h>
+#include <limits.h>
 
 DECLARE_NATIVE("sun/nio/ch", IOUtil, initIDs, "()V") {
   return value_null();
