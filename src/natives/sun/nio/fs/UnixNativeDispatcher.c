@@ -61,17 +61,26 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, stat0, "(JLsun/nio/fs/UnixFil
   MapAttrInt(st_gid, st.st_gid);
   MapAttrLong(st_size, st.st_size);
 
-  MapAttrLong(st_atime_sec, st.st_atimespec.tv_sec);
-  MapAttrLong(st_atime_nsec, st.st_atimespec.tv_nsec);
+#ifdef __APPLE__
+#define suffix(x) x ## espec
+#else
+#define suffix(x) x
+#endif
 
-  MapAttrLong(st_mtime_sec, st.st_mtimespec.tv_sec);
-  MapAttrLong(st_mtime_nsec, st.st_mtimespec.tv_nsec);
+  MapAttrLong(st_atime_sec, st.suffix(st_atim).tv_sec);
+  MapAttrLong(st_atime_nsec, st.suffix(st_atim).tv_nsec);
 
-  MapAttrLong(st_ctime_sec, st.st_ctimespec.tv_sec);
-  MapAttrLong(st_ctime_nsec, st.st_ctimespec.tv_nsec);
+  MapAttrLong(st_mtime_sec, st.suffix(st_mtim).tv_sec);
+  MapAttrLong(st_mtime_nsec, st.suffix(st_mtim).tv_nsec);
 
+  MapAttrLong(st_ctime_sec, st.suffix(st_ctim).tv_sec);
+  MapAttrLong(st_ctime_nsec, st.suffix(st_ctim).tv_nsec);
+
+#ifdef __APPLE__
   MapAttrLong(st_birthtime_sec, st.st_birthtimespec.tv_sec);
   MapAttrLong(st_birthtime_nsec, st.st_birthtimespec.tv_nsec);
+#endif
+
 #undef MapAttrLong
   #undef MapAttrInt
 
