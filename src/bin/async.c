@@ -16,7 +16,7 @@ DEFINE_ASYNC(int, my_inner_future, int a) {
   ASYNC_END(5);
 };
 
-DECLARE_ASYNC_VOID(fetch_data, int _res; my_inner_future_t _inner_future, int a);
+DECLARE_ASYNC_VOID(fetch_data, int _res; my_inner_future_t _inner_future);
 
 DEFINE_ASYNC_VOID(fetch_data)
 {
