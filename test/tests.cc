@@ -538,6 +538,10 @@ param3
 )");
 }
 
+TEST_CASE("Extended NPE message") {
+  auto result = run_test_case("test_files/extended_npe/", false, "ExtendedNPETests");
+}
+
 #if 0
 TEST_CASE("ITextPDF") {
   auto result = run_test_case("test_files/pdf:test_files/pdf/itextpdf-5.5.13.4.jar"

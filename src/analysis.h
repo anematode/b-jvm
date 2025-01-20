@@ -125,6 +125,8 @@ bool bjvm_query_dominance(const bjvm_basic_block *dominator,
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
 const char *bjvm_insn_code_name(bjvm_insn_code_kind code);
 
+int get_extended_npe_message(bjvm_cp_method *method, int pc, heap_string *result);
+
 #ifdef __cplusplus
 }
 #endif

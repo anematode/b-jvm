@@ -165,6 +165,17 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
   format_error_dynamic(strdup(buf));
 }
 
+const bjvm_utf8 * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table){
+  // Linear scan throught the whole array
+  for (int i = 0; i < table->entries_count; ++i) {
+    bjvm_attribute_lvt_entry *entry = table->entries + i;
+    if (entry->index == index && entry->start_pc <= original_pc && entry->end_pc > original_pc) {
+      return &entry->name;
+    }
+  }
+  return nullptr;
+}
+
 bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
                                 int expected_kinds, const char *reason) {
   assert(reason);
@@ -1779,6 +1790,8 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     attr->kind = BJVM_ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE;
     uint16_t count = attr->lvt.entries_count =
           reader_next_u16(&attr_reader, "local variable table count");
+    attr->lvt.entries =
+        arena_alloc(ctx->arena, count, sizeof(bjvm_attribute_lvt_entry));
     for (int i = 0; i < count; ++i) {
       bjvm_attribute_lvt_entry *entry =
           &attr->lvt.entries[i];

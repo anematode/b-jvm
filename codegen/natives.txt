@@ -1,6 +1,8 @@
 java/lang/String
 java/lang/StackTraceElement
 java/lang/Throwable
+  bjvm_cp_method *method;
+  int faulting_insn;
 java/lang/invoke/LambdaForm
 java/lang/invoke/CallSite
 jdk/internal/reflect/ConstantPool

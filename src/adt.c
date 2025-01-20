@@ -159,6 +159,7 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
 
 void bjvm_string_builder_init(bjvm_string_builder *builder) {
   builder->data = nullptr;
+  builder->write_pos = 0;
 }
 
 void bjvm_string_builder_append(bjvm_string_builder *builder, const char *fmt,
@@ -174,6 +175,8 @@ void bjvm_string_builder_append(bjvm_string_builder *builder, const char *fmt,
   va_start(args, fmt);
   vsnprintf(write, len + 1, fmt, args);
   va_end(args);
+
+  builder->write_pos = arrlen(builder->data) - 1;
 }
 
 void bjvm_string_builder_free(bjvm_string_builder *builder) {

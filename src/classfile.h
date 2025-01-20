@@ -516,6 +516,10 @@ typedef struct {
   int entries_count;
 } bjvm_attribute_local_variable_table;
 
+// Look up an entry in the local variable table, according to a swizzled local index but the original instruction
+// program counter.
+const bjvm_utf8 *bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table) ;
+
 typedef struct {
   bjvm_utf8 name;
   uint16_t access_flags;

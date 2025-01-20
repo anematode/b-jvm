@@ -13,7 +13,7 @@ DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
     if (thread->vm->write_stdout)
       thread->vm->write_stdout(data[offset + i], thread->vm->write_byte_param);
     else
-      fprintf(stderr, "%d ", data[offset + i]);
+      fprintf(stderr, "%c", data[offset + i]);
   }
   return (bjvm_stack_value){.i = 0};
 }

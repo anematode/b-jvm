@@ -568,13 +568,20 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj) {
   printf("Raising exception of type %s\n", obj->descriptor->name);
 #endif
 
+#define T ((struct bjvm_native_Throwable *)obj)
+  if (thread->frames_count > 0) {
+    bjvm_stack_frame *frame = thread->frames[thread->frames_count - 1];
+    if (!bjvm_is_frame_native(frame)) {
+      T->faulting_insn = frame->plain.program_counter;
+      T->method = frame->plain.method;
+    }
+  }
   thread->current_exception = obj;
 }
 
 // Helper function to raise VM-generated exceptions
 int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name, const bjvm_utf8 exception_string) {
   bjvm_classdesc *classdesc = bootstrap_lookup_class(thread, exception_name);
-  printf("Exception name: %.*s\n", fmt_slice(exception_name));
   assert(classdesc->state == BJVM_CD_STATE_INITIALIZED && "VM-generated exceptions should be initialised at VM boot");
 
   thread->lang_exception_frame = (int)thread->frames_count - 1;
@@ -593,7 +600,7 @@ int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name,
   thread->lang_exception_frame = -1;
 
 #ifndef EMSCRIPTEN
-  fprintf(stderr, "Exception: %.*s: %.*s\n", fmt_slice(exception_name), fmt_slice(exception_string));
+  // fprintf(stderr, "Exception: %.*s: %.*s\n", fmt_slice(exception_name), fmt_slice(exception_string));
 #endif
   bjvm_raise_exception_object(thread, obj);
   return 0;

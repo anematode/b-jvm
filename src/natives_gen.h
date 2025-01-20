@@ -22,6 +22,11 @@ struct bjvm_native_StackTraceElement {
 };
 struct bjvm_native_Throwable {
   bjvm_obj_header base;
+  // implementation-dependent fields
+  bjvm_cp_method *method;
+
+  int faulting_insn;
+
   // my fields
   bjvm_obj_header *backtrace;  // Ljava/lang/Object;
   bjvm_obj_header *detailMessage;  // Ljava/lang/String;
@@ -241,6 +246,7 @@ struct bjvm_native_Reference {
   bjvm_obj_header *discovered;  // Ljava/lang/ref/Reference;
 };
 static inline void bjvm_register_native_padding(bjvm_vm *vm) {
+  (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/Throwable", -1, (void*) (2 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "jdk/internal/reflect/ConstantPool", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/Class", -1, (void*) (1 * sizeof(void*)));
   (void)bjvm_hash_table_insert(&vm->class_padding, "java/lang/reflect/Field", -1, (void*) (1 * sizeof(void*)));
