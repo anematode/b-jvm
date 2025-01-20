@@ -136,6 +136,15 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     bjvm_hash_table_iterator_next(&it);
   }
 
+  // Modules
+  it = bjvm_hash_table_get_iterator(&vm->modules);
+  bjvm_module *module;
+  while (bjvm_hash_table_iterator_has_next(it, &key, &key_len,
+                                           (void **)&module)) {
+    PUSH_ROOT(&module->reflection_object);
+    bjvm_hash_table_iterator_next(&it);
+  }
+
   // Stack and local variables on active threads
   for (int thread_i = 0; thread_i < vm->active_thread_count; ++thread_i) {
     bjvm_thread *thr = vm->active_threads[thread_i];

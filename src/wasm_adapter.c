@@ -82,7 +82,7 @@ static void *create_adapter_to_interpreter_frame(bjvm_type_kind *kinds,
     const int frame_local = kinds_len + 3;
     bjvm_wasm_expression *make_frame = bjvm_wasm_local_set(module, frame_local, push_frame);
     bjvm_wasm_expression *null_check = bjvm_wasm_unop(module, BJVM_WASM_OP_KIND_I32_EQZ, bjvm_wasm_local_get(module, frame_local, bjvm_wasm_int32()));
-    bjvm_wasm_expression *return_exc = bjvm_wasm_return(module, bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_EXC));
+    bjvm_wasm_expression *return_exc = bjvm_wasm_return(module, bjvm_wasm_i32_const(module, 1));
     bjvm_wasm_expression *addr = bjvm_wasm_local_get(module, frame_local, bjvm_wasm_int32());
     bjvm_wasm_expression **spill = generate_writes(module, kinds, kinds_len, addr);
     bjvm_wasm_expression *call_interpret = bjvm_wasm_call(module, bjvm_wasm_import_runtime_function(module, "bjvm_interpret", "ii", "i"), (bjvm_wasm_expression*[]){

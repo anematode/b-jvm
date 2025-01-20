@@ -13,7 +13,7 @@ DECLARE_NATIVE(
 
   (void)loader;
 
-  heap_string name_str = read_string_to_utf8(name);
+  heap_string name_str = AsHeapString(name, on_oom);
   uint8_t *bytes = ArrayData(data) + offset;
 
   // Replace name_str with slashes
@@ -24,12 +24,17 @@ DECLARE_NATIVE(
   }
 
   bjvm_classdesc *result =
-      bjvm_define_class(thread, hslc(name_str), bytes, length);
+      bjvm_define_bootstrap_class(thread, hslc(name_str), bytes, length);
 
   free_heap_str(name_str);
 
-  bjvm_initialize_class(thread, result);
+  bjvm_initialize_class_t pox = {0};
+  future_t f = bjvm_initialize_class(&pox, thread, result); // TODO convert
+  assert(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};
+
+  on_oom:
+  return value_null();
 }

@@ -19,17 +19,19 @@ static int64_t *get_native_handle(bjvm_obj_header *obj) {
 DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
   if (!args[0].handle->obj)
     return value_null();
-  heap_string filename = read_string_to_utf8(args[0].handle->obj);
+  heap_string filename = AsHeapString(args[0].handle->obj, on_oom);
   bjvm_obj_header *fd = *get_fd(obj->obj);
   assert(fd);
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/FileNotFoundException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
                          hslc(filename));
   } else {
     *get_native_handle(fd) = (int64_t)file;
   }
   free_heap_str(filename);
+
+  on_oom:
   return value_null();
 }
 
@@ -38,7 +40,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, read0, "()I") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -51,7 +53,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, seek0, "(J)V") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -65,7 +67,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, getFilePointer, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }
@@ -89,7 +91,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, length, "()J") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    bjvm_raise_exception(thread, STR("java/io/IOException"),
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
                          STR("File not open"));
     return value_null();
   }

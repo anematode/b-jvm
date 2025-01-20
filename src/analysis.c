@@ -139,12 +139,16 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(aload)
     CASE(astore)
     CASE(anewarray)
+    CASE(anewarray_resolved)
     CASE(checkcast)
+    CASE(checkcast_resolved)
     CASE(getfield)
     CASE(getstatic)
     CASE(instanceof)
+    CASE(instanceof_resolved)
     CASE(invokedynamic)
     CASE(new)
+    CASE(new_resolved)
     CASE(putfield)
     CASE(putstatic)
     CASE(invokevirtual)
@@ -184,6 +188,8 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(invokeitable_monomorphic)
     CASE(invokeitable_polymorphic)
     CASE(invokespecial_resolved)
+    CASE(invokestatic_resolved)
+    CASE(invokecallsite)
     CASE(getfield_B)
     CASE(getfield_C)
     CASE(getfield_S)
@@ -192,7 +198,32 @@ const char *bjvm_insn_code_name(bjvm_insn_code_kind code) {
     CASE(getfield_F)
     CASE(getfield_D)
     CASE(getfield_L)
+    CASE(putfield_B)
+    CASE(putfield_C)
+    CASE(putfield_S)
+    CASE(putfield_I)
+    CASE(putfield_J)
+    CASE(putfield_F)
+    CASE(putfield_D)
+    CASE(putfield_L)
+    CASE(getstatic_B)
+    CASE(getstatic_C)
+    CASE(getstatic_S)
+    CASE(getstatic_I)
+    CASE(getstatic_J)
+    CASE(getstatic_F)
+    CASE(getstatic_D)
+    CASE(getstatic_L)
+    CASE(putstatic_B)
+    CASE(putstatic_C)
+    CASE(putstatic_S)
+    CASE(putstatic_I)
+    CASE(putstatic_J)
+    CASE(putstatic_F)
+    CASE(putstatic_D)
+    CASE(putstatic_L)
   }
+  printf("Unknown code: %d\n", code);
   UNREACHABLE();
 }
 
@@ -954,7 +985,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     bjvm_cp_entry *ent =
         bjvm_check_cp_entry(insn->cp,
                             BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
-                                BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS,
+                                BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS | BJVM_CP_KIND_DYNAMIC_CONSTANT,
                             "ldc argument");
     PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
               : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT

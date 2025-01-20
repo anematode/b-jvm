@@ -354,7 +354,8 @@ typedef enum {
   BJVM_MH_KIND_INVOKE_STATIC = 6,
   BJVM_MH_KIND_INVOKE_SPECIAL = 7,
   BJVM_MH_KIND_NEW_INVOKE_SPECIAL = 8,
-  BJVM_MH_KIND_INVOKE_INTERFACE = 9
+  BJVM_MH_KIND_INVOKE_INTERFACE = 9,
+  BJVM_MH_KIND_LAST = 9
 } bjvm_method_handle_kind;
 
 typedef struct {
@@ -395,6 +396,9 @@ typedef enum {
   BJVM_CP_KIND_METHOD_HANDLE = 1 << 11,
   BJVM_CP_KIND_METHOD_TYPE = 1 << 12,
   BJVM_CP_KIND_INVOKE_DYNAMIC = 1 << 13,
+  BJVM_CP_KIND_DYNAMIC_CONSTANT = 1 << 14,
+  BJVM_CP_KIND_MODULE = 1 << 15,
+  BJVM_CP_KIND_PACKAGE = 1 << 16
 } bjvm_cp_kind;
 
 typedef struct bjvm_cp_entry {
@@ -446,7 +450,8 @@ typedef enum {
   BJVM_ACCESS_STRICT = 0x0800,
   BJVM_ACCESS_SYNTHETIC = 0x1000,
   BJVM_ACCESS_ANNOTATION = 0x2000,
-  BJVM_ACCESS_ENUM = 0x4000
+  BJVM_ACCESS_ENUM = 0x4000,
+  BJVM_ACCESS_MODULE = 0x8000
 } bjvm_access_flags;
 
 typedef enum {
@@ -462,7 +467,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_SIGNATURE,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS,
-  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT
+  BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT,
+  BJVM_ATTRIBUTE_KIND_NEST_HOST
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -651,6 +657,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_runtime_visible_type_annotations type_annotations;
     bjvm_attribute_annotation_default annotation_default;
     bjvm_attribute_signature signature;
+    bjvm_cp_class_info *nest_host;
   };
 } bjvm_attribute;
 
@@ -711,6 +718,8 @@ typedef struct bjvm_cp_field {
   bjvm_classdesc *my_class;
 } bjvm_cp_field;
 
+typedef struct bjvm_module bjvm_module;
+
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct bjvm_classdesc {
   bjvm_classdesc_kind kind;
@@ -720,6 +729,7 @@ typedef struct bjvm_classdesc {
   bjvm_access_flags access_flags;
   heap_string name;
   bjvm_cp_class_info *super_class;
+  bjvm_cp_class_info *nest_host;
 
   int interfaces_count;
   bjvm_cp_class_info **interfaces;
@@ -759,6 +769,9 @@ typedef struct bjvm_classdesc {
   bjvm_bytecode_insn **indy_insns; // used to get GC roots to CallSites
 
   void (*dtor)(bjvm_classdesc *); // apoptosis
+
+  bjvm_module *module;
+  void *classloader; // parent classloader (static-ish lifetime)
 
   bjvm_vtable vtable;
   bjvm_itables itables;

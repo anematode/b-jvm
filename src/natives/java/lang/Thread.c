@@ -23,3 +23,11 @@ DECLARE_NATIVE("java/lang", Thread, holdsLock, "(Ljava/lang/Object;)Z") {
 DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
   return value_null(); // TODO
 }
+
+DECLARE_NATIVE("java/lang", Thread, getNextThreadIdOffset, "()J") {
+  return (bjvm_stack_value){.l = (intptr_t) &thread->vm->next_thread_id};
+}
+
+DECLARE_NATIVE("java/lang", Thread, currentCarrierThread, "()Ljava/lang/Thread;") {
+  return (bjvm_stack_value){.obj = (void*)thread->thread_obj};
+}

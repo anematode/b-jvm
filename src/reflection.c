@@ -4,6 +4,8 @@
 #include "bjvm.h"
 #include "objects.h"
 
+#include <cached_classdescs.h>
+
 bjvm_utf8 bjvm_unparse_field_descriptor(bjvm_utf8 str,
                                         const bjvm_field_descriptor *desc) {
   bjvm_utf8 write = str;
@@ -27,9 +29,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
                                    bjvm_classdesc *classdesc,
                                    bjvm_cp_field *field) {
 
-  bjvm_classdesc *reflect_Field =
-      must_create_class(thread, STR("java/lang/reflect/Field"));
-  bjvm_initialize_class(thread, reflect_Field);
+  bjvm_classdesc *reflect_Field = thread->vm->cached_classdescs->field;
   bjvm_handle *field_mirror =
       bjvm_make_handle(thread, new_object(thread, reflect_Field));
   if (!field_mirror->obj) { // out of memory
@@ -68,9 +68,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
                                          bjvm_cp_method *method) {
   assert(utf8_equals(method->name, "<init>"));
 
-  bjvm_classdesc *reflect_Constructor =
-      must_create_class(thread, STR("java/lang/reflect/Constructor"));
-  bjvm_initialize_class(thread, reflect_Constructor);
+  bjvm_classdesc *reflect_Constructor = thread->vm->cached_classdescs->constructor;
 
   method->reflection_ctor = (void *)new_object(thread, reflect_Constructor);
 
@@ -81,7 +79,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
   C->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   C->modifiers = method->access_flags;
   C->parameterTypes = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Class")),
+      thread, thread->vm->cached_classdescs->klass,
       method->descriptor->args_count);
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
@@ -98,9 +96,8 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method) {
-  bjvm_classdesc *reflect_Method =
-      must_create_class(thread, STR("java/lang/reflect/Method"));
-  bjvm_initialize_class(thread, reflect_Method);
+  assert(!utf8_equals(method->name, "<init>"));
+  bjvm_classdesc *reflect_Method = thread->vm->cached_classdescs->method;
 
   bjvm_handle *result =
       bjvm_make_handle(thread, new_object(thread, reflect_Method));
@@ -143,7 +140,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   }
 
   M->parameterTypes = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Class")),
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
       method->descriptor->args_count);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
@@ -158,7 +155,7 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
   M->exceptionTypes = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Class")), 0);
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
   // TODO parse these ^^
 
   method->reflection_method = (void *)M;
@@ -168,14 +165,7 @@ oom: // OOM while creating the Method
 }
 
 static bjvm_obj_header * get_method_parameters_impl(bjvm_thread * thread, bjvm_cp_method * method, bjvm_attribute_method_parameters mparams) {
-  bjvm_classdesc *Parameter = must_create_class(thread, STR("java/lang/reflect/Parameter"));
-  if (!Parameter)
-    return nullptr;  // OOM
-
-  bjvm_interpreter_result_t status = bjvm_initialize_class(thread, Parameter);
-  if (status != BJVM_INTERP_RESULT_OK)
-    return nullptr;
-
+  bjvm_classdesc *Parameter = thread->vm->cached_classdescs->parameter;
   bjvm_handle *params = bjvm_make_handle(thread, CreateObjectArray1D(thread, Parameter, mparams.count));
   if (!params->obj)
     return nullptr;

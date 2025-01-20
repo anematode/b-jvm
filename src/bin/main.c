@@ -25,7 +25,7 @@ bjvm_thread *bjvm_ffi_create_thread(bjvm_vm *vm) {
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_async_run_ctx *bjvm_ffi_run_main(bjvm_thread *thr) {
-  bjvm_classdesc *desc = must_create_class(thr, STR("Main"));
+  bjvm_classdesc *desc = bootstrap_lookup_class(thr, STR("Main"));
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
@@ -40,7 +40,7 @@ bjvm_async_run_ctx *bjvm_ffi_run_main(bjvm_thread *thr) {
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_classdesc *bjvm_ffi_get_class(bjvm_thread *thr, const char *name) {
-  bjvm_classdesc *clazz = must_create_class(thr, (bjvm_utf8){.chars=(char*)name, .len=(int)strlen(name)});
+  bjvm_classdesc *clazz = bootstrap_lookup_class(thr, (bjvm_utf8){.chars=(char*)name, .len=(int)strlen(name)});
   if (!clazz) return nullptr;
   bjvm_initialize_class(thr, clazz);  // TODO step this
   return clazz;
@@ -168,12 +168,12 @@ int print_error(void *ctx) {
   bjvm_thread *thr = run_ctx->thread;
   if (thr->current_exception) {
     printf("Exception was raised!\n");
-    // bjvm_thread_run printStackTrace
+    // bjvm_thread_run_root printStackTrace
     bjvm_stack_value args[1] = {{.obj = thr->current_exception}};
     bjvm_cp_method *method = bjvm_method_lookup(
             thr->current_exception->descriptor, STR("printStackTrace"), STR("()V"), true, false);
     thr->current_exception = nullptr;
-    bjvm_thread_run(thr, method, args, nullptr);
+    bjvm_thread_run_root(thr, method, args, nullptr);
   }
   return 0;
 }

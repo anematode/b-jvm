@@ -226,16 +226,16 @@ void *wasm_runtime_new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_interpreter_result_t wasm_runtime_raise_npe(bjvm_thread *thread) {
+int wasm_runtime_raise_npe(bjvm_thread *thread) {
   bjvm_null_pointer_exception(thread);
-  return BJVM_INTERP_RESULT_EXC;
+  return BJVM_ASYNC_RUN_RESULT_EXC;
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_interpreter_result_t
+int
 wasm_runtime_raise_array_index_oob(bjvm_thread *thread, int index, int length) {
   bjvm_array_index_oob_exception(thread, index, length);
-  return BJVM_INTERP_RESULT_EXC;
+  return BJVM_ASYNC_RUN_RESULT_EXC;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -253,7 +253,7 @@ bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
+int wasm_runtime_invokestatic(bjvm_thread *thread,
                                                     bjvm_plain_frame *frame,
                                                     bjvm_bytecode_insn *insn) {
   // printf("invokestatic called!\n");
@@ -262,7 +262,7 @@ bjvm_interpreter_result_t wasm_runtime_invokestatic(bjvm_thread *thread,
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_interpreter_result_t
+int
 wasm_runtime_invokenonstatic(bjvm_thread *thread, bjvm_plain_frame *frame,
                              bjvm_bytecode_insn *insn) {
   // fprintf(stderr, "invokenonstatic called from method %.*s!\n",
@@ -664,11 +664,11 @@ typedef struct {
 
 static bjvm_wasm_expression *exception_raised(bjvm_wasm_module *module) {
   return bjvm_wasm_return(module,
-                          bjvm_wasm_i32_const(module, BJVM_INTERP_RESULT_EXC));
+                          bjvm_wasm_i32_const(module, BJVM_ASYNC_RUN_RESULT_EXC));
 }
 
 static bjvm_wasm_expression *interrupt(compile_ctx *ctx, int pc) {
-  return spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT, 0, -1);
+  return spill_or_load_code(ctx, pc, false, BJVM_ASYNC_RUN_RESULT_INT, 0, -1);
 }
 
 bjvm_wasm_expression *wasm_lower_anewarray(compile_ctx *ctx,
@@ -812,7 +812,7 @@ expression wasm_lower_invoke(compile_ctx *ctx, const bjvm_bytecode_insn *insn,
   expression interrupt_check = bjvm_wasm_if_else(
       ctx->module,
       bjvm_wasm_binop(ctx->module, BJVM_WASM_OP_KIND_I32_NE, call,
-                      bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK)),
+                      bjvm_wasm_i32_const(ctx->module, BJVM_ASYNC_RUN_RESULT_OK)),
       interrupt(ctx, pc), nullptr, bjvm_wasm_int32());
 
   // Now load in the return value
@@ -952,7 +952,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
     case bjvm_insn_areturn: {
       PUSH_EXPR = wasm_lower_return(ctx, insn, pc, sd);
       PUSH_EXPR = bjvm_wasm_return(
-          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK));
+          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_ASYNC_RUN_RESULT_OK));
       outgoing_edges_processed = true;
       break;
     }
@@ -1008,7 +1008,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
           wasm_raise_npe(ctx), store, bjvm_wasm_void());
       PUSH_EXPR = execute;
       // Spill all locals
-      PUSH_EXPR = spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_EXC,
+      PUSH_EXPR = spill_or_load_code(ctx, pc, false, BJVM_ASYNC_RUN_RESULT_EXC,
                                      ctx->code->max_stack, -1);
       break;
     }
@@ -1215,7 +1215,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
     case bjvm_insn_return: {
       // Just return OK
       PUSH_EXPR = bjvm_wasm_return(
-          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_INTERP_RESULT_OK));
+          ctx->module, bjvm_wasm_i32_const(ctx->module, BJVM_ASYNC_RUN_RESULT_OK));
       break;
     }
     case bjvm_insn_swap: {
@@ -1435,7 +1435,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
     fprintf(stderr, "Rejecting JIT because of unimplemented instruction %s\n",
             bjvm_insn_code_name(bb->start[i].kind));
     PUSH_EXPR =
-        spill_or_load_code(ctx, pc, false, BJVM_INTERP_RESULT_INT, 0, -1);
+        spill_or_load_code(ctx, pc, false, BJVM_ASYNC_RUN_RESULT_INT, 0, -1);
   } else if (!outgoing_edges_processed && bb->next_count) {
     int next = topo->block_to_topo[bb->next[0]];
     if (next != topo->topo_i + 1) {
@@ -1585,7 +1585,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
   // Resulting signature and (roughly) behavior is same as
   // bjvm_bytecode_interpret:
   // (bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_stack_value *result)
-  // -> bjvm_interpreter_result_t
+  // -> int
   // The key difference is that the frame MUST be the topmost frame, and this
   // must be the first invocation, whereas in the interpreter, we can interpret
   // things after an interrupt.
@@ -1634,7 +1634,7 @@ bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
       analy->block_count, false};
   // Push a block to load stuff from the stack
   *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression){
-      spill_or_load_code(&ctx, 0, true, BJVM_INTERP_RESULT_INT, 0, -1), 0, -1,
+      spill_or_load_code(&ctx, 0, true, BJVM_ASYNC_RUN_RESULT_INT, 0, -1), 0, -1,
       false};
   for (topo.topo_i = 0; topo.topo_i <= analy->block_count; ++topo.topo_i) {
     // First close off any blocks as appropriate

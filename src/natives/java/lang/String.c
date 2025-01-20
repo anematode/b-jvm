@@ -5,7 +5,7 @@ DECLARE_NATIVE("java/lang", String, intern, "()Ljava/lang/String;") {
     ThrowLangException(NullPointerException);
     return value_null();
   }
-  short *buf;
+  int8_t *buf;
   size_t len;
   read_string(thread, obj->obj, &buf, &len);
 

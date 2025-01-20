@@ -224,20 +224,32 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     CONSTANT_Utf8 = 1,
     CONSTANT_MethodHandle = 15,
     CONSTANT_MethodType = 16,
+    CONSTANT_Dynamic = 17,
     CONSTANT_InvokeDynamic = 18,
+    CONSTANT_Module = 19,
+    CONSTANT_Package = 20
   };
 
   uint8_t kind = reader_next_u8(reader, "cp kind");
   switch (kind) {
+  case CONSTANT_Module:
+    [[fallthrough]];
+  case CONSTANT_Package:
+    [[fallthrough]];
   case CONSTANT_Class: {
+    bjvm_cp_kind entry_kind = kind == CONSTANT_Class    ? BJVM_CP_KIND_CLASS
+                              : kind == CONSTANT_Module ? BJVM_CP_KIND_MODULE
+                                                        : BJVM_CP_KIND_PACKAGE;
+
     uint16_t index = reader_next_u16(reader, "class index");
     return (bjvm_cp_entry){
-        .kind = BJVM_CP_KIND_CLASS,
+        .kind = entry_kind,
         .class_info = {
             .name = skip_linking
                         ? null_str()
                         : checked_get_utf8(ctx->cp, index, "class info name")}};
   }
+
   case CONSTANT_Fieldref:
   case CONSTANT_Methodref:
   case CONSTANT_InterfaceMethodref: {
@@ -350,6 +362,8 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                                 : checked_get_utf8(ctx->cp, desc_index,
                                                    "method type descriptor")}};
   }
+  case CONSTANT_Dynamic:
+    [[fallthrough]];
   case CONSTANT_InvokeDynamic: {
     uint16_t bootstrap_method_attr_index =
         reader_next_u16(reader, "bootstrap method attr index");
@@ -363,13 +377,13 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
                             ->name_and_type;
 
     return (bjvm_cp_entry){
-        .kind = BJVM_CP_KIND_INVOKE_DYNAMIC,
-        .indy_info = {
-          // will be converted into a pointer to the method in link_bootstrap_methods
-            .method =
-                (void *)(uintptr_t)bootstrap_method_attr_index,
-            .name_and_type = name_and_type,
-            .method_descriptor = nullptr}};
+        .kind = (kind == CONSTANT_Dynamic) ? BJVM_CP_KIND_DYNAMIC_CONSTANT
+                                           : BJVM_CP_KIND_INVOKE_DYNAMIC,
+        .indy_info = {// will be converted into a pointer to the method in
+                      // link_bootstrap_methods
+                      .method = (void *)(uintptr_t)bootstrap_method_attr_index,
+                      .name_and_type = name_and_type,
+                      .method_descriptor = nullptr}};
   }
   default:
     format_error_static("Invalid constant pool entry kind");
@@ -466,6 +480,10 @@ bjvm_constant_pool *parse_constant_pool(cf_byteslice *reader,
         // TODO fix ^^ this is janky af
       }
       ent->my_index = cp_i;
+
+      if (ent->kind == BJVM_CP_KIND_PACKAGE) {
+        printf("PACKAGE: %.*s\n", fmt_slice(ent->class_info.name));
+      }
 
       if (ent->kind == BJVM_CP_KIND_LONG || ent->kind == BJVM_CP_KIND_DOUBLE) {
         get_constant_pool_entry(pool, cp_i + 1)->kind = BJVM_CP_KIND_INVALID;
@@ -1510,7 +1528,8 @@ void parse_bootstrap_methods_attribute(cf_byteslice attr_reader,
       const int allowed = BJVM_CP_KIND_STRING | BJVM_CP_KIND_INTEGER |
                           BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_LONG |
                           BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_METHOD_HANDLE |
-                          BJVM_CP_KIND_METHOD_TYPE;
+                          BJVM_CP_KIND_METHOD_TYPE | BJVM_CP_KIND_CLASS |
+                          BJVM_CP_KIND_DYNAMIC_CONSTANT;
       method->args[j] = checked_cp_entry(
           ctx->cp, reader_next_u16(&attr_reader, "bootstrap method arg"),
           allowed, "bootstrap method arg");
@@ -1620,7 +1639,8 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
 }
 
 // 4.2.2. Unqualified Names
-void check_unqualified_name(bjvm_utf8 name, bool is_method, const char *reading) {
+void check_unqualified_name(bjvm_utf8 name, bool is_method,
+                            const char *reading) {
   // "An unqualified name must contain at least one Unicode code point and must
   // not contain any of the ASCII characters . ; [ /"
   // "Method names are further constrained so that ... they must not contain
@@ -1632,13 +1652,15 @@ void check_unqualified_name(bjvm_utf8 name, bool is_method, const char *reading)
     format_error_dynamic(strdup(complaint));
   }
   if (utf8_equals(name, "<init>") || utf8_equals(name, "<clinit>")) {
-    return;  // only valid method names
+    return; // only valid method names
   }
   for (int i = 0; i < name.len; ++i) {
     char c = name.chars[i];
-    if (c == '.' || c == ';' || c == '[' || c == '/' || (is_method && (c == '<' || c == '>'))) {
+    if (c == '.' || c == ';' || c == '[' || c == '/' ||
+        (is_method && (c == '<' || c == '>'))) {
       char complaint[1024];
-      snprintf(complaint, sizeof(complaint), "invalid %s name: '%.*s'", reading, fmt_slice(name));
+      snprintf(complaint, sizeof(complaint), "invalid %s name: '%.*s'", reading,
+               fmt_slice(name));
       format_error_dynamic(strdup(complaint));
     }
   }
@@ -1707,13 +1729,13 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
         arena_alloc(ctx->arena, count, sizeof(bjvm_method_parameter_info));
 
     for (int i = 0; i < count; ++i) {
-      uint16_t name_index = reader_next_u16(&attr_reader, "method parameter name");
+      uint16_t name_index =
+          reader_next_u16(&attr_reader, "method parameter name");
       // "If the value of the name_index item is zero, then this parameters
       // element indicates a formal parameter with no name"
       if (name_index) {
-        bjvm_utf8 param_name = checked_get_utf8(
-          ctx->cp, name_index,
-          "method parameter name");
+        bjvm_utf8 param_name =
+            checked_get_utf8(ctx->cp, name_index, "method parameter name");
         check_unqualified_name(param_name, false, "method parameter name");
         params[i].name = param_name;
       } else {
@@ -1748,6 +1770,11 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     attr->signature.utf8 = checked_get_utf8(
         ctx->cp, reader_next_u16(&attr_reader, "Signature index"),
         "Signature index");
+  } else if (utf8_equals(attr->name, "NestHost")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_NEST_HOST;
+    attr->nest_host = &checked_cp_entry(
+            ctx->cp, reader_next_u16(&attr_reader, "NestHost index"),
+            BJVM_CP_KIND_CLASS, "NestHost index")->class_info;
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
@@ -1870,7 +1897,6 @@ char *parse_field_descriptor(const char **chars, size_t len,
       "Expected field descriptor character, but reached end of string");
 }
 
-
 char *parse_method_descriptor(const bjvm_utf8 entry,
                               bjvm_method_descriptor *result, arena *arena) {
   // MethodDescriptor:
@@ -1977,13 +2003,13 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),
                         BJVM_CP_KIND_CLASS, "this class")
            ->class_info;
-  cf->name = (heap_string) {.chars = this_class->name.chars,
-                            .len = this_class->name.len};  // TODO unjank
+  cf->name = (heap_string){.chars = this_class->name.chars,
+                           .len = this_class->name.len}; // TODO unjank
 
   bool is_primordial_object = utf8_equals(hslc(cf->name), "java/lang/Object");
 
   uint16_t super_class = reader_next_u16(&reader, "super class");
-  cf->super_class = is_primordial_object
+  cf->super_class = ((cf->access_flags & BJVM_ACCESS_MODULE) | is_primordial_object)
                         ? nullptr
                         : &checked_cp_entry(cf->pool, super_class,
                                             BJVM_CP_KIND_CLASS, "super class")
@@ -2045,6 +2071,8 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
       cf->bootstrap_methods = &attr->bootstrap_methods;
     } else if (attr->kind == BJVM_ATTRIBUTE_KIND_SOURCE_FILE) {
       cf->source_file = &attr->source_file;
+    } else if (attr->kind ==BJVM_ATTRIBUTE_KIND_NEST_HOST) {
+      cf->nest_host = attr->nest_host;
     }
   }
 

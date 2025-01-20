@@ -8,6 +8,8 @@
 
 #include "tests-common.h"
 
+#include "natives.h"
+
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -32,7 +34,7 @@ optional<vector<uint8_t>>
 ResolveClassPath(string const &filename,
                  std::vector<string> const &extra_paths) {
   std::vector<string> paths = extra_paths;
-  paths.emplace_back("jre8/"); // for testing
+  paths.emplace_back("jdk23/"); // for testing
 
   for (const auto &path : paths) {
     optional<vector<uint8_t>> file_data = ReadFile(path + filename);
@@ -212,46 +214,52 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
     fprintf(stderr, "Failed to create VM");
     return result;
   }
-  bjvm_thread *thr = bjvm_create_thread(vm, bjvm_default_thread_options());
+  bjvm_thread *thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 
   bjvm_utf8 m{.chars = (char *)main_class.c_str(),
               .len = (int)main_class.size()};
 
-  bjvm_classdesc *desc = must_create_class(thr, m);
+  bjvm_classdesc *desc = bootstrap_lookup_class(thread, m);
   if (!desc) {
     return result;
   }
   bjvm_stack_value args[1] = {{.obj = nullptr}};
 
   bjvm_cp_method *method;
-  bjvm_initialize_class(thr, desc);
+
+  bjvm_initialize_class_t pox = { 0 };
+  future_t f = bjvm_initialize_class(&pox, thread, desc);
+  assert(f.status == FUTURE_READY);
 
   method = bjvm_method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"),
                               false, false);
 
-  bjvm_thread_run(thr, method, args, nullptr);
+  bjvm_thread_run_root(thread, method, args, nullptr);
 
-  if (thr->current_exception) {
+  if (thread->current_exception) {
     method =
-        bjvm_method_lookup(thr->current_exception->descriptor, STR("toString"),
+        bjvm_method_lookup(thread->current_exception->descriptor, STR("toString"),
                            STR("()Ljava/lang/String;"), true, false);
-    bjvm_stack_value args[1] = {{.obj = thr->current_exception}}, result;
-    thr->current_exception = nullptr;
-    bjvm_thread_run(thr, method, args, &result);
-    heap_string read = read_string_to_utf8(result.obj);
+    bjvm_stack_value args[1] = {{.obj = thread->current_exception}}, result;
+    thread->current_exception = nullptr;
+    bjvm_thread_run_root(thread, method, args, &result);
+    heap_string read = AsHeapString(result.obj, on_oom);
     std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
     free_heap_str(read);
 
     // Then call printStackTrace ()V
     method = bjvm_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
                                 STR("()V"), true, false);
-    bjvm_thread_run(thr, method, args, nullptr);
+    bjvm_thread_run_root(thread, method, args, nullptr);
   }
 
-  bjvm_free_thread(thr);
+  bjvm_free_thread(thread);
   bjvm_free_vm(vm);
 
   return result;
+
+  on_oom:
+  UNREACHABLE();
 }
 
 } // namespace Bjvm::Tests

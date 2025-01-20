@@ -3,7 +3,7 @@ java/lang/StackTraceElement
 java/lang/Throwable
 java/lang/invoke/LambdaForm
 java/lang/invoke/CallSite
-sun/reflect/ConstantPool
+jdk/internal/reflect/ConstantPool
   bjvm_classdesc *reflected_class;
 java/lang/Class
   bjvm_classdesc *reflected_class;
@@ -23,3 +23,4 @@ java/lang/invoke/MethodType
 java/lang/invoke/MemberName
   void *vmtarget;
   intptr_t vmindex;
+java/lang/ref/Reference

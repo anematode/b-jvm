@@ -46,3 +46,15 @@ DECLARE_NATIVE("java/lang", Object, getClass, "()Ljava/lang/Class;") {
   return (bjvm_stack_value){
       .obj = (void *)bjvm_get_class_mirror(thread, obj->obj->descriptor)};
 }
+
+DECLARE_NATIVE("java/lang", Object, notifyAll, "()V") {
+  return value_null(); // TODO
+}
+
+DECLARE_NATIVE("java/lang", Object, notify, "()V") {
+  return value_null(); // TODO
+}
+
+DECLARE_NATIVE("java/lang", Object, wait, "()V") {
+  return value_null(); // TODO
+}

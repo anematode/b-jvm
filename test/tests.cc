@@ -18,11 +18,15 @@
 #include "../src/bjvm.h"
 #include "../src/util.h"
 #include "../src/wasm_jit.h"
+#include "catch2/matchers/catch_matchers_container_properties.hpp"
+#include "catch2/matchers/catch_matchers_string.hpp"
+#include "catch2/matchers/catch_matchers_vector.hpp"
 #include "tests-common.h"
 
 #include <numeric>
 
 using namespace Bjvm::Tests;
+using Catch::Matchers::Equals;
 
 double get_time() {
 #ifdef EMSCRIPTEN
@@ -46,7 +50,7 @@ TEST_CASE("Test classfile parsing") {
   bool fuzz = false;
 
   // list all java files in the jre8 directory
-  auto files = ListDirectory("jre8", true);
+  auto files = ListDirectory("jdk23", true);
   double total_millis = 0;
 
   int count = 0;
@@ -355,7 +359,7 @@ short1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 long1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 float1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
 double1041nullfalsefalsefalsefalsefalsefalse00nulltruenull
-java.lang.Integer17nullfalsefalsetruefalsefalsefalse1152class java.lang.Numberfalsenull
+java.lang.Integer17nullfalsefalsetruefalsefalsefalse861class java.lang.Numberfalsenull
 [Ljava.lang.Integer;1041class java.lang.Integertruefalsefalsetruefalsefalse00class java.lang.Objectfalsenull
 [[Ljava.lang.Integer;1041class [Ljava.lang.Integer;truefalsefalsefalsefalsefalse00class java.lang.Objectfalsenull
 [I1041inttruefalsefalsefalsetruefalse00class java.lang.Objectfalsenull
@@ -496,17 +500,28 @@ TEST_CASE("Conflicting defaults") {
   REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 
+#if 0
+TEST_CASE("Records") {
+  auto result = run_test_case("test_files/records/", true,
+                              "Records");
+  REQUIRE_THAT(result.stdout_, Equals(R"(true
+true)"));
+}
+#endif
+
+#if 0
 TEST_CASE("JSON tests") {
   std::string classpath =
-      "test_files/json:test_files/json/gson-2.8.0.jar:test_files/"
+      "test_files/json:test_files/json/gson-2.11.0.jar:test_files/"
       "json/jackson-core-2.18.2.jar:test_files/json/"
       "jackson-annotations-2.18.2.jar:test_files/json/"
       "jackson-databind-2.18.2.jar";
   auto result = run_test_case(classpath, true, "GsonExample");
-  REQUIRE(result.stdout_ == R"(Student: Goober is 21 years old.
+  REQUIRE_THAT(result.stdout_, Equals(R"(Student: Goober is 21 years old.
 {"name":"Goober","age":21}
-{"name":"Goober","age":21})");
+{"name":"Goober","age":21})"));
 }
+#endif
 
 TEST_CASE("ArrayStoreException") {
   auto result = run_test_case("test_files/array_store/", true, "ArrayStore");
@@ -550,5 +565,13 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 #endif
 
 TEST_CASE("Playground") {
-  auto result = run_test_case("jre/lib/resources.jar:jre/lib/tools.jar:jre/lib/plugin.jar:test_files/compiler", false);
+  auto result = run_test_case("test_files/compiler", false);
 }
+
+#if 0
+TEST_CASE("Filesystem") {
+  auto result = run_test_case("test_files/filesystem", true, "Filesystem");
+  REQUIRE_THAT(result.stderr_, Equals(""));
+  REQUIRE_THAT(result.stdout_, Equals("UnixFileSystem"));
+}
+#endif

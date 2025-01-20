@@ -109,11 +109,18 @@ void fill_mn_with_method(bjvm_thread *thread, bjvm_handle *mn,
   M->clazz = (void *)bjvm_get_class_mirror(thread, search_on);
 }
 
-bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
+typedef enum {
+  METHOD_RESOLVE_OK,
+  METHOD_RESOLVE_NOT_FOUND,
+  METHOD_RESOLVE_EXCEPTION
+} method_resolve_result;
+
+method_resolve_result resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   heap_string search_for =
-      M->name ? read_string_to_utf8(M->name) : make_heap_str(0);
+      M->name ? AsHeapString(M->name, on_oom) : make_heap_str(0);
   bjvm_classdesc *search_on =
       ((struct bjvm_native_Class *)M->clazz)->reflected_class;
+  bjvm_link_class(thread, search_on);
 
   bjvm_method_handle_kind kind = unpack_mn_kind(M); // TODO validate
   M->flags &= (int)0xFF000000U;
@@ -146,6 +153,7 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   case BJVM_MH_KIND_INVOKE_INTERFACE:
     struct bjvm_native_MethodType *mt = (void *)M->type;
     heap_string descriptor = unparse_method_type(mt);
+
     bjvm_cp_method *method = bjvm_method_lookup(search_on, hslc(search_for),
                                                 hslc(descriptor), true, false);
     free_heap_str(descriptor);
@@ -163,22 +171,28 @@ bool resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
   }
 
   free_heap_str(search_for);
-  return found;
+  return found ? METHOD_RESOLVE_OK : METHOD_RESOLVE_NOT_FOUND;
+
+  on_oom:
+  return METHOD_RESOLVE_EXCEPTION;
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
-               "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;)Ljava/lang/"
+               "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;IZ)Ljava/lang/"
                "invoke/MemberName;") {
-  assert(argc == 2);
+  assert(argc == 4);
 
   struct bjvm_native_Class *caller = (void *)args[1].handle->obj;
   bjvm_handle *mn = (void *)args[0].handle;
 
-  bool found = resolve_mn(thread, mn);
-  (void)found;
-  if (!found) {
+  method_resolve_result found = resolve_mn(thread, mn);
+  if (unlikely(found == METHOD_RESOLVE_EXCEPTION)) {
+    return value_null();
+  }
+
+  if (unlikely(found == METHOD_RESOLVE_NOT_FOUND)) {
     // Raise LinkageError
-    bjvm_raise_exception(thread, STR("java/lang/LinkageError"),
+    bjvm_raise_vm_exception(thread, STR("java/lang/LinkageError"),
                          STR("Failed to resolve MemberName"));
     return value_null();
   }
@@ -193,16 +207,16 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   assert(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   bjvm_obj_header *array = CreateObjectArray1D(
-      thread, must_create_class(thread, STR("java/lang/Object")), 2);
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 2);
 
   bjvm_obj_header **data = ArrayData(array);
 
-  bjvm_classdesc *Long = must_create_class(thread, STR("java/lang/Long"));
+  bjvm_classdesc *Long = bootstrap_lookup_class(thread, STR("java/lang/Long"));
   bjvm_cp_method *valueFrom = bjvm_method_lookup(
       Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
   bjvm_stack_value result;
-  bjvm_thread_run(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},
+  bjvm_thread_run_root(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},
                   &result);
   data[0] = result.obj;
 
@@ -257,6 +271,20 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset,
+               "(Ljava/lang/invoke/MemberName;)J") {
+  assert(argc == 1);
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
+  return (bjvm_stack_value){.l = mn->vmindex};
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, staticFieldBase,
+               "(Ljava/lang/invoke/MemberName;)Ljava/lang/Object;") {
+  assert(argc == 1);
+  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
+  return (bjvm_stack_value){.obj = (void*)bjvm_unmirror_class(mn->clazz)->static_fields};
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, staticFieldOffset,
                "(Ljava/lang/invoke/MemberName;)J") {
   assert(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;

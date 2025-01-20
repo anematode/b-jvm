@@ -94,10 +94,8 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
          c_abs = get_unambiguous_method(s)->access_flags & BJVM_ACCESS_ABSTRACT;
     if (d_abs || d == s) {
       result = s; // c is concrete, or both are abstract so choose one
-    } else if (c_abs) {
-      result = d; // d is concrete
     } else {
-      result = mark_ambiguous(d); // both are concrete -- ambiguous!
+      result = d; // d is concrete
     }
 
     // Now check if the method is ambiguous

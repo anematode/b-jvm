@@ -8,23 +8,32 @@
 using namespace Bjvm::Tests;
 
 TEST_CASE("Analysis passes on valid bytecode") {
-  auto files = ListDirectory("jre8", true);
+  auto files = ListDirectory("jdk23", true);
   for (const auto &file : files) {
     if (!EndsWith(file, ".class"))
       continue;
     auto contents = ReadFile(file).value();
     bjvm_classdesc cls;
+
+    heap_string error;
     parse_result_t result =
-        bjvm_parse_classfile(contents.data(), contents.size(), &cls, nullptr);
-    assert(result == 0);
+        bjvm_parse_classfile(contents.data(), contents.size(), &cls, &error);
+
+    if (result != 0) {
+        FAIL("Failed to parse classfile " << file << ": " << to_string_view(error));
+    }
 
     for (int i = 0; i < cls.methods_count; ++i) {
       auto *method = cls.methods + i;
       if (!method->code)
         continue;
-      heap_string error;
+
       int status = bjvm_analyze_method_code(method, &error);
-      assert(status == 0);
+
+      if (status != 0) {
+        FAIL("Failed to analyze method " << to_string_view(cls.name) << "#" << to_string_view(method->name) << ": " << to_string_view(error));
+      }
+
       auto *analy = static_cast<bjvm_code_analysis *>(method->code_analysis);
       bjvm_scan_basic_blocks(method->code, analy);
       bjvm_compute_dominator_tree(analy);
@@ -32,7 +41,7 @@ TEST_CASE("Analysis passes on valid bytecode") {
       // All Java code should be reducible because it uses structured control
       // flow!
       int failed_to_reduce = bjvm_attempt_reduce_cfg(analy);
-      assert(failed_to_reduce == 0);
+      REQUIRE(failed_to_reduce == 0);
     }
 
     bjvm_free_classfile(cls);
