@@ -998,7 +998,19 @@ DEFINE_ASYNC_SL(struct bjvm_native_MethodType *, resolve_mh_mt, BJVM_MH_KIND_LAS
 
   switch (info->handle_kind) {
   case BJVM_MH_KIND_GET_FIELD:
-    UNREACHABLE();
+    // MT should be of the form (C)T, where C is the class the field is found on
+    bjvm_cp_field_info *field = &info->reference->field;
+    bjvm_resolve_class(thread, field->class_info);
+    AWAIT(bjvm_initialize_class(&self->ic, thread, field->class_info->classdesc));
+
+    // reload these because we awaited
+    rtype = nullptr;
+    ptypes = nullptr;
+    ptypes_count = 0;
+    ptypes_capacity = 0;
+
+    *VECTOR_PUSH(ptypes, ptypes_count, ptypes_capacity) = field->class_info->classdesc;
+    rtype = load_class_of_field(thread, field->parsed_descriptor);
     break;
   case BJVM_MH_KIND_GET_STATIC:
     UNREACHABLE();

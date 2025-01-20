@@ -543,6 +543,18 @@ param3
 )");
 }
 
+TEST_CASE("Permitted subclasses") {
+  auto result = run_test_case("test_files/permitted_subclasses/", true, "PermittedSubclasses");
+  REQUIRE(result.stdout_ == R"(PermittedSubclasses
+Subclass1
+Subclass2
+Subclass3
+Subclass1
+Subclass2
+Subclass3
+)");
+}
+
 #if 0
 TEST_CASE("ITextPDF") {
   auto result = run_test_case("test_files/pdf:test_files/pdf/itextpdf-5.5.13.4.jar"
