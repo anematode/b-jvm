@@ -33,7 +33,6 @@ static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) { return 
 
 #define LoadFieldObject(receiver, name, desc)                                                                          \
   ({                                                                                                                   \
-    _Static_assert((desc)[0] == 'L', "descriptor must be an object type");                                             \
     bjvm_cp_field *field = bjvm_easy_field_lookup(receiver->descriptor, STR(name), STR(desc));                         \
     assert(field && name);                                                                                             \
     bjvm_get_field(receiver, field).obj;                                                                               \
