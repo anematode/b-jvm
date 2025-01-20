@@ -121,7 +121,13 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
   bjvm_handle *props = make_string_array(thread, 2);
 
   SET_PROP(0, STR("java.home"));
-  SET_PROP(1, STR("/"));
+  char cwd[1024] = {0};
+  getcwd(cwd, 1024);
+
+  INIT_STACK_STRING(java_home, 1024);
+  java_home = bprintf(java_home, "%s/jdk23", cwd);
+
+  SET_PROP(1, java_home);
 
   return (bjvm_stack_value){.obj = props->obj};
 }

@@ -25,7 +25,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, ensureClassInitialized0,
                "(Ljava/lang/Class;)V") {
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   if (desc->state != BJVM_CD_STATE_INITIALIZED) {
-    bjvm_initialize_class_t pox;
+    bjvm_initialize_class_t pox = {0};
     future_t f = bjvm_initialize_class(&pox, thread, desc);
     assert(f.status == FUTURE_READY);
   }
@@ -172,9 +172,9 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, addressSize, "()I") {
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
   assert(argc == 1);
-  const int64_t l = (int64_t)malloc(args[0].l);
-  printf("Allocated memory!: %p\n", l);
-  return (bjvm_stack_value){.l = l};
+  void *l = malloc(args[0].l);
+  arrput(thread->vm->unsafe_allocations, l);
+  return (bjvm_stack_value){.l = (int64_t)l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class;)Ljava/lang/Object;") {
@@ -187,7 +187,15 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   assert(argc == 1);
   free((void *)args[0].l);
-  return value_null();
+  void **unsafe_allocations = thread->vm->unsafe_allocations;
+  for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
+    if (unsafe_allocations[i] == (void *)args[0].l) {
+      arrdelswap(unsafe_allocations, i);
+      return value_null();
+    }
+  }
+  fprintf(stderr, "Attempted to free memory that was not allocated by Unsafe\n");
+  abort();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {
@@ -218,25 +226,25 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReference,
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getInt, "(Ljava/lang/Object;J)I") {
   assert(argc == 2);
   return (bjvm_stack_value){
-      .i = *(int *)((void *)args[0].handle->obj + args[1].l)};
+      .i = *(int *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getShort, "(Ljava/lang/Object;J)S") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .i = *(short *)((void *)args[0].handle->obj + args[1].l)};
+    .i = *(short *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(Ljava/lang/Object;J)B") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .i = *(int8_t *)((void *)args[0].handle->obj + args[1].l)};
+    .i = *(int8_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLong, "(Ljava/lang/Object;J)J") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .i = *(int64_t *)((void *)args[0].handle->obj + args[1].l)};
+    .i = *(int64_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(J)B") {
@@ -249,45 +257,6 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReferenceVolatile,
   assert(argc == 2);
   return (bjvm_stack_value){
       .obj = *(void **)((uintptr_t)args[0].handle->obj + args[1].l)};
-}
-
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineAnonymousClass,
-               "(Ljava/lang/Class;[B[Ljava/lang/Object;)Ljava/lang/Class;") {
-  assert(argc == 3);
-  bjvm_obj_header *host = args[0].handle->obj;
-  bjvm_obj_header *data = args[1].handle->obj;
-  bjvm_obj_header *cp_patches = args[2].handle->obj;
-
-  (void)host;
-  (void)cp_patches;  // TODO implement
-
-  // Read data into byte array
-  int length = *ArrayLength(data);
-  uint8_t *bytes = ArrayData(data);
-
-  bjvm_classdesc *cd = calloc(1, sizeof(bjvm_classdesc));
-  // Pre-parse to get the name of the class
-  bjvm_parse_classfile(bytes, length, cd, nullptr);
-
-  INIT_STACK_STRING(random_name, 1000);
-  random_name =
-      bprintf(random_name, "%.*s/%d", fmt_slice(hslc(cd->name)), rand());
-
-  bjvm_free_classfile(*cd);
-  free(cd);
-
-  INIT_STACK_STRING(cf_name, 1000);
-  cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(random_name));
-
-  bjvm_classdesc *result =
-      bjvm_define_bootstrap_class(thread, random_name, bytes, length);
-
-  bjvm_initialize_class_t pox;
-  future_t f = bjvm_initialize_class(&pox, thread, result);
-  assert(f.status == FUTURE_READY);
-
-  return (bjvm_stack_value){.obj =
-                                (void *)bjvm_get_class_mirror(thread, result)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
@@ -328,7 +297,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
   free_heap_str(name_str);
 
 
-  bjvm_initialize_class_t pox;
+  bjvm_initialize_class_t pox = {};
   future_t f = bjvm_initialize_class(&pox, thread, result);
   assert(f.status == FUTURE_READY);
 
@@ -354,7 +323,6 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, copyMemory0, "(Ljava/lang/Object;JLj
   void *src = (void*)((uintptr_t)args[0].handle->obj + args[1].l);
   void *dst = (void*)((uintptr_t)args[2].handle->obj + args[3].l);
   size_t len = args[4].l;
-  printf("Copying %zu bytes from %p to %p\n", len, src, dst);
   if (len > 0) {
     memcpy(dst, src, len);
   }

@@ -27,18 +27,21 @@ endif()
 
 # If doing emscripten
 if (EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "-O2 -fms-extensions -Wall -Wextra -Wpedantic -sUSE_ZLIB=1")
-    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wpedantic")
-    set(EmscriptenFlags "-O2 -s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
+    set(CMAKE_C_FLAGS "-fms-extensions -Wall -Wextra -Wpedantic -sUSE_ZLIB=1")
+    set(CMAKE_CXX_FLAGS "-Wall -Wpedantic")
+    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
 elseif (APPLE)
-    set(CMAKE_C_FLAGS "-O0 -fms-extensions -Wall -Wextra  -fsanitize=address,undefined -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
-    set(CMAKE_CXX_FLAGS "-O0 -Wall -Wextra -Wimplicit-fallthrough -fsanitize=address,undefined -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
+    set(CMAKE_C_FLAGS "-O2 -fms-extensions -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing")
+    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers -fno-strict-aliasing") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
     set(EmscriptenFlags "")
 else ()
-    set(CMAKE_C_FLAGS "-O3 -fms-extensions -Wall -Wextra -g -fsanitize=address,undefined -Werror=incompatible-pointer-types -march=native -fno-strict-aliasing -lm")
-    set(CMAKE_CXX_FLAGS "-O3 -Wall -g -fsanitize=address,undefined -fopenmp -march=native -Werror=incompatible-pointer-types -fno-strict-aliasing -lm")
+    set(CMAKE_C_FLAGS "-fms-extensions -Wall -Wextra -g -Werror=incompatible-pointer-types -march=native -fno-strict-aliasing -lm")
+    set(CMAKE_CXX_FLAGS "-fms-extensions -Wall -g -fopenmp -march=native -Werror=incompatible-pointer-types -fno-strict-aliasing -lm")
     set(EmscriptenFlags "")
 endif ()
+
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
 
 if (FALSE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DNDEBUG")
@@ -63,7 +66,8 @@ add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         src/natives/java/lang/NullPointerException.c
         src/natives/java/lang/StringUTF16.c
         src/natives/jdk/internal/misc/Signal.c
-        src/natives/jdk/internal/loader/BootLoader.c)
+        src/natives/jdk/internal/loader/BootLoader.c
+        src/natives/java/lang/Module.c)
 target_include_directories(bjvm PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR})
 
 if (NOT EMSCRIPTEN)
@@ -101,4 +105,4 @@ set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 add_test(NAME tests
         COMMAND tests --skip-benchmarks
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/test")
-set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=1,detect_container_overflow=0")
+set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0,detect_container_overflow=0")

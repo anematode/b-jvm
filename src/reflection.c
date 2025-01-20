@@ -96,6 +96,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method) {
+  assert(!utf8_equals(method->name, "<init>"));
   bjvm_classdesc *reflect_Method = thread->vm->cached_classdescs->method;
 
   bjvm_handle *result =

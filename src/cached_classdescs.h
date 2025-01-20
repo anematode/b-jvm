@@ -26,7 +26,9 @@
   X(illegal_access_error, "java/lang/IllegalAccessError") \
   X(illegal_argument_exception, "java/lang/IllegalArgumentException") \
   X(arithmetic_exception, "java/lang/ArithmeticException") \
-  X(direct_method_handles_holder, "java/lang/invoke/DirectMethodHandle$Holder") \
+  X(direct_method_handle_holder, "java/lang/invoke/DirectMethodHandle$Holder") \
+  X(delegating_method_handle_holder, "java/lang/invoke/DelegatingMethodHandle$Holder") \
+  X(lf_holder, "java/lang/invoke/LambdaForm$Holder") \
   X(illegal_state_exception, "java/lang/IllegalStateException")
 
 
@@ -45,6 +47,7 @@
   X(object, "java/lang/Object")                                                \
   X(thread, "java/lang/Thread")                                                \
   X(thread_group, "java/lang/ThreadGroup")                                     \
+  X(module, "java/lang/Module")                                     \
   X(system, "java/lang/System")
 
 #define CACHED_CLASSDESCS(X)                                                   \

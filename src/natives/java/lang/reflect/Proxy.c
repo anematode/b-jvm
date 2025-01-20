@@ -28,7 +28,7 @@ DECLARE_NATIVE(
 
   free_heap_str(name_str);
 
-  bjvm_initialize_class_t pox;
+  bjvm_initialize_class_t pox = {0};
   future_t f = bjvm_initialize_class(&pox, thread, result); // TODO convert
   assert(f.status == FUTURE_READY);
 
