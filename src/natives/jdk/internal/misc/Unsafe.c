@@ -172,8 +172,9 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, addressSize, "()I") {
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
   assert(argc == 1);
-  const int64_t l = (int64_t)malloc(args[0].l);
-  return (bjvm_stack_value){.l = l};
+  void *l = malloc(args[0].l);
+  arrput(thread->vm->unsafe_allocations, l);
+  return (bjvm_stack_value){.l = (int64_t)l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class;)Ljava/lang/Object;") {
@@ -186,7 +187,15 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   assert(argc == 1);
   free((void *)args[0].l);
-  return value_null();
+  void **unsafe_allocations = thread->vm->unsafe_allocations;
+  for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
+    if (unsafe_allocations[i] == (void *)args[0].l) {
+      arrdelswap(unsafe_allocations, i);
+      return value_null();
+    }
+  }
+  fprintf(stderr, "Attempted to free memory that was not allocated by Unsafe\n");
+  abort();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {

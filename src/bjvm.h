@@ -231,6 +231,10 @@ typedef struct bjvm_vm {
   struct bjvm_cached_classdescs *cached_classdescs;
 
   int next_thread_id;
+
+  // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
+  // the finalizers aren't run
+  void **unsafe_allocations;
 } bjvm_vm;
 
 // Java Module

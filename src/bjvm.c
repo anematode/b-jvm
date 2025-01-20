@@ -752,6 +752,13 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   return vm;
 }
 
+void free_unsafe_allocations(bjvm_vm *vm) {
+  for (int i = 0; i < arrlen(vm->unsafe_allocations); ++i) {
+    free(vm->unsafe_allocations[i]);
+  }
+  arrfree(vm->unsafe_allocations);
+}
+
 void bjvm_free_vm(bjvm_vm *vm) {
   bjvm_free_hash_table(vm->classes);
   bjvm_free_hash_table(vm->natives);
@@ -771,6 +778,8 @@ void bjvm_free_vm(bjvm_vm *vm) {
   free(vm->cached_classdescs);
   free(vm->active_threads);
   free(vm->heap);
+  free_unsafe_allocations(vm);
+
   free(vm);
 }
 
