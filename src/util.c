@@ -13,6 +13,12 @@ bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right) {
          memcmp(left.chars, right.chars, left.len) == 0;
 }
 
+bool utf8_ends_with(bjvm_utf8 str, bjvm_utf8 ending) {
+  if (ending.len > str.len) return false;
+
+  return memcmp(str.chars + str.len - ending.len, ending.chars, ending.len) == 0;
+}
+
 int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
                                    int *result_len, bool sloppy) {
   *result = malloc(len * sizeof(short)); // conservatively large

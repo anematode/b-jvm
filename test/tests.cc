@@ -20,6 +20,7 @@
 #include "../src/wasm_jit.h"
 #include "catch2/matchers/catch_matchers_container_properties.hpp"
 #include "catch2/matchers/catch_matchers_string.hpp"
+#include "catch2/matchers/catch_matchers_vector.hpp"
 #include "tests-common.h"
 
 #include <numeric>
@@ -561,4 +562,10 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 
 TEST_CASE("Playground") {
   auto result = run_test_case("jre/lib/resources.jar:jre/lib/tools.jar:jre/lib/plugin.jar:test_files/compiler", false);
+}
+
+TEST_CASE("Filesystem") {
+  auto result = run_test_case("test_files/filesystem", true, "Filesystem");
+  REQUIRE_THAT(result.stderr_, Equals(""));
+  REQUIRE_THAT(result.stdout_, Equals("UnixFileSystem"));
 }

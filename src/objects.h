@@ -5,6 +5,9 @@ uint64_t ObjNextHashCode();
 /// Create a java.lang.String from a null-terminated C string.
 bjvm_obj_header *MakeJavaStringUtf8(bjvm_thread *thread, char const *chars);
 
+/// Create a java.lang.String from a slice string.
+bjvm_obj_header *MakeJavaStringSlice(bjvm_thread *thread, bjvm_utf8 slice);
+
 /// Helper for java.lang.String#length
 inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
   assert(utf8_equals(hslc(string->descriptor->name), "java/lang/String"));
