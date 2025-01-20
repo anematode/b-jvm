@@ -8,7 +8,7 @@
 #include "unixlike-fs.h"
 
 typedef struct {
-  unixlike_fs unix;
+  unixlike_fs unix_;
 } posix_fs;
 
 bool posix_fs_supported(void);
