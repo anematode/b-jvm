@@ -54,6 +54,23 @@ typedef struct bjvm_basic_block {
   bool nothrow_accessible;
 } bjvm_basic_block;
 
+typedef enum : uint16_t {
+  // The nth parameter to the function (0 = implicit 'this')
+  BJVM_VARIABLE_SRC_KIND_PARAMETER,
+  // The nth local (not parameter) of the function
+  BJVM_VARIABLE_SRC_KIND_LOCAL,
+  // The nth instruction produced this variable in the course of execution (seeing through
+  // instructions like dup etc.)
+  BJVM_VARIABLE_SRC_KIND_INSN,
+  // Comes from multiple possible instructions
+  BJVM_VARIABLE_SRC_KIND_UNK
+} bjvm_variable_source_kind;
+
+typedef struct {
+  uint16_t index;
+  bjvm_variable_source_kind kind;
+} bjvm_stack_variable_source;
+
 // Result of the analysis of a code segment. During analysis, stack operations
 // on longs/doubles are simplified as if they only took up one stack slot (e.g.,
 // pop2 on a double becomes a pop, while pop2 on two ints stays as a pop2).
@@ -76,6 +93,10 @@ typedef struct bjvm_code_analysis {
 
   uint16_t *insn_index_to_stack_depth;
   int insn_count;
+
+  // For each instruction that might participate in extended NPE message resolution,
+  // the sources of its first two operands.
+  struct { bjvm_stack_variable_source a, b; } *sources;
 
   // block 0 = entry point
   bjvm_basic_block *blocks;

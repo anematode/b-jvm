@@ -468,7 +468,8 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS,
   BJVM_ATTRIBUTE_KIND_RUNTIME_VISIBLE_TYPE_ANNOTATIONS,
   BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT,
-  BJVM_ATTRIBUTE_KIND_NEST_HOST
+  BJVM_ATTRIBUTE_KIND_NEST_HOST,
+  BJVM_ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -501,6 +502,19 @@ typedef struct {
   bjvm_line_number_table_entry *entries;
   int entry_count;
 } bjvm_attribute_line_number_table;
+
+typedef struct {
+  int start_pc, end_pc;
+  int index;
+  bjvm_utf8 name;
+  bjvm_utf8 descriptor;
+} bjvm_attribute_lvt_entry;
+
+// Local variable table
+typedef struct {
+  bjvm_attribute_lvt_entry *entries;
+  int entries_count;
+} bjvm_attribute_local_variable_table;
 
 typedef struct {
   bjvm_utf8 name;
@@ -590,6 +604,7 @@ typedef struct {
   bjvm_bytecode_insn *code;
   bjvm_attribute_exception_table *exception_table;
   bjvm_attribute_line_number_table *line_number_table;
+  bjvm_attribute_local_variable_table *local_variable_table;
 
   bjvm_attribute *attributes;
   int attributes_count;
@@ -657,6 +672,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_runtime_visible_type_annotations type_annotations;
     bjvm_attribute_annotation_default annotation_default;
     bjvm_attribute_signature signature;
+    bjvm_attribute_local_variable_table lvt;
     bjvm_cp_class_info *nest_host;
   };
 } bjvm_attribute;

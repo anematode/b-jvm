@@ -12,7 +12,10 @@
 #include <inttypes.h>
 #include <limits.h>
 
-typedef bjvm_type_kind bjvm_analy_stack_entry;
+typedef struct {
+  bjvm_type_kind type;
+  bjvm_stack_variable_source source;
+} bjvm_analy_stack_entry;
 
 // State of the stack (or local variable table) during analysis, indexed after
 // index swizzling (which occurs very early in our processing)
@@ -402,7 +405,7 @@ char *print_analy_stack_state(const bjvm_analy_stack_state *state) {
   char *write = buf;
   write = stpncpy(write, "[ ", end - write);
   for (int i = 0; i < state->entries_count; ++i) {
-    write = stpncpy(write, bjvm_type_kind_to_string(state->entries[i]),
+    write = stpncpy(write, bjvm_type_kind_to_string(state->entries[i].type),
                     end - write);
     if (i + 1 < state->entries_count)
       write = stpncpy(write, ", ", end - write);
@@ -433,7 +436,7 @@ char *expect_analy_stack_states_equal(bjvm_analy_stack_state a,
   if (a.entries_count != b.entries_count)
     goto fail;
   for (int i = 0; i < a.entries_count; ++i) {
-    if (a.entries[i] != b.entries[i]) {
+    if (a.entries[i].type != b.entries[i].type) {
       goto fail;
     }
   }
@@ -481,9 +484,32 @@ void write_kinds_to_bitset(const bjvm_analy_stack_state *inferred_stack,
                            bjvm_compressed_bitset *bjvm_compressed_bitset,
                            bjvm_type_kind test) {
   for (int i = 0; i < inferred_stack->entries_count; ++i) {
-    if (inferred_stack->entries[i] == test)
+    if (inferred_stack->entries[i].type == test)
       bjvm_test_set_compressed_bitset(bjvm_compressed_bitset, offset + i);
   }
+}
+
+
+static bjvm_analy_stack_entry parameter_source(bjvm_type_kind type, int j) {
+  return (bjvm_analy_stack_entry){
+    type,
+    {.kind = BJVM_VARIABLE_SRC_KIND_PARAMETER, .index = j}};
+}
+
+static bjvm_analy_stack_entry this_source() {
+  return parameter_source(BJVM_TYPE_KIND_REFERENCE, 0);
+}
+
+static bjvm_analy_stack_entry insn_source(bjvm_type_kind type, int j) {
+  return (bjvm_analy_stack_entry){
+    type,
+    {.kind = BJVM_VARIABLE_SRC_KIND_INSN, .index = j}};
+}
+
+static bjvm_analy_stack_entry local_source(bjvm_type_kind type, int j) {
+  return (bjvm_analy_stack_entry){
+    type,
+    {.kind = BJVM_VARIABLE_SRC_KIND_LOCAL, .index = j}};
 }
 
 int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
@@ -496,7 +522,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
   *locals_swizzle = malloc(max_locals * sizeof(int));
   for (int i = 0; i < max_locals; ++i) {
-    locals->entries[i] = BJVM_TYPE_KIND_VOID;
+    locals->entries[i].type = BJVM_TYPE_KIND_VOID;
     (*locals_swizzle)[i] = -1;
   }
   int i = 0, j = 0;
@@ -506,13 +532,13 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
     if (max_locals == 0)
       goto fail;
     (*locals_swizzle)[0] = 0; // map 0 -> 0
-    locals->entries[j++] = BJVM_TYPE_KIND_REFERENCE;
+    locals->entries[j++] = this_source();
   }
   locals->entries_cap = locals->entries_count = max_locals;
   for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     bjvm_field_descriptor arg = desc->args[i];
     int swizzled = i + !is_static;
-    locals->entries[swizzled] = field_to_kind(&arg);
+    locals->entries[swizzled] = parameter_source(field_to_kind(&arg), i + 1 /* 1-indexed */);
     // map nth local to nth argument if static, n+1th if nonstatic
     (*locals_swizzle)[j] = swizzled;
     if (bjvm_is_field_wide(arg)) {
@@ -566,27 +592,26 @@ struct method_analysis_ctx {
 #define POP_KIND(kind)                                                         \
   {                                                                            \
     bjvm_analy_stack_entry popped_kind = POP_VAL;                              \
-    if (kind != popped_kind)                                                   \
+    if (kind != popped_kind.type)                                              \
       goto stack_type_mismatch;                                                \
   }
 #define POP(kind) POP_KIND(BJVM_TYPE_KIND_##kind)
 // Push a kind to the analysis stack.
-#define PUSH_KIND(kind)                                                        \
+#define PUSH_ENTRY(kind)                                                        \
   {                                                                            \
     if (ctx->stack.entries_count == ctx->stack.entries_cap)                    \
       goto stack_overflow;                                                     \
-    if (kind != BJVM_TYPE_KIND_VOID)                                           \
-      ctx->stack.entries[ctx->stack.entries_count++] =                         \
-          kind_to_representable_kind(kind);                                    \
+    if (kind.type != BJVM_TYPE_KIND_VOID)                                      \
+      ctx->stack.entries[ctx->stack.entries_count++] = kind; \
   }
-#define PUSH(kind) PUSH_KIND(BJVM_TYPE_KIND_##kind)
+#define PUSH(kind) PUSH_ENTRY(insn_source(BJVM_TYPE_KIND_##kind, insn_index))
 
 // Set the kind of the local variable, in pre-swizzled indices.
 #define SET_LOCAL(index, kind)                                                 \
   {                                                                            \
     if (index >= ctx->code->max_locals)                                        \
       goto local_overflow;                                                     \
-    ctx->locals.entries[index] = BJVM_TYPE_KIND_##kind;                        \
+    ctx->locals.entries[index] = local_source(BJVM_TYPE_KIND_##kind, index);   \
   }
 // Remap the index to the new local variable index after unwidening.
 #define SWIZZLE_LOCAL(index)                                                   \
@@ -598,7 +623,7 @@ struct method_analysis_ctx {
 
 #define CHECK_LOCAL(index, kind)                                               \
   {                                                                            \
-    if (ctx->locals.entries[index] != BJVM_TYPE_KIND_##kind)                   \
+    if (ctx->locals.entries[index].type != BJVM_TYPE_KIND_##kind)              \
       goto local_type_mismatch;                                                \
   }
 
@@ -681,84 +706,84 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   case bjvm_insn_dup: {
     if (ctx->stack.entries_count == 0)
       goto stack_underflow;
-    PUSH_KIND(ctx->stack.entries[ctx->stack.entries_count - 1])
+    PUSH_ENTRY(ctx->stack.entries[ctx->stack.entries_count - 1])
     break;
   }
   case bjvm_insn_dup_x1: {
     if (ctx->stack.entries_count <= 1)
       goto stack_underflow;
-    bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
-    if (is_kind_wide(kind1) || is_kind_wide(kind2))
+    bjvm_analy_stack_entry kind1 = POP_VAL, kind2 = POP_VAL;
+    if (is_kind_wide(kind1.type) || is_kind_wide(kind2.type))
       goto stack_type_mismatch;
-    PUSH_KIND(kind1) PUSH_KIND(kind2) PUSH_KIND(kind1) break;
+    PUSH_ENTRY(kind1) PUSH_ENTRY(kind2) PUSH_ENTRY(kind1) break;
   }
   case bjvm_insn_dup_x2: {
-    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
-    if (is_kind_wide(to_dup))
+    bjvm_analy_stack_entry to_dup = POP_VAL, kind2 = POP_VAL, kind3;
+    if (is_kind_wide(to_dup.type))
       goto stack_type_mismatch;
-    if (is_kind_wide(kind2)) {
-      PUSH_KIND(to_dup) PUSH_KIND(kind2) insn->kind = bjvm_insn_dup_x1;
+    if (is_kind_wide(kind2.type)) {
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(kind2) insn->kind = bjvm_insn_dup_x1;
     } else {
       kind3 = POP_VAL;
-      PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2)
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(kind3) PUSH_ENTRY(kind2)
     }
-    PUSH_KIND(to_dup)
+    PUSH_ENTRY(to_dup)
     break;
   }
   case bjvm_insn_dup2: {
-    bjvm_type_kind to_dup = POP_VAL, kind2;
-    if (is_kind_wide(to_dup)) {
-      PUSH_KIND(to_dup) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup;
+    bjvm_analy_stack_entry to_dup = POP_VAL, kind2;
+    if (is_kind_wide(to_dup.type)) {
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(to_dup) insn->kind = bjvm_insn_dup;
     } else {
       kind2 = POP_VAL;
-      if (is_kind_wide(kind2))
+      if (is_kind_wide(kind2.type))
         goto stack_type_mismatch;
-      PUSH_KIND(kind2) PUSH_KIND(to_dup) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+      PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup)
     }
     break;
   }
   case bjvm_insn_dup2_x1: {
-    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3;
-    if (is_kind_wide(to_dup)) {
-      PUSH_KIND(to_dup)
-      PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
+    bjvm_analy_stack_entry to_dup = POP_VAL, kind2 = POP_VAL, kind3;
+    if (is_kind_wide(to_dup.type)) {
+      PUSH_ENTRY(to_dup)
+      PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = bjvm_insn_dup_x1;
     } else {
       kind3 = POP_VAL;
-      if (is_kind_wide(kind3))
+      if (is_kind_wide(kind3.type))
         goto stack_type_mismatch;
-      PUSH_KIND(kind2)
-      PUSH_KIND(to_dup) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+      PUSH_ENTRY(kind2)
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(kind3) PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup)
     }
     break;
   }
   case bjvm_insn_dup2_x2: {
-    bjvm_type_kind to_dup = POP_VAL, kind2 = POP_VAL, kind3, kind4;
-    if (is_kind_wide(to_dup)) {
-      if (is_kind_wide(kind2)) {
-        PUSH_KIND(to_dup)
-        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x1;
+    bjvm_analy_stack_entry to_dup = POP_VAL, kind2 = POP_VAL, kind3, kind4;
+    if (is_kind_wide(to_dup.type)) {
+      if (is_kind_wide(kind2.type)) {
+        PUSH_ENTRY(to_dup)
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = bjvm_insn_dup_x1;
       } else {
         kind3 = POP_VAL;
-        if (is_kind_wide(kind3))
+        if (is_kind_wide(kind3.type))
           goto stack_type_mismatch;
-        PUSH_KIND(to_dup)
-        PUSH_KIND(kind3)
-        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup_x2;
+        PUSH_ENTRY(to_dup)
+        PUSH_ENTRY(kind3)
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = bjvm_insn_dup_x2;
       }
     } else {
       kind3 = POP_VAL;
-      if (is_kind_wide(kind3)) {
-        PUSH_KIND(kind2)
-        PUSH_KIND(to_dup)
-        PUSH_KIND(kind3)
-        PUSH_KIND(kind2) PUSH_KIND(to_dup) insn->kind = bjvm_insn_dup2_x1;
+      if (is_kind_wide(kind3.type)) {
+        PUSH_ENTRY(kind2)
+        PUSH_ENTRY(to_dup)
+        PUSH_ENTRY(kind3)
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = bjvm_insn_dup2_x1;
       } else {
         kind4 = POP_VAL;
-        if (is_kind_wide(kind4))
+        if (is_kind_wide(kind4.type))
           goto stack_type_mismatch;
-        PUSH_KIND(kind2)
-        PUSH_KIND(to_dup)
-        PUSH_KIND(kind4) PUSH_KIND(kind3) PUSH_KIND(kind2) PUSH_KIND(to_dup)
+        PUSH_ENTRY(kind2)
+        PUSH_ENTRY(to_dup)
+        PUSH_ENTRY(kind4) PUSH_ENTRY(kind3) PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup)
       }
     }
     break;
@@ -886,16 +911,16 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     break;
   }
   case bjvm_insn_pop: {
-    bjvm_type_kind kind = POP_VAL;
-    if (is_kind_wide(kind))
+    bjvm_analy_stack_entry kind = POP_VAL;
+    if (is_kind_wide(kind.type))
       goto stack_type_mismatch;
     break;
   }
   case bjvm_insn_pop2: {
-    bjvm_type_kind kind = POP_VAL;
-    if (!is_kind_wide(kind)) {
-      bjvm_type_kind kind2 = POP_VAL;
-      if (is_kind_wide(kind2))
+    bjvm_analy_stack_entry kind = POP_VAL;
+    if (!is_kind_wide(kind.type)) {
+      bjvm_analy_stack_entry kind2 = POP_VAL;
+      if (is_kind_wide(kind2.type))
         goto stack_type_mismatch;
     } else {
       insn->kind = bjvm_insn_pop;
@@ -907,11 +932,11 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     break;
   }
   case bjvm_insn_swap: {
-    bjvm_type_kind kind1 = POP_VAL, kind2 = POP_VAL;
-    if (is_kind_wide(kind1) || is_kind_wide(kind2))
+    bjvm_analy_stack_entry kind1 = POP_VAL, kind2 = POP_VAL;
+    if (is_kind_wide(kind1.type) || is_kind_wide(kind2.type))
       goto stack_type_mismatch;
     ;
-    PUSH_KIND(kind1) PUSH_KIND(kind2) break;
+    PUSH_ENTRY(kind1) PUSH_ENTRY(kind2) break;
   }
   case bjvm_insn_anewarray: {
     POP(INT) PUSH(REFERENCE) break;
@@ -927,7 +952,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
         bjvm_check_cp_entry(insn->cp, BJVM_CP_KIND_FIELD_REF,
                             "getstatic/getfield argument")
             ->field.parsed_descriptor;
-    PUSH_KIND(field_to_kind(field));
+    PUSH_ENTRY(insn_source(field_to_kind(field), insn_index));
     break;
   }
   case bjvm_insn_instanceof: {
@@ -943,7 +968,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
       POP_KIND(field_to_kind(field));
     }
     if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
-      PUSH_KIND(field_to_kind(&descriptor->return_type))
+      PUSH_ENTRY(insn_source(field_to_kind(&descriptor->return_type), insn_index))
     break;
   }
   case bjvm_insn_new: {
@@ -952,7 +977,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
   }
   case bjvm_insn_putfield:
   case bjvm_insn_putstatic: {
-    bjvm_type_kind kind = POP_VAL;
+    bjvm_analy_stack_entry kind = POP_VAL;
     // TODO check that the field matches
     (void)kind;
     if (insn->kind == bjvm_insn_putfield) {
@@ -978,7 +1003,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
       POP(REFERENCE)
     }
     if (descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID)
-      PUSH_KIND(field_to_kind(&descriptor->return_type));
+      PUSH_ENTRY(insn_source(field_to_kind(&descriptor->return_type), insn_index));
     break;
   }
   case bjvm_insn_ldc: {
@@ -987,16 +1012,18 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
                             BJVM_CP_KIND_INTEGER | BJVM_CP_KIND_STRING |
                                 BJVM_CP_KIND_FLOAT | BJVM_CP_KIND_CLASS | BJVM_CP_KIND_DYNAMIC_CONSTANT,
                             "ldc argument");
-    PUSH_KIND(ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
+    bjvm_type_kind kind = ent->kind == BJVM_CP_KIND_INTEGER ? BJVM_TYPE_KIND_INT
               : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT
-                                                : BJVM_TYPE_KIND_REFERENCE)
+                                                : BJVM_TYPE_KIND_REFERENCE;
+    PUSH_ENTRY(insn_source(kind, insn_index))
     break;
   }
   case bjvm_insn_ldc2_w: {
     bjvm_cp_entry *ent = bjvm_check_cp_entry(
         insn->cp, BJVM_CP_KIND_DOUBLE | BJVM_CP_KIND_LONG, "ldc2_w argument");
-    PUSH_KIND(ent->kind == BJVM_CP_KIND_DOUBLE ? BJVM_TYPE_KIND_DOUBLE
-                                               : BJVM_TYPE_KIND_LONG)
+    bjvm_type_kind kind = ent->kind == BJVM_CP_KIND_DOUBLE ? BJVM_TYPE_KIND_DOUBLE
+                                               : BJVM_TYPE_KIND_LONG;
+    PUSH_ENTRY(insn_source(kind, insn_index))
     break;
   }
   case bjvm_insn_dload: {
@@ -1145,6 +1172,8 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index,
     ctx->stack_terminated = true;
     break;
   }
+  default:  // instruction shouldn't come out of the parser
+    UNREACHABLE();
   }
 
   return 0; // ok
@@ -1183,6 +1212,10 @@ error:;
   return -1;
 }
 
+bool sources_equal(bjvm_stack_variable_source src1, bjvm_stack_variable_source src2) {
+  return memcmp(&src1, &src2, sizeof(src1)) == 0;
+}
+
 bool filter_locals(bjvm_analy_stack_state *s1,
                    const bjvm_analy_stack_state *s2) {
   if (s1->entries_count != s2->entries_count) {
@@ -1192,9 +1225,9 @@ bool filter_locals(bjvm_analy_stack_state *s1,
   assert(s1->entries_count == s2->entries_count);
   bool changed = false;
   for (int i = 0; i < s1->entries_count; ++i) {
-    if (s1->entries[i] != BJVM_TYPE_KIND_VOID &&
-        s1->entries[i] != s2->entries[i]) {
-      s1->entries[i] = BJVM_TYPE_KIND_VOID;
+    if (s1->entries[i].type != BJVM_TYPE_KIND_VOID &&
+        s1->entries[i].type != s2->entries[i].type) {
+      s1->entries[i].type = BJVM_TYPE_KIND_VOID;
       changed = true;
     }
   }
@@ -1255,19 +1288,19 @@ bool gross_quadratic_algorithm_to_refine_local_references(
       stack_terminated = true;
       break;
     case bjvm_insn_astore:
-      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_REFERENCE;
+      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_REFERENCE;
       break;
     case bjvm_insn_dstore:
-      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_DOUBLE;
+      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_DOUBLE;
       break;
     case bjvm_insn_fstore:
-      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_FLOAT;
+      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_FLOAT;
       break;
     case bjvm_insn_istore:
-      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_INT;
+      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_INT;
       break;
     case bjvm_insn_lstore:
-      ctx->locals.entries[insn->index] = BJVM_TYPE_KIND_LONG;
+      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_LONG;
       break;
     default:
       break;
@@ -1308,6 +1341,18 @@ void add_exception_edges(struct method_analysis_ctx *ctx) {
   }
 }
 
+void intersect_analy_stack_state(bjvm_analy_stack_state *src, bjvm_analy_stack_state *dst) {
+  if (src->entries_count != dst->entries_count) {
+    // Malformed branch target! Will be caught in analyze_instruction
+    copy_analy_stack_state(*src, dst);
+  }
+  for (int i = 0; i < src->entries_count; ++i) {
+    if (!sources_equal(src->entries[i].source, dst->entries[i].source)) {
+      src->entries[i].source.kind = dst->entries[i].source.kind = BJVM_VARIABLE_SRC_KIND_UNK;
+    }
+  }
+}
+
 /**
  * Analyze the method's code attribute if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
@@ -1341,7 +1386,19 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   // Initialize stack to the stack at exception handler entry
   ctx.stack.entries_cap = code->max_stack + 1;
   ctx.stack.entries_count = 1;
-  ctx.stack.entries[0] = BJVM_TYPE_KIND_REFERENCE;
+  ctx.stack.entries[0].type = BJVM_TYPE_KIND_REFERENCE;
+  ctx.stack.entries[0].source.kind = BJVM_VARIABLE_SRC_KIND_UNK;  // caught exceptions will never be null
+
+  if (code->local_variable_table) {
+    for (int i = 0; i < code->local_variable_table->entries_count; ++i) {
+      bjvm_attribute_lvt_entry *ent = &code->local_variable_table->entries[i];
+      if (ent->index >= code->max_locals) {
+        result = -1;
+        goto done;
+      }
+      ent->index = ctx.locals_swizzle[ent->index];
+    }
+  }
 
   ctx.error = error;
 
@@ -1376,7 +1433,12 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
 
   for (int i = 0; i < code->insn_count; ++i) {
     if (inferred_stacks[i].entries) {
-      copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
+      if (ctx.stack_terminated) {
+        copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
+      } else {
+        intersect_analy_stack_state(&inferred_stacks[i], &ctx.stack);
+      }
+
       bjvm_analy_stack_state *this_locals = &inferred_locals[i];
       if (inferred_locals[i].is_exc_handler) {
         // At exception handlers, use the local variable table of the start of
@@ -1385,9 +1447,11 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
                                &ctx.locals);
         copy_analy_stack_state(ctx.locals, this_locals);
       }
+
       inferred_stacks[i].from_jump_target = false;
       ctx.stack_terminated = false;
     }
+
     if (inferred_locals[i].entries) {
       copy_analy_stack_state(inferred_locals[i], &ctx.locals);
     }
@@ -1438,6 +1502,62 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
 
   while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
     ;
+
+  analy->sources = calloc(code->insn_count, sizeof(*analy->sources));
+  for (int i = 0; i < code->insn_count; ++i) {
+    bjvm_bytecode_insn *insn = code->code + i;
+    bjvm_stack_variable_source a = {}, b = {};
+    bjvm_analy_stack_state *stack = &inferred_stacks[i];
+    int sd = stack->entries_count;
+    switch (insn->kind) {
+    case bjvm_insn_putfield:
+    case bjvm_insn_aaload:
+    case bjvm_insn_baload:
+    case bjvm_insn_caload:
+    case bjvm_insn_faload:
+    case bjvm_insn_daload:
+    case bjvm_insn_laload:
+    case bjvm_insn_saload:
+    {
+      a = stack->entries[sd - 2].source;
+      b = stack->entries[sd - 1].source;
+      break;
+    }
+    case bjvm_insn_aastore:
+    case bjvm_insn_bastore:
+    case bjvm_insn_castore:
+    case bjvm_insn_fastore:
+    case bjvm_insn_dastore:
+    case bjvm_insn_lastore:
+    case bjvm_insn_sastore:
+    {
+      a = stack->entries[sd - 3].source;  // trying to store into a null array
+      b = stack->entries[sd - 2].source;
+      break;
+    }
+    case bjvm_insn_invokedynamic:
+    case bjvm_insn_invokevirtual:
+    case bjvm_insn_invokeinterface:
+    case bjvm_insn_invokespecial: {  // Trying to invoke on an object
+      int argc = insn->cp->methodref.descriptor->args_count;
+      a = stack->entries[sd - argc].source;
+      break;
+    }
+    case bjvm_insn_arraylength:
+    case bjvm_insn_athrow:
+    case bjvm_insn_monitorenter:
+    case bjvm_insn_monitorexit:
+    case bjvm_insn_getfield:
+    {
+      a = stack->entries[sd - 1].source;
+      break;
+    }
+    default:
+      break;
+    }
+    analy->sources[i].a = a;
+    analy->sources[i].b = b;
+  }
 
 done:
   for (int i = 0; i < code->insn_count; ++i) {
@@ -1790,4 +1910,44 @@ void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis) {
     }
   }
   fprintf(out, "}\n");
+}
+
+// If a NullPointerException is thrown by the given instruction, generate a message like "Cannot load from char array
+// because the return value of "charAt" is null".
+static int get_extended_npe_message(bjvm_cp_method *method, int insn_i, heap_string *result) {
+  // See https://openjdk.org/jeps/358 for more information on how this works, but there are basically two phases: One
+  // which depends on the particular instruction that failed (e.g. caload -> cannot load from char array) and the other
+  // which uses the instruction's sources to produce a more informative message.
+  bjvm_code_analysis *analy = method->code_analysis;
+  bjvm_attribute_code *code = method->code;
+  if (!analy || !code || (unsigned)insn_i >= code->insn_count)
+    return -1;
+
+  bjvm_bytecode_insn *faulting_insn = method->code->code + insn_i;
+  heap_string reason;
+
+#undef CASE
+#define CASE(insn, r) case insn: reason = make_heap_str_from(STR(r)); break;
+
+  switch (faulting_insn->kind) {
+    CASE(bjvm_insn_aaload, "Cannot load from object array")
+    CASE(bjvm_insn_baload, "Cannot load from byte array")
+    CASE(bjvm_insn_caload, "Cannot load from char array")
+    CASE(bjvm_insn_laload, "Cannot load from long array")
+    CASE(bjvm_insn_saload, "Cannot load from short array")
+    CASE(bjvm_insn_faload, "Cannot load from float array")
+    CASE(bjvm_insn_daload, "Cannot load from double array")
+    CASE(bjvm_insn_aastore, "Cannot store to object array")
+    CASE(bjvm_insn_bastore, "Cannot store to byte array")
+    CASE(bjvm_insn_castore, "Cannot store to char array")
+    CASE(bjvm_insn_lastore, "Cannot store to long array")
+    CASE(bjvm_insn_sastore, "Cannot store to short array")
+    CASE(bjvm_insn_fastore, "Cannot store to float array")
+    CASE(bjvm_insn_dastore, "Cannot store to double array")
+    CASE(bjvm_insn_arraylength, "Cannot read the array length")
+    CASE(bjvm_insn_athrow, "Cannot throw exception")
+  case bjvm_insn_getfield:
+  case bjvm_insn_getfield_B ... bjvm_insn_getfield_L:
+
+  }
 }

@@ -1615,11 +1615,14 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
       arena_alloc(ctx->arena, attributes_count, sizeof(bjvm_attribute));
 
   bjvm_attribute_line_number_table *lnt = NULL;
+  bjvm_attribute_local_variable_table *lvt = NULL;
   for (int i = 0; i < attributes_count; ++i) {
     bjvm_attribute *attr = attributes + i;
     parse_attribute(&attr_reader, ctx, attr);
     if (attr->kind == BJVM_ATTRIBUTE_KIND_LINE_NUMBER_TABLE) {
       lnt = &attr->lnt;
+    } else if (attr->kind == BJVM_ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE) {
+      lvt = &attr->lvt;
     }
   }
 
@@ -1631,6 +1634,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
                                .attributes = attributes,
                                .exception_table = table,
                                .line_number_table = lnt,
+                               .local_variable_table = lvt,
                                .attributes_count = attributes_count};
 }
 
@@ -1771,6 +1775,23 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
     attr->nest_host = &checked_cp_entry(
             ctx->cp, reader_next_u16(&attr_reader, "NestHost index"),
             BJVM_CP_KIND_CLASS, "NestHost index")->class_info;
+  } else if (utf8_equals(attr->name, "LocalVariableTable")) {
+    attr->kind = BJVM_ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE;
+    uint16_t count = attr->lvt.entries_count =
+          reader_next_u16(&attr_reader, "local variable table count");
+    for (int i = 0; i < count; ++i) {
+      bjvm_attribute_lvt_entry *entry =
+          &attr->lvt.entries[i];
+      entry->start_pc = reader_next_u16(&attr_reader, "local variable start pc");
+      entry->end_pc = entry->start_pc + reader_next_u16(&attr_reader, "local variable length");
+      entry->name = checked_cp_entry(ctx->cp,
+                                     reader_next_u16(&attr_reader, "local variable name"),
+                                     BJVM_CP_KIND_UTF8, "local variable name")->utf8;
+      entry->descriptor = checked_cp_entry(ctx->cp,
+                                           reader_next_u16(&attr_reader, "local variable descriptor"),
+                                           BJVM_CP_KIND_UTF8, "local variable descriptor")->utf8;
+      entry->index = reader_next_u16(&attr_reader, "local variable index");
+    }
   } else {
     attr->kind = BJVM_ATTRIBUTE_KIND_UNKNOWN;
   }
