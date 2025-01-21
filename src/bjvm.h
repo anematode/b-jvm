@@ -131,7 +131,7 @@ DECLARE_ASYNC(
       bjvm_initialize_class_t init_class_state;
       resolve_mh_mt_t resolve;
     };
-    bjvm_classdesc * DirectMethodHandle; bjvm_classdesc * MemberName; bjvm_cp_method * m;
+    bjvm_classdesc * DirectMethodHandle; bjvm_classdesc * MemberName; bjvm_cp_method * m; bjvm_cp_field *f;
     , bjvm_thread *thread, bjvm_cp_method_handle_info *info);
 
 typedef struct bjvm_interpret_s bjvm_interpret_t;

@@ -500,14 +500,13 @@ TEST_CASE("Conflicting defaults") {
   REQUIRE(result.stdout_.find("AbstractMethodError") != std::string::npos);
 }
 
-#if 0
 TEST_CASE("Records") {
   auto result = run_test_case("test_files/records/", true,
                               "Records");
   REQUIRE_THAT(result.stdout_, Equals(R"(true
-true)"));
+true
+)"));
 }
-#endif
 
 #if 0
 TEST_CASE("JSON tests") {
@@ -542,6 +541,7 @@ param2
 param3
 )");
 }
+
 
 TEST_CASE("Permitted subclasses") {
   auto result = run_test_case("test_files/permitted_subclasses/", true, "PermittedSubclasses");

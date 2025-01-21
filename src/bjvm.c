@@ -4,10 +4,10 @@
 // instruction. This messes up the debug dumps but can lead to slightly better
 // performance because the branch predictor has more information about pairs
 // of instructions which tend to follow another.
-#define ONE_GOTO_PER_INSN 1
+#define ONE_GOTO_PER_INSN 0
 // Skip the memset(...) call to clear each frame's locals/stack. This messes
 // up the debug dumps, but makes setting up frames faster.
-#define SKIP_CLEARING_FRAME 1
+#define SKIP_CLEARING_FRAME 0
 
 #include <assert.h>
 #include <limits.h>
@@ -1099,18 +1099,54 @@ DEFINE_ASYNC_SL(struct bjvm_native_MethodHandle *, bjvm_resolve_method_handle, B
   AWAIT(resolve_mh_mt(&self->resolve, thread, info));
   info->resolved_mt = self->resolve._result;
 
+  self->DirectMethodHandle = bootstrap_lookup_class(thread, STR("java/lang/invoke/DirectMethodHandle"));
+  self->MemberName = bootstrap_lookup_class(thread, STR("java/lang/invoke/MemberName"));
+
+  AWAIT(bjvm_initialize_class(&self->init_class_state, thread, self->DirectMethodHandle));
+  AWAIT(bjvm_initialize_class(&self->init_class_state, thread, self->MemberName));
+
   switch (info->handle_kind) {
   case BJVM_MH_KIND_GET_FIELD:
   case BJVM_MH_KIND_GET_STATIC:
   case BJVM_MH_KIND_PUT_FIELD:
-  case BJVM_MH_KIND_PUT_STATIC:
-    UNREACHABLE();
+  case BJVM_MH_KIND_PUT_STATIC: {
+    bjvm_cp_field_info *field = &info->reference->field;
+    bjvm_resolve_class(thread, field->class_info);
+    AWAIT(bjvm_initialize_class(&self->init_class_state, thread, field->class_info->classdesc));
+
+    field = &info->reference->field; // reload because of the await
+
+    self->f = bjvm_field_lookup(field->class_info->classdesc, field->nat->name, field->nat->descriptor);
+
+    bjvm_reflect_initialize_field(thread, field->class_info->classdesc, self->f);
+
+    bjvm_handle *member = bjvm_make_handle(thread, new_object(thread, self->MemberName));
+    bjvm_cp_method *make_member =
+            bjvm_method_lookup(self->MemberName, STR("<init>"),
+              STR("(Ljava/lang/reflect/Field;)V"), false, false);
+    bjvm_stack_value result;
+    bjvm_thread_run_leaf(
+            thread, make_member,
+            (bjvm_stack_value[]){
+              {.obj = (void *)member->obj},
+              {.obj = (void *)self->f->reflection_field}
+            }, nullptr);
+
+    bjvm_cp_method *make = bjvm_method_lookup(self->DirectMethodHandle, STR("make"),
+                                              STR("(Ljava/lang/invoke/MemberName;)Ljava/lang/"
+                                                  "invoke/DirectMethodHandle;"),
+                                              false, false);
+
+    bjvm_thread_run_leaf(thread, make, (bjvm_stack_value[]){{.obj = member->obj}}, &result);
+    bjvm_drop_handle(thread, member);
+    ASYNC_RETURN((void *)result.obj);
     break;
+  }
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_STATIC:
   case BJVM_MH_KIND_INVOKE_SPECIAL:
   case BJVM_MH_KIND_NEW_INVOKE_SPECIAL:
-  case BJVM_MH_KIND_INVOKE_INTERFACE:
+  case BJVM_MH_KIND_INVOKE_INTERFACE: {
     bjvm_cp_method_info *method = &info->reference->methodref;
     bjvm_resolve_class(thread, method->class_info);
 
@@ -1126,12 +1162,6 @@ DEFINE_ASYNC_SL(struct bjvm_native_MethodHandle *, bjvm_resolve_method_handle, B
     }
 
     // Call DirectMethodHandle.make(method, true)
-    self->DirectMethodHandle = bootstrap_lookup_class(thread, STR("java/lang/invoke/DirectMethodHandle"));
-    self->MemberName = bootstrap_lookup_class(thread, STR("java/lang/invoke/MemberName"));
-
-    AWAIT(bjvm_initialize_class(&self->init_class_state, thread, self->DirectMethodHandle));
-    AWAIT(bjvm_initialize_class(&self->init_class_state, thread, self->MemberName));
-
     bjvm_handle *member = bjvm_make_handle(thread, new_object(thread, self->MemberName));
     bool is_ctor = BJVM_MH_KIND_NEW_INVOKE_SPECIAL == info->handle_kind;
     bjvm_cp_method *make_member =
@@ -1152,6 +1182,7 @@ DEFINE_ASYNC_SL(struct bjvm_native_MethodHandle *, bjvm_resolve_method_handle, B
     bjvm_thread_run_leaf(thread, make, (bjvm_stack_value[]){{.obj = member->obj}}, &result);
     bjvm_drop_handle(thread, member);
     ASYNC_RETURN((void *)result.obj);
+  }
   }
 
   // "Third, a reference to an instance of java.lang.invoke.MethodType is
@@ -2384,6 +2415,7 @@ DEFINE_ASYNC(int, indy_resolve, bjvm_thread *thread, bjvm_bytecode_insn *insn, b
                                                    true, false);
 
   int sd = self->static_i + 4;
+  memset(&self->invoke, 0, sizeof(bjvm_invokevirtual_signature_polymorphic_t));
   AWAIT(bjvm_invokevirtual_signature_polymorphic(&self->invoke, thread, self->fake_frame, &sd, invokeExact,
                                                  m->ref->resolved_mt, (void *)self->bootstrap_handle->obj));
 
@@ -2798,6 +2830,10 @@ interpret_frame:
       bjvm_obj_header *obj = checked_pop(frame).obj;
       if (!obj) {
         bjvm_null_pointer_exception(thread);
+        goto done;
+      }
+      if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
+        bjvm_raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), STR("Cannot call length on an ordinary object"));
         goto done;
       }
       assert(obj->descriptor->kind != BJVM_CD_KIND_ORDINARY);
