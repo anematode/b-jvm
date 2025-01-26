@@ -58,6 +58,7 @@ void bjvm_free_classfile(bjvm_classdesc cf) {
     free_method(&cf.methods[i]);
   free(cf.static_fields);
   arrfree(cf.indy_insns);
+  arrfree(cf.sigpoly_insns);
   bjvm_free_compressed_bitset(cf.static_references);
   bjvm_free_compressed_bitset(cf.instance_references);
   arena_uninit(&cf.arena);
@@ -550,13 +551,16 @@ bjvm_bytecode_insn parse_tableswitch_insn(cf_byteslice *reader, int pc,
     targets[i] = checked_pc(original_pc,
                             reader_next_i32(reader, "tableswitch target"), ctx);
   }
-  return (bjvm_bytecode_insn){.kind = bjvm_insn_tableswitch,
-                              .original_pc = original_pc,
-                              .tableswitch = {.default_target = default_target,
+  struct bjvm_bc_tableswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
+  *data = (struct bjvm_bc_tableswitch_data) {.default_target = default_target,
                                               .low = low,
                                               .high = high,
                                               .targets = targets,
-                                              .targets_count = targets_count}};
+                                              .targets_count = (int)targets_count};
+
+  return (bjvm_bytecode_insn){.kind = bjvm_insn_tableswitch,
+                              .original_pc = original_pc,
+                              .tableswitch = data};
 }
 
 bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
@@ -584,13 +588,15 @@ bjvm_bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc,
         original_pc, reader_next_i32(reader, "lookupswitch target"), ctx);
   }
 
-  return (bjvm_bytecode_insn){.kind = bjvm_insn_lookupswitch,
-                              .original_pc = original_pc,
-                              .lookupswitch = {.default_target = default_target,
+  struct bjvm_bc_lookupswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
+  *data = (struct bjvm_bc_lookupswitch_data) {.default_target = default_target,
                                                .keys = keys,
                                                .keys_count = pairs_count,
                                                .targets = targets,
-                                               .targets_count = pairs_count}};
+                                               .targets_count = pairs_count};
+  return (bjvm_bytecode_insn){.kind = bjvm_insn_lookupswitch,
+                              .original_pc = original_pc,
+                              .lookupswitch = data};
 }
 
 bjvm_type_kind parse_atype(uint8_t atype) {
@@ -1433,9 +1439,12 @@ bjvm_bytecode_insn parse_insn_impl(cf_byteslice *reader, uint32_t pc,
         &checked_cp_entry(ctx->cp, index, BJVM_CP_KIND_CLASS,
                           "multianewarray class")
              ->class_info;
+    struct bjvm_multianewarray_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
+    data->entry = entry;
+    data->dimensions = dimensions;
     return (bjvm_bytecode_insn){
         .kind = bjvm_insn_multianewarray,
-        .multianewarray = {.entry = entry, .dimensions = dimensions}};
+        .multianewarray = data};
   }
 
   case ifnull:
@@ -1493,19 +1502,19 @@ void convert_pc_offsets_to_insn_offsets(bjvm_bytecode_insn *code,
   for (int i = 0; i < insn_count; ++i) {
     bjvm_bytecode_insn *insn = &code[i];
     if (insn->kind == bjvm_insn_tableswitch) {
-      insn->tableswitch.default_target = convert_pc_to_insn(
-          insn->tableswitch.default_target, pc_to_insn, max_pc);
-      int count = insn->tableswitch.high - insn->tableswitch.low + 1;
+      insn->tableswitch->default_target = convert_pc_to_insn(
+          insn->tableswitch->default_target, pc_to_insn, max_pc);
+      int count = insn->tableswitch->high - insn->tableswitch->low + 1;
       for (int j = 0; j < count; ++j) {
-        insn->tableswitch.targets[j] = convert_pc_to_insn(
-            insn->tableswitch.targets[j], pc_to_insn, max_pc);
+        insn->tableswitch->targets[j] = convert_pc_to_insn(
+            insn->tableswitch->targets[j], pc_to_insn, max_pc);
       }
     } else if (insn->kind == bjvm_insn_lookupswitch) {
-      insn->lookupswitch.default_target = convert_pc_to_insn(
-          insn->lookupswitch.default_target, pc_to_insn, max_pc);
-      for (int j = 0; j < insn->lookupswitch.targets_count; ++j) {
-        insn->lookupswitch.targets[j] = convert_pc_to_insn(
-            insn->lookupswitch.targets[j], pc_to_insn, max_pc);
+      insn->lookupswitch->default_target = convert_pc_to_insn(
+          insn->lookupswitch->default_target, pc_to_insn, max_pc);
+      for (int j = 0; j < insn->lookupswitch->targets_count; ++j) {
+        insn->lookupswitch->targets[j] = convert_pc_to_insn(
+            insn->lookupswitch->targets[j], pc_to_insn, max_pc);
       }
     } else if (insn->kind >= bjvm_insn_goto && insn->kind <= bjvm_insn_ifnull) {
       // instruction uses index to store PC; convert to instruction
@@ -2079,6 +2088,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
 
   cf->bootstrap_methods = nullptr;
   cf->indy_insns = nullptr;
+  cf->sigpoly_insns = nullptr;
 
   bool in_MethodHandle =
       utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle") ||

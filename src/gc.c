@@ -69,6 +69,12 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
     bjvm_bytecode_insn *insn = desc->indy_insns[i];
     PUSH_ROOT(&insn->ic);
   }
+
+  // Push all ICed method type objects
+  for (int i = 0; i < arrlen(desc->sigpoly_insns); ++i) {
+    bjvm_bytecode_insn *insn = desc->sigpoly_insns[i];
+    PUSH_ROOT(&insn->ic2);
+  }
 }
 
 void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {

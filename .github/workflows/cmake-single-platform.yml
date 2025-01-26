@@ -17,10 +17,16 @@ jobs:
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
     # You can convert this to a matrix build if you need cross-platform coverage.
     # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install GCC 14
+      run: sudo apt-get install gcc-14 g++-14
+    
+    - name: Make GCC the default
+      run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
 
     - name: Download JDK23
       run: curl -o ${{github.workspace}}/jdk-23_linux-x64_bin.tar.gz https://download.oracle.com/java/23/latest/jdk-23_linux-x64_bin.tar.gz

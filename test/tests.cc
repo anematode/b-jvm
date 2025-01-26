@@ -573,6 +573,18 @@ TEST_CASE("java.lang.reflect.Method", "[reflection]") {
 }
 #endif
 
+TEST_CASE("Simple generic types") {
+  auto result = run_test_case("test_files/generic_types/", true, "GenericBox");
+  REQUIRE(result.stdout_ == R"(Integer Value: 10
+String Value: Hello World
+Box in Box Value: 10
+Cursed time
+Reached
+Correctly threw ClassCastException upon getting
+Done
+)");
+}
+
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/compiler", false);
 }
