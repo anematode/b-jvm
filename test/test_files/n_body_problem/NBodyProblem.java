@@ -89,7 +89,7 @@ public final class NBodyProblem {
     public static void main(String[] args) {
         // int n = Integer.parseInt(args[0]);
         // int n = 50_000_000; // num simulation steps in the original program
-        int n = 50_000;
+        int n = 1000000;
 
         var bodies = new Body[] {
             // sun
@@ -110,7 +110,7 @@ public final class NBodyProblem {
                 4.12479856412430479e+00,
                 -4.03523417114321381e-01,
                 -2.76742510726862411e-03 * DAYS_PER_YEAR,
-                4.99852801234917238e-03 * DAYS_PER_YEAR,
+               4.99852801234917238e-03 * DAYS_PER_YEAR,
                 2.30417297573763929e-05 * DAYS_PER_YEAR,
                 2.85885980666130812e-04 * SOLAR_MASS
             ),

@@ -27,6 +27,7 @@
 #include "wasm_jit.h"
 
 #include "cached_classdescs.h"
+#include <sys/mman.h>
 
 DECLARE_ASYNC(int, init_cached_classdescs,
   locals(
@@ -782,6 +783,10 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
 void free_unsafe_allocations(bjvm_vm *vm) {
   for (int i = 0; i < arrlen(vm->unsafe_allocations); ++i) {
     free(vm->unsafe_allocations[i]);
+  }
+  for (int i = 0; i < arrlen(vm->mmap_allocations); ++i) {
+    mmap_allocation A = vm->mmap_allocations[i];
+    munmap(A.ptr, A.len);
   }
   arrfree(vm->unsafe_allocations);
 }
@@ -2489,7 +2494,7 @@ DEFINE_ASYNC(indy_resolve) {
     result = -1;
   } else {
     assert(res.obj);
-    args->insn->ic = res.obj;
+    args->inst->ic = res.obj;
     result = 0;
   }
 
@@ -2629,9 +2634,9 @@ static void nodejs_bootloader() {
       // Read each of these from disk and put them in the filesystem
       for (let i = 0; i < needed.length; ++i) {
         const path = needed[i];
-        const data = fs.readFileSync("./" + path, "binary");
+        const data = fs.readFileSync("./" + path);  // Buffer
         FS.createPath('/', path.substring(0, path.lastIndexOf('/')));
-        FS.createDataFile('/', path, data, true, true, true);
+        FS.writeFile(path, data);
       }
     }
   });
