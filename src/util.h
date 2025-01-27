@@ -160,7 +160,7 @@ static inline bjvm_utf8 str_to_utf8(const char *str) {
 bool utf8_equals(const bjvm_utf8 entry, const char *str);
 bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
 bool utf8_ends_with(bjvm_utf8 str, bjvm_utf8 ending);
-int convert_modified_utf8_to_chars(const char *bytes, int len, short **result, int *result_len, bool sloppy);
+int convert_modified_utf8_to_chars(const char *bytes, int len, uint16_t **result, int *result_len, bool sloppy);
 
 // These are unlikely (ha!) to actually improve codegen, but are actually kind
 // of nice to indicate what we "think" is going to happen. Long term we might

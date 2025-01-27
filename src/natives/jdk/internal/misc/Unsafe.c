@@ -244,7 +244,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(Ljava/lang/Object;J)B") {
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLong, "(Ljava/lang/Object;J)J") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .i = *(int64_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
+    .l = *(int64_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(J)B") {

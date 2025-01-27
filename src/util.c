@@ -19,14 +19,14 @@ bool utf8_ends_with(bjvm_utf8 str, bjvm_utf8 ending) {
   return memcmp(str.chars + str.len - ending.len, ending.chars, ending.len) == 0;
 }
 
-int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
+int convert_modified_utf8_to_chars(const char *bytes, int len, uint16_t **result,
                                    int *result_len, bool sloppy) {
   *result = malloc(len * sizeof(short)); // conservatively large
   int i = 0, j = 0;
 
   uint16_t idxs[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   for (int i = 0; i < 16; ++i)
-    idxs[i] -= 256;
+    idxs[i] += (uint16_t)-256;
 
   for (; i < len; ++i) {
     // "Code points in the range '\u0001' to '\u007F' are represented by a
@@ -39,7 +39,7 @@ int convert_modified_utf8_to_chars(const char *bytes, int len, short **result,
       // bytes"
       if (i >= len - 1)
         goto inval;
-      (*result)[j++] = (short)((byte & 0x1F) << 6) | (bytes[i + 1] & 0x3F);
+      (*result)[j++] = (((uint16_t)byte & 0x1F) << 6) | ((uint16_t)bytes[i + 1] & 0x3F);
       i++;
     } else if ((bytes[i] & 0xF0) == 0xE0) {
       // "Code points in the range '\u0800' to '\uFFFF' are represented by three

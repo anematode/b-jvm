@@ -58,7 +58,7 @@ void arena_init(arena *a) { a->begin = nullptr; }
 
 const size_t ARENA_REGION_BYTES = 1 << 12;
 void *arena_alloc(arena *a, size_t count, size_t bytes) {
-  size_t allocate = (count * bytes + 7) & ~7;
+  size_t allocate = (count * bytes + 7) & ~(size_t)7;
   if (allocate > ARENA_REGION_BYTES) {
     arena_region *region = calloc(1, sizeof(arena_region) + allocate);
     region->used = region->capacity = allocate;
@@ -234,6 +234,7 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
+__attribute__((no_sanitize("unsigned-shift-base"), no_sanitize("unsigned-integer-overflow")))
 static uint32_t fxhash_string(const char *key, size_t len) {
   const uint64_t FXHASH_CONST = 0x517cc1b727220a95ULL;
   uint64_t hash = 0;
@@ -247,7 +248,8 @@ static uint32_t fxhash_string(const char *key, size_t len) {
     memcpy(&word, key + len - (len & 7), len & 7);
     hash = ((hash << 5 | hash >> 59) ^ word) * FXHASH_CONST;
   }
-  return hash;
+
+  return (uint32_t) hash;
 }
 
 bjvm_hash_table_entry *
@@ -327,8 +329,10 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
 }
 
 void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
-                                  int len, void *value, bool copy_key) {
-  len = len == -1 ? (int)strlen(key) : len;
+                                  int len_, void *value, bool copy_key) {
+  assert(len_ >= -1);
+  size_t len = len_ == -1 ? (int)strlen(key) : len_;
+
   bool equal, on_chain;
   if ((double)tbl->entries_count + 1 >=
       tbl->load_factor * (double)tbl->entries_cap) {

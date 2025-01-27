@@ -272,18 +272,18 @@ void bjvm_free_function_tables(bjvm_classdesc *classdesc) {
   arrfree(classdesc->itables.entries);
 }
 
-bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc *classdesc, int index) {
-  assert(index >= 0 && index < arrlen(classdesc->vtable.methods) &&
+bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc const *classdesc, size_t index) {
+  assert(index < arrlenu(classdesc->vtable.methods) &&
          "vtable index out of range");
   return classdesc->vtable.methods[index];
 }
 
-bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc *classdesc,
-                                   bjvm_classdesc *interface, int index) {
+bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc const *classdesc,
+                                   bjvm_classdesc const *interface, size_t index) {
   for (int i = 0; i < arrlen(classdesc->itables.interfaces); ++i) {
     if (classdesc->itables.interfaces[i] == interface) {
       bjvm_itable itable = classdesc->itables.entries[i];
-      assert(index >= 0 && index < arrlen(itable.methods) &&
+      assert(index < arrlenu(itable.methods) &&
              "itable index out of range");
       bjvm_itable_method_t m = itable.methods[index];
       if (m & BJVM_ITABLE_METHOD_BIT_INVALID) {

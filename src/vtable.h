@@ -6,6 +6,7 @@
 #define VTABLE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +27,7 @@ typedef struct bjvm_vtable {
 
 typedef uintptr_t bjvm_itable_method_t; // bjvm_cp_method*
 
-enum {
+enum : bjvm_itable_method_t {
   // The method is either abstract or ambiguous, and therefore an
   // IncompatibleClassChangeError ought to be raised if it is called.
   BJVM_ITABLE_METHOD_BIT_INVALID = 1 << 0,
@@ -66,13 +67,13 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc);
 void bjvm_free_function_tables(bjvm_classdesc *classdesc);
 
 // Look up a method in the vtable. No ranges are checked.
-bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc *classdesc, int index);
+bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc const *classdesc, size_t index);
 
 // Look up a method in the itables. No ranges are checked, but nullptr is
 // returned if the object does not actually implement the method, or if there
 // are multiple methods that could be called.
-bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc *classdesc,
-                                   bjvm_classdesc *interface, int index);
+bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc const *classdesc,
+                                   bjvm_classdesc const *interface, size_t index);
 
 #ifdef __cplusplus
 }

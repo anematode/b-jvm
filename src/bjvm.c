@@ -506,9 +506,9 @@ int primitive_order(bjvm_type_kind kind) {
 }
 
 // https://github.com/openjdk/jdk11u-dev/blob/be6956b15653f0d870efae89fc1b5df657cca45f/src/java.base/share/classes/java/lang/StringLatin1.java#L52
-static bool do_latin1(short *chars, int len) {
+static bool do_latin1(const uint16_t *chars, size_t len) {
   for (int i = 0; i < len; ++i) {
-    if ((unsigned short)chars[i] >> 8 != 0)
+    if (chars[i] >> 8 != 0)
       return false;
   }
   return true;
@@ -522,7 +522,7 @@ bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string) {
 
   bjvm_obj_header *result = nullptr;
 
-  short *chars;
+  uint16_t *chars;
   int len;
   convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true);
 
@@ -638,7 +638,7 @@ struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_
   return bjvm_primitive_classdesc(thread, prim_kind)->mirror;
 }
 
-bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_thread *thread, bjvm_type_kind kind, const bjvm_utf8 name) {
+bjvm_classdesc *bjvm_make_primitive_classdesc(bjvm_type_kind kind, const bjvm_utf8 name) {
   bjvm_classdesc *desc = calloc(1, sizeof(bjvm_classdesc));
 
   desc->kind = BJVM_CD_KIND_PRIMITIVE;
@@ -659,23 +659,23 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
     return; // already initialized
 
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BOOLEAN)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BOOLEAN, STR("boolean"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_BOOLEAN, STR("boolean"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_BYTE)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_BYTE, STR("byte"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_BYTE, STR("byte"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_CHAR)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_CHAR, STR("char"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_CHAR, STR("char"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_SHORT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_SHORT, STR("short"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_SHORT, STR("short"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_INT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_INT, STR("int"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_INT, STR("int"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_LONG)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_LONG, STR("long"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_LONG, STR("long"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_FLOAT)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_FLOAT, STR("float"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_FLOAT, STR("float"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_DOUBLE)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_DOUBLE, STR("double"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_DOUBLE, STR("double"));
   vm->primitive_classes[primitive_order(BJVM_TYPE_KIND_VOID)] =
-      bjvm_make_primitive_classdesc(thread, BJVM_TYPE_KIND_VOID, STR("void"));
+      bjvm_make_primitive_classdesc(BJVM_TYPE_KIND_VOID, STR("void"));
 
   // Set up mirrors
   for (int i = 0; i < 9; ++i) {
@@ -934,7 +934,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
   bjvm_cp_method *method;
   bjvm_stack_value ret;
-  for (int i = 0; i < sizeof(phases) / sizeof(*phases); ++i) {
+  for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); ++i) {
     method = bjvm_method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
     assert(method);
     bjvm_stack_value args[2] = {{.i = 1}, {.i = 1}};
@@ -1620,7 +1620,7 @@ void bjvm_out_of_memory(bjvm_thread *thread) {
 
 void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   // round up to multiple of 8
-  bytes = (bytes + 7) & ~7;
+  bytes = (bytes + 7) & ~(size_t)7;
   bjvm_vm *vm = thread->vm;
 #if AGGRESSIVE_DEBUG
   printf("Allocating %zu bytes, %zu used, %zu capacity\n", bytes, vm->heap_used, vm->heap_capacity);
@@ -2537,21 +2537,6 @@ DEFINE_ASYNC(bjvm_run_native) {
 
 #undef thread
 #undef frame
-}
-
-void make_invokevtable_polymorphic(bjvm_bytecode_insn *insn) {
-  assert(insn->kind == bjvm_insn_invokevtable_monomorphic);
-  bjvm_cp_method *method = insn->ic;
-  assert(method);
-  insn->kind = bjvm_insn_invokevtable_polymorphic;
-  insn->ic2 = (void *)method->vtable_index;
-}
-
-void make_invokeitable_polymorphic(bjvm_bytecode_insn *insn) {
-  assert(insn->kind == bjvm_insn_invokeitable_monomorphic);
-  insn->kind = bjvm_insn_invokeitable_polymorphic;
-  insn->ic = (void *)insn->cp->methodref.resolved->my_class;
-  insn->ic2 = (void *)insn->cp->methodref.resolved->itable_index;
 }
 
 // Main interpreter

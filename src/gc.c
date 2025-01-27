@@ -347,7 +347,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
   // Copy object by object
   for (int i = 0; i < ctx.objs_count; ++i) {
     // Align to 8 bytes
-    write_ptr = (uint8_t *)((uintptr_t)write_ptr + 7 & ~7);
+    write_ptr = (uint8_t *)((uintptr_t)write_ptr + 7 & ~(size_t)7);
     bjvm_obj_header *obj = ctx.objs[i];
     size_t sz = size_of_object(obj);
 
@@ -376,5 +376,5 @@ void bjvm_major_gc(bjvm_vm *vm) {
 
   vm->heap = new_heap;
   vm->heap_used = write_ptr - new_heap;
-  vm->heap_used = (vm->heap_used + 7) & ~7;
+  vm->heap_used = (vm->heap_used + 7) & ~(size_t)7;
 }

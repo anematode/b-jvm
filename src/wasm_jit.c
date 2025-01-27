@@ -239,8 +239,8 @@ wasm_runtime_raise_array_index_oob(bjvm_thread *thread, int index, int length) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_stack_frame *wasm_runtime_push_frame(bjvm_thread *thread,
-                                          bjvm_bytecode_insn *insn) {
+bjvm_stack_frame *wasm_runtime_push_frame([[maybe_unused]] bjvm_thread *thread,
+                                          [[maybe_unused]] bjvm_bytecode_insn *insn) {
   return nullptr;
 }
 
@@ -253,11 +253,10 @@ bjvm_obj_header *wasm_runtime_make_object_array(bjvm_thread *thread, int count,
 }
 
 EMSCRIPTEN_KEEPALIVE
-int wasm_runtime_invokestatic(bjvm_thread *thread,
-                                                    bjvm_stack_frame *frame,
-                                                    bjvm_bytecode_insn *insn) {
+int wasm_runtime_invokestatic([[maybe_unused]] bjvm_thread *thread,
+                                                    [[maybe_unused]] bjvm_stack_frame *frame,
+                                                    [[maybe_unused]] bjvm_bytecode_insn *insn) {
   // printf("invokestatic called!\n");
-  int sd = stack_depth(frame);
   return 0; // bjvm_invokestatic(thread, frame, insn, &sd);
 }
 

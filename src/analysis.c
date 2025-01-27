@@ -1567,7 +1567,6 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
     case bjvm_insn_lstore:
     case bjvm_insn_fstore:
     case bjvm_insn_dstore:
-      insn->args = (int)insn->index - code->max_locals;
       break;
     case bjvm_insn_putfield:
     case bjvm_insn_aaload:

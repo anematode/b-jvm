@@ -9,8 +9,9 @@
 extern "C" {
 #endif
 
-#include <stdint.h>
 #include <assert.h>
+#include <stdint.h>
+#include "util.h"
 
 typedef enum { FUTURE_NOT_READY, FUTURE_READY } future_status;
 
@@ -59,7 +60,7 @@ typedef struct future {
   struct name##_args {                                                                                                 \
     arguments;                                                                                                         \
   };                                                                                                                   \
-  union name##_invoked_async_methods {                                                         \
+  union name##_invoked_async_methods {                                                                                 \
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
   future_t name(name##_t *self);                                                                                       \
@@ -77,12 +78,17 @@ typedef struct future {
 #define DEFINE_ASYNC_SL(name, start_idx)                                                                               \
   future_t name(name##_t *self) {                                                                                      \
     assert(self);                                                                                                      \
-    struct name##_args *args = &self->args;                                                                            \
+    [[maybe_unused]] struct name##_args *args = &self->args;                                                           \
     start_counter(label_counter, (start_idx) + 1);                                                                     \
     self->_state = (self->_state == 0) ? (start_idx) : self->_state;                                                   \
     switch (self->_state) {                                                                                            \
     case (start_idx):                                                                                                  \
       *self = (typeof(*self)){.args = self->args, ._state = self->_state};
+
+#define PUSH_PRAGMA(x)                                                                                                 \
+  _Pragma("GCC diagnostic push");                                                                                      \
+  _Pragma(x);
+#define POP_PRAGMA _Pragma("GCC diagnostic pop");
 
 /// Defines a value-returning async function. Should be followed by a block
 /// containing the code of the async function.  MUST end with ASYNC_END, or
@@ -98,6 +104,8 @@ typedef struct future {
     get_counter_value(label_counter, state_index);                                                                     \
     (context)->_state = 0;                                                                                             \
     (context)->args = (struct method_name##_args){__VA_ARGS__};                                                        \
+    PUSH_PRAGMA("GCC diagnostic ignored \"-Wimplicit-fallthrough\"");                                                  \
+    PUSH_PRAGMA("GCC diagnostic ignored \"-Wswitch\"");                                                                \
   case state_index:                                                                                                    \
     args = &self->args;                                                                                                \
     future_t __fut = method_name(context);                                                                             \
@@ -105,6 +113,8 @@ typedef struct future {
       self->_state = state_index;                                                                                      \
       return __fut;                                                                                                    \
     }                                                                                                                  \
+    POP_PRAGMA;                                                                                                        \
+    POP_PRAGMA;                                                                                                        \
   } while (0)
 
 #define AWAIT_FUTURE_EXPR(expr, ...)                                                                                   \
@@ -124,19 +134,21 @@ typedef struct future {
 /// Ends an async value-returning function, returning the given value.  Must be
 /// used inside an async function.
 #define ASYNC_END(return_value)                                                                                        \
+  self->_result = (return_value);                                                                                      \
+  self->_state = 0;                                                                                                    \
+  return future_ready();                                                                                               \
   default:                                                                                                             \
-    self->_result = (return_value);                                                                                    \
-    self->_state = 0;                                                                                                  \
-    return future_ready();                                                                                             \
+    UNREACHABLE();                                                                                                     \
     }                                                                                                                  \
     }
-
+// todo: unreachable on dfault
 /// Ends an async void-returning function.  Must be used inside an async
 /// function.
 #define ASYNC_END_VOID()                                                                                               \
+  self->_state = 0;                                                                                                    \
+  return future_ready();                                                                                               \
   default:                                                                                                             \
-    self->_state = 0;                                                                                                  \
-    return future_ready();                                                                                             \
+    UNREACHABLE();                                                                                                     \
     }                                                                                                                  \
     }
 

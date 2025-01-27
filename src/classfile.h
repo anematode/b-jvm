@@ -16,7 +16,10 @@ extern "C" {
 typedef struct bjvm_cp_entry bjvm_cp_entry;
 typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 
-bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
+enum bjvm_cp_kind : uint32_t;
+typedef enum bjvm_cp_kind bjvm_cp_kind;
+
+bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_kinds,
                                    const char *reason);
 
 /**
@@ -391,7 +394,7 @@ typedef struct {
   struct bjvm_native_MethodType *resolved_mt;
 } bjvm_cp_indy_info;
 
-typedef enum {
+enum bjvm_cp_kind : uint32_t {
   BJVM_CP_KIND_INVALID = 0,
   BJVM_CP_KIND_UTF8 = 1 << 0,
   BJVM_CP_KIND_INTEGER = 1 << 1,
@@ -411,7 +414,7 @@ typedef enum {
   BJVM_CP_KIND_MODULE = 1 << 15,
   BJVM_CP_KIND_PACKAGE = 1 << 16,
   BJVM_CP_KIND_LAST = 1 << 16
-} bjvm_cp_kind;
+};
 
 typedef struct bjvm_cp_entry {
   bjvm_cp_kind kind;
@@ -447,7 +450,7 @@ typedef struct bjvm_constant_pool {
 } bjvm_constant_pool;
 
 // Access flags. Same as given in the class file specification.
-typedef enum {
+typedef enum : uint16_t {
   BJVM_ACCESS_PUBLIC = 0x0001,
   BJVM_ACCESS_PRIVATE = 0x0002,
   BJVM_ACCESS_PROTECTED = 0x0004,
@@ -500,7 +503,7 @@ typedef struct {
 
 typedef struct {
   bjvm_exception_table_entry *entries;
-  int entries_count;
+  uint16_t entries_count;
 } bjvm_attribute_exception_table;
 
 typedef struct bjvm_attribute bjvm_attribute;
@@ -811,7 +814,7 @@ heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
 
 char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result, arena *arena);
-char *parse_method_descriptor(const bjvm_utf8 entry,
+char *parse_method_descriptor(bjvm_utf8 entry,
                               bjvm_method_descriptor *result, arena *arena);
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;

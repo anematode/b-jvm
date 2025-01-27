@@ -149,10 +149,10 @@ bjvm_utf8 parse_modified_utf8(const uint8_t *bytes, int len, arena *arena) {
   return (bjvm_utf8){.chars = result, .len = len};
 }
 
-bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, int expected_kinds,
+bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_kinds,
                                    const char *reason) {
   assert(reason);
-  if (entry->kind & expected_kinds)
+  if ((entry->kind & expected_kinds) || (!expected_kinds))
     return entry;
   char buf[1000] = {0}, *write = buf, *end = buf + sizeof(buf);
   write = write + snprintf(buf, end - write,
@@ -178,7 +178,7 @@ const bjvm_utf8 * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribu
 }
 
 bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
-                                int expected_kinds, const char *reason) {
+                                bjvm_cp_kind expected_kinds, const char *reason) {
   assert(reason);
   if (!(index >= 0 && index < pool->entries_len)) {
     char buf[256] = {0};
@@ -357,7 +357,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t reference_index = reader_next_u16(reader, "reference index");
     bjvm_cp_entry *entry = skip_linking
                                ? nullptr
-                               : checked_cp_entry(ctx->cp, reference_index, -1,
+                               : checked_cp_entry(ctx->cp, reference_index, 0,
                                                   "method handle reference");
     // TODO validate both
     return (bjvm_cp_entry){
@@ -2040,7 +2040,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
   // the actual value of the flag in the class file and the version of the
   // class file."
   // -> getModifiers doesn't return this bit
-  cf->access_flags &= ~0x0020;
+  cf->access_flags &= ~BJVM_ACCESS_SYNCHRONIZED;
 
   bjvm_cp_class_info *this_class =
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"),

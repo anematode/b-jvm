@@ -314,7 +314,6 @@ DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
 }
 
 DECLARE_NATIVE("java/lang", Class, isHidden, "()Z") { // TODO
-  bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   return (bjvm_stack_value){.i = 0};
 }
 
