@@ -35,7 +35,7 @@
 // If true, use a sequence of tail calls rather than computed goto and an aggressively inlined function. We try to make
 // the code reasonably generic to handle both cases efficiently.
 #ifdef EMSCRIPTEN
-#define DO_TAILS 1
+#define DO_TAILS 0
 #else
 #define DO_TAILS 1
 #endif
@@ -48,16 +48,17 @@
 #define RETURN_ABRUPT return 0;
 
 #define ARGS_VOID                                                                                                      \
-  bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_
+  bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_,             \
+      [[maybe_unused]] int64_t arg_1, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
 #define ARGS_INT                                                                                                       \
   bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_,             \
-      [[maybe_unused]] int64_t tos_
+      [[maybe_unused]] int64_t tos_, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
 #define ARGS_DOUBLE                                                                                                    \
   bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_,             \
-      double tos_
+      [[maybe_unused]] int64_t arg_1, [[maybe_unused]] float arg_2, [[maybe_unused]] double tos_
 #define ARGS_FLOAT                                                                                                     \
   bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_,             \
-      float tos_
+      [[maybe_unused]] int64_t arg_1, [[maybe_unused]] float tos_, [[maybe_unused]] double arg_3
 
 // The current instruction
 #define insn insns
@@ -107,36 +108,33 @@ static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE);
 #if DO_TAILS
 
 #define INLINE_IF_WASM
-#ifndef EMSCRIPTEN
-#define MUSTTAIL [[clang::musttail]]
-#endif
 
 #define WITH_UNDEF(expr) { \
   int64_t a_undef; float b_undef; double c_undef; expr }
 
 #define JMP_INT(tos)  int k = insns[0].kind;                                                                                                 \
-  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns, pc, sp, tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns, pc, sp, tos, b_undef, c_undef);)
 #define JMP_FLOAT(tos)  int k = insns[0].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns, pc, sp, tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns, pc, sp, a_undef, tos, c_undef);)
 #define JMP_DOUBLE(tos)  int k = insns[0].kind;                                                                                              \
-  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns, pc, sp, tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns, pc, sp, a_undef, b_undef, tos);)
 
 #define NEXT_INT(tos) int k = insns[1].kind; \
-  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns + 1, pc + 1, sp, (int64_t)tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns + 1, pc + 1, sp, (int64_t)tos, b_undef, c_undef);)
 #define NEXT_FLOAT(tos) int k = insns[1].kind; \
-  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns + 1, pc + 1, sp, tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns + 1, pc + 1, sp, a_undef, tos, c_undef);)
 #define NEXT_DOUBLE(tos) int k = insns[1].kind; \
-  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns + 1, pc + 1, sp, tos);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, tos);)
 
 
 // Jump to the instruction at pc, with nothing in the top of the stack. This does NOT imply that sp = 0, only that
 // all stack values are in memory (rather than in a register)
 #define JMP_VOID                                                                                                       \
-  WITH_UNDEF(MUSTTAIL return jmp_table_void[insns[0].kind](thread, frame, insns, pc, sp);)
+  WITH_UNDEF(MUSTTAIL return jmp_table_void[insns[0].kind](thread, frame, insns, pc, sp, a_undef, b_undef, c_undef);)
 // Jump to the instruction at pc + 1, with nothing in the top of the stack.
 #define NEXT_VOID                                                                                                      \
   WITH_UNDEF(                                                                                                          \
-      MUSTTAIL return jmp_table_void[insns[1].kind](thread, frame, insns + 1, pc + 1, sp);)
+      MUSTTAIL return jmp_table_void[insns[1].kind](thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, c_undef);)
 #else
 
 #define INLINE_IF_WASM __attribute__((always_inline))
@@ -239,19 +237,19 @@ __builtin_unreachable();
   INLINE_IF_WASM \
   static int64_t which##_impl_int(ARGS_INT) {                                                                          \
     *(sp - 1) = (bjvm_stack_value){.l = tos};                                                                          \
-    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_);                                \
+    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, tos_, arg_2, arg_3);                                \
   }                                                                                                                    \
                                                                                                                        \
   INLINE_IF_WASM \
   static int64_t which##_impl_float(ARGS_FLOAT) {                                                                      \
     *(sp - 1) = (bjvm_stack_value){.f = tos};                                                                          \
-    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_);                                \
+    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, tos_, arg_3);                                \
   }                                                                                                                    \
                                                                                                                        \
   INLINE_IF_WASM \
   static int64_t which##_impl_double(ARGS_DOUBLE) {                                                                    \
     *(sp - 1) = (bjvm_stack_value){.d = tos};                                                                          \
-    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_);                                \
+    MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                                \
   }
 
 /** Helper functions */
@@ -2539,7 +2537,7 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
     bjvm_bytecode_insn *insns = frame_->method->code->code;
 
 #if DO_TAILS
-    result.l = entry(thread, frame_, insns + pc_, pc_, sp_);
+    result.l = entry(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
     int64_t int_tos = 0, int_tos_;
     float float_tos = 0, float_tos_;
@@ -2815,7 +2813,7 @@ PAGE_ALIGN static int64_t (*jmp_table_void[MAX_INSN_KIND])(ARGS_VOID) = {
     nullptr /* putstatic_L_impl_void */,
 };
 
-PAGE_ALIGN static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE) = {
+PAGE_ALIGN static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
   nop_impl_double,
   nullptr /* aaload_impl_double */,
   nullptr /* aastore_impl_double */,
@@ -3013,7 +3011,7 @@ PAGE_ALIGN static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE) = {
   dsqrt_impl_double,
 };
 
-PAGE_ALIGN static int64_t (*jmp_table_int[MAX_INSN_KIND])(ARGS_INT) = {
+PAGE_ALIGN static int64_t (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
   nop_impl_int,
   aaload_impl_int,
   aastore_impl_int,
@@ -3211,7 +3209,7 @@ PAGE_ALIGN static int64_t (*jmp_table_int[MAX_INSN_KIND])(ARGS_INT) = {
   nullptr
 };
 
-PAGE_ALIGN static int64_t (*jmp_table_float[MAX_INSN_KIND])(ARGS_FLOAT) = {
+PAGE_ALIGN static int64_t (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
   nop_impl_float,
   nullptr /* aaload_impl_float */,
   nullptr /* aastore_impl_float */,
