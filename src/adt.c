@@ -237,7 +237,6 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wattributes"
 __attribute__((no_sanitize("unsigned-shift-base"), no_sanitize("unsigned-integer-overflow")))
-#pragma GCC diagnostic pop
 static uint32_t fxhash_string(const char *key, size_t len) {
   const uint64_t FXHASH_CONST = 0x517cc1b727220a95ULL;
   uint64_t hash = 0;
@@ -254,6 +253,7 @@ static uint32_t fxhash_string(const char *key, size_t len) {
 
   return (uint32_t) hash;
 }
+#pragma GCC diagnostic pop
 
 bjvm_hash_table_entry *
 bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,

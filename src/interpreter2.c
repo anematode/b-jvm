@@ -908,11 +908,10 @@ static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
 /** Arithmetic operations */
 
-#define ALLOW_OVERFLOW                                                                                                 \
-  _Pragma("GCC diagnostic push");                                                                                      \
-  _Pragma("GCC diagnostic ignored \"-Wattributes\"");                                                                  \
-  __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base"))) _Pragma(               \
-      "GCC diagnostic pop");
+#define ALLOW_OVERFLOW __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base")))
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 
 // Binary operation on two integers (ints or longs)
 #define INTEGER_BIN_OP(which, eval)                                                                                    \
@@ -965,6 +964,8 @@ INTEGER_UN_OP(l2f, (float)a, NEXT_FLOAT)
 INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
 
 #undef INTEGER_UN_OP
+
+#pragma GCC diagnostic pop
 
 #define FLOAT_BIN_OP(which, eval, out_float, out_double, NEXT1, NEXT2)                                                 \
   static int64_t f##which##_impl_float(ARGS_FLOAT) {                                                                   \
