@@ -234,9 +234,10 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
-_Pragma( "GCC diagnostic ignored \"-Wattributes\"" )
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wattributes"
 __attribute__((no_sanitize("unsigned-shift-base"), no_sanitize("unsigned-integer-overflow")))
-_Pragma( "GCC diagnostic pop" )
+#pragma GCC diagnostic pop
 static uint32_t fxhash_string(const char *key, size_t len) {
   const uint64_t FXHASH_CONST = 0x517cc1b727220a95ULL;
   uint64_t hash = 0;

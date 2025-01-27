@@ -908,9 +908,11 @@ static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
 /** Arithmetic operations */
 
-#define ALLOW_OVERFLOW _Pragma( "GCC diagnostic ignored \"-Wattributes\"" ) \
- __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base"))) \
- _Pragma( "GCC diagnostic pop" )
+#define ALLOW_OVERFLOW                                                                                                 \
+  _Pragma("GCC diagnostic push");                                                                                      \
+  _Pragma("GCC diagnostic ignored \"-Wattributes\"");                                                                  \
+  __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base"))) _Pragma(               \
+      "GCC diagnostic pop");
 
 // Binary operation on two integers (ints or longs)
 #define INTEGER_BIN_OP(which, eval)                                                                                    \
