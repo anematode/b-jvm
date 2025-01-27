@@ -59,12 +59,17 @@ template <typename T> struct pick_or_zero_sized {
   using type = std::conditional_t<(sizeof(T) > 1), T, int[0]>;
 };
 
+#define PUSH_EXTERN_C PUSH_PRAGMA("GCC diagnostic ignored \"-Wextern-c-compat\"");
+#define POP_EXTERN_C POP_PRAGMA
+
 template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T>::type;
 }
 
 #define FixTypeSize(name) pick_or_zero_sized_t<name>
 #else
 #define FixTypeSize(name) name
+#define PUSH_EXTERN_C
+#define POP_EXTERN_C
 #endif
 
 /// Declares an async function that returns nothing.  Should be followed by a
@@ -73,14 +78,14 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
 #define DECLARE_ASYNC_VOID(name, locals, arguments, invoked_async_methods_)                                            \
   struct name##_s;                                                                                                     \
   typedef struct name##_s name##_t;                                                                                    \
-  PUSH_PRAGMA("GCC diagnostic ignored \"-Wextern-c-compat\""); /*if these types are empty,we deal with it later*/      \
+  PUSH_EXTERN_C;                                                                                                       \
   struct name##_args {                                                                                                 \
     arguments;                                                                                                         \
   };                                                                                                                   \
   union name##_invoked_async_methods {                                                                                 \
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
-  POP_PRAGMA;                                                                                                          \
+  POP_EXTERN_C;                                                                                                        \
   future_t name(name##_t *self);                                                                                       \
   struct name##_s {                                                                                                    \
     FixTypeSize(struct name##_args) args;                                                                              \
