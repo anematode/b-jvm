@@ -69,6 +69,10 @@ for i, instruction in enumerate(instructions):
             cases += f"""
 {instruction}_{tos}: {outline_begin}
     jump_to = (unsigned){call}; {outline_end}
+    if (always_false) {{
+        result.l = {call};
+        result.l = {call};
+    }}
     continue;"""
 
 

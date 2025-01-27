@@ -789,15 +789,31 @@ goto *insn_jump_table[jump_to];
 
 nop_void: 
     jump_to = (unsigned)nop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = nop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = nop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 nop_double: 
     jump_to = (unsigned)nop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = nop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = nop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 nop_int: 
     jump_to = (unsigned)nop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = nop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = nop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 nop_float: 
     jump_to = (unsigned)nop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = nop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = nop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aaload_void: __builtin_unreachable();
 
@@ -805,6 +821,10 @@ aaload_double: __builtin_unreachable();
 
 aaload_int: 
     jump_to = (unsigned)aaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aaload_float: __builtin_unreachable();
 
@@ -814,20 +834,40 @@ aastore_double: __builtin_unreachable();
 
 aastore_int: 
     jump_to = (unsigned)aastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aastore_float: __builtin_unreachable();
 
 aconst_null_void: 
     jump_to = (unsigned)aconst_null_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aconst_null_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aconst_null_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aconst_null_double: 
     jump_to = (unsigned)aconst_null_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aconst_null_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aconst_null_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aconst_null_int: 
     jump_to = (unsigned)aconst_null_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aconst_null_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aconst_null_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aconst_null_float: 
     jump_to = (unsigned)aconst_null_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aconst_null_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aconst_null_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 areturn_void: __builtin_unreachable();
 
@@ -844,6 +884,10 @@ arraylength_double: __builtin_unreachable();
 
 arraylength_int: 
     jump_to = (unsigned)arraylength_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = arraylength_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = arraylength_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 arraylength_float: __builtin_unreachable();
 
@@ -853,6 +897,10 @@ athrow_double: __builtin_unreachable();
 
 athrow_int: 
     jump_to = (unsigned)athrow_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = athrow_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = athrow_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 athrow_float: __builtin_unreachable();
 
@@ -862,6 +910,10 @@ baload_double: __builtin_unreachable();
 
 baload_int: 
     jump_to = (unsigned)baload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = baload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = baload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 baload_float: __builtin_unreachable();
 
@@ -871,6 +923,10 @@ bastore_double: __builtin_unreachable();
 
 bastore_int: 
     jump_to = (unsigned)bastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = bastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = bastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 bastore_float: __builtin_unreachable();
 
@@ -880,6 +936,10 @@ caload_double: __builtin_unreachable();
 
 caload_int: 
     jump_to = (unsigned)caload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = caload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = caload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 caload_float: __builtin_unreachable();
 
@@ -889,6 +949,10 @@ castore_double: __builtin_unreachable();
 
 castore_int: 
     jump_to = (unsigned)castore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = castore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = castore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 castore_float: __builtin_unreachable();
 
@@ -896,6 +960,10 @@ d2f_void: __builtin_unreachable();
 
 d2f_double: 
     jump_to = (unsigned)d2f_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = d2f_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = d2f_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 d2f_int: __builtin_unreachable();
 
@@ -905,6 +973,10 @@ d2i_void: __builtin_unreachable();
 
 d2i_double: 
     jump_to = (unsigned)d2i_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = d2i_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = d2i_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 d2i_int: __builtin_unreachable();
 
@@ -914,6 +986,10 @@ d2l_void: __builtin_unreachable();
 
 d2l_double: 
     jump_to = (unsigned)d2l_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = d2l_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = d2l_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 d2l_int: __builtin_unreachable();
 
@@ -923,6 +999,10 @@ dadd_void: __builtin_unreachable();
 
 dadd_double: 
     jump_to = (unsigned)dadd_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dadd_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dadd_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dadd_int: __builtin_unreachable();
 
@@ -934,6 +1014,10 @@ daload_double: __builtin_unreachable();
 
 daload_int: 
     jump_to = (unsigned)daload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = daload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = daload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 daload_float: __builtin_unreachable();
 
@@ -941,6 +1025,10 @@ dastore_void: __builtin_unreachable();
 
 dastore_double: 
     jump_to = (unsigned)dastore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dastore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dastore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dastore_int: __builtin_unreachable();
 
@@ -950,6 +1038,10 @@ dcmpg_void: __builtin_unreachable();
 
 dcmpg_double: 
     jump_to = (unsigned)dcmpg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dcmpg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dcmpg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dcmpg_int: __builtin_unreachable();
 
@@ -959,6 +1051,10 @@ dcmpl_void: __builtin_unreachable();
 
 dcmpl_double: 
     jump_to = (unsigned)dcmpl_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dcmpl_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dcmpl_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dcmpl_int: __builtin_unreachable();
 
@@ -968,6 +1064,10 @@ ddiv_void: __builtin_unreachable();
 
 ddiv_double: 
     jump_to = (unsigned)ddiv_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ddiv_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ddiv_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ddiv_int: __builtin_unreachable();
 
@@ -977,6 +1077,10 @@ dmul_void: __builtin_unreachable();
 
 dmul_double: 
     jump_to = (unsigned)dmul_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dmul_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dmul_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dmul_int: __builtin_unreachable();
 
@@ -986,6 +1090,10 @@ dneg_void: __builtin_unreachable();
 
 dneg_double: 
     jump_to = (unsigned)dneg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dneg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dneg_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dneg_int: __builtin_unreachable();
 
@@ -1012,6 +1120,10 @@ dsub_void: __builtin_unreachable();
 
 dsub_double: 
     jump_to = (unsigned)dsub_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dsub_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dsub_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dsub_int: __builtin_unreachable();
 
@@ -1021,67 +1133,139 @@ dup_void: __builtin_unreachable();
 
 dup_double: 
     jump_to = (unsigned)dup_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_int: 
     jump_to = (unsigned)dup_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_float: 
     jump_to = (unsigned)dup_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x1_void: __builtin_unreachable();
 
 dup_x1_double: 
     jump_to = (unsigned)dup_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x1_int: 
     jump_to = (unsigned)dup_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x1_float: 
     jump_to = (unsigned)dup_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x2_void: __builtin_unreachable();
 
 dup_x2_double: 
     jump_to = (unsigned)dup_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x2_int: 
     jump_to = (unsigned)dup_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup_x2_float: 
     jump_to = (unsigned)dup_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_void: __builtin_unreachable();
 
 dup2_double: 
     jump_to = (unsigned)dup2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_int: 
     jump_to = (unsigned)dup2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_float: 
     jump_to = (unsigned)dup2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x1_void: __builtin_unreachable();
 
 dup2_x1_double: 
     jump_to = (unsigned)dup2_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x1_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x1_int: 
     jump_to = (unsigned)dup2_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x1_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x1_float: 
     jump_to = (unsigned)dup2_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x1_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x2_void: __builtin_unreachable();
 
 dup2_x2_double: 
     jump_to = (unsigned)dup2_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x2_int: 
     jump_to = (unsigned)dup2_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dup2_x2_float: 
     jump_to = (unsigned)dup2_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dup2_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dup2_x2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 f2d_void: __builtin_unreachable();
 
@@ -1091,6 +1275,10 @@ f2d_int: __builtin_unreachable();
 
 f2d_float: 
     jump_to = (unsigned)f2d_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = f2d_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = f2d_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 f2i_void: __builtin_unreachable();
 
@@ -1100,6 +1288,10 @@ f2i_int: __builtin_unreachable();
 
 f2i_float: 
     jump_to = (unsigned)f2i_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = f2i_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = f2i_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 f2l_void: __builtin_unreachable();
 
@@ -1109,6 +1301,10 @@ f2l_int: __builtin_unreachable();
 
 f2l_float: 
     jump_to = (unsigned)f2l_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = f2l_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = f2l_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fadd_void: __builtin_unreachable();
 
@@ -1118,6 +1314,10 @@ fadd_int: __builtin_unreachable();
 
 fadd_float: 
     jump_to = (unsigned)fadd_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fadd_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fadd_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 faload_void: __builtin_unreachable();
 
@@ -1125,6 +1325,10 @@ faload_double: __builtin_unreachable();
 
 faload_int: 
     jump_to = (unsigned)faload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = faload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = faload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 faload_float: __builtin_unreachable();
 
@@ -1136,6 +1340,10 @@ fastore_int: __builtin_unreachable();
 
 fastore_float: 
     jump_to = (unsigned)fastore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fastore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fastore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fcmpg_void: __builtin_unreachable();
 
@@ -1145,6 +1353,10 @@ fcmpg_int: __builtin_unreachable();
 
 fcmpg_float: 
     jump_to = (unsigned)fcmpg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fcmpg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fcmpg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fcmpl_void: __builtin_unreachable();
 
@@ -1154,6 +1366,10 @@ fcmpl_int: __builtin_unreachable();
 
 fcmpl_float: 
     jump_to = (unsigned)fcmpl_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fcmpl_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fcmpl_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fdiv_void: __builtin_unreachable();
 
@@ -1163,6 +1379,10 @@ fdiv_int: __builtin_unreachable();
 
 fdiv_float: 
     jump_to = (unsigned)fdiv_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fdiv_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fdiv_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fmul_void: __builtin_unreachable();
 
@@ -1172,6 +1392,10 @@ fmul_int: __builtin_unreachable();
 
 fmul_float: 
     jump_to = (unsigned)fmul_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fmul_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fmul_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fneg_void: __builtin_unreachable();
 
@@ -1181,6 +1405,10 @@ fneg_int: __builtin_unreachable();
 
 fneg_float: 
     jump_to = (unsigned)fneg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fneg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fneg_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 frem_void: __builtin_unreachable();
 
@@ -1207,6 +1435,10 @@ fsub_int: __builtin_unreachable();
 
 fsub_float: 
     jump_to = (unsigned)fsub_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fsub_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fsub_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2b_void: __builtin_unreachable();
 
@@ -1214,6 +1446,10 @@ i2b_double: __builtin_unreachable();
 
 i2b_int: 
     jump_to = (unsigned)i2b_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2b_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2b_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2b_float: __builtin_unreachable();
 
@@ -1223,6 +1459,10 @@ i2c_double: __builtin_unreachable();
 
 i2c_int: 
     jump_to = (unsigned)i2c_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2c_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2c_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2c_float: __builtin_unreachable();
 
@@ -1232,6 +1472,10 @@ i2d_double: __builtin_unreachable();
 
 i2d_int: 
     jump_to = (unsigned)i2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2d_float: __builtin_unreachable();
 
@@ -1241,6 +1485,10 @@ i2f_double: __builtin_unreachable();
 
 i2f_int: 
     jump_to = (unsigned)i2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2f_float: __builtin_unreachable();
 
@@ -1250,6 +1498,10 @@ i2l_double: __builtin_unreachable();
 
 i2l_int: 
     jump_to = (unsigned)i2l_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2l_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2l_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2l_float: __builtin_unreachable();
 
@@ -1259,6 +1511,10 @@ i2s_double: __builtin_unreachable();
 
 i2s_int: 
     jump_to = (unsigned)i2s_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = i2s_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = i2s_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 i2s_float: __builtin_unreachable();
 
@@ -1268,6 +1524,10 @@ iadd_double: __builtin_unreachable();
 
 iadd_int: 
     jump_to = (unsigned)iadd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iadd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iadd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iadd_float: __builtin_unreachable();
 
@@ -1277,6 +1537,10 @@ iaload_double: __builtin_unreachable();
 
 iaload_int: 
     jump_to = (unsigned)iaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iaload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iaload_float: __builtin_unreachable();
 
@@ -1286,6 +1550,10 @@ iand_double: __builtin_unreachable();
 
 iand_int: 
     jump_to = (unsigned)iand_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iand_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iand_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iand_float: __builtin_unreachable();
 
@@ -1295,6 +1563,10 @@ iastore_double: __builtin_unreachable();
 
 iastore_int: 
     jump_to = (unsigned)iastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iastore_float: __builtin_unreachable();
 
@@ -1304,6 +1576,10 @@ idiv_double: __builtin_unreachable();
 
 idiv_int: 
     jump_to = (unsigned)idiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = idiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = idiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 idiv_float: __builtin_unreachable();
 
@@ -1313,6 +1589,10 @@ imul_double: __builtin_unreachable();
 
 imul_int: 
     jump_to = (unsigned)imul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = imul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = imul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 imul_float: __builtin_unreachable();
 
@@ -1322,6 +1602,10 @@ ineg_double: __builtin_unreachable();
 
 ineg_int: 
     jump_to = (unsigned)ineg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ineg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ineg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ineg_float: __builtin_unreachable();
 
@@ -1331,6 +1615,10 @@ ior_double: __builtin_unreachable();
 
 ior_int: 
     jump_to = (unsigned)ior_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ior_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ior_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ior_float: __builtin_unreachable();
 
@@ -1340,6 +1628,10 @@ irem_double: __builtin_unreachable();
 
 irem_int: 
     jump_to = (unsigned)irem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = irem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = irem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 irem_float: __builtin_unreachable();
 
@@ -1358,6 +1650,10 @@ ishl_double: __builtin_unreachable();
 
 ishl_int: 
     jump_to = (unsigned)ishl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ishl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ishl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ishl_float: __builtin_unreachable();
 
@@ -1367,6 +1663,10 @@ ishr_double: __builtin_unreachable();
 
 ishr_int: 
     jump_to = (unsigned)ishr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ishr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ishr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ishr_float: __builtin_unreachable();
 
@@ -1376,6 +1676,10 @@ isub_double: __builtin_unreachable();
 
 isub_int: 
     jump_to = (unsigned)isub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = isub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = isub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 isub_float: __builtin_unreachable();
 
@@ -1385,6 +1689,10 @@ iushr_double: __builtin_unreachable();
 
 iushr_int: 
     jump_to = (unsigned)iushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iushr_float: __builtin_unreachable();
 
@@ -1394,6 +1702,10 @@ ixor_double: __builtin_unreachable();
 
 ixor_int: 
     jump_to = (unsigned)ixor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ixor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ixor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ixor_float: __builtin_unreachable();
 
@@ -1403,6 +1715,10 @@ l2d_double: __builtin_unreachable();
 
 l2d_int: 
     jump_to = (unsigned)l2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = l2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = l2d_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 l2d_float: __builtin_unreachable();
 
@@ -1412,6 +1728,10 @@ l2f_double: __builtin_unreachable();
 
 l2f_int: 
     jump_to = (unsigned)l2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = l2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = l2f_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 l2f_float: __builtin_unreachable();
 
@@ -1421,6 +1741,10 @@ l2i_double: __builtin_unreachable();
 
 l2i_int: 
     jump_to = (unsigned)l2i_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = l2i_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = l2i_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 l2i_float: __builtin_unreachable();
 
@@ -1430,6 +1754,10 @@ ladd_double: __builtin_unreachable();
 
 ladd_int: 
     jump_to = (unsigned)ladd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ladd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ladd_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ladd_float: __builtin_unreachable();
 
@@ -1439,6 +1767,10 @@ laload_double: __builtin_unreachable();
 
 laload_int: 
     jump_to = (unsigned)laload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = laload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = laload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 laload_float: __builtin_unreachable();
 
@@ -1448,6 +1780,10 @@ land_double: __builtin_unreachable();
 
 land_int: 
     jump_to = (unsigned)land_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = land_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = land_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 land_float: __builtin_unreachable();
 
@@ -1457,6 +1793,10 @@ lastore_double: __builtin_unreachable();
 
 lastore_int: 
     jump_to = (unsigned)lastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lastore_float: __builtin_unreachable();
 
@@ -1466,6 +1806,10 @@ lcmp_double: __builtin_unreachable();
 
 lcmp_int: 
     jump_to = (unsigned)lcmp_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lcmp_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lcmp_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lcmp_float: __builtin_unreachable();
 
@@ -1475,6 +1819,10 @@ ldiv_double: __builtin_unreachable();
 
 ldiv_int: 
     jump_to = (unsigned)ldiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ldiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ldiv_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ldiv_float: __builtin_unreachable();
 
@@ -1484,6 +1832,10 @@ lmul_double: __builtin_unreachable();
 
 lmul_int: 
     jump_to = (unsigned)lmul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lmul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lmul_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lmul_float: __builtin_unreachable();
 
@@ -1493,6 +1845,10 @@ lneg_double: __builtin_unreachable();
 
 lneg_int: 
     jump_to = (unsigned)lneg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lneg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lneg_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lneg_float: __builtin_unreachable();
 
@@ -1502,6 +1858,10 @@ lor_double: __builtin_unreachable();
 
 lor_int: 
     jump_to = (unsigned)lor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lor_float: __builtin_unreachable();
 
@@ -1511,6 +1871,10 @@ lrem_double: __builtin_unreachable();
 
 lrem_int: 
     jump_to = (unsigned)lrem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lrem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lrem_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lrem_float: __builtin_unreachable();
 
@@ -1529,6 +1893,10 @@ lshl_double: __builtin_unreachable();
 
 lshl_int: 
     jump_to = (unsigned)lshl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lshl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lshl_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lshl_float: __builtin_unreachable();
 
@@ -1538,6 +1906,10 @@ lshr_double: __builtin_unreachable();
 
 lshr_int: 
     jump_to = (unsigned)lshr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lshr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lshr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lshr_float: __builtin_unreachable();
 
@@ -1547,6 +1919,10 @@ lsub_double: __builtin_unreachable();
 
 lsub_int: 
     jump_to = (unsigned)lsub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lsub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lsub_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lsub_float: __builtin_unreachable();
 
@@ -1556,6 +1932,10 @@ lushr_double: __builtin_unreachable();
 
 lushr_int: 
     jump_to = (unsigned)lushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lushr_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lushr_float: __builtin_unreachable();
 
@@ -1565,6 +1945,10 @@ lxor_double: __builtin_unreachable();
 
 lxor_int: 
     jump_to = (unsigned)lxor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lxor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lxor_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lxor_float: __builtin_unreachable();
 
@@ -1574,6 +1958,10 @@ monitorenter_double: __builtin_unreachable();
 
 monitorenter_int: 
     jump_to = (unsigned)monitorenter_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = monitorenter_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = monitorenter_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 monitorenter_float: __builtin_unreachable();
 
@@ -1583,31 +1971,63 @@ monitorexit_double: __builtin_unreachable();
 
 monitorexit_int: 
     jump_to = (unsigned)monitorexit_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = monitorexit_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = monitorexit_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 monitorexit_float: __builtin_unreachable();
 
 pop_void: 
     jump_to = (unsigned)pop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop_double: 
     jump_to = (unsigned)pop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop_int: 
     jump_to = (unsigned)pop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop_float: 
     jump_to = (unsigned)pop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop2_void: __builtin_unreachable();
 
 pop2_double: 
     jump_to = (unsigned)pop2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop2_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop2_int: 
     jump_to = (unsigned)pop2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop2_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 pop2_float: 
     jump_to = (unsigned)pop2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = pop2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = pop2_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 return_void:
     result.l = return_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
@@ -1627,6 +2047,10 @@ saload_double: __builtin_unreachable();
 
 saload_int: 
     jump_to = (unsigned)saload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = saload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = saload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 saload_float: __builtin_unreachable();
 
@@ -1636,6 +2060,10 @@ sastore_double: __builtin_unreachable();
 
 sastore_int: 
     jump_to = (unsigned)sastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = sastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = sastore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 sastore_float: __builtin_unreachable();
 
@@ -1643,12 +2071,24 @@ swap_void: __builtin_unreachable();
 
 swap_double: 
     jump_to = (unsigned)swap_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = swap_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = swap_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 swap_int: 
     jump_to = (unsigned)swap_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = swap_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = swap_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 swap_float: 
     jump_to = (unsigned)swap_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = swap_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = swap_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 anewarray_void: __builtin_unreachable();
 
@@ -1656,6 +2096,10 @@ anewarray_double: __builtin_unreachable();
 
 anewarray_int: 
     jump_to = (unsigned)anewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = anewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = anewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 anewarray_float: __builtin_unreachable();
 
@@ -1665,6 +2109,10 @@ checkcast_double: __builtin_unreachable();
 
 checkcast_int: 
     jump_to = (unsigned)checkcast_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = checkcast_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = checkcast_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 checkcast_float: __builtin_unreachable();
 
@@ -1674,20 +2122,40 @@ getfield_double: __builtin_unreachable();
 
 getfield_int: 
     jump_to = (unsigned)getfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_float: __builtin_unreachable();
 
 getstatic_void: 
     jump_to = (unsigned)getstatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_double: 
     jump_to = (unsigned)getstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_int: 
     jump_to = (unsigned)getstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_float: 
     jump_to = (unsigned)getstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 instanceof_void: __builtin_unreachable();
 
@@ -1695,166 +2163,370 @@ instanceof_double: __builtin_unreachable();
 
 instanceof_int: 
     jump_to = (unsigned)instanceof_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = instanceof_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = instanceof_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 instanceof_float: __builtin_unreachable();
 
 invokedynamic_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokedynamic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokedynamic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokedynamic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokedynamic_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokedynamic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokedynamic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokedynamic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokedynamic_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokedynamic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokedynamic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokedynamic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokedynamic_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokedynamic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokedynamic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokedynamic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 new_void: 
     jump_to = (unsigned)new_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_double: 
     jump_to = (unsigned)new_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_int: 
     jump_to = (unsigned)new_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_float: 
     jump_to = (unsigned)new_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_void: __builtin_unreachable();
 
 putfield_double: 
     jump_to = (unsigned)putfield_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_int: 
     jump_to = (unsigned)putfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_float: 
     jump_to = (unsigned)putfield_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_void: __builtin_unreachable();
 
 putstatic_double: 
     jump_to = (unsigned)putstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_int: 
     jump_to = (unsigned)putstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_float: 
     jump_to = (unsigned)putstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevirtual_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevirtual_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevirtual_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevirtual_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevirtual_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevirtual_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevirtual_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevirtual_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevirtual_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevirtual_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevirtual_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevirtual_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevirtual_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevirtual_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevirtual_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevirtual_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokespecial_void: __builtin_unreachable();
 
 invokespecial_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokespecial_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokespecial_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokespecial_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokespecial_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokespecial_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokespecial_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokespecial_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokespecial_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokespecial_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokespecial_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokespecial_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokestatic_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokestatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokestatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokestatic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokestatic_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokestatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokestatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokestatic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokestatic_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokestatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokestatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokestatic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokestatic_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokestatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokestatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokestatic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 ldc_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)ldc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = ldc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = ldc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 ldc_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)ldc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = ldc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = ldc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 ldc_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)ldc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = ldc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = ldc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 ldc_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)ldc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = ldc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = ldc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 ldc2_w_void: 
     jump_to = (unsigned)ldc2_w_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ldc2_w_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ldc2_w_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ldc2_w_double: 
     jump_to = (unsigned)ldc2_w_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ldc2_w_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ldc2_w_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ldc2_w_int: 
     jump_to = (unsigned)ldc2_w_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ldc2_w_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ldc2_w_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ldc2_w_float: 
     jump_to = (unsigned)ldc2_w_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ldc2_w_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ldc2_w_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dload_void: 
     jump_to = (unsigned)dload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dload_double: 
     jump_to = (unsigned)dload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dload_int: 
     jump_to = (unsigned)dload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dload_float: 
     jump_to = (unsigned)dload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fload_void: 
     jump_to = (unsigned)fload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fload_double: 
     jump_to = (unsigned)fload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fload_int: 
     jump_to = (unsigned)fload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fload_float: 
     jump_to = (unsigned)fload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iload_void: 
     jump_to = (unsigned)iload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iload_double: 
     jump_to = (unsigned)iload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iload_int: 
     jump_to = (unsigned)iload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iload_float: 
     jump_to = (unsigned)iload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lload_void: 
     jump_to = (unsigned)lload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lload_double: 
     jump_to = (unsigned)lload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lload_int: 
     jump_to = (unsigned)lload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lload_float: 
     jump_to = (unsigned)lload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dstore_void: __builtin_unreachable();
 
 dstore_double: 
     jump_to = (unsigned)dstore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dstore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dstore_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dstore_int: __builtin_unreachable();
 
@@ -1868,6 +2540,10 @@ fstore_int: __builtin_unreachable();
 
 fstore_float: 
     jump_to = (unsigned)fstore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fstore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fstore_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 istore_void: __builtin_unreachable();
 
@@ -1875,6 +2551,10 @@ istore_double: __builtin_unreachable();
 
 istore_int: 
     jump_to = (unsigned)istore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = istore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = istore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 istore_float: __builtin_unreachable();
 
@@ -1884,20 +2564,40 @@ lstore_double: __builtin_unreachable();
 
 lstore_int: 
     jump_to = (unsigned)lstore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lstore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lstore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lstore_float: __builtin_unreachable();
 
 aload_void: 
     jump_to = (unsigned)aload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aload_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aload_double: 
     jump_to = (unsigned)aload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aload_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aload_int: 
     jump_to = (unsigned)aload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aload_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 aload_float: 
     jump_to = (unsigned)aload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = aload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = aload_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 astore_void: __builtin_unreachable();
 
@@ -1905,20 +2605,40 @@ astore_double: __builtin_unreachable();
 
 astore_int: 
     jump_to = (unsigned)astore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = astore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = astore_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 astore_float: __builtin_unreachable();
 
 goto_void: 
     jump_to = (unsigned)goto_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = goto_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = goto_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 goto_double: 
     jump_to = (unsigned)goto_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = goto_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = goto_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 goto_int: 
     jump_to = (unsigned)goto_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = goto_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = goto_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 goto_float: 
     jump_to = (unsigned)goto_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = goto_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = goto_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 jsr_void: __builtin_unreachable();
 
@@ -1934,6 +2654,10 @@ if_acmpeq_double: __builtin_unreachable();
 
 if_acmpeq_int: 
     jump_to = (unsigned)if_acmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_acmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_acmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_acmpeq_float: __builtin_unreachable();
 
@@ -1943,6 +2667,10 @@ if_acmpne_double: __builtin_unreachable();
 
 if_acmpne_int: 
     jump_to = (unsigned)if_acmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_acmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_acmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_acmpne_float: __builtin_unreachable();
 
@@ -1952,6 +2680,10 @@ if_icmpeq_double: __builtin_unreachable();
 
 if_icmpeq_int: 
     jump_to = (unsigned)if_icmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmpeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmpeq_float: __builtin_unreachable();
 
@@ -1961,6 +2693,10 @@ if_icmpne_double: __builtin_unreachable();
 
 if_icmpne_int: 
     jump_to = (unsigned)if_icmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmpne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmpne_float: __builtin_unreachable();
 
@@ -1970,6 +2706,10 @@ if_icmplt_double: __builtin_unreachable();
 
 if_icmplt_int: 
     jump_to = (unsigned)if_icmplt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmplt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmplt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmplt_float: __builtin_unreachable();
 
@@ -1979,6 +2719,10 @@ if_icmpge_double: __builtin_unreachable();
 
 if_icmpge_int: 
     jump_to = (unsigned)if_icmpge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmpge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmpge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmpge_float: __builtin_unreachable();
 
@@ -1988,6 +2732,10 @@ if_icmpgt_double: __builtin_unreachable();
 
 if_icmpgt_int: 
     jump_to = (unsigned)if_icmpgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmpgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmpgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmpgt_float: __builtin_unreachable();
 
@@ -1997,6 +2745,10 @@ if_icmple_double: __builtin_unreachable();
 
 if_icmple_int: 
     jump_to = (unsigned)if_icmple_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = if_icmple_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = if_icmple_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 if_icmple_float: __builtin_unreachable();
 
@@ -2006,6 +2758,10 @@ ifeq_double: __builtin_unreachable();
 
 ifeq_int: 
     jump_to = (unsigned)ifeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifeq_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifeq_float: __builtin_unreachable();
 
@@ -2015,6 +2771,10 @@ ifne_double: __builtin_unreachable();
 
 ifne_int: 
     jump_to = (unsigned)ifne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifne_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifne_float: __builtin_unreachable();
 
@@ -2024,6 +2784,10 @@ iflt_double: __builtin_unreachable();
 
 iflt_int: 
     jump_to = (unsigned)iflt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iflt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iflt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iflt_float: __builtin_unreachable();
 
@@ -2033,6 +2797,10 @@ ifge_double: __builtin_unreachable();
 
 ifge_int: 
     jump_to = (unsigned)ifge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifge_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifge_float: __builtin_unreachable();
 
@@ -2042,6 +2810,10 @@ ifgt_double: __builtin_unreachable();
 
 ifgt_int: 
     jump_to = (unsigned)ifgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifgt_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifgt_float: __builtin_unreachable();
 
@@ -2051,6 +2823,10 @@ ifle_double: __builtin_unreachable();
 
 ifle_int: 
     jump_to = (unsigned)ifle_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifle_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifle_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifle_float: __builtin_unreachable();
 
@@ -2060,6 +2836,10 @@ ifnonnull_double: __builtin_unreachable();
 
 ifnonnull_int: 
     jump_to = (unsigned)ifnonnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifnonnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifnonnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifnonnull_float: __builtin_unreachable();
 
@@ -2069,80 +2849,180 @@ ifnull_double: __builtin_unreachable();
 
 ifnull_int: 
     jump_to = (unsigned)ifnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = ifnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = ifnull_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 ifnull_float: __builtin_unreachable();
 
 iconst_void: 
     jump_to = (unsigned)iconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iconst_double: 
     jump_to = (unsigned)iconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iconst_int: 
     jump_to = (unsigned)iconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iconst_float: 
     jump_to = (unsigned)iconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dconst_void: 
     jump_to = (unsigned)dconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dconst_double: 
     jump_to = (unsigned)dconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dconst_int: 
     jump_to = (unsigned)dconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dconst_float: 
     jump_to = (unsigned)dconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fconst_void: 
     jump_to = (unsigned)fconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fconst_double: 
     jump_to = (unsigned)fconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fconst_int: 
     jump_to = (unsigned)fconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 fconst_float: 
     jump_to = (unsigned)fconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = fconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = fconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lconst_void: 
     jump_to = (unsigned)lconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lconst_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lconst_double: 
     jump_to = (unsigned)lconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lconst_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lconst_int: 
     jump_to = (unsigned)lconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lconst_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lconst_float: 
     jump_to = (unsigned)lconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lconst_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iinc_void: 
     jump_to = (unsigned)iinc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iinc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iinc_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iinc_double: 
     jump_to = (unsigned)iinc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iinc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iinc_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iinc_int: 
     jump_to = (unsigned)iinc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iinc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iinc_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 iinc_float: 
     jump_to = (unsigned)iinc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = iinc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = iinc_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokeinterface_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeinterface_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeinterface_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeinterface_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeinterface_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeinterface_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeinterface_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeinterface_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeinterface_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeinterface_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeinterface_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeinterface_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeinterface_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeinterface_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeinterface_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeinterface_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 multianewarray_void: __builtin_unreachable();
 
@@ -2150,6 +3030,10 @@ multianewarray_double: __builtin_unreachable();
 
 multianewarray_int: 
     jump_to = (unsigned)multianewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = multianewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = multianewarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 multianewarray_float: __builtin_unreachable();
 
@@ -2159,6 +3043,10 @@ newarray_double: __builtin_unreachable();
 
 newarray_int: 
     jump_to = (unsigned)newarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = newarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = newarray_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 newarray_float: __builtin_unreachable();
 
@@ -2168,6 +3056,10 @@ tableswitch_double: __builtin_unreachable();
 
 tableswitch_int: 
     jump_to = (unsigned)tableswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = tableswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = tableswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 tableswitch_float: __builtin_unreachable();
 
@@ -2177,6 +3069,10 @@ lookupswitch_double: __builtin_unreachable();
 
 lookupswitch_int: 
     jump_to = (unsigned)lookupswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = lookupswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = lookupswitch_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 lookupswitch_float: __builtin_unreachable();
 
@@ -2194,6 +3090,10 @@ anewarray_resolved_double: __builtin_unreachable();
 
 anewarray_resolved_int: 
     jump_to = (unsigned)anewarray_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = anewarray_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = anewarray_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 anewarray_resolved_float: __builtin_unreachable();
 
@@ -2203,6 +3103,10 @@ checkcast_resolved_double: __builtin_unreachable();
 
 checkcast_resolved_int: 
     jump_to = (unsigned)checkcast_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = checkcast_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = checkcast_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 checkcast_resolved_float: __builtin_unreachable();
 
@@ -2212,116 +3116,264 @@ instanceof_resolved_double: __builtin_unreachable();
 
 instanceof_resolved_int: 
     jump_to = (unsigned)instanceof_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = instanceof_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = instanceof_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 instanceof_resolved_float: __builtin_unreachable();
 
 new_resolved_void: 
     jump_to = (unsigned)new_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_resolved_double: 
     jump_to = (unsigned)new_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_resolved_int: 
     jump_to = (unsigned)new_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 new_resolved_float: 
     jump_to = (unsigned)new_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = new_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = new_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevtable_monomorphic_void: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevtable_monomorphic_double: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevtable_monomorphic_int: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevtable_monomorphic_float: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokevtable_polymorphic_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevtable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevtable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevtable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevtable_polymorphic_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevtable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevtable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevtable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevtable_polymorphic_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevtable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevtable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevtable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokevtable_polymorphic_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokevtable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokevtable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokevtable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeitable_monomorphic_void: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokeitable_monomorphic_double: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokeitable_monomorphic_int: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokeitable_monomorphic_float: 
     jump_to = (unsigned)invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokeitable_vtable_monomorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokeitable_polymorphic_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeitable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeitable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeitable_polymorphic_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeitable_polymorphic_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeitable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeitable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeitable_polymorphic_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeitable_polymorphic_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeitable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeitable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeitable_polymorphic_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokeitable_polymorphic_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokeitable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokeitable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokeitable_polymorphic_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokespecial_resolved_void: 
     jump_to = (unsigned)invokespecial_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokespecial_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokespecial_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokespecial_resolved_double: 
     jump_to = (unsigned)invokespecial_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokespecial_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokespecial_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokespecial_resolved_int: 
     jump_to = (unsigned)invokespecial_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokespecial_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokespecial_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokespecial_resolved_float: 
     jump_to = (unsigned)invokespecial_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokespecial_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokespecial_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokestatic_resolved_void: 
     jump_to = (unsigned)invokestatic_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokestatic_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokestatic_resolved_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokestatic_resolved_double: 
     jump_to = (unsigned)invokestatic_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokestatic_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokestatic_resolved_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokestatic_resolved_int: 
     jump_to = (unsigned)invokestatic_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokestatic_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokestatic_resolved_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokestatic_resolved_float: 
     jump_to = (unsigned)invokestatic_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokestatic_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokestatic_resolved_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokecallsite_void: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokecallsite_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokecallsite_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokecallsite_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokecallsite_double: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokecallsite_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokecallsite_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokecallsite_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokecallsite_int: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokecallsite_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokecallsite_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokecallsite_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokecallsite_float: int_tos_ = int_tos; float_tos_ = float_tos; double_tos_ = double_tos;
     jump_to = (unsigned)invokecallsite_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);; int_tos = int_tos_; float_tos = float_tos_; double_tos = double_tos_;
+    if (always_false) {
+        result.l = invokecallsite_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+        result.l = invokecallsite_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos_, &float_tos_, &double_tos_);;
+    }
     continue;
 invokesigpoly_void: 
     jump_to = (unsigned)invokesigpoly_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokesigpoly_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokesigpoly_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokesigpoly_double: 
     jump_to = (unsigned)invokesigpoly_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokesigpoly_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokesigpoly_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokesigpoly_int: 
     jump_to = (unsigned)invokesigpoly_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokesigpoly_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokesigpoly_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 invokesigpoly_float: 
     jump_to = (unsigned)invokesigpoly_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = invokesigpoly_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = invokesigpoly_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_B_void: __builtin_unreachable();
 
@@ -2329,6 +3381,10 @@ getfield_B_double: __builtin_unreachable();
 
 getfield_B_int: 
     jump_to = (unsigned)getfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_B_float: __builtin_unreachable();
 
@@ -2338,6 +3394,10 @@ getfield_C_double: __builtin_unreachable();
 
 getfield_C_int: 
     jump_to = (unsigned)getfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_C_float: __builtin_unreachable();
 
@@ -2347,6 +3407,10 @@ getfield_S_double: __builtin_unreachable();
 
 getfield_S_int: 
     jump_to = (unsigned)getfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_S_float: __builtin_unreachable();
 
@@ -2356,6 +3420,10 @@ getfield_I_double: __builtin_unreachable();
 
 getfield_I_int: 
     jump_to = (unsigned)getfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_I_float: __builtin_unreachable();
 
@@ -2365,6 +3433,10 @@ getfield_J_double: __builtin_unreachable();
 
 getfield_J_int: 
     jump_to = (unsigned)getfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_J_float: __builtin_unreachable();
 
@@ -2374,6 +3446,10 @@ getfield_F_double: __builtin_unreachable();
 
 getfield_F_int: 
     jump_to = (unsigned)getfield_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_F_float: __builtin_unreachable();
 
@@ -2383,6 +3459,10 @@ getfield_D_double: __builtin_unreachable();
 
 getfield_D_int: 
     jump_to = (unsigned)getfield_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_D_float: __builtin_unreachable();
 
@@ -2392,6 +3472,10 @@ getfield_Z_double: __builtin_unreachable();
 
 getfield_Z_int: 
     jump_to = (unsigned)getfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_Z_float: __builtin_unreachable();
 
@@ -2401,6 +3485,10 @@ getfield_L_double: __builtin_unreachable();
 
 getfield_L_int: 
     jump_to = (unsigned)getfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getfield_L_float: __builtin_unreachable();
 
@@ -2410,6 +3498,10 @@ putfield_B_double: __builtin_unreachable();
 
 putfield_B_int: 
     jump_to = (unsigned)putfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_B_float: __builtin_unreachable();
 
@@ -2419,6 +3511,10 @@ putfield_C_double: __builtin_unreachable();
 
 putfield_C_int: 
     jump_to = (unsigned)putfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_C_float: __builtin_unreachable();
 
@@ -2428,6 +3524,10 @@ putfield_S_double: __builtin_unreachable();
 
 putfield_S_int: 
     jump_to = (unsigned)putfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_S_float: __builtin_unreachable();
 
@@ -2437,6 +3537,10 @@ putfield_I_double: __builtin_unreachable();
 
 putfield_I_int: 
     jump_to = (unsigned)putfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_I_float: __builtin_unreachable();
 
@@ -2446,6 +3550,10 @@ putfield_J_double: __builtin_unreachable();
 
 putfield_J_int: 
     jump_to = (unsigned)putfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_J_float: __builtin_unreachable();
 
@@ -2457,11 +3565,19 @@ putfield_F_int: __builtin_unreachable();
 
 putfield_F_float: 
     jump_to = (unsigned)putfield_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_D_void: __builtin_unreachable();
 
 putfield_D_double: 
     jump_to = (unsigned)putfield_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_D_int: __builtin_unreachable();
 
@@ -2473,6 +3589,10 @@ putfield_Z_double: __builtin_unreachable();
 
 putfield_Z_int: 
     jump_to = (unsigned)putfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_Z_float: __builtin_unreachable();
 
@@ -2482,116 +3602,264 @@ putfield_L_double: __builtin_unreachable();
 
 putfield_L_int: 
     jump_to = (unsigned)putfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putfield_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putfield_L_float: __builtin_unreachable();
 
 getstatic_B_void: 
     jump_to = (unsigned)getstatic_B_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_B_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_B_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_B_double: 
     jump_to = (unsigned)getstatic_B_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_B_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_B_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_B_int: 
     jump_to = (unsigned)getstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_B_float: 
     jump_to = (unsigned)getstatic_B_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_B_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_B_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_C_void: 
     jump_to = (unsigned)getstatic_C_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_C_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_C_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_C_double: 
     jump_to = (unsigned)getstatic_C_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_C_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_C_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_C_int: 
     jump_to = (unsigned)getstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_C_float: 
     jump_to = (unsigned)getstatic_C_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_C_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_C_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_S_void: 
     jump_to = (unsigned)getstatic_S_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_S_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_S_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_S_double: 
     jump_to = (unsigned)getstatic_S_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_S_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_S_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_S_int: 
     jump_to = (unsigned)getstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_S_float: 
     jump_to = (unsigned)getstatic_S_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_S_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_S_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_I_void: 
     jump_to = (unsigned)getstatic_I_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_I_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_I_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_I_double: 
     jump_to = (unsigned)getstatic_I_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_I_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_I_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_I_int: 
     jump_to = (unsigned)getstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_I_float: 
     jump_to = (unsigned)getstatic_I_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_I_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_I_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_J_void: 
     jump_to = (unsigned)getstatic_J_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_J_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_J_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_J_double: 
     jump_to = (unsigned)getstatic_J_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_J_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_J_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_J_int: 
     jump_to = (unsigned)getstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_J_float: 
     jump_to = (unsigned)getstatic_J_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_J_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_J_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_F_void: 
     jump_to = (unsigned)getstatic_F_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_F_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_F_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_F_double: 
     jump_to = (unsigned)getstatic_F_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_F_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_F_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_F_int: 
     jump_to = (unsigned)getstatic_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_F_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_F_float: 
     jump_to = (unsigned)getstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_D_void: 
     jump_to = (unsigned)getstatic_D_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_D_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_D_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_D_double: 
     jump_to = (unsigned)getstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_D_int: 
     jump_to = (unsigned)getstatic_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_D_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_D_float: 
     jump_to = (unsigned)getstatic_D_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_D_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_D_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_Z_void: 
     jump_to = (unsigned)getstatic_Z_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_Z_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_Z_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_Z_double: 
     jump_to = (unsigned)getstatic_Z_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_Z_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_Z_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_Z_int: 
     jump_to = (unsigned)getstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_Z_float: 
     jump_to = (unsigned)getstatic_Z_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_Z_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_Z_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_L_void: 
     jump_to = (unsigned)getstatic_L_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_L_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_L_impl_void(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_L_double: 
     jump_to = (unsigned)getstatic_L_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_L_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_L_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_L_int: 
     jump_to = (unsigned)getstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 getstatic_L_float: 
     jump_to = (unsigned)getstatic_L_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = getstatic_L_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = getstatic_L_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_B_void: __builtin_unreachable();
 
@@ -2599,6 +3867,10 @@ putstatic_B_double: __builtin_unreachable();
 
 putstatic_B_int: 
     jump_to = (unsigned)putstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_B_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_B_float: __builtin_unreachable();
 
@@ -2608,6 +3880,10 @@ putstatic_C_double: __builtin_unreachable();
 
 putstatic_C_int: 
     jump_to = (unsigned)putstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_C_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_C_float: __builtin_unreachable();
 
@@ -2617,6 +3893,10 @@ putstatic_S_double: __builtin_unreachable();
 
 putstatic_S_int: 
     jump_to = (unsigned)putstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_S_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_S_float: __builtin_unreachable();
 
@@ -2626,6 +3906,10 @@ putstatic_I_double: __builtin_unreachable();
 
 putstatic_I_int: 
     jump_to = (unsigned)putstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_I_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_I_float: __builtin_unreachable();
 
@@ -2635,6 +3919,10 @@ putstatic_J_double: __builtin_unreachable();
 
 putstatic_J_int: 
     jump_to = (unsigned)putstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_J_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_J_float: __builtin_unreachable();
 
@@ -2646,11 +3934,19 @@ putstatic_F_int: __builtin_unreachable();
 
 putstatic_F_float: 
     jump_to = (unsigned)putstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_F_impl_float(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_D_void: __builtin_unreachable();
 
 putstatic_D_double: 
     jump_to = (unsigned)putstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_D_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_D_int: __builtin_unreachable();
 
@@ -2662,6 +3958,10 @@ putstatic_Z_double: __builtin_unreachable();
 
 putstatic_Z_int: 
     jump_to = (unsigned)putstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_Z_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_Z_float: __builtin_unreachable();
 
@@ -2671,6 +3971,10 @@ putstatic_L_double: __builtin_unreachable();
 
 putstatic_L_int: 
     jump_to = (unsigned)putstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = putstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = putstatic_L_impl_int(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 putstatic_L_float: __builtin_unreachable();
 
@@ -2678,6 +3982,10 @@ dsqrt_void: __builtin_unreachable();
 
 dsqrt_double: 
     jump_to = (unsigned)dsqrt_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);; 
+    if (always_false) {
+        result.l = dsqrt_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+        result.l = dsqrt_impl_double(thread, frame_, &current, &pc_, &sp_, &int_tos, &float_tos, &double_tos);;
+    }
     continue;
 dsqrt_int: __builtin_unreachable();
 

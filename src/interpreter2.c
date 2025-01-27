@@ -137,8 +137,6 @@ static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE);
       MUSTTAIL return jmp_table_void[insns[1].kind](thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, c_undef);)
 #else
 
-#define INLINE_IF_WASM __attribute__((always_inline))
-
 int64_t *arg_1;
 float *arg_2;
 double *arg_3;  // unused
@@ -234,19 +232,16 @@ __builtin_unreachable();
 // For a bytecode that takes no arguments, given an implementation for the int TOS type, generate adapter funcsptions
 // which push the current TOS value onto the stack and then call the void TOS implementation.
 #define FORWARD_TO_NULLARY(which)                                                                                      \
-  INLINE_IF_WASM \
   static int64_t which##_impl_int(ARGS_INT) {                                                                          \
     *(sp - 1) = (bjvm_stack_value){.l = tos};                                                                          \
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, tos_, arg_2, arg_3);                                \
   }                                                                                                                    \
                                                                                                                        \
-  INLINE_IF_WASM \
   static int64_t which##_impl_float(ARGS_FLOAT) {                                                                      \
     *(sp - 1) = (bjvm_stack_value){.f = tos};                                                                          \
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, tos_, arg_3);                                \
   }                                                                                                                    \
                                                                                                                        \
-  INLINE_IF_WASM \
   static int64_t which##_impl_double(ARGS_DOUBLE) {                                                                    \
     *(sp - 1) = (bjvm_stack_value){.d = tos};                                                                          \
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                                \
@@ -294,7 +289,7 @@ static int double_to_int(double x) {
 }
 
 // Java saturates the conversion
-static int64_t double_to_long(double x) {
+__attribute__((noinline, used)) static int64_t double_to_long(double x) {
   if (x >= (double)(ULLONG_MAX / 2))
     return LLONG_MAX;
   if (x < (double)LLONG_MIN)
@@ -483,7 +478,7 @@ DEFINE_ASYNC_SL(resolve_getstatic_putstatic, 100) {
   ASYNC_END(0);
 }
 
-static int64_t getstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   resolve_getstatic_putstatic_t ctx = {0};
   ctx.args.thread = thread;
@@ -508,7 +503,7 @@ FORWARD_TO_NULLARY(getstatic)
 
 // Never actually directly called -- we just do it this way because it's easier and we might as well merge code paths
 // for different TOS types.
-static int64_t putstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   resolve_getstatic_putstatic_t ctx = {0};
   ctx.args.thread = thread;
@@ -523,7 +518,7 @@ static int64_t putstatic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(putstatic)
 
-static int64_t getstatic_L_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_L_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
   sp++;
@@ -531,7 +526,7 @@ static int64_t getstatic_L_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_L)
 
-static int64_t getstatic_F_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_F_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -540,7 +535,7 @@ static int64_t getstatic_F_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_F)
 
-static int64_t getstatic_D_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_D_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -549,7 +544,7 @@ static int64_t getstatic_D_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_D)
 
-static int64_t getstatic_J_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_J_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -558,7 +553,7 @@ static int64_t getstatic_J_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_J)
 
-static int64_t getstatic_I_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_I_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -567,7 +562,7 @@ static int64_t getstatic_I_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_I)
 
-static int64_t getstatic_S_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_S_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -576,7 +571,7 @@ static int64_t getstatic_S_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_S)
 
-static int64_t getstatic_C_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_C_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -585,7 +580,7 @@ static int64_t getstatic_C_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_C)
 
-static int64_t getstatic_B_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_B_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -594,7 +589,7 @@ static int64_t getstatic_B_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_B)
 
-static int64_t getstatic_Z_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t getstatic_Z_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   assert(insn->ic && "Static field location not found");
@@ -603,7 +598,7 @@ static int64_t getstatic_Z_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_Z)
 
-static int64_t putstatic_B_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_B_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(int8_t *)insn->ic = (int8_t)tos;
@@ -611,7 +606,7 @@ static int64_t putstatic_B_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_C_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_C_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(uint16_t *)insn->ic = (uint16_t)tos;
@@ -619,7 +614,7 @@ static int64_t putstatic_C_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_S_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_S_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(int16_t *)insn->ic = (int16_t)tos;
@@ -627,7 +622,7 @@ static int64_t putstatic_S_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_I_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_I_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(int *)insn->ic = (int)tos;
@@ -635,7 +630,7 @@ static int64_t putstatic_I_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_J_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_J_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(int64_t *)insn->ic = tos;
@@ -643,7 +638,7 @@ static int64_t putstatic_J_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_F_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t putstatic_F_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   *(float *)insn->ic = tos;
@@ -651,7 +646,7 @@ static int64_t putstatic_F_impl_float(ARGS_FLOAT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_D_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t putstatic_D_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
   *(double *)insn->ic = tos;
@@ -659,7 +654,7 @@ static int64_t putstatic_D_impl_double(ARGS_DOUBLE) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_L_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_L_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(bjvm_obj_header **)insn->ic = (bjvm_obj_header *)tos;
@@ -667,7 +662,7 @@ static int64_t putstatic_L_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putstatic_Z_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putstatic_Z_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   *(int8_t *)insn->ic = (int8_t)tos;
@@ -740,7 +735,7 @@ DEFINE_ASYNC_SL(resolve_getfield_putfield, 100) {
 #undef sp_
 }
 
-static int64_t getfield_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_impl_int(ARGS_INT) {
 
   SPILL(tos)
   DEBUG_CHECK
@@ -758,7 +753,7 @@ static int64_t getfield_impl_int(ARGS_INT) {
   JMP_INT(tos)
 }
 
-static int64_t putfield_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t putfield_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   resolve_getfield_putfield_t ctx = {0};
@@ -776,70 +771,70 @@ static int64_t putfield_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(putfield)
 
-static int64_t getfield_B_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_B_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int8_t *field = (int8_t *)((char *)tos + (int)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
-static int64_t getfield_C_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_C_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   uint16_t *field = (uint16_t *)((char *)tos + (int)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
-static int64_t getfield_S_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_S_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int16_t *field = (int16_t *)((char *)tos + (int)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
-static int64_t getfield_I_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_I_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int *field = (int *)((char *)tos + (int)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
-static int64_t getfield_J_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_J_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int64_t *field = (int64_t *)((char *)tos + (int)insn->ic2);
   NEXT_INT(*field)
 }
 
-static int64_t getfield_F_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_F_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   float *field = (float *)((char *)tos + (int)insn->ic2);
   NEXT_FLOAT(*field)
 }
 
-static int64_t getfield_D_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_D_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   double *field = (double *)((char *)tos + (int)insn->ic2);
   NEXT_DOUBLE(*field)
 }
 
-static int64_t getfield_L_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_L_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   bjvm_obj_header **field = (bjvm_obj_header **)((char *)tos + (int)insn->ic2);
   NEXT_INT(*field)
 }
 
-static int64_t getfield_Z_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t getfield_Z_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int8_t *field = (int8_t *)((char *)tos + (int)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
-static int64_t putfield_B_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_B_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int8_t *field = (int8_t *)((char *)(*(sp - 2)).obj + (int)insn->ic2);
@@ -848,7 +843,7 @@ static int64_t putfield_B_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_C_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_C_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   uint16_t *field = (uint16_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -857,7 +852,7 @@ static int64_t putfield_C_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_S_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_S_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int16_t *field = (int16_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -866,7 +861,7 @@ static int64_t putfield_S_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_I_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_I_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int *field = (int *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -875,7 +870,7 @@ static int64_t putfield_I_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_J_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_J_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int64_t *field = (int64_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -884,7 +879,7 @@ static int64_t putfield_J_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_L_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_L_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   bjvm_obj_header **field = (bjvm_obj_header **)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -893,7 +888,7 @@ static int64_t putfield_L_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_Z_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t putfield_Z_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int8_t *field = (int8_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -902,7 +897,7 @@ static int64_t putfield_Z_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_F_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t putfield_F_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   float *field = (float *)((char *)(sp - 2)->obj + (int)insn->ic2);
@@ -911,7 +906,7 @@ static int64_t putfield_F_impl_float(ARGS_FLOAT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK
   double *field = (double *)((char *)(sp - 2)->obj + (int)insn->ic2);
   *field = tos;
@@ -933,7 +928,7 @@ static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
 // Binary operation on two long
 #define LONG_BIN_OP(which, eval)                                                                                    \
-static int64_t which##_impl_int(ARGS_INT) {                                                                          \
+__attribute__((noinline, used)) static int64_t which##_impl_int(ARGS_INT) {                                                                          \
 DEBUG_CHECK                                                                                                        \
 int64_t a = (sp - 2)->l, b = tos;                                                                                  \
 int64_t result = eval;                                                                                             \
@@ -1028,7 +1023,7 @@ DOUBLE_UN_OP(d2i, double_to_int(a), int, NEXT_INT)
 DOUBLE_UN_OP(d2l, double_to_long(a), int64_t, NEXT_INT)
 DOUBLE_UN_OP(d2f, (float)a, float, NEXT_FLOAT)
 
-static int64_t idiv_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t idiv_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int a = (sp - 2)->i, b = (int)tos;
@@ -1041,7 +1036,7 @@ static int64_t idiv_impl_int(ARGS_INT) {
   NEXT_INT(java_idiv_(a, b));
 }
 
-static int64_t ldiv_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t ldiv_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int64_t a = (sp - 2)->l, b = tos;
@@ -1054,7 +1049,7 @@ static int64_t ldiv_impl_int(ARGS_INT) {
   NEXT_INT(java_ldiv_(a, b));
 }
 
-static int64_t lcmp_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t lcmp_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int64_t a = (sp - 2)->l, b = tos;
@@ -1062,7 +1057,7 @@ static int64_t lcmp_impl_int(ARGS_INT) {
   NEXT_INT(a > b ? 1 : (a < b ? -1 : 0));
 }
 
-static int64_t irem_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t irem_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int a = (sp - 2)->i, b = (int)tos;
@@ -1075,7 +1070,7 @@ static int64_t irem_impl_int(ARGS_INT) {
   NEXT_INT(java_irem_(a, b));
 }
 
-static int64_t lrem_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t lrem_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int64_t a = (sp - 2)->l, b = tos;
@@ -1090,7 +1085,7 @@ static int64_t lrem_impl_int(ARGS_INT) {
 
 /** Array instructions (arraylength, array loads, array stores) */
 
-static int64_t arraylength_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t arraylength_impl_int(ARGS_INT) {
   DEBUG_CHECK
   bjvm_obj_header *array = (bjvm_obj_header *)tos;
   if (unlikely(!array)) {
@@ -1162,7 +1157,7 @@ ARRAY_STORE(castore, int, ARGS_INT, uint16_t, CharArrayStore)
 
 // We implement aastore separately because it needs an additional instanceof check for ArrayStoreExceptions.
 // <array> <index> <value>  ->  <void>
-static int64_t aastore_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t aastore_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   bjvm_obj_header *array = (bjvm_obj_header *)(sp - 3)->obj;
@@ -1192,32 +1187,32 @@ static int64_t aastore_impl_int(ARGS_INT) {
 
 /** Control-flow instructions (returns, jumps, branches) */
 
-static int64_t return_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t return_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   SPILL_VOID
   return 0;
 }
 FORWARD_TO_NULLARY(return)
 
-static int64_t areturn_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t areturn_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos);
   return (int64_t)(uintptr_t)tos;
 }
 
-static int64_t ireturn_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t ireturn_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos);
   return (int)tos;
 }
 
-static int64_t lreturn_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t lreturn_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos);
   return tos;
 }
 
-static int64_t freturn_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t freturn_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK
   SPILL(tos);
   int64_t a = 0;
@@ -1225,7 +1220,7 @@ static int64_t freturn_impl_float(ARGS_FLOAT) {
   return a;
 }
 
-static int64_t dreturn_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t dreturn_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK
   SPILL(tos);
   int64_t a = 0;
@@ -1233,7 +1228,7 @@ static int64_t dreturn_impl_double(ARGS_DOUBLE) {
   return a;
 }
 
-static int64_t goto_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t goto_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   int delta = insn->index - pc;
   pc = insn->index;
@@ -1241,7 +1236,7 @@ static int64_t goto_impl_void(ARGS_VOID) {
   JMP_VOID
 }
 
-static int64_t goto_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t goto_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
   int delta = insn->index - pc;
@@ -1250,7 +1245,7 @@ static int64_t goto_impl_double(ARGS_DOUBLE) {
   JMP_DOUBLE(tos)
 }
 
-static int64_t goto_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t goto_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   int delta = insn->index - pc;
@@ -1259,7 +1254,7 @@ static int64_t goto_impl_float(ARGS_FLOAT) {
   JMP_FLOAT(tos)
 }
 
-static int64_t goto_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t goto_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int delta = insn->index - pc;
@@ -1268,7 +1263,7 @@ static int64_t goto_impl_int(ARGS_INT) {
   JMP_INT(tos)
 }
 
-static int64_t tableswitch_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t tableswitch_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int32_t index = (int32_t)tos;
@@ -1288,7 +1283,7 @@ static int64_t tableswitch_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t lookupswitch_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t lookupswitch_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   struct bjvm_bc_lookupswitch_data data = *insn->lookupswitch;
@@ -1353,7 +1348,7 @@ MAKE_INT_BRANCH(if_icmpge, >=)
 MAKE_INT_BRANCH(if_icmpgt, >)
 MAKE_INT_BRANCH(if_icmple, <=)
 
-static int64_t if_acmpeq_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t if_acmpeq_impl_int(ARGS_INT) {
   DEBUG_CHECK
   uintptr_t a = (sp - 2)->l, b = tos;
   int old_pc = pc;
@@ -1363,7 +1358,7 @@ static int64_t if_acmpeq_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1))
 }
 
-static int64_t if_acmpne_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t if_acmpne_impl_int(ARGS_INT) {
   DEBUG_CHECK
   uintptr_t a = (sp - 2)->l, b = tos;
   int old_pc = pc;
@@ -1376,8 +1371,7 @@ static int64_t if_acmpne_impl_int(ARGS_INT) {
 /** Monitors */
 
 // TODO actually implement this stuff
-static int64_t monitorenter_impl_int(ARGS_INT) {
-
+__attribute__((noinline, used)) static int64_t monitorenter_impl_int(ARGS_INT) {
   DEBUG_CHECK
   if (unlikely(!tos)) {
     SPILL(tos);
@@ -1389,7 +1383,7 @@ static int64_t monitorenter_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t monitorexit_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t monitorexit_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   if (unlikely(!tos)) {
@@ -1404,7 +1398,7 @@ static int64_t monitorexit_impl_int(ARGS_INT) {
 
 /** New object creation */
 
-static int64_t new_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t new_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   SPILL_VOID
@@ -1431,7 +1425,7 @@ static int64_t new_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(new)
 
-static int64_t new_resolved_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t new_resolved_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   SPILL_VOID
@@ -1444,7 +1438,7 @@ static int64_t new_resolved_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(new_resolved)
 
-static int64_t newarray_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t newarray_impl_int(ARGS_INT) {
   DEBUG_CHECK
   int count = tos;
   SPILL(tos)
@@ -1459,7 +1453,7 @@ static int64_t newarray_impl_int(ARGS_INT) {
   NEXT_INT(array)
 }
 
-static int64_t anewarray_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t anewarray_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   bjvm_cp_class_info *info = &insn->cp->class_info;
@@ -1477,7 +1471,7 @@ static int64_t anewarray_impl_int(ARGS_INT) {
 }
 
 // <length> -> <object>
-static int64_t anewarray_resolved_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t anewarray_resolved_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int count = tos;
@@ -1493,7 +1487,7 @@ static int64_t anewarray_resolved_impl_int(ARGS_INT) {
   RETURN_ABRUPT // oom
 }
 
-static int64_t multianewarray_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t multianewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos)
   uint16_t temp_sp = sp - frame_stack(frame);
@@ -1537,7 +1531,7 @@ DEFINE_ASYNC(resolve_invokestatic) {
   ASYNC_END(0);
 };
 
-__attribute__((noinline)) static int64_t invokestatic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_cp_method_info *info = &insn->cp->methodref;
 
@@ -1591,7 +1585,7 @@ static inline uint8_t __attempt_invoke(bjvm_thread *thread, bjvm_stack_frame *in
     result;                                                                                                            \
   })
 
-__attribute__((always_inline)) static int64_t invokestatic_resolved_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokestatic_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_cp_method *method = insn->ic;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
@@ -1622,7 +1616,7 @@ __attribute__((always_inline)) static int64_t invokestatic_resolved_impl_void(AR
 }
 FORWARD_TO_NULLARY(invokestatic_resolved)
 
-__attribute__((noinline)) static int64_t invokevirtual_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokevirtual_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
@@ -1673,7 +1667,7 @@ __attribute__((noinline)) static int64_t invokevirtual_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokevirtual)
 
-__attribute__((noinline)) static int64_t invokespecial_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokespecial_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
@@ -1737,7 +1731,7 @@ __attribute__((noinline)) static int64_t invokespecial_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokespecial)
 
-__attribute__((always_inline)) static int64_t invokespecial_resolved_impl_void(ARGS_VOID) {
+ static int64_t invokespecial_resolved_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_obj_header *target = (sp - insn->args)->obj;
@@ -1773,7 +1767,7 @@ __attribute__((always_inline)) static int64_t invokespecial_resolved_impl_void(A
 }
 FORWARD_TO_NULLARY(invokespecial_resolved)
 
-__attribute__((noinline)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_cp_method_info *method_info = &insn->cp->methodref;
@@ -1810,7 +1804,7 @@ __attribute__((noinline)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokeinterface)
 
-__attribute__((noinline)) void make_invokevtable_polymorphic_(bjvm_bytecode_insn *inst) {
+__attribute__((noinline, used)) void make_invokevtable_polymorphic_(bjvm_bytecode_insn *inst) {
   assert(inst->kind == bjvm_insn_invokevtable_monomorphic);
   bjvm_cp_method *method = inst->ic;
   assert(method);
@@ -1818,14 +1812,14 @@ __attribute__((noinline)) void make_invokevtable_polymorphic_(bjvm_bytecode_insn
   inst->ic2 = (void *)method->vtable_index;
 }
 
-__attribute__((noinline)) void make_invokeitable_polymorphic_(bjvm_bytecode_insn *inst) {
+__attribute__((noinline, used)) void make_invokeitable_polymorphic_(bjvm_bytecode_insn *inst) {
   assert(inst->kind == bjvm_insn_invokeitable_monomorphic);
   inst->kind = bjvm_insn_invokeitable_polymorphic;
   inst->ic = (void *)inst->cp->methodref.resolved->my_class;
   inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
 }
 
-__attribute__((always_inline)) static int64_t invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
+ static int64_t invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
@@ -1859,7 +1853,7 @@ __attribute__((always_inline)) static int64_t invokeitable_vtable_monomorphic_im
 }
 FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
-__attribute__((always_inline)) static int64_t invokesigpoly_impl_void(ARGS_VOID) {
+ static int64_t invokesigpoly_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
@@ -1890,7 +1884,7 @@ __attribute__((always_inline)) static int64_t invokesigpoly_impl_void(ARGS_VOID)
 }
 FORWARD_TO_NULLARY(invokesigpoly)
 
-static int64_t invokeitable_polymorphic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokeitable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
@@ -1923,7 +1917,7 @@ static int64_t invokeitable_polymorphic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokeitable_polymorphic)
 
-static int64_t invokevtable_polymorphic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokevtable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID;
@@ -1952,7 +1946,7 @@ static int64_t invokevtable_polymorphic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokevtable_polymorphic)
 
-__attribute__((noinline)) static int64_t invokedynamic_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokedynamic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   SPILL_VOID
 
@@ -1977,7 +1971,7 @@ __attribute__((noinline)) static int64_t invokedynamic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokedynamic)
 
-static int64_t invokecallsite_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t invokecallsite_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   // Call the "vmtarget" method with the correct number of arguments
   struct bjvm_native_CallSite *cs = insn->ic;
@@ -2028,27 +2022,27 @@ static int64_t invokecallsite_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokecallsite)
 
-__attribute__((always_inline))
+
 bjvm_stack_value *get_local(bjvm_stack_frame *frame, bjvm_bytecode_insn *inst) {
   return frame_locals(frame) + inst->index;
 }
 
 /** Local variable accessors */
-__attribute__((always_inline)) static int64_t iload_impl_void(ARGS_VOID) {
+ static int64_t iload_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   sp++;
   NEXT_INT(get_local(frame, insn)->i)
 }
 FORWARD_TO_NULLARY(iload)
 
-__attribute__((always_inline)) static int64_t fload_impl_void(ARGS_VOID) {
+ static int64_t fload_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   sp++;
   NEXT_FLOAT(get_local(frame, insn)->f)
 }
 FORWARD_TO_NULLARY(fload)
 
-__attribute__((always_inline)) static int64_t dload_impl_void(ARGS_VOID) {
+ static int64_t dload_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2056,7 +2050,7 @@ __attribute__((always_inline)) static int64_t dload_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(dload)
 
-__attribute__((always_inline)) static int64_t lload_impl_void(ARGS_VOID) {
+ static int64_t lload_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2064,28 +2058,28 @@ __attribute__((always_inline)) static int64_t lload_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(lload)
 
-__attribute__((always_inline)) static int64_t aload_impl_void(ARGS_VOID) {
+ static int64_t aload_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   sp++;
   NEXT_INT(get_local(frame, insn)->obj)
 }
 FORWARD_TO_NULLARY(aload)
 
-__attribute__((always_inline)) static int64_t astore_impl_int(ARGS_INT) {
+ static int64_t astore_impl_int(ARGS_INT) {
   DEBUG_CHECK
   get_local(frame, insn)->obj = (bjvm_obj_header *)tos;
   sp--;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t istore_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t istore_impl_int(ARGS_INT) {
   DEBUG_CHECK
   get_local(frame, insn)->i = (int)tos;
   sp--;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t fstore_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t fstore_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   get_local(frame, insn)->f = tos;
@@ -2093,7 +2087,7 @@ static int64_t fstore_impl_float(ARGS_FLOAT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t dstore_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t dstore_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
   get_local(frame, insn)->d = tos;
@@ -2101,7 +2095,7 @@ static int64_t dstore_impl_double(ARGS_DOUBLE) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t lstore_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t lstore_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   get_local(frame, insn)->l = tos;
@@ -2109,7 +2103,7 @@ static int64_t lstore_impl_int(ARGS_INT) {
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
 
-static int64_t iinc_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t iinc_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   int *a = &frame_locals(frame)[insn->iinc.index].i;
@@ -2117,7 +2111,7 @@ static int64_t iinc_impl_void(ARGS_VOID) {
   NEXT_VOID
 }
 
-static int64_t iinc_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t iinc_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
   int *a = &frame_locals(frame)[insn->iinc.index].i;
@@ -2125,7 +2119,7 @@ static int64_t iinc_impl_double(ARGS_DOUBLE) {
   NEXT_DOUBLE(tos)
 }
 
-static int64_t iinc_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t iinc_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   int *a = &frame_locals(frame)[insn->iinc.index].i;
@@ -2133,7 +2127,7 @@ static int64_t iinc_impl_float(ARGS_FLOAT) {
   NEXT_FLOAT(tos)
 }
 
-static int64_t iinc_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t iinc_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   int *a = &frame_locals(frame)[insn->iinc.index].i;
@@ -2143,7 +2137,7 @@ static int64_t iinc_impl_int(ARGS_INT) {
 
 /** Constant-pushing instructions */
 
-static int64_t aconst_null_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t aconst_null_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2151,7 +2145,7 @@ static int64_t aconst_null_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(aconst_null)
 
-static int64_t ldc_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t ldc_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2187,7 +2181,7 @@ static int64_t ldc_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(ldc)
 
-static int64_t ldc2_w_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t ldc2_w_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2203,7 +2197,7 @@ static int64_t ldc2_w_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(ldc2_w)
 
-static int64_t iconst_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t iconst_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2211,7 +2205,7 @@ static int64_t iconst_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(iconst)
 
-static int64_t fconst_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t fconst_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2219,7 +2213,7 @@ static int64_t fconst_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(fconst)
 
-static int64_t dconst_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t dconst_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2227,7 +2221,7 @@ static int64_t dconst_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(dconst)
 
-static int64_t lconst_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t lconst_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp++;
@@ -2237,7 +2231,7 @@ FORWARD_TO_NULLARY(lconst)
 
 /** Stack manipulation instructions */
 
-static int64_t pop_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t pop_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp--;
@@ -2245,7 +2239,7 @@ static int64_t pop_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(pop)
 
-static int64_t pop2_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t pop2_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   sp -= 2;
@@ -2254,7 +2248,7 @@ static int64_t pop2_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(pop2)
 
 // Never directly called
-static int64_t swap_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t swap_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_stack_value tmp = *(sp - 1);
@@ -2264,42 +2258,42 @@ static int64_t swap_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(swap)
 
-static int64_t nop_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t nop_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   NEXT_VOID
 }
 
-static int64_t nop_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t nop_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
   NEXT_DOUBLE(tos)
 }
 
-static int64_t nop_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t nop_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
   NEXT_FLOAT(tos)
 }
 
-static int64_t nop_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t nop_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   NEXT_INT(tos)
 }
 
-static int64_t dup_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t dup_impl_int(ARGS_INT) {
   DEBUG_CHECK(sp++ - 1)->l = tos;
   NEXT_INT(tos)
 }
 
-static int64_t dup_impl_float(ARGS_FLOAT) {
+__attribute__((noinline, used)) static int64_t dup_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK(sp++ - 1)->f = tos;
   NEXT_FLOAT(tos)
 }
 
-static int64_t dup_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t dup_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK(sp++ - 1)->d = tos;
   NEXT_DOUBLE(tos)
@@ -2309,7 +2303,7 @@ static int64_t dup_impl_double(ARGS_DOUBLE) {
 // every TOS type to them.
 
 // ..., val2, val1 -> ..., val2, val1, val2, val1
-static int64_t dup2_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t dup2_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_stack_value val1 = *(sp - 1), val2 = *(sp - 2);
@@ -2321,7 +2315,7 @@ static int64_t dup2_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(dup2)
 
 // ..., val2, val1 -> ..., val1, val2, val1
-static int64_t dup_x1_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t dup_x1_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_stack_value val1 = *(sp - 1), val2 = *(sp - 2);
@@ -2334,8 +2328,7 @@ static int64_t dup_x1_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(dup_x1)
 
 // ..., val3, val2, val1 -> val1, val3, val2, val1
-static int64_t dup_x2_impl_void(ARGS_VOID) {
-
+__attribute__((noinline, used)) static int64_t dup_x2_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   bjvm_stack_value val1 = *(sp - 1), val2 = *(sp - 2), val3 = *(sp - 3);
   *(sp - 3) = val1;
@@ -2348,7 +2341,7 @@ static int64_t dup_x2_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(dup_x2)
 
 // ..., val3, val2, val1 -> ..., val2, val1, val3, val2, val1
-static int64_t dup2_x1_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t dup2_x1_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_stack_value val1 = *(sp - 1), val2 = *(sp - 2), val3 = *(sp - 3);
@@ -2363,7 +2356,7 @@ static int64_t dup2_x1_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(dup2_x1)
 
 // ..., val4, val3, val2, val1 -> ..., val2, val1, val4, val3, val2, val1
-static int64_t dup2_x2_impl_void(ARGS_VOID) {
+__attribute__((noinline, used)) static int64_t dup2_x2_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK
   bjvm_stack_value val1 = *(sp - 1), val2 = *(sp - 2), val3 = *(sp - 3), val4 = *(sp - 4);
@@ -2378,18 +2371,18 @@ static int64_t dup2_x2_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(dup2_x2)
 
-__attribute__((always_inline)) static int64_t entry(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
-__attribute__((always_inline)) static int64_t jmp_void(ARGS_VOID) { JMP_VOID }
+ static int64_t entry(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
+ static int64_t jmp_void(ARGS_VOID) { JMP_VOID }
 
 /** Misc. */
-static int64_t athrow_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t athrow_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos)
   thread->current_exception = (bjvm_obj_header *)tos;
   RETURN_ABRUPT
 }
 
-static int64_t checkcast_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t checkcast_impl_int(ARGS_INT) {
   DEBUG_CHECK
   bjvm_cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
@@ -2403,7 +2396,7 @@ static int64_t checkcast_impl_int(ARGS_INT) {
   JMP_INT(tos)
 }
 
-static int64_t checkcast_resolved_impl_int(ARGS_INT) {
+__attribute__((noinline, used)) static int64_t checkcast_resolved_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
   bjvm_obj_header *obj = (bjvm_obj_header *)tos;
@@ -2418,8 +2411,7 @@ static int64_t checkcast_resolved_impl_int(ARGS_INT) {
   NEXT_INT(tos)
 }
 
-static int64_t instanceof_impl_int(ARGS_INT) {
-
+__attribute__((noinline, used)) static int64_t instanceof_impl_int(ARGS_INT) {
   DEBUG_CHECK
   bjvm_cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
@@ -2433,18 +2425,65 @@ static int64_t instanceof_impl_int(ARGS_INT) {
   JMP_INT(tos)
 }
 
-static int64_t instanceof_resolved_impl_int(ARGS_INT) {
-
+__attribute__((noinline, used)) static int64_t instanceof_resolved_impl_int(ARGS_INT) {
   DEBUG_CHECK
   bjvm_obj_header *obj = (bjvm_obj_header *)tos;
   int result = obj ? bjvm_instanceof(obj->descriptor, insn->classdesc) : 0;
   NEXT_INT(result)
 }
 
-static int64_t dsqrt_impl_double(ARGS_DOUBLE) {
+__attribute__((noinline, used)) static int64_t dsqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK
   NEXT_DOUBLE(sqrt(tos))
 }
+
+static bool buf;
+
+#define always_false buf
+
+EMSCRIPTEN_KEEPALIVE
+void break_the_program() {
+  always_false = true;
+}
+
+#if !DO_TAILS
+__attribute__((noinline, used))
+int64_t interpreter_hell(bjvm_thread *thread, bjvm_stack_frame *frame_) {
+  int64_t int_tos = 0;
+  float float_tos = 0;
+  double double_tos = 0;
+  int pc_ = frame_->plain.program_counter;
+  bjvm_stack_value *sp_ = &frame_->plain.stack[stack_depth(frame_)];
+  bjvm_bytecode_insn *insns = frame_->method->code->code;
+  bjvm_bytecode_insn *current = insns + pc_;
+
+  switch (insns[pc_].tos_before) {
+  case TOS_INT:
+    int_tos = (sp_ - 1)->l;
+    break;
+  case TOS_FLOAT:
+    float_tos = (sp_ - 1)->f;
+    break;
+  case TOS_DOUBLE:
+    double_tos = (sp_ - 1)->d;
+    break;
+  default:
+    break;
+  }
+
+  int64_t int_tos_;
+  float float_tos_;
+  double double_tos_;
+
+  unsigned jump_to = current->kind * 4 + insns[pc_].tos_before;
+  bjvm_stack_value result;
+  while (true) {
+#include "interpreter2-computed-goto.inc"
+  }
+  done:;
+  return result.l;
+}
+#endif
 
 bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
   bjvm_stack_value result;
@@ -2539,30 +2578,14 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
 #if DO_TAILS
     result.l = entry(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
-    int64_t int_tos = 0, int_tos_;
-    float float_tos = 0, float_tos_;
-    double double_tos = 0, double_tos_;
-    bjvm_bytecode_insn *current = insns + pc_;
-
-    switch (insns[pc_].tos_before) {
-      case TOS_INT:
-        int_tos = (sp_ - 1)->l;
-        break;
-      case TOS_FLOAT:
-        float_tos = (sp_ - 1)->f;
-        break;
-      case TOS_DOUBLE:
-        double_tos = (sp_ - 1)->d;
-        break;
-      default:
-        break;
+    result.l = interpreter_hell(thread, frame_);
+    // Discourage inlining of interpreter_hell because wasm-opt
+    if (always_false) {
+      interpreter_hell(thread, frame_);
+      interpreter_hell(thread, frame_);
+      interpreter_hell(thread, frame_);
+      interpreter_hell(thread, frame_);
     }
-
-    unsigned jump_to = current->kind * 4 + insns[pc_].tos_before;
-    while (true) {
-#include "interpreter2-computed-goto.inc"
-    }
-    interp_done:;
 #endif
 
     // we really should just have all the methods return a future_t via a pointer, but whatever
