@@ -24,7 +24,7 @@ jobs:
 
       - name: Cache JDK
         id: cache_jdk
-        uses: actions/cache@v3
+        uses: actions/cache@v4.2.0
         with:
           path: ${{ github.workspace }}/test/jdk23
           key: jdk-23-${{ runner.os }}
@@ -44,7 +44,7 @@ jobs:
 
       - name: Cache ccache
         id: cache_ccache
-        uses: actions/cache@v3
+        uses: actions/cache@v4.2.0
         with:
           path: ~/.cache/ccache
           key: ccache-${{ runner.os }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
