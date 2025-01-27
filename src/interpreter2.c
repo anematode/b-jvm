@@ -908,14 +908,9 @@ static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
 /** Arithmetic operations */
 
-#define ALLOW_OVERFLOW __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base")))
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wattributes"
-
 // Binary operation on two integers (ints or longs)
 #define INTEGER_BIN_OP(which, eval)                                                                                    \
-  ALLOW_OVERFLOW static int64_t which##_impl_int(ARGS_INT) {                                                           \
+  static int64_t which##_impl_int(ARGS_INT) {                                                           \
     DEBUG_CHECK                                                                                                        \
     int64_t a = (sp - 2)->l, b = tos;                                                                                  \
     int64_t result = eval;                                                                                             \
@@ -945,7 +940,7 @@ INTEGER_BIN_OP(lushr, (int64_t)((uint64_t)a >> (b & 0x3f)))
 #undef INTEGER_BIN_OP
 
 #define INTEGER_UN_OP(which, eval, NEXT)                                                                               \
-  ALLOW_OVERFLOW static int64_t which##_impl_int(ARGS_INT) {                                                           \
+  static int64_t which##_impl_int(ARGS_INT) {                                                           \
     DEBUG_CHECK                                                                                                        \
     int64_t a = tos;                                                                                                   \
     NEXT(eval)                                                                                                         \
@@ -964,8 +959,6 @@ INTEGER_UN_OP(l2f, (float)a, NEXT_FLOAT)
 INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
 
 #undef INTEGER_UN_OP
-
-#pragma GCC diagnostic pop
 
 #define FLOAT_BIN_OP(which, eval, out_float, out_double, NEXT1, NEXT2)                                                 \
   static int64_t f##which##_impl_float(ARGS_FLOAT) {                                                                   \
