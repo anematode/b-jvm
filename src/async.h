@@ -59,15 +59,18 @@ template <typename T> struct pick_or_zero_sized {
   using type = std::conditional_t<(sizeof(T) > 1), T, int[0]>;
 };
 
-#define PUSH_EXTERN_C PUSH_PRAGMA("GCC diagnostic ignored \"-Wextern-c-compat\"");
-#define POP_EXTERN_C POP_PRAGMA
-
 template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T>::type;
 }
 
 #define FixTypeSize(name) pick_or_zero_sized_t<name>
 #else
 #define FixTypeSize(name) name
+#endif
+
+#ifdef __clang__
+#define PUSH_EXTERN_C PUSH_PRAGMA("GCC diagnostic ignored \"-Wextern-c-compat\"");
+#define POP_EXTERN_C POP_PRAGMA
+#else
 #define PUSH_EXTERN_C
 #define POP_EXTERN_C
 #endif
