@@ -9,9 +9,9 @@
 extern "C" {
 #endif
 
+#include "util.h"
 #include <assert.h>
 #include <stdint.h>
-#include "util.h"
 
 typedef enum { FUTURE_NOT_READY, FUTURE_READY } future_status;
 
@@ -31,11 +31,10 @@ typedef struct future {
 #define start_counter(counter_name, start_value) enum { counter_name = __COUNTER__ - (start_value) };
 #define get_counter_value(counter_name, target_name) enum { target_name = __COUNTER__ - (counter_name) - 1 };
 
-#define DEBRACKET(X) ESC(ISH X)
-#define ISH(...) ISH __VA_ARGS__
-#define ESC(...) ESC_(__VA_ARGS__)
-#define ESC_(...) VAN##__VA_ARGS__
-#define VANISH
+#define PUSH_PRAGMA(x)                                                                                                 \
+  _Pragma("GCC diagnostic push");                                                                                      \
+  _Pragma(x);
+#define POP_PRAGMA _Pragma("GCC diagnostic pop");
 
 /// Declares an async function.  Should be followed by a block containing any
 /// locals that the async function needs (accessibly via self->).
@@ -51,25 +50,62 @@ typedef struct future {
 #define arguments(...) __VA_ARGS__
 
 #define get_async_result(method_name) (self->invoked_async_methods.method_name._result)
+
+#ifdef __cplusplus
+// in c++, empty structs/unions have a size of 1 -- so if we detect this, replace with an int[0]
+extern "C++" {
+#include <type_traits>
+template <typename T> struct pick_or_zero_sized {
+  using type = std::conditional_t<(sizeof(T) > 1), T, int[0]>;
+};
+
+template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T>::type;
+}
+
+#define FixTypeSize(name) pick_or_zero_sized_t<name>
+#else
+#define FixTypeSize(name) name
+#endif
+
 /// Declares an async function that returns nothing.  Should be followed by a
 /// block containing any locals that the async function needs (accessibly via
 /// self->).
 #define DECLARE_ASYNC_VOID(name, locals, arguments, invoked_async_methods_)                                            \
   struct name##_s;                                                                                                     \
   typedef struct name##_s name##_t;                                                                                    \
+  PUSH_PRAGMA("GCC diagnostic ignored \"-Wextern-c-compat\""); /*if these types are empty,we deal with it later*/      \
   struct name##_args {                                                                                                 \
     arguments;                                                                                                         \
   };                                                                                                                   \
   union name##_invoked_async_methods {                                                                                 \
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
+  POP_PRAGMA;                                                                                                          \
   future_t name(name##_t *self);                                                                                       \
   struct name##_s {                                                                                                    \
-    struct name##_args args;                                                                                           \
+    FixTypeSize(struct name##_args) args;                                                                              \
     int _state;                                                                                                        \
     locals;                                                                                                            \
-    union name##_invoked_async_methods invoked_async_methods;                                                          \
+    FixTypeSize(union name##_invoked_async_methods) invoked_async_methods;                                             \
   };
+
+// deal with the fallout of FixTypeSize
+#ifdef __cplusplus
+extern "C++" {
+template <typename T> T ZeroInternalState_(T t) {
+  if constexpr (sizeof(t.args) == 0)
+    return (T){._state = t._state};
+  else
+    return (T){.args = t.args, ._state = t._state};
+}
+}
+
+#define DoArgsDecl(name) auto args = &self->args;
+#define ZeroInternalState(thing) thing = ZeroInternalState_(thing);
+#else
+#define DoArgsDecl(name) struct name##_args *args = &self->args;
+#define ZeroInternalState(thing) thing = (typeof(thing)){.args = (thing).args, ._state = (thing)._state};
+#endif
 
 /// Defines a async function, with a custom starting label idx
 /// for cases. Should be followed by a block containing the code of the async
@@ -78,17 +114,12 @@ typedef struct future {
 #define DEFINE_ASYNC_SL(name, start_idx)                                                                               \
   future_t name(name##_t *self) {                                                                                      \
     assert(self);                                                                                                      \
-    [[maybe_unused]] struct name##_args *args = &self->args;                                                           \
+    [[maybe_unused]] DoArgsDecl(name);                                                                                 \
     start_counter(label_counter, (start_idx) + 1);                                                                     \
     self->_state = (self->_state == 0) ? (start_idx) : self->_state;                                                   \
     switch (self->_state) {                                                                                            \
     case (start_idx):                                                                                                  \
-      *self = (typeof(*self)){.args = self->args, ._state = self->_state};
-
-#define PUSH_PRAGMA(x)                                                                                                 \
-  _Pragma("GCC diagnostic push");                                                                                      \
-  _Pragma(x);
-#define POP_PRAGMA _Pragma("GCC diagnostic pop");
+      ZeroInternalState(*self);
 
 /// Defines a value-returning async function. Should be followed by a block
 /// containing the code of the async function.  MUST end with ASYNC_END, or

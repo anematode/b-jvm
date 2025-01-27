@@ -271,6 +271,41 @@ DECLARE_ASYNC(int, resolve_getfield_putfield,
   arguments(bjvm_thread *thread; bjvm_bytecode_insn *inst; bjvm_plain_frame *frame; bjvm_stack_value *sp_;),
   invoked_methods(invoked_method(bjvm_initialize_class)));
 
+DECLARE_ASYNC(int, resolve_invokestatic,
+              locals(),
+              arguments(bjvm_thread *thread; bjvm_bytecode_insn *insn_),
+              invoked_method(resolve_methodref)
+);
+
+DECLARE_ASYNC(int, resolve_insn,
+              locals(),
+              arguments(bjvm_thread *thread; bjvm_bytecode_insn *inst; bjvm_plain_frame *frame; bjvm_stack_value *sp_;),
+              invoked_methods(
+                invoked_method(resolve_getstatic_putstatic)
+                invoked_method(resolve_getfield_putfield)
+                invoked_method(resolve_invokestatic)
+              )
+);
+
+DEFINE_ASYNC(resolve_insn) {
+  switch (args->inst->kind) {
+  case bjvm_insn_getstatic:
+  case bjvm_insn_putstatic:
+    AWAIT(resolve_getstatic_putstatic, args->thread, args->inst);
+    ASYNC_RETURN(get_async_result(resolve_getstatic_putstatic));
+  case bjvm_insn_getfield:
+  case bjvm_insn_putfield:
+    AWAIT(resolve_getfield_putfield, args->thread, args->inst, args->frame, args->sp_);
+    ASYNC_RETURN(get_async_result(resolve_getfield_putfield));
+  case bjvm_insn_invokestatic:
+    AWAIT(resolve_invokestatic, args->thread, args->inst);
+    ASYNC_RETURN(get_async_result(resolve_invokestatic));
+  default:
+    UNREACHABLE();
+  }
+  ASYNC_END_VOID();
+}
+
 /// In the interpreter, we don't use the DECLARE_ASYNC/DEFINE_ASYNC macros;  instead, we manually
 /// define the different positions an async continuation may return to.  When an async function yields,
 /// the top of the async stack contains (a) the state index and (b) a pointer to a malloc'd
@@ -279,10 +314,9 @@ start_counter(state_index, 1);
 typedef enum { STATE_DONE, STATE_FAILED, STATE_YIELD } async_task_status;
 
 typedef enum {
-  CONT_GETSTATIC,
-  CONT_PUTSTATIC,
+  CONT_RESOLVE,
   CONT_INVOKE,
-  CONT_INVOKESIGPOLY // tos must be reloaded
+  CONT_INVOKESIGPOLY, // tos must be reloaded
 } continuation_point;
 
 typedef struct {
@@ -290,8 +324,7 @@ typedef struct {
   continuation_point pnt;
 
   union {
-    resolve_getstatic_putstatic_t resolve_getstatic_putstatic;
-    resolve_getfield_putfield_t resolve_getfield_putfield;
+    resolve_insn_t resolve_insn;
     bjvm_invokevirtual_signature_polymorphic_t sigpoly;
     struct {
       bjvm_stack_frame *frame;
@@ -436,26 +469,29 @@ DEFINE_ASYNC_SL(resolve_getstatic_putstatic, 100) {
   ASYNC_END(0);
 }
 
+#define TryResolve(thread_, insn_, frame_, sp_)                                                                        \
+  do {                                                                                                                 \
+    resolve_insn_t ctx = {.args = {thread_, insn_, frame_, sp_}};                                                      \
+    future_t fut = resolve_insn(&ctx);                                                                                 \
+    if (unlikely(fut.status == FUTURE_NOT_READY)) {                                                                    \
+      continuation_frame *cont = async_stack_push(thread);                                                             \
+      frame->is_async_suspended = true;                                                                                \
+      *cont = (continuation_frame){.pnt = CONT_RESOLVE, .ctx.resolve_insn = ctx};                                      \
+      return 0;                                                                                                        \
+    }                                                                                                                  \
+  } while (0)
+
 static int64_t getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
-  resolve_getstatic_putstatic_t ctx = {};
-  ctx.args.thread = thread;
-  ctx.args.inst = insn;
   SPILL_VOID
-  future_t fut = resolve_getstatic_putstatic(&ctx);
 
-  if (unlikely(fut.status == FUTURE_NOT_READY)) {
-    continuation_frame *cont = async_stack_push(thread);
-    frame->is_async_suspended = true;
-    *cont = (continuation_frame){.pnt = CONT_GETSTATIC, .ctx.resolve_getstatic_putstatic = ctx};
-    return 0;
-  }
+  TryResolve(thread, insn, &frame->plain, sp);
 
   if (unlikely(thread->current_exception)) {
     return 0;
   }
-  assert(fut.status == FUTURE_READY); // for now
-  JMP_VOID                            // we rewrote this instruction to a resolved form, so jump to that implementation
+
+  JMP_VOID // we rewrote this instruction to a resolved form, so jump to that implementation
 }
 FORWARD_TO_NULLARY(getstatic)
 
@@ -463,15 +499,12 @@ FORWARD_TO_NULLARY(getstatic)
 // for different TOS types.
 static int64_t putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
-  resolve_getstatic_putstatic_t ctx = {};
-  ctx.args.thread = thread;
-  ctx.args.inst = insn;
   SPILL_VOID
-  future_t fut = resolve_getstatic_putstatic(&ctx);
+  TryResolve(thread, insn, &frame->plain, sp);
   if (thread->current_exception) {
     return 0;
   }
-  assert(fut.status == FUTURE_READY); // for now
+
   STACK_POLYMORPHIC_JMP(*(sp - 1));
 }
 FORWARD_TO_NULLARY(putstatic)
@@ -732,70 +765,70 @@ FORWARD_TO_NULLARY(putfield)
 static int64_t getfield_B_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int8_t *field = (int8_t *)((char *)tos + (int)insn->ic2);
+  int8_t *field = (int8_t *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
 static int64_t getfield_C_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  uint16_t *field = (uint16_t *)((char *)tos + (int)insn->ic2);
+  uint16_t *field = (uint16_t *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
 static int64_t getfield_S_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int16_t *field = (int16_t *)((char *)tos + (int)insn->ic2);
+  int16_t *field = (int16_t *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
 static int64_t getfield_I_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int *field = (int *)((char *)tos + (int)insn->ic2);
+  int *field = (int *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
 static int64_t getfield_J_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int64_t *field = (int64_t *)((char *)tos + (int)insn->ic2);
+  int64_t *field = (int64_t *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT(*field)
 }
 
 static int64_t getfield_F_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  float *field = (float *)((char *)tos + (int)insn->ic2);
+  float *field = (float *)((char *)tos + (size_t)insn->ic2);
   NEXT_FLOAT(*field)
 }
 
 static int64_t getfield_D_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  double *field = (double *)((char *)tos + (int)insn->ic2);
+  double *field = (double *)((char *)tos + (size_t)insn->ic2);
   NEXT_DOUBLE(*field)
 }
 
 static int64_t getfield_L_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  bjvm_obj_header **field = (bjvm_obj_header **)((char *)tos + (int)insn->ic2);
+  bjvm_obj_header **field = (bjvm_obj_header **)((char *)tos + (size_t)insn->ic2);
   NEXT_INT(*field)
 }
 
 static int64_t getfield_Z_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int8_t *field = (int8_t *)((char *)tos + (int)insn->ic2);
+  int8_t *field = (int8_t *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((int64_t)*field)
 }
 
 static int64_t putfield_B_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int8_t *field = (int8_t *)((char *)(*(sp - 2)).obj + (int)insn->ic2);
+  int8_t *field = (int8_t *)((char *)(*(sp - 2)).obj + (size_t)insn->ic2);
   *field = (int8_t)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -804,7 +837,7 @@ static int64_t putfield_B_impl_int(ARGS_INT) {
 static int64_t putfield_C_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  uint16_t *field = (uint16_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  uint16_t *field = (uint16_t *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = (uint16_t)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -813,7 +846,7 @@ static int64_t putfield_C_impl_int(ARGS_INT) {
 static int64_t putfield_S_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int16_t *field = (int16_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  int16_t *field = (int16_t *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = (int16_t)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -822,7 +855,7 @@ static int64_t putfield_S_impl_int(ARGS_INT) {
 static int64_t putfield_I_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int *field = (int *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  int *field = (int *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = (int)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -831,7 +864,7 @@ static int64_t putfield_I_impl_int(ARGS_INT) {
 static int64_t putfield_J_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int64_t *field = (int64_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  int64_t *field = (int64_t *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -840,7 +873,7 @@ static int64_t putfield_J_impl_int(ARGS_INT) {
 static int64_t putfield_L_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  bjvm_obj_header **field = (bjvm_obj_header **)((char *)(sp - 2)->obj + (int)insn->ic2);
+  bjvm_obj_header **field = (bjvm_obj_header **)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = (bjvm_obj_header *)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -849,7 +882,7 @@ static int64_t putfield_L_impl_int(ARGS_INT) {
 static int64_t putfield_Z_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int8_t *field = (int8_t *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  int8_t *field = (int8_t *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = (int8_t)tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -858,7 +891,7 @@ static int64_t putfield_Z_impl_int(ARGS_INT) {
 static int64_t putfield_F_impl_float(ARGS_FLOAT) {
 
   DEBUG_CHECK
-  float *field = (float *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  float *field = (float *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -867,7 +900,7 @@ static int64_t putfield_F_impl_float(ARGS_FLOAT) {
 static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
   DEBUG_CHECK
-  double *field = (double *)((char *)(sp - 2)->obj + (int)insn->ic2);
+  double *field = (double *)((char *)(sp - 2)->obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -875,8 +908,7 @@ static int64_t putfield_D_impl_double(ARGS_DOUBLE) {
 
 /** Arithmetic operations */
 
-#define ALLOW_OVERFLOW                                                                                                 \
-  __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base")))
+#define ALLOW_OVERFLOW __attribute__((no_sanitize("unsigned-integer-overflow"), no_sanitize("unsigned-shift-base")))
 
 // Binary operation on two integers (ints or longs)
 #define INTEGER_BIN_OP(which, eval)                                                                                    \
@@ -892,10 +924,10 @@ INTEGER_BIN_OP(iadd, (int32_t)((uint32_t)a + (uint32_t)b))
 INTEGER_BIN_OP(ladd, (int64_t)((uint64_t)a + (uint64_t)b))
 INTEGER_BIN_OP(isub, (int32_t)((uint32_t)a - (uint32_t)b))
 INTEGER_BIN_OP(lsub, (int64_t)((uint64_t)a - (uint64_t)b))
-INTEGER_BIN_OP(imul, (int32_t)((uint32_t)a * (uint32_t)b))
-INTEGER_BIN_OP(lmul, (int64_t)((uint64_t)a * (uint64_t)b))
-INTEGER_BIN_OP(iand, (int32_t)((uint32_t)a & (uint32_t)b))
-INTEGER_BIN_OP(land, (int64_t)((uint64_t)a & (uint64_t)b))
+INTEGER_BIN_OP(imul, (int32_t)((uint32_t)a *(uint32_t)b))
+INTEGER_BIN_OP(lmul, (int64_t)((uint64_t)a *(uint64_t)b))
+INTEGER_BIN_OP(iand, (int32_t)((uint32_t)a &(uint32_t)b))
+INTEGER_BIN_OP(land, (int64_t)((uint64_t)a &(uint64_t)b))
 INTEGER_BIN_OP(ior, (int32_t)((uint32_t)a | (uint32_t)b))
 INTEGER_BIN_OP(lor, (int64_t)((uint64_t)a | (uint64_t)b))
 INTEGER_BIN_OP(ixor, (int32_t)((uint32_t)a ^ (uint32_t)b))
@@ -1467,12 +1499,6 @@ static int intrinsify(bjvm_bytecode_insn *inst) {
   return 0;
 }
 
-DECLARE_ASYNC(int, resolve_invokestatic,
-              locals(),
-              arguments(bjvm_thread *thread; bjvm_bytecode_insn *insn_),
-              invoked_method(resolve_methodref)
-);
-
 DEFINE_ASYNC(resolve_invokestatic) {
   AWAIT(resolve_methodref, self->args.thread, &self->args.insn_->cp->methodref);
   if (self->args.thread->current_exception) {
@@ -1489,20 +1515,10 @@ DEFINE_ASYNC(resolve_invokestatic) {
 
 __attribute__((noinline)) static int64_t invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK
-  bjvm_cp_method_info *info = &insn->cp->methodref;
-
   SPILL_VOID
-  resolve_invokestatic_t ctx = {};
-  ctx.args.thread = thread;
-  ctx.args.insn_ = insn;
-  future_t fut = resolve_invokestatic(&ctx);
+  TryResolve(thread, insn, &frame->plain, sp);
   if (thread->current_exception)
     return 0;
-
-  info = &insn->cp->methodref;
-  insn->kind = bjvm_insn_invokestatic_resolved;
-  insn->ic = info->resolved;
-  insn->args = info->descriptor->args_count;
 
   if (intrinsify(insn)) {
     STACK_POLYMORPHIC_JMP(*(sp - 1));
@@ -1842,7 +1858,7 @@ static int64_t invokeitable_polymorphic_impl_void(ARGS_VOID) {
     bjvm_null_pointer_exception(thread);
     return 0;
   }
-  bjvm_cp_method *target_method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
+  bjvm_cp_method *target_method = bjvm_itable_lookup(target->descriptor, insn->ic, (size_t)insn->ic2);
   if (unlikely(!target_method)) {
     bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
     return 0;
@@ -1875,7 +1891,7 @@ static int64_t invokevtable_polymorphic_impl_void(ARGS_VOID) {
     bjvm_null_pointer_exception(thread);
     return 0;
   }
-  bjvm_cp_method *target_method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
+  bjvm_cp_method *target_method = bjvm_vtable_lookup(target->descriptor, (size_t)insn->ic2);
   assert(target_method);
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
@@ -2435,11 +2451,16 @@ static int64_t async_resume(ARGS_VOID) {
 
   bool has_result = false;
   bool advance_pc = false;
+  bool needs_polymorphic_jump = false;
 
   switch (cont.pnt) {
-  case CONT_GETSTATIC:
-  case CONT_PUTSTATIC:
-    fut = resolve_getstatic_putstatic(&cont.ctx.resolve_getstatic_putstatic);
+  case CONT_RESOLVE:
+    fut = resolve_insn(&cont.ctx.resolve_insn);
+
+    bjvm_bytecode_insn *in = cont.ctx.resolve_insn.args.inst;
+    if (in->kind == bjvm_insn_invokestatic && fut.status == FUTURE_READY) {
+      needs_polymorphic_jump = intrinsify(in);
+    }
     break;
 
   case CONT_INVOKE:
@@ -2476,6 +2497,8 @@ static int64_t async_resume(ARGS_VOID) {
 
   if (advance_pc) {
     STACK_POLYMORPHIC_NEXT(*(sp - 1));
+  } else if (needs_polymorphic_jump) {
+    STACK_POLYMORPHIC_JMP(*(sp - 1));
   } else {
     JMP_VOID;
   }

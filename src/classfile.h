@@ -740,7 +740,7 @@ typedef struct bjvm_cp_field {
   int attributes_count;
   bjvm_attribute *attributes;
   // Offset of the field in the static or instance data area
-  int byte_offset;
+  size_t byte_offset;
 
   bjvm_field_descriptor parsed_descriptor;
   struct bjvm_native_Field *reflection_field;
