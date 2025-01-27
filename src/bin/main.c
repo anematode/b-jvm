@@ -2,7 +2,10 @@
 // Created by Cowpox on 12/10/24.
 //
 
+#ifdef EMSCRIPTEN
 #include <emscripten/emscripten.h>
+#endif
+
 #include "../bjvm.h"
 
 EMSCRIPTEN_KEEPALIVE

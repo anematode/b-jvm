@@ -322,6 +322,8 @@ static void dumb_lower_dconst(bjvm_bytecode_insn *insn) {
   local_set(stack_double(0));
 }
 
+static void dumb_lower_
+
 // Push a "compiled frame" of the appropriate size, returning on StackOverflow.
 static void dumb_lower_push_frame(dumb_jit_ctx *ctx) {
 

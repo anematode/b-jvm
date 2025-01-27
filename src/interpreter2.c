@@ -2156,20 +2156,7 @@ static int64_t ldc_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(ldc)
 
 static int64_t ldc2_w_impl_void(ARGS_VOID) {
-
-  DEBUG_CHECK
-  sp++;
-  bjvm_cp_entry *ent = insn->cp;
-  switch (ent->kind) {
-  case BJVM_CP_KIND_DOUBLE: {
-    NEXT_DOUBLE(ent->floating.value);
-  }
-  case BJVM_CP_KIND_LONG: {
-    NEXT_INT(ent->integral.value);
-  }
-  default:
-    UNREACHABLE();
-  }
+  UNREACHABLE();  // should have been converted to double or long
 }
 FORWARD_TO_NULLARY(ldc2_w)
 
