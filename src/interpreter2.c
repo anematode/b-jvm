@@ -960,6 +960,7 @@ INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
 
 #undef INTEGER_UN_OP
 
+
 #define FLOAT_BIN_OP(which, eval, out_float, out_double, NEXT1, NEXT2)                                                 \
   static int64_t f##which##_impl_float(ARGS_FLOAT) {                                                                   \
     DEBUG_CHECK                                                                                                        \
