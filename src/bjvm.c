@@ -79,7 +79,6 @@ uint16_t stack_depth(const bjvm_stack_frame *frame) {
 
 bool bjvm_is_frame_native(const bjvm_stack_frame *frame) { return frame->is_native != 0; }
 
-__attribute__((always_inline))
 bjvm_stack_value *frame_locals(const bjvm_stack_frame *frame) {
   assert(!bjvm_is_frame_native(frame));
   return ((bjvm_stack_value *) frame) - frame->num_locals;

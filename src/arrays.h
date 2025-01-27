@@ -19,7 +19,7 @@ static int constexpr kArrayLengthOffset = sizeof(bjvm_obj_header);
 /// pointer Not sure if it's worth the memory savings to align to the size of
 /// the element
 static int constexpr kArrayDataOffset =
-    ALIGN_UP(sizeof(bjvm_obj_header) + sizeof(int), alignof(bjvm_obj_header *));
+    ALIGN_UP(sizeof(bjvm_obj_header) + sizeof(int), alignof(int64_t));
 
 static int constexpr kArrayHeaderSize =
     kArrayDataOffset - sizeof(bjvm_obj_header);

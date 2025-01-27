@@ -194,7 +194,7 @@ typedef enum : uint8_t {
   bjvm_insn_ret,
 
   /** Instruction failed with a LinkageError */
-  // bjvm_insn_linkage_error,
+  /* bjvm_insn_linkage_error, */
 
   /** Resolved versions of misc instructions */
   bjvm_insn_anewarray_resolved,
@@ -257,7 +257,9 @@ typedef enum : uint8_t {
   bjvm_insn_putstatic_L,
 
   /** intrinsics */
-  bjvm_insn_dsqrt
+  bjvm_insn_dsqrt,
+
+
 } bjvm_insn_code_kind;
 
 typedef enum : uint8_t {

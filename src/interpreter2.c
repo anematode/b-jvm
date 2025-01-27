@@ -30,10 +30,12 @@
   assert(stack_depth(frame) == sp - frame->plain.stack);
 #endif
 
+#define MAX_INSN_KIND (bjvm_insn_dsqrt + 1)
+
 // If true, use a sequence of tail calls rather than computed goto and an aggressively inlined function. We try to make
 // the code reasonably generic to handle both cases efficiently.
 #ifdef EMSCRIPTEN
-#define DO_TAILS 1
+#define DO_TAILS 0
 #else
 #define DO_TAILS 1
 #endif
@@ -42,6 +44,8 @@
 #define sp sp_
 #define pc pc_
 #define tos tos_
+
+#define RETURN_ABRUPT return 0;
 
 #define ARGS_VOID                                                                                                      \
   bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn *insns, int pc_, bjvm_stack_value *sp_,             \
@@ -64,6 +68,9 @@
 #define pc (*pc_)
 #define tos (*tos_)
 
+#define ESCAPE (4 * MAX_INSN_KIND)
+#define RETURN_ABRUPT return ESCAPE;
+
 #define ARGS_VOID                                                                                                      \
 bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn **insns, int *pc_, bjvm_stack_value **sp_,             \
 [[maybe_unused]] int64_t *arg_1, [[maybe_unused]] float *arg_2, [[maybe_unused]] double *arg_3
@@ -84,7 +91,6 @@ bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_bytecode_insn **insns, int *p
 // Indicates that the following return must be a tail call. Supported by modern clang and GCC (but GCC support seems
 // somewhat buggy...)
 #define MUSTTAIL [[clang::musttail]]
-#define MAX_INSN_KIND (bjvm_insn_dsqrt + 1)
 
 // Forward declarations
 bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame);
@@ -138,33 +144,38 @@ float *arg_2;
 double *arg_3;  // unused
 bool *tos_;
 
+static unsigned get_jmp_target(bjvm_bytecode_insn *inst, bjvm_reduced_tos_kind t) {
+  int result = inst->kind * 4 + t;
+  return result;
+}
+
 #define JMP_INT(tos) _Generic(*tos_, \
-  int64_t: ({ *tos_ = (int64_t)(tos); return 0; }), \
-  default: ({ *arg_1 = (int64_t)(tos); return 0; }) \
+  int64_t: ({ *tos_ = (int64_t)(tos); return get_jmp_target(insn, TOS_INT); }), \
+  default: ({ *arg_1 = (int64_t)(tos); return get_jmp_target(insn, TOS_INT); }) \
 );
 #define JMP_FLOAT(tos) _Generic(*tos_, \
-double: ({ *tos_ = (float)(tos); return 0; }),\
-default: ({ *arg_2 = (float)(tos); return 0; })\
+float: ({ *tos_ = (float)(tos); return get_jmp_target(insn, TOS_FLOAT); }),\
+default: ({ *arg_2 = (float)(tos); return get_jmp_target(insn, TOS_FLOAT); })\
 );
 #define JMP_DOUBLE(tos) _Generic(*tos_, \
-double: ({ *tos_ = (double)(tos); return 0; }), \
-default: ({ *arg_3 = (double)(tos); return 0; })\
+double: ({ *tos_ = (double)(tos); return get_jmp_target(insn, TOS_DOUBLE); }), \
+default: ({ *arg_3 = (double)(tos); return get_jmp_target(insn, TOS_DOUBLE); })\
 );
-#define JMP_VOID return 0;
+#define JMP_VOID return get_jmp_target(insn, TOS_VOID);
 
-#define NEXT_INT(tos) { insns += 1; pc += 1; _Generic(*tos_, \
-int64_t: ({ *tos_ = (int64_t)(tos); return 0; }), \
-default: ({ *arg_1 = (int64_t)(tos); return 0; }) \
+#define NEXT_INT(tos) { typeof(tos) evaled = tos; insn += 1; pc += 1; _Generic(*tos_, \
+int64_t: ({ *tos_ = (int64_t)(evaled); return get_jmp_target(insn, TOS_INT); }), \
+default: ({ *arg_1 = (int64_t)(evaled); return get_jmp_target(insn, TOS_INT); }) \
 ); }
-#define NEXT_FLOAT(tos) { insns += 1; pc += 1; _Generic(*tos_, \
-double: ({ *tos_ = (float)(tos); return 0; }), \
-default: ({ *arg_2 = (float)(tos); return 0; }) \
+#define NEXT_FLOAT(tos) { typeof(tos) evaled = tos; insn += 1; pc += 1; _Generic(*tos_, \
+float: ({ *tos_ = (float)(evaled); return get_jmp_target(insn, TOS_FLOAT); }), \
+default: ({ *arg_2 = (float)(evaled); return get_jmp_target(insn, TOS_FLOAT); }) \
 ); }
-#define NEXT_DOUBLE(tos) { insns += 1; pc += 1; _Generic(*tos_, \
-double: ({ *tos_ = (double)(tos); return 0; }), \
-default: ({ *arg_3 = (double)(tos); return 0; }) \
+#define NEXT_DOUBLE(tos) { typeof(tos) evaled = tos; insn += 1; pc += 1; _Generic(*tos_, \
+double: ({ *tos_ = (double)(evaled); return get_jmp_target(insn, TOS_DOUBLE); }), \
+default: ({ *arg_3 = (double)(evaled); return get_jmp_target(insn, TOS_DOUBLE); }) \
 ); }
-#define NEXT_VOID { insns += 1; pc += 1; return 0; }
+#define NEXT_VOID { insn += 1; pc += 1; return get_jmp_target(insn, TOS_VOID); }
 
 #endif
 
@@ -484,11 +495,11 @@ static int64_t getstatic_impl_void(ARGS_VOID) {
     continuation_frame *cont = async_stack_push(thread);
     frame->is_async_suspended = true;
     *cont = (continuation_frame){.pnt = CONT_GETSTATIC, .ctx.resolve_getstatic_putstatic = ctx};
-    return 0;
+    RETURN_ABRUPT
   }
 
   if (unlikely(thread->current_exception)) {
-    return 0;
+    RETURN_ABRUPT
   }
   assert(fut.status == FUTURE_READY); // for now
   JMP_VOID                            // we rewrote this instruction to a resolved form, so jump to that implementation
@@ -505,10 +516,10 @@ static int64_t putstatic_impl_void(ARGS_VOID) {
   SPILL_VOID
   future_t fut = resolve_getstatic_putstatic(&ctx);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
   assert(fut.status == FUTURE_READY); // for now
-  JMP_VOID
+  STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
 FORWARD_TO_NULLARY(putstatic)
 
@@ -740,7 +751,7 @@ static int64_t getfield_impl_int(ARGS_INT) {
   ctx.args.sp_ = sp;
   future_t fut = resolve_getfield_putfield(&ctx);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
   RELOAD(tos)
   assert(fut.status == FUTURE_READY); // for now
@@ -758,7 +769,7 @@ static int64_t putfield_impl_void(ARGS_VOID) {
   SPILL_VOID
   future_t fut = resolve_getfield_putfield(&ctx);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
   assert(fut.status == FUTURE_READY); // for now
   STACK_POLYMORPHIC_JMP(*(sp - 1))
@@ -962,8 +973,8 @@ INTEGER_UN_OP(i2l, (int64_t)a, NEXT_INT)
 INTEGER_UN_OP(i2s, (int64_t)(int16_t)a, NEXT_INT)
 INTEGER_UN_OP(i2b, (int64_t)(int8_t)a, NEXT_INT)
 INTEGER_UN_OP(i2c, (int64_t)(uint16_t)a, NEXT_INT)
-INTEGER_UN_OP(i2f, (float)a, NEXT_FLOAT)
-INTEGER_UN_OP(i2d, (double)a, NEXT_DOUBLE)
+INTEGER_UN_OP(i2f, (float)(int)a, NEXT_FLOAT)
+INTEGER_UN_OP(i2d, (double)(int)a, NEXT_DOUBLE)
 INTEGER_UN_OP(l2i, (int)a, NEXT_INT)
 INTEGER_UN_OP(l2f, (float)a, NEXT_FLOAT)
 INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
@@ -1024,7 +1035,7 @@ static int64_t idiv_impl_int(ARGS_INT) {
   if (unlikely(b == 0)) {
     SPILL(tos);
     bjvm_arithmetic_exception(thread, STR("/ by zero"));
-    return 0;
+    RETURN_ABRUPT
   }
   sp--;
   NEXT_INT(java_idiv_(a, b));
@@ -1037,7 +1048,7 @@ static int64_t ldiv_impl_int(ARGS_INT) {
   if (unlikely(b == 0)) {
     SPILL(tos);
     bjvm_arithmetic_exception(thread, STR("/ by zero"));
-    return 0;
+    RETURN_ABRUPT
   }
   sp--;
   NEXT_INT(java_ldiv_(a, b));
@@ -1058,7 +1069,7 @@ static int64_t irem_impl_int(ARGS_INT) {
   if (unlikely(b == 0)) {
     SPILL(tos);
     bjvm_arithmetic_exception(thread, STR("/ by zero"));
-    return 0;
+    RETURN_ABRUPT
   }
   sp--;
   NEXT_INT(java_irem_(a, b));
@@ -1071,7 +1082,7 @@ static int64_t lrem_impl_int(ARGS_INT) {
   if (unlikely(b == 0)) {
     SPILL(tos);
     bjvm_arithmetic_exception(thread, STR("/ by zero"));
-    return 0;
+    RETURN_ABRUPT
   }
   sp--;
   NEXT_INT(java_lrem_(a, b));
@@ -1085,7 +1096,7 @@ static int64_t arraylength_impl_int(ARGS_INT) {
   if (unlikely(!array)) {
     SPILL(tos);
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   NEXT_INT(*ArrayLength(array))
 }
@@ -1098,13 +1109,13 @@ static int64_t arraylength_impl_int(ARGS_INT) {
     if (unlikely(!array)) {                                                                                            \
       SPILL(tos);                                                                                                      \
       bjvm_null_pointer_exception(thread);                                                                             \
-      return 0;                                                                                                        \
+      RETURN_ABRUPT                                                                                                        \
     }                                                                                                                  \
     int length = *ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL(tos);                                                                                                      \
       bjvm_array_index_oob_exception(thread, index, length);                                                           \
-      return 0;                                                                                                        \
+      RETURN_ABRUPT                                                                                                        \
     }                                                                                                                  \
     sp--;                                                                                                              \
     type cow = load(array, index);                                                                                     \
@@ -1128,13 +1139,13 @@ ARRAY_LOAD(caload, CharArrayLoad, int64_t, NEXT_INT)
     if (unlikely(!array)) {                                                                                            \
       SPILL(tos);                                                                                                      \
       bjvm_null_pointer_exception(thread);                                                                             \
-      return 0;                                                                                                        \
+      RETURN_ABRUPT                                                                                                        \
     }                                                                                                                  \
     int length = *ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL(tos);                                                                                                      \
       bjvm_array_index_oob_exception(thread, index, length);                                                           \
-      return 0;                                                                                                        \
+      RETURN_ABRUPT                                                                                                        \
     }                                                                                                                  \
     store(array, index, (tt3)tos);                                                                                     \
     sp -= 3;                                                                                                           \
@@ -1160,19 +1171,19 @@ static int64_t aastore_impl_int(ARGS_INT) {
   if (unlikely(!array)) {
     SPILL(tos);
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   int length = *ArrayLength(array);
   if (unlikely(index < 0 || index >= length)) {
     SPILL(tos);
     bjvm_array_index_oob_exception(thread, index, length);
-    return 0;
+    RETURN_ABRUPT
   }
   // Instanceof check against the component type
   if (value && !bjvm_instanceof(value->descriptor, array->descriptor->one_fewer_dim)) {
     SPILL(tos);
     bjvm_array_store_exception(thread, hslc(value->descriptor->name));
-    return 0;
+    RETURN_ABRUPT
   }
   ReferenceArrayStore(array, index, value);
   sp -= 3;
@@ -1226,7 +1237,7 @@ static int64_t goto_impl_void(ARGS_VOID) {
   DEBUG_CHECK
   int delta = insn->index - pc;
   pc = insn->index;
-  insns += delta;
+  insn += delta;
   JMP_VOID
 }
 
@@ -1235,7 +1246,7 @@ static int64_t goto_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK
   int delta = insn->index - pc;
   pc = insn->index;
-  insns += delta;
+  insn += delta;
   JMP_DOUBLE(tos)
 }
 
@@ -1244,7 +1255,7 @@ static int64_t goto_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK
   int delta = insn->index - pc;
   pc = insn->index;
-  insns += delta;
+  insn += delta;
   JMP_FLOAT(tos)
 }
 
@@ -1253,7 +1264,7 @@ static int64_t goto_impl_int(ARGS_INT) {
   DEBUG_CHECK
   int delta = insn->index - pc;
   pc = insn->index;
-  insns += delta;
+  insn += delta;
   JMP_INT(tos)
 }
 
@@ -1267,11 +1278,11 @@ static int64_t tableswitch_impl_int(ARGS_INT) {
   if (index < low || index > high) {
     int delta = (insn->tableswitch->default_target - 1) - pc;
     pc = insn->tableswitch->default_target - 1;
-    insns += delta;
+    insn += delta;
   } else {
     int delta = (offsets[index - low] - 1) - pc;
     pc = offsets[index - low] - 1;
-    insns += delta;
+    insn += delta;
   }
   sp--;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -1293,14 +1304,14 @@ static int64_t lookupswitch_impl_int(ARGS_INT) {
     if (keys[i] == key) {
       int delta = (offsets[i] - 1) - pc;
       pc = offsets[i] - 1;
-      insns += delta;
+      insn += delta;
       sp--;
       STACK_POLYMORPHIC_NEXT(*(sp - 1));
     }
   }
   int delta = (default_target - 1) - pc;
   pc = default_target - 1;
-  insns += delta;
+  insn += delta;
   sp--;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
 }
@@ -1310,7 +1321,7 @@ static int64_t lookupswitch_impl_int(ARGS_INT) {
     DEBUG_CHECK                                                                                                        \
     int old_pc = pc;                                                                                                   \
     pc = (int)tos op 0 ? (insn->index - 1) : pc;                                                                       \
-    insns += pc - old_pc;                                                                                              \
+    insn += pc - old_pc;                                                                                              \
     sp--;                                                                                                              \
     STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                 \
   }
@@ -1330,7 +1341,7 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     int64_t a = (sp - 2)->i, b = (int)tos;                                                                             \
     int old_pc = pc;                                                                                                   \
     pc = a op b ? (insn->index - 1) : pc;                                                                              \
-    insns += pc - old_pc;                                                                                              \
+    insn += pc - old_pc;                                                                                              \
     sp -= 2;                                                                                                           \
     STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                 \
   }
@@ -1347,7 +1358,7 @@ static int64_t if_acmpeq_impl_int(ARGS_INT) {
   uintptr_t a = (sp - 2)->l, b = tos;
   int old_pc = pc;
   pc = a == b ? (insn->index - 1) : pc;
-  insns += pc - old_pc;
+  insn += pc - old_pc;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1))
 }
@@ -1357,7 +1368,7 @@ static int64_t if_acmpne_impl_int(ARGS_INT) {
   uintptr_t a = (sp - 2)->l, b = tos;
   int old_pc = pc;
   pc = a != b ? (insn->index - 1) : pc;
-  insns += pc - old_pc;
+  insn += pc - old_pc;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1))
 }
@@ -1371,7 +1382,7 @@ static int64_t monitorenter_impl_int(ARGS_INT) {
   if (unlikely(!tos)) {
     SPILL(tos);
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   sp--;
@@ -1384,7 +1395,7 @@ static int64_t monitorexit_impl_int(ARGS_INT) {
   if (unlikely(!tos)) {
     SPILL(tos);
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   sp--;
@@ -1401,7 +1412,7 @@ static int64_t new_impl_void(ARGS_VOID) {
   bjvm_cp_class_info *info = &insn->cp->class_info;
   int error = bjvm_resolve_class(thread, info);
   if (error)
-    return 0;
+    RETURN_ABRUPT
 
   if (insn->cp->class_info.classdesc->state < BJVM_CD_STATE_INITIALIZED) {
     bjvm_initialize_class_t init = {0};
@@ -1410,7 +1421,7 @@ static int64_t new_impl_void(ARGS_VOID) {
     future_t fut = bjvm_initialize_class(&init);
     assert(fut.status == FUTURE_READY); // for now
     if (thread->current_exception)
-      return 0;
+      RETURN_ABRUPT
   }
 
   insn->kind = bjvm_insn_new_resolved;
@@ -1426,7 +1437,7 @@ static int64_t new_resolved_impl_void(ARGS_VOID) {
   SPILL_VOID
   bjvm_obj_header *obj = new_object(thread, insn->classdesc);
   if (!obj)
-    return 0;
+    RETURN_ABRUPT
 
   sp++;
   NEXT_INT(obj)
@@ -1439,11 +1450,11 @@ static int64_t newarray_impl_int(ARGS_INT) {
   SPILL(tos)
   if (unlikely(count < 0)) {
     bjvm_negative_array_size_exception(thread, count);
-    return 0;
+    RETURN_ABRUPT
   }
   bjvm_obj_header *array = CreatePrimitiveArray1D(thread, insn->array_type, count);
   if (unlikely(!array)) {
-    return 0; // oom
+    RETURN_ABRUPT // oom
   }
   NEXT_INT(array)
 }
@@ -1454,11 +1465,11 @@ static int64_t anewarray_impl_int(ARGS_INT) {
   bjvm_cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
   if (bjvm_resolve_class(thread, info)) {
-    return 0;
+    RETURN_ABRUPT
   }
   assert(info->classdesc);
   if (bjvm_link_class(thread, info->classdesc)) {
-    return 0;
+    RETURN_ABRUPT
   }
   insn->classdesc = info->classdesc;
   insn->kind = bjvm_insn_anewarray_resolved;
@@ -1473,13 +1484,13 @@ static int64_t anewarray_resolved_impl_int(ARGS_INT) {
   SPILL(tos)
   if (count < 0) {
     bjvm_negative_array_size_exception(thread, count);
-    return 0;
+    RETURN_ABRUPT
   }
   bjvm_obj_header *array = CreateObjectArray1D(thread, insn->classdesc, count);
   if (array) {
     NEXT_INT(array)
   }
-  return 0; // oom
+  RETURN_ABRUPT // oom
 }
 
 static int64_t multianewarray_impl_int(ARGS_INT) {
@@ -1487,7 +1498,7 @@ static int64_t multianewarray_impl_int(ARGS_INT) {
   SPILL(tos)
   uint16_t temp_sp = sp - frame_stack(frame);
   if (bjvm_multianewarray(thread, &frame->plain, insn->multianewarray, &temp_sp))
-    return 0;
+    RETURN_ABRUPT
 
   sp = frame_stack(frame) + temp_sp;
   NEXT_INT(frame_stack(frame)[temp_sp - 1].obj)
@@ -1536,7 +1547,7 @@ __attribute__((noinline)) static int64_t invokestatic_impl_void(ARGS_VOID) {
   ctx.args.insn_ = insn;
   future_t fut = resolve_invokestatic(&ctx);
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
 
   info = &insn->cp->methodref;
@@ -1575,7 +1586,7 @@ static inline uint8_t __attempt_invoke(bjvm_thread *thread, bjvm_stack_frame *in
   ({                                                                                                                   \
     bjvm_stack_value result;                                                                                           \
     if (unlikely(__attempt_invoke(thread, invoked_frame, frame, argc, returns, &result))) {                            \
-      return 0;                                                                                                        \
+      RETURN_ABRUPT                                                                                                        \
     }                                                                                                                  \
     result;                                                                                                            \
   })
@@ -1592,13 +1603,13 @@ __attribute__((always_inline)) static int64_t invokestatic_resolved_impl_void(AR
     invoked_frame = bjvm_push_frame(thread, method, sp - insn->args, insn->args);
   }
   if (unlikely(!invoked_frame)) {
-    return 0;
+    RETURN_ABRUPT
   }
 
   bjvm_stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
 
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
 
   if (returns) {
@@ -1620,7 +1631,7 @@ __attribute__((noinline)) static int64_t invokevirtual_impl_void(ARGS_VOID) {
   SPILL_VOID
   if (!target) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   resolve_methodref_t ctx = {0};
@@ -1629,7 +1640,7 @@ __attribute__((noinline)) static int64_t invokevirtual_impl_void(ARGS_VOID) {
   future_t fut = resolve_methodref(&ctx);
   assert(fut.status == FUTURE_READY);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
   method_info = &insn->cp->methodref;
 
@@ -1670,7 +1681,7 @@ __attribute__((noinline)) static int64_t invokespecial_impl_void(ARGS_VOID) {
   SPILL_VOID
   if (!target) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   resolve_methodref_t ctx = {0};
@@ -1679,7 +1690,7 @@ __attribute__((noinline)) static int64_t invokespecial_impl_void(ARGS_VOID) {
   future_t fut = resolve_methodref(&ctx);
   assert(fut.status == FUTURE_READY);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
 
   method_info = &insn->cp->methodref;
@@ -1708,11 +1719,11 @@ __attribute__((noinline)) static int64_t invokespecial_impl_void(ARGS_VOID) {
     }
     if (!candidate) {
       bjvm_abstract_method_error(thread, method_info->resolved);
-      return 0;
+      RETURN_ABRUPT
     }
   } else if (candidate->access_flags & BJVM_ACCESS_ABSTRACT) {
     bjvm_abstract_method_error(thread, candidate);
-    return 0;
+    RETURN_ABRUPT
   }
 
   // If this is the <init> method of Object, make it a nop
@@ -1734,23 +1745,23 @@ __attribute__((always_inline)) static int64_t invokespecial_resolved_impl_void(A
   SPILL_VOID
   if (target == nullptr) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   bjvm_cp_method *target_method = insn->ic;
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
-    return 0;
+    RETURN_ABRUPT
 
   bjvm_stack_value result = ({
     bjvm_stack_value result;
     if (unlikely(__attempt_invoke(thread, invoked_frame, frame, insn->args, returns, &result))) {
-      return 0;
+      RETURN_ABRUPT
     }
     result;
   });
 
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   if (returns) {
     *(sp - insn->args) = result;
@@ -1771,7 +1782,7 @@ __attribute__((noinline)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
   SPILL_VOID
   if (!target) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   resolve_methodref_t ctx = {0};
@@ -1780,7 +1791,7 @@ __attribute__((noinline)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
   future_t fut = resolve_methodref(&ctx);
   assert(fut.status == FUTURE_READY);
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   method_info = &insn->cp->methodref;
   if (!(method_info->resolved->my_class->access_flags & BJVM_ACCESS_INTERFACE)) {
@@ -1792,7 +1803,7 @@ __attribute__((noinline)) static int64_t invokeinterface_impl_void(ARGS_VOID) {
   insn->ic2 = target->descriptor;
   if (!insn->ic) {
     bjvm_abstract_method_error(thread, method_info->resolved);
-    return 0;
+    RETURN_ABRUPT
   }
   insn->kind = bjvm_insn_invokeitable_monomorphic;
   JMP_VOID
@@ -1821,7 +1832,7 @@ __attribute__((always_inline)) static int64_t invokeitable_vtable_monomorphic_im
   SPILL_VOID
   if (target == nullptr) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   if (unlikely(target->descriptor != insn->ic2)) {
     if (insn->kind == bjvm_insn_invokevtable_monomorphic)
@@ -1832,12 +1843,12 @@ __attribute__((always_inline)) static int64_t invokeitable_vtable_monomorphic_im
   }
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, insn->ic, sp - insn->args, insn->args);
   if (!invoked_frame)
-    return 0;
+    RETURN_ABRUPT
 
   bjvm_stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
 
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   if (returns) {
     *(sp - insn->args) = result;
@@ -1855,7 +1866,7 @@ __attribute__((always_inline)) static int64_t invokesigpoly_impl_void(ARGS_VOID)
   SPILL_VOID
   if (target == nullptr) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
 
   bjvm_invokevirtual_signature_polymorphic_t ctx = {
@@ -1867,11 +1878,11 @@ __attribute__((always_inline)) static int64_t invokesigpoly_impl_void(ARGS_VOID)
     continuation_frame *cont = async_stack_push(thread);
     frame->is_async_suspended = true;
     *cont = (continuation_frame){.pnt = CONT_INVOKESIGPOLY, .ctx.sigpoly = ctx};
-    return 0;
+    RETURN_ABRUPT
   }
 
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   sp -= insn->args;
   sp += returns;
@@ -1886,22 +1897,22 @@ static int64_t invokeitable_polymorphic_impl_void(ARGS_VOID) {
   SPILL_VOID
   if (target == nullptr) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   bjvm_cp_method *target_method = bjvm_itable_lookup(target->descriptor, insn->ic, (int)insn->ic2);
   if (unlikely(!target_method)) {
     bjvm_abstract_method_error(thread, insn->cp->methodref.resolved);
-    return 0;
+    RETURN_ABRUPT
   }
   assert(target_method);
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
-    return 0;
+    RETURN_ABRUPT
 
   bjvm_stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
 
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   if (returns) {
     *(sp - insn->args) = result;
@@ -1919,18 +1930,18 @@ static int64_t invokevtable_polymorphic_impl_void(ARGS_VOID) {
   SPILL_VOID
   if (target == nullptr) {
     bjvm_null_pointer_exception(thread);
-    return 0;
+    RETURN_ABRUPT
   }
   bjvm_cp_method *target_method = bjvm_vtable_lookup(target->descriptor, (int)insn->ic2);
   assert(target_method);
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
-    return 0;
+    RETURN_ABRUPT
 
   bjvm_stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
 
   if (thread->current_exception)
-    return 0;
+    RETURN_ABRUPT
 
   if (returns) {
     *(sp - insn->args) = result;
@@ -1952,7 +1963,7 @@ __attribute__((noinline)) static int64_t invokedynamic_impl_void(ARGS_VOID) {
   ctx.args.indy = indy;
   future_t fut = indy_resolve(&ctx);
   if (thread->current_exception) {
-    return 0;
+    RETURN_ABRUPT
   }
 
   assert(insn->ic);
@@ -1995,7 +2006,7 @@ static int64_t invokecallsite_impl_void(ARGS_VOID) {
 
     bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, invoke, arguments, insn->args);
     if (!invoked_frame) {
-      return 0;
+      RETURN_ABRUPT
     }
 
     bjvm_stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
@@ -2008,7 +2019,7 @@ static int64_t invokecallsite_impl_void(ARGS_VOID) {
     sp += returns;
 
     if (thread->current_exception) {
-      return 0;
+      RETURN_ABRUPT
     }
   } else {
     UNREACHABLE();
@@ -2154,9 +2165,9 @@ static int64_t ldc_impl_void(ARGS_VOID) {
     // Initialize the class, then get its Java mirror
     SPILL_VOID
     if (bjvm_resolve_class(thread, &ent->class_info))
-      return 0;
+      RETURN_ABRUPT
     if (bjvm_link_class(thread, ent->class_info.classdesc))
-      return 0;
+      RETURN_ABRUPT
 
     bjvm_obj_header *obj = (void *)bjvm_get_class_mirror(thread, ent->class_info.classdesc);
     NEXT_INT(obj);
@@ -2166,7 +2177,7 @@ static int64_t ldc_impl_void(ARGS_VOID) {
     SPILL_VOID
     bjvm_obj_header *obj = bjvm_intern_string(thread, s);
     if (!obj) // oom
-      return 0;
+      RETURN_ABRUPT
 
     NEXT_INT(obj);
   }
@@ -2375,7 +2386,7 @@ static int64_t athrow_impl_int(ARGS_INT) {
   DEBUG_CHECK
   SPILL(tos)
   thread->current_exception = (bjvm_obj_header *)tos;
-  return 0;
+  RETURN_ABRUPT
 }
 
 static int64_t checkcast_impl_int(ARGS_INT) {
@@ -2384,7 +2395,7 @@ static int64_t checkcast_impl_int(ARGS_INT) {
   SPILL(tos)
   int error = bjvm_resolve_class(thread, info);
   if (error)
-    return 0;
+    RETURN_ABRUPT
 
   RELOAD(tos)
   insn->classdesc = info->classdesc;
@@ -2402,7 +2413,7 @@ static int64_t checkcast_resolved_impl_int(ARGS_INT) {
                         fmt_slice(obj->descriptor->name));
     SPILL(tos)
     bjvm_raise_vm_exception(thread, STR("java/lang/ClassCastException"), complaint);
-    return 0;
+    RETURN_ABRUPT
   }
   NEXT_INT(tos)
 }
@@ -2414,7 +2425,7 @@ static int64_t instanceof_impl_int(ARGS_INT) {
   SPILL(tos)
   int error = bjvm_resolve_class(thread, info);
   if (error)
-    return 0;
+    RETURN_ABRUPT
 
   RELOAD(tos)
   insn->classdesc = info->classdesc;
@@ -2430,7 +2441,7 @@ static int64_t instanceof_resolved_impl_int(ARGS_INT) {
   NEXT_INT(result)
 }
 
-static int64_t sqrt_impl_double(ARGS_DOUBLE) {
+static int64_t dsqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK
   NEXT_DOUBLE(sqrt(tos))
 }
@@ -2439,7 +2450,7 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
   bjvm_stack_value result;
   bjvm_plain_frame *frame;
   bjvm_stack_value *sp_;
-  uint16_t pc_;
+  int pc_;
 
   // Handle native frames
   if (bjvm_is_frame_native(frame_)) {
@@ -2528,11 +2539,30 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
 #if DO_TAILS
     result.l = entry(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
-    int64_t int_tos = 0;
-    float float_tos = 0;
-    double double_tos = 0;
+    int64_t int_tos = 0, int_tos_;
+    float float_tos = 0, float_tos_;
+    double double_tos = 0, double_tos_;
+    bjvm_bytecode_insn *current = insns + pc_;
 
+    switch (insns[pc_].tos_before) {
+      case TOS_INT:
+        int_tos = (sp_ - 1)->l;
+        break;
+      case TOS_FLOAT:
+        float_tos = (sp_ - 1)->f;
+        break;
+      case TOS_DOUBLE:
+        double_tos = (sp_ - 1)->d;
+        break;
+      default:
+        break;
+    }
+
+    unsigned jump_to = current->kind * 4 + insns[pc_].tos_before;
+    while (true) {
 #include "interpreter2-computed-goto.inc"
+    }
+    interp_done:;
 #endif
 
     // we really should just have all the methods return a future_t via a pointer, but whatever
@@ -2549,10 +2579,10 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
     exception:
       bjvm_attribute_exception_table *table = frame_->method->code->exception_table;
       if (table) {
-        int pc = frame->program_counter;
+        int pc_ = frame->program_counter;
         for (int i = 0; i < table->entries_count; ++i) {
           bjvm_exception_table_entry ent = table->entries[i];
-          if (ent.start_insn <= pc && pc < ent.end_insn) {
+          if (ent.start_insn <= pc_ && pc_ < ent.end_insn) {
             if (ent.catch_type) {
               int error = bjvm_resolve_class(thread, ent.catch_type);
               if (error)
@@ -2581,6 +2611,8 @@ done:
 }
 
 /** Jump table definitions. Must be kept in sync with the enum order. */
+
+#if DO_TAILS
 
 #define PAGE_ALIGN _Alignas(4096)
 
@@ -2976,7 +3008,7 @@ PAGE_ALIGN static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
   putstatic_D_impl_double,
   nullptr /* putstatic_Z_impl_double */,
   nullptr, /* putstatic_L_impl_double */
-  sqrt_impl_double
+  dsqrt_impl_double,
 };
 
 PAGE_ALIGN static int64_t (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3374,3 +3406,5 @@ PAGE_ALIGN static int64_t (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
   nullptr /* putstatic_L_impl_float */,
   nullptr
 };
+
+#endif

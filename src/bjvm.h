@@ -371,6 +371,7 @@ typedef struct bjvm_stack_frame {
 uint16_t stack_depth(const bjvm_stack_frame *frame);
 
 bool bjvm_is_frame_native(const bjvm_stack_frame *frame);
+__attribute__((always_inline))
 bjvm_stack_value *frame_locals(const bjvm_stack_frame *frame);
 bjvm_value *bjvm_get_native_args(const bjvm_stack_frame *frame); // same as locals, just called args for native
 
