@@ -19,12 +19,9 @@
 #include "arrays.h"
 #include "bjvm.h"
 #include "classloader.h"
-#include "monitor.h"
 #include "natives.h"
 #include "objects.h"
-#include "strings.h"
 #include "util.h"
-#include "wasm_jit.h"
 
 #include "cached_classdescs.h"
 
