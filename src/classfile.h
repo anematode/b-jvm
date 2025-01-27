@@ -725,6 +725,8 @@ typedef struct bjvm_cp_method {
 
   // This method overrides a method in a superclass
   bool overrides;
+  // An indirect call to this method with the appropriate calling convention will execute the method.
+  void *jit_entry;
 
   // JIT-compiled method
   void *compiled_method; // bjvm_wasm_instantiation_result*

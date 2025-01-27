@@ -50,7 +50,7 @@ if (FALSE AND NOT EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
 
-file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
+file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/**.c" "src/**/*.c" "src/**.h" "src/**/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
 
 add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}

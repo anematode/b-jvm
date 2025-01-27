@@ -445,6 +445,9 @@ typedef struct {
   size_t bytes_cap;
 } bjvm_bytevector;
 
+void write_byte(bjvm_bytevector *ctx, int byte);
+void write_slice(bjvm_bytevector *ctx, const uint8_t *bytes, size_t len);
+
 // LEB128 encodings
 void bjvm_wasm_writeuint(bjvm_bytevector *ctx, uint64_t value);
 void bjvm_wasm_writeint(bjvm_bytevector *ctx, int64_t value);
