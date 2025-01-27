@@ -1053,6 +1053,13 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
               : ent->kind == BJVM_CP_KIND_FLOAT ? BJVM_TYPE_KIND_FLOAT
                                                 : BJVM_TYPE_KIND_REFERENCE;
     PUSH_ENTRY(insn_source(kind, insn_index))
+    if (ent->kind == BJVM_CP_KIND_INTEGER) { // rewrite to iconst or lconst
+      insn->kind = bjvm_insn_iconst;
+      insn->integer_imm = (int32_t)ent->integral.value;
+    } else if (ent->kind == BJVM_CP_KIND_FLOAT) {
+      insn->kind = bjvm_insn_fconst;
+      insn->f_imm = (float)ent->floating.value;
+    }
     break;
   }
   case bjvm_insn_ldc2_w: {
@@ -1061,6 +1068,13 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
     bjvm_type_kind kind = ent->kind == BJVM_CP_KIND_DOUBLE ? BJVM_TYPE_KIND_DOUBLE
                                                : BJVM_TYPE_KIND_LONG;
     PUSH_ENTRY(insn_source(kind, insn_index))
+    if (ent->kind == BJVM_CP_KIND_LONG) {
+      insn->kind = bjvm_insn_lconst;
+      insn->integer_imm = ent->integral.value;
+    } else {
+      insn->kind = bjvm_insn_dconst;
+      insn->d_imm = ent->floating.value;
+    }
     break;
   }
   case bjvm_insn_dload: {

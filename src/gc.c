@@ -60,6 +60,10 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
         PUSH_ROOT(&ent->indy_info.resolved_mt);
       } else if (ent->kind == BJVM_CP_KIND_METHOD_TYPE) {
         PUSH_ROOT(&ent->method_type.resolved_mt);
+      } else if (ent->kind == BJVM_CP_KIND_STRING) {
+        PUSH_ROOT(&ent->string.interned);
+      } else if (ent->kind == BJVM_CP_KIND_CLASS) {
+        PUSH_ROOT(&ent->class_info.vm_object);
       }
     }
   }

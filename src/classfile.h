@@ -308,7 +308,7 @@ typedef struct {
   bjvm_classdesc *classdesc;
   bjvm_utf8 name;
 
-  void *resolution_error; // bjvm_obj_header
+  void *vm_object; // linkage error (todo) or resolved class
 } bjvm_cp_class_info;
 
 typedef struct bjvm_cp_name_and_type {
@@ -347,6 +347,7 @@ typedef struct {
 
 typedef struct {
   bjvm_utf8 chars;
+  void *interned;  // pointer to the interned string, if instantiated
 } bjvm_cp_string_info;
 
 typedef struct {

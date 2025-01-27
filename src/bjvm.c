@@ -1948,14 +1948,14 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
 
   if (info->classdesc)
     return 0; // already succeeded
-  if (info->resolution_error) {
+  if (info->vm_object) {
     bjvm_raise_exception_object(thread,
-                                info->resolution_error); // already failed
+                                info->vm_object); // already failed
     return -1;
   }
   info->classdesc = bootstrap_lookup_class(thread, info->name);
   if (!info->classdesc) {
-    info->resolution_error = thread->current_exception;
+    info->vm_object = thread->current_exception;
     return -1;
   }
 
