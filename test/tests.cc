@@ -437,6 +437,13 @@ Chicken
 )");
 }
 
+TEST_CASE("Basic input/output") {
+  auto result = run_test_case("test_files/system_input/", false);
+//  REQUIRE(result.stdout_ == R"(Egg
+//Chicken
+//)");
+}
+
 TEST_CASE("ConstantValue initialisation") {
   auto result = run_test_case("test_files/constant_value/", true);
   REQUIRE(result.stdout_ == "2147483647\n");

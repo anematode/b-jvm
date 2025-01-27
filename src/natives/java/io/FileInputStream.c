@@ -46,8 +46,9 @@ DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    // Raise java.lang.IOException TODO
-    UNREACHABLE();
+    bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
+                            STR("File not open"));
+    return value_null();
   }
   bjvm_obj_header *array = args[0].handle->obj;
   if (!array) {
