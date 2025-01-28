@@ -73,15 +73,46 @@ static int64_t (*jmp_table_float[MAX_INSN_KIND])(ARGS_FLOAT);
 // Used when the TOS is double (wasm signature: f64)
 static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE);
 
+extern int64_t __interpreter_intrinsic_next_void(ARGS_VOID, int index);
+extern int64_t __interpreter_intrinsic_next_int(ARGS_INT, int index);
+extern int64_t __interpreter_intrinsic_next_double(ARGS_DOUBLE, int index);
+extern int64_t __interpreter_intrinsic_next_float(ARGS_FLOAT, int index);
+
+// These point into .rodata and are used to recover the function pointers for the funcref jump tables.
+EMSCRIPTEN_KEEPALIVE
+void *__interpreter_intrinsic_void_table_base() {
+  return jmp_table_void;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void *__interpreter_intrinsic_int_table_base() {
+  return jmp_table_int;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void *__interpreter_intrinsic_float_table_base() {
+  return jmp_table_float;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void *__interpreter_intrinsic_double_table_base() {
+  return jmp_table_double;
+}
+
+EMSCRIPTEN_KEEPALIVE
+int32_t __interpreter_intrinsic_max_insn() {
+  return MAX_INSN_KIND;
+}
+
 #if DO_TAILS
 
 #ifdef EMSCRIPTEN
 // Sad :(
 #define WITH_UNDEF(expr)                                                                                               \
   {                                                                                                                    \
-    int64_t a_undef;                                                                                                   \
-    float b_undef;                                                                                                     \
-    double c_undef;                                                                                                    \
+    int64_t a_undef = 0;                                                                                                   \
+    float b_undef = 0;                                                                                                     \
+    double c_undef = 0;                                                                                                    \
     expr                                                                                                               \
   }
 #else
@@ -97,32 +128,32 @@ static int64_t (*jmp_table_double[MAX_INSN_KIND])(ARGS_DOUBLE);
 
 #define JMP_INT(tos)                                                                                                   \
   int k = insns[0].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns, pc, sp, tos, b_undef, c_undef);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_int(thread, frame, insns, pc, sp, tos, b_undef, c_undef, k);)
 #define JMP_FLOAT(tos)                                                                                                 \
   int k = insns[0].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns, pc, sp, a_undef, tos, c_undef);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_float(thread, frame, insns, pc, sp, a_undef, tos, c_undef, k);)
 #define JMP_DOUBLE(tos)                                                                                                \
   int k = insns[0].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns, pc, sp, a_undef, b_undef, tos);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_double(thread, frame, insns, pc, sp, a_undef, b_undef, tos, k);)
 
 #define NEXT_INT(tos)                                                                                                  \
   int k = insns[1].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_int[k](thread, frame, insns + 1, pc + 1, sp, (int64_t)tos, b_undef, c_undef);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_int(thread, frame, insns + 1, pc + 1, sp, (int64_t)tos, b_undef, c_undef, k);)
 #define NEXT_FLOAT(tos)                                                                                                \
   int k = insns[1].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_float[k](thread, frame, insns + 1, pc + 1, sp, a_undef, tos, c_undef);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_float(thread, frame, insns + 1, pc + 1, sp, a_undef, tos, c_undef, k);)
 #define NEXT_DOUBLE(tos)                                                                                               \
   int k = insns[1].kind;                                                                                               \
-  WITH_UNDEF(MUSTTAIL return jmp_table_double[k](thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, tos);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_double(thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, tos, k);)
 
 // Jump to the instruction at pc, with nothing in the top of the stack. This does NOT imply that sp = 0, only that
 // all stack values are in memory (rather than in a register)
 #define JMP_VOID                                                                                                       \
-  WITH_UNDEF(MUSTTAIL return jmp_table_void[insns[0].kind](thread, frame, insns, pc, sp, a_undef, b_undef, c_undef);)
+  WITH_UNDEF(MUSTTAIL return __interpreter_intrinsic_next_void(thread, frame, insns, pc, sp, a_undef, b_undef, c_undef, insns[0].kind);)
 // Jump to the instruction at pc + 1, with nothing in the top of the stack.
 #define NEXT_VOID                                                                                                      \
   WITH_UNDEF(                                                                                                          \
-      MUSTTAIL return jmp_table_void[insns[1].kind](thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, c_undef);)
+      MUSTTAIL return __interpreter_intrinsic_next_void(thread, frame, insns + 1, pc + 1, sp, a_undef, b_undef, c_undef, insns[1].kind);)
 #else
 #endif
 
@@ -508,7 +539,6 @@ static int64_t putstatic_impl_void(ARGS_VOID) {
   if (thread->current_exception) {
     return 0;
   }
-
   STACK_POLYMORPHIC_JMP(*(sp - 1));
 }
 FORWARD_TO_NULLARY(putstatic)
@@ -1338,7 +1368,7 @@ MAKE_INT_BRANCH(if_icmple, <=)
 static int64_t if_acmpeq_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int64_t a = (sp - 2)->l, b = tos;
+  bjvm_obj_header * a = (sp - 2)->obj, *b = (bjvm_obj_header *)tos;
   int old_pc = pc;
   pc = a == b ? (insn->index - 1) : pc;
   insns += pc - old_pc;
@@ -1349,7 +1379,7 @@ static int64_t if_acmpeq_impl_int(ARGS_INT) {
 static int64_t if_acmpne_impl_int(ARGS_INT) {
 
   DEBUG_CHECK
-  int64_t a = (sp - 2)->l, b = tos;
+  bjvm_obj_header *a = (sp - 2)->obj, *b = (bjvm_obj_header *)tos;
   uint16_t old_pc = pc;
   pc = a != b ? (insn->index - 1) : pc;
   insns += pc - old_pc;

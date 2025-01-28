@@ -2626,9 +2626,9 @@ __attribute__((constructor)) static void nodejs_bootloader() {
       // Read each of these from disk and put them in the filesystem
       for (let i = 0; i < needed.length; ++i) {
         const path = needed[i];
-        const data = fs.readFileSync("./" + path, "binary");
+        const data = fs.readFileSync("./" + path);
         FS.createPath('/', path.substring(0, path.lastIndexOf('/')));
-        FS.createDataFile('/', path, data, true, true, true);
+        FS.writeFile('/' + path, data);
       }
     }
   });

@@ -89,7 +89,7 @@ public final class NBodyProblem {
     public static void main(String[] args) {
         // int n = Integer.parseInt(args[0]);
         // int n = 50_000_000; // num simulation steps in the original program
-        int n = 50_000;
+        int n = 1_000_000;
 
         var bodies = new Body[] {
             // sun
