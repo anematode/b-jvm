@@ -34,13 +34,15 @@ bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len);
 void arena_uninit(arena *a);
 
 typedef struct {
+  uint64_t *bits;
+  uint32_t size_words;
+} heap_bitset;
+
+typedef struct {
   union {
     // Used if the # of bits is less than 63, and the lowest bit = 1
     uint64_t bits_inl;
-    struct {
-      uint64_t *bits;
-      uint32_t size_words;
-    } ptr;
+    heap_bitset ptr;
   };
 } bjvm_compressed_bitset;
 

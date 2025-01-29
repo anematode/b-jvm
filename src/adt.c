@@ -58,7 +58,7 @@ void arena_init(arena *a) { a->begin = nullptr; }
 
 const size_t ARENA_REGION_BYTES = 1 << 12;
 void *arena_alloc(arena *a, size_t count, size_t bytes) {
-  size_t allocate = (count * bytes + 7) & ~(size_t)7;
+  size_t allocate = align_up(count * bytes, 8);
   if (allocate > ARENA_REGION_BYTES) {
     arena_region *region = calloc(1, sizeof(arena_region) + allocate);
     region->used = region->capacity = allocate;

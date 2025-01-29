@@ -37,7 +37,7 @@ bjvm_async_run_ctx *bjvm_ffi_run_main(bjvm_thread *thr) {
   method = bjvm_method_lookup(desc, STR("main"),
                                    STR("([Ljava/lang/String;)V"), false, false);
 
-  bjvm_async_run_ctx *ctx = bjvm_thread_async_run(thr, method, args, nullptr);
+  bjvm_async_run_ctx *ctx = create_run_ctx(thr, method, args, nullptr);
   return ctx;
 }
 

@@ -12,6 +12,16 @@ extern "C" {
 #include "util.h"
 #include <assert.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <util.h>
+
+#ifdef __cplusplus
+#define maybe_extern_begin extern "C" {
+#define maybe_extern_end }
+#else
+#define maybe_extern_begin
+#define maybe_extern_end
+#endif
 
 typedef enum { FUTURE_NOT_READY, FUTURE_READY } future_status;
 
@@ -79,6 +89,7 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
 /// block containing any locals that the async function needs (accessibly via
 /// self->).
 #define DECLARE_ASYNC_VOID(name, locals, arguments, invoked_async_methods_)                                            \
+  maybe_extern_begin;                                                                                                  \
   struct name##_s;                                                                                                     \
   typedef struct name##_s name##_t;                                                                                    \
   PUSH_EXTERN_C;                                                                                                       \
@@ -89,29 +100,30 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
   POP_EXTERN_C;                                                                                                        \
-  future_t name(name##_t *self);                                                                                       \
+  future_t name(void *self_);                                                                                          \
   struct name##_s {                                                                                                    \
     FixTypeSize(struct name##_args) args;                                                                              \
-    int _state;                                                                                                        \
+    uint32_t _state;                                                                                                   \
     locals;                                                                                                            \
     FixTypeSize(union name##_invoked_async_methods) invoked_async_methods;                                             \
-  };
+  };                                                                                                                   \
+  maybe_extern_end;
 
 // deal with the fallout of FixTypeSize
 #ifdef __cplusplus
 extern "C++" {
-template <typename T> T ZeroInternalState_(T t) {
-  if constexpr (sizeof(t.args) == 0)
-    return (T){._state = t._state};
-  else
-    return (T){.args = t.args, ._state = t._state};
-}
+  template <typename T> T ZeroInternalState_(T t) {
+    if constexpr (sizeof(t.args) == 0)
+      return (T){._state = t._state};
+    else
+      return (T){.args = t.args, ._state = t._state};
+  }
 }
 
-#define DoArgsDecl(name) auto args = &self->args;
+#define DoArgsDecl(name) [[maybe_unused]] auto args = &self->args;
 #define ZeroInternalState(thing) thing = ZeroInternalState_(thing);
 #else
-#define DoArgsDecl(name) struct name##_args *args = &self->args;
+#define DoArgsDecl(name) [[maybe_unused]] struct name##_args *args = &self->args;
 #define ZeroInternalState(thing) thing = (typeof(thing)){.args = (thing).args, ._state = (thing)._state};
 #endif
 
@@ -119,15 +131,23 @@ template <typename T> T ZeroInternalState_(T t) {
 /// for cases. Should be followed by a block containing the code of the async
 /// function.  MUST end with ASYNC_END, or ASYNC_END_VOID if the function is
 /// guaranteed to call ASYNC_RETURN() before it reaches the end statement.
-#define DEFINE_ASYNC_SL(name, start_idx)                                                                               \
-  future_t name(name##_t *self) {                                                                                      \
+#define DEFINE_ASYNC_SL(name, start_idx) DEFINE_ASYNC_SL_(cached_state_prelude, name, start_idx)
+
+#define DEFINE_ASYNC_SL_(prelude, name, start_idx)                                                                     \
+  maybe_extern_begin;                                                                                                  \
+  future_t name(void *self_) {                                                                                         \
+    name##_t *self = (name##_t *)self_;                                                                                \
     assert(self);                                                                                                      \
-    [[maybe_unused]] DoArgsDecl(name);                                                                                 \
+    prelude(name);                                                                                                     \
     start_counter(label_counter, (start_idx) + 1);                                                                     \
     self->_state = (self->_state == 0) ? (start_idx) : self->_state;                                                   \
     switch (self->_state) {                                                                                            \
     case (start_idx):                                                                                                  \
       ZeroInternalState(*self);
+
+#define cached_state_prelude(name)                                                                                     \
+  _DECLARE_CACHED_STATE(name);                                                                                         \
+  _RELOAD_CACHED_STATE();
 
 /// Defines a value-returning async function. Should be followed by a block
 /// containing the code of the async function.  MUST end with ASYNC_END, or
@@ -136,9 +156,23 @@ template <typename T> T ZeroInternalState_(T t) {
 /// another switch/case
 #define DEFINE_ASYNC(name) DEFINE_ASYNC_SL(name, 0)
 
+/// reload the cached state from the self pointer
+#define _RELOAD_CACHED_STATE()                                                                                         \
+  do {                                                                                                                 \
+    args = &self->args;                                                                                                \
+  } while (0)
+
+/// used to cache state on the stack for easy access -- must be reloaded in _RELOAD_CACHED_STATE
+#define _DECLARE_CACHED_STATE(method_name) DoArgsDecl(method_name);
+
+#define do_maybe_reload_state()                                                                                        \
+  if (unlikely(self->_state == state_index))                                                                           \
+    _RELOAD_CACHED_STATE();
+
 /// Begins a block of code that will be executed asynchronously from inside
 /// another block. DO NOT USE STACK VARIABLES FROM BEFORE AWAIT() AFTER AWAIT.
-#define AWAIT_INNER(context, method_name, ...)                                                                         \
+#define AWAIT_INNER(context, method_name, ...) AWAIT_INNER_(do_maybe_reload_state, context, method_name, __VA_ARGS__)
+#define AWAIT_INNER_(after_label, context, method_name, ...)                                                           \
   do {                                                                                                                 \
     get_counter_value(label_counter, state_index);                                                                     \
     (context)->_state = 0;                                                                                             \
@@ -146,7 +180,8 @@ template <typename T> T ZeroInternalState_(T t) {
     PUSH_PRAGMA("GCC diagnostic ignored \"-Wimplicit-fallthrough\"");                                                  \
     PUSH_PRAGMA("GCC diagnostic ignored \"-Wswitch\"");                                                                \
   case state_index:                                                                                                    \
-    args = &self->args;                                                                                                \
+    /* if we've fallen through to this point, we don't need to reload the state */                                     \
+    after_label();                                                                                                     \
     future_t __fut = method_name(context);                                                                             \
     if (__fut.status == FUTURE_NOT_READY) {                                                                            \
       self->_state = state_index;                                                                                      \
@@ -159,16 +194,32 @@ template <typename T> T ZeroInternalState_(T t) {
 #define AWAIT_FUTURE_EXPR(expr, ...)                                                                                   \
   do {                                                                                                                 \
     get_counter_value(label_counter, state_index);                                                                     \
+    PUSH_PRAGMA("GCC diagnostic ignored \"-Wimplicit-fallthrough\"");                                                  \
   case state_index:                                                                                                    \
-    args = &self->args;                                                                                                \
+    /* if we've fallen through to this point, we don't need to reload the state */                                     \
+    if (unlikely(self->_state == state_index))                                                                         \
+      _RELOAD_CACHED_STATE();                                                                                          \
     future_t __fut = (expr);                                                                                           \
     if (__fut.status == FUTURE_NOT_READY) {                                                                            \
       self->_state = state_index;                                                                                      \
       return __fut;                                                                                                    \
     }                                                                                                                  \
+    POP_PRAGMA;                                                                                                        \
   } while (0)
 
 #define AWAIT(method_name, ...) AWAIT_INNER(&self->invoked_async_methods.method_name, method_name, __VA_ARGS__)
+
+/// Calls an async method that is guaranteed to be ready immediately.  Will UNREACHABLE()
+/// if the future is not ready.  Usable as an expression from a non-async fn -- does not interact with async method
+/// machinery.
+#define AWAIT_READY(method_name, ...)                                                                                  \
+  ({                                                                                                                   \
+    method_name##_t __ctx = {.args = {__VA_ARGS__}, ._state = 0};                                                      \
+    future_t __fut = method_name(&__ctx);                                                                              \
+    if (unlikely(__fut.status != FUTURE_READY))                                                                        \
+      UNREACHABLE(#method_name " called via AWAIT_READY, but it tried to block.");                                     \
+    __ctx._result;                                                                                                     \
+  })
 
 /// Ends an async value-returning function, returning the given value.  Must be
 /// used inside an async function.
@@ -179,8 +230,9 @@ template <typename T> T ZeroInternalState_(T t) {
   default:                                                                                                             \
     UNREACHABLE();                                                                                                     \
     }                                                                                                                  \
-    }
-// todo: unreachable on dfault
+    }                                                                                                                  \
+    maybe_extern_end;
+
 /// Ends an async void-returning function.  Must be used inside an async
 /// function.
 #define ASYNC_END_VOID()                                                                                               \
@@ -189,20 +241,21 @@ template <typename T> T ZeroInternalState_(T t) {
   default:                                                                                                             \
     UNREACHABLE();                                                                                                     \
     }                                                                                                                  \
-    }
+    }                                                                                                                  \
+    maybe_extern_end;
 
 /// Returns from an async function.
 #define ASYNC_RETURN(return_value)                                                                                     \
   do {                                                                                                                 \
     self->_state = 0;                                                                                                  \
     self->_result = (return_value);                                                                                    \
-    return (future_t){FUTURE_READY, .wakeup = nullptr};                                                                \
+    return future_ready();                                                                \
   } while (0)
 
 #define ASYNC_RETURN_VOID()                                                                                            \
   do {                                                                                                                 \
     self->_state = 0;                                                                                                  \
-    return (future_t){FUTURE_READY, .wakeup = nullptr};                                                                \
+    return future_ready();                                                                \
   } while (0)
 
 /// Yields control back to the caller.  Must be used inside an async function.

@@ -24,12 +24,15 @@ struct loaded_bytes {
 
 static struct loaded_bytes read_file(FILE *f) {
   fseek(f, 0, SEEK_END);
-  uint32_t length = ftell(f);
+  size_t length = ftell(f);
   fseek(f, 0, SEEK_SET);
   char *data = malloc(length);
   assert(data);
-  fread(data, 1, length, f);
-  return (struct loaded_bytes){.bytes = data, .length = length};
+  length = fread(data, 1, length, f);
+
+  assert(length <= UINT32_MAX);
+
+  return (struct loaded_bytes){.bytes = data, .length = (uint32_t) length};
 }
 
 #ifdef EMSCRIPTEN

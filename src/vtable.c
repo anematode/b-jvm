@@ -90,6 +90,8 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
     assert(s != 0 && "i-table method must not be null");
     assert(d != 0 && "i-table method must not be null");
+
+    [[maybe_unused]]
     bool d_abs = get_unambiguous_method(d)->access_flags & BJVM_ACCESS_ABSTRACT,
          c_abs = get_unambiguous_method(s)->access_flags & BJVM_ACCESS_ABSTRACT;
     if (d_abs || d == s) {
@@ -219,7 +221,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   // are overridden.
   if (classdesc->super_class) {
     bjvm_classdesc *super = classdesc->super_class->classdesc;
-    for (int i = 0; i < arrlen(super->vtable.methods); ++i) {
+    for (size_t i = 0; i < arrlenu(super->vtable.methods); ++i) {
       bjvm_cp_method *method = super->vtable.methods[i];
       bjvm_cp_method *replacement = bjvm_method_lookup(
           classdesc, method->name, method->unparsed_descriptor, false, false);
@@ -257,7 +259,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   for (int i = 0; i < classdesc->methods_count; ++i) {
     bjvm_cp_method *method = classdesc->methods + i;
     if (vtable_include(method)) {
-      method->vtable_index = arrlen(vtable->methods);
+      method->vtable_index = arrlenu(vtable->methods);
       arrpush(vtable->methods, method);
     }
   }

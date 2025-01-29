@@ -264,10 +264,10 @@ typedef enum : uint8_t {
 } bjvm_insn_code_kind;
 
 typedef enum : uint8_t {
-  TOS_VOID,
-  TOS_DOUBLE,
-  TOS_INT,
-  TOS_FLOAT,
+  TOS_VOID = 0,
+  TOS_DOUBLE = 1,
+  TOS_INT = 2,
+  TOS_FLOAT = 3,
 } bjvm_reduced_tos_kind;
 
 typedef enum : char {
@@ -711,9 +711,9 @@ typedef struct bjvm_cp_method {
   bjvm_classdesc *my_class;
 
   // Index in the vtable, if applicable. Only set at class link time.
-  int vtable_index;
+  size_t vtable_index;
   // Index in the itable, if applicable.
-  int itable_index;
+  size_t itable_index;
   void *native_handle; // bjvm_native_callback
 
   struct bjvm_native_Constructor *reflection_ctor;
