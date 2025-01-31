@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-typedef enum {
+typedef enum : uint8_t {
   BJVM_WASM_TYPE_KIND_VOID,
   BJVM_WASM_TYPE_KIND_FLOAT64 = 0x7C,
   BJVM_WASM_TYPE_KIND_FLOAT32 = 0x7D,
@@ -558,6 +558,28 @@ bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
                                        bjvm_wasm_type results);
 
 bjvm_wasm_type bjvm_jvm_type_to_wasm(bjvm_type_kind kind);
+
+typedef struct {
+  bjvm_wasm_module *module;
+
+  bjvm_wasm_value_type *params;  // function parameters
+  bjvm_wasm_value_type *locals;
+
+  bjvm_wasm_value_type return_type;
+
+  int32_t next_local;  // initialized to len(params)
+
+  bjvm_string_hash_table local_names;
+} bjvm_wasm_function_builder;
+
+bjvm_wasm_function_builder *create_wasm_function_builder(bjvm_wasm_module *module, bjvm_wasm_value_type return_type,
+  bjvm_wasm_value_type *args, int argc) ;
+
+// Get a local with the given name and type, or create a new one if it doesn't exist
+uint32_t function_builder_get_local(bjvm_wasm_function_builder *builder,
+  bjvm_wasm_value_type value, const char *name) ;
+
+bjvm_wasm_function *function_builder_finish(bjvm_wasm_function_builder *builder, bjvm_wasm_expression *expr, const char* name) ;
 
 typedef enum {
   BJVM_WASM_INSTANTIATION_SUCCESS,

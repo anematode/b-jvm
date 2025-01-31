@@ -43,9 +43,8 @@ bjvm_wasm_expression **generate_writes(bjvm_wasm_module *module, bjvm_type_kind 
   return result;
 }
 
-void *create_adapter_to_interpreter_frame(bjvm_type_kind *kinds,
-                                                 int kinds_len, bool is_native) {
-  // bjvm_interpreter_result_t (*compiled)(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *result, ... args)
+void *create_adapter_to_interpreter_frame(bjvm_type_kind *kinds, int kinds_len, bool is_native) {
+  // return_val (*compiled)(bjvm_thread *thread, bjvm_cp_method *method, ... args)
   // static bjvm_stack_value scratch_space[256];
 
   enum {

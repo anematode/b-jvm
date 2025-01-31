@@ -721,19 +721,28 @@ typedef struct bjvm_cp_method {
   struct bjvm_native_MethodType *method_type_obj;
 
   // Rough number of times this method has been called. Used for JIT heuristics.
-  // Not at all exact because of interrupts.
   int call_count;
+  int deopt_count;
 
   // This method overrides a method in a superclass
   bool overrides;
-  // An indirect call to this method with the appropriate calling convention will execute the method.
+
+  // (thread *, cp_method *, ... args) -> result
   void *jit_entry;
+  // Same signature as jit_entry, but creates a stack frame and uses bjvm_interpret. Also the
+  // initial value of jit_entry.
+  void *interpreter_entry;
+
+  bool has_dumb_jit;
+  void *dumb_jit_info;
 
   // JIT-compiled method
   void *compiled_method; // bjvm_wasm_instantiation_result*
   // Already tried and failed
   bool failed_jit;
 } bjvm_cp_method;
+
+int bjvm_argc(const bjvm_cp_method *method);
 
 typedef struct bjvm_cp_field {
   bjvm_access_flags access_flags;

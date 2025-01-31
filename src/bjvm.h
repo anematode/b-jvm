@@ -370,6 +370,13 @@ typedef struct bjvm_native_frame {
   const bjvm_method_descriptor *method_shape;
 } bjvm_native_frame;
 
+// Stack frame associated with a JITed method.
+typedef struct bjvm_compiled_frame {
+  uint16_t program_counter;
+  uint16_t references_count;
+  bjvm_stack_value references[];
+} bjvm_compiled_frame;
+
 // A frame is either a native frame or a plain frame. They may be distinguished
 // with is_native.
 //
@@ -379,14 +386,15 @@ typedef struct bjvm_stack_frame {
   uint8_t is_native;
   uint8_t is_async_suspended;
   uint16_t num_locals;
-  bjvm_interpret_t async_frame;
-
   // The method associated with this frame
   bjvm_cp_method *method;
+
+  bjvm_interpret_t async_frame;
 
   union {
     bjvm_plain_frame plain;
     bjvm_native_frame native;
+    bjvm_compiled_frame compiled;
   };
 } bjvm_stack_frame;
 
@@ -603,7 +611,7 @@ void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
 void bjvm_incompatible_class_change_error(bjvm_thread *thread, bjvm_utf8 complaint);
 void bjvm_unsatisfied_link_error(bjvm_thread *thread, const bjvm_cp_method *method);
 void bjvm_abstract_method_error(bjvm_thread *thread, const bjvm_cp_method *method);
-void bjvm_arithmetic_exception(bjvm_thread *thread, const bjvm_utf8 complaint);
+void bjvm_arithmetic_exception(bjvm_thread *thread);
 int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame, struct bjvm_multianewarray_data *multianewarray,
                         uint16_t *sd);
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame);

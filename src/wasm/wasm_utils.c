@@ -996,3 +996,41 @@ bjvm_wasm_type bjvm_jvm_type_to_wasm(bjvm_type_kind kind) {
     UNREACHABLE();
   }
 }
+
+bjvm_wasm_function_builder * create_wasm_function_builder(bjvm_wasm_module *module, bjvm_wasm_value_type return_type, bjvm_wasm_value_type *args, int argc){
+  bjvm_wasm_function_builder *builder = calloc(1, sizeof(bjvm_wasm_function_builder));
+  builder->module = module;
+  builder->return_type = return_type;
+  memcpy(arraddnptr(builder->params, argc), args, argc * sizeof(bjvm_wasm_value_type));
+  builder->local_names = bjvm_make_hash_table(nullptr, 0.5, 2);
+  builder->next_local = argc;
+  return builder;
+}
+
+uint32_t function_builder_get_local(bjvm_wasm_function_builder *builder, bjvm_wasm_value_type value, const char *name){
+  uint32_t index = (uint32_t)bjvm_hash_table_lookup(&builder->local_names, name, -1);
+  if (index == 0) {
+    uint32_t next = builder->next_local++;
+    arrput(builder->locals, value);
+    (void)bjvm_hash_table_insert(&builder->local_names, name, -1, (void *)(uintptr_t)(next + 1));
+    return next;
+  }
+  assert(builder->locals[index - 1] == value);
+  return index - 1;
+}
+
+bjvm_wasm_function * function_builder_finish(bjvm_wasm_function_builder *builder, bjvm_wasm_expression *expr, const char *name){
+  bjvm_wasm_type params = bjvm_wasm_make_tuple(builder->module, builder->params, arrlen(builder->params));
+  bjvm_wasm_type locals = bjvm_wasm_make_tuple(builder->module, builder->locals, arrlen(builder->locals));
+  bjvm_wasm_function *fn = bjvm_wasm_add_function(builder->module,
+    params,
+    (bjvm_wasm_type) { builder->return_type },
+    locals, expr, name);
+
+  bjvm_free_hash_table(builder->local_names);
+  free(builder->params);
+  free(builder->locals);
+  free(builder);
+
+  return fn;
+}

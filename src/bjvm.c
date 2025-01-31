@@ -427,8 +427,8 @@ void bjvm_incompatible_class_change_error(bjvm_thread *thread, const bjvm_utf8 c
 }
 
 // Raise an ArithmeticException.
-void bjvm_arithmetic_exception(bjvm_thread *thread, const bjvm_utf8 complaint) {
-  bjvm_raise_vm_exception(thread, STR("java/lang/ArithmeticException"), complaint);
+void bjvm_arithmetic_exception(bjvm_thread *thread) {
+  bjvm_raise_vm_exception(thread, STR("java/lang/ArithmeticException"), STR("/ by zero"));
 }
 
 // Raise an ArrayIndexOutOfBoundsException with the given index and length.

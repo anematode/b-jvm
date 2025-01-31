@@ -1123,7 +1123,7 @@ static int64_t idiv_impl_int(ARGS_INT) {
   int a = (sp - 2)->i, b = (int)tos;
   if (unlikely(b == 0)) {
     SPILL(tos);
-    bjvm_arithmetic_exception(thread, STR("/ by zero"));
+    bjvm_arithmetic_exception(thread);
     return 0;
   }
   sp--;
@@ -1136,7 +1136,7 @@ static int64_t ldiv_impl_int(ARGS_INT) {
   int64_t a = (sp - 2)->l, b = tos;
   if (unlikely(b == 0)) {
     SPILL(tos);
-    bjvm_arithmetic_exception(thread, STR("/ by zero"));
+    bjvm_arithmetic_exception(thread);
     return 0;
   }
   sp--;
@@ -1157,7 +1157,7 @@ static int64_t irem_impl_int(ARGS_INT) {
   int a = (sp - 2)->i, b = (int)tos;
   if (unlikely(b == 0)) {
     SPILL(tos);
-    bjvm_arithmetic_exception(thread, STR("/ by zero"));
+    bjvm_arithmetic_exception(thread);
     return 0;
   }
   sp--;
@@ -1170,7 +1170,7 @@ static int64_t lrem_impl_int(ARGS_INT) {
   int64_t a = (sp - 2)->l, b = tos;
   if (unlikely(b == 0)) {
     SPILL(tos);
-    bjvm_arithmetic_exception(thread, STR("/ by zero"));
+    bjvm_arithmetic_exception(thread);
     return 0;
   }
   sp--;
