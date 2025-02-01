@@ -657,25 +657,33 @@ void dumb_lower_binop(bjvm_wasm_value_type in1, bjvm_wasm_value_type in2, bjvm_w
   local_set(stack_value(out, -2));
 }
 
-static bjvm_wasm_value_type inspect_stack_value(int32_t offset) {
-  int test = ctx->sd + offset;
-  assert(test >= 0 && test < ctx->code->max_stack);
+static bjvm_type_kind inspect_jvm_value_impl(int32_t test) {
+  assert(test >= 0 && test < ctx->code->max_stack + ctx->code->max_locals);
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_doubles[ctx->pc], test)) {
-    return BJVM_WASM_TYPE_KIND_FLOAT64;
+    return BJVM_TYPE_KIND_DOUBLE;
   }
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_longs[ctx->pc], test)) {
-    return BJVM_WASM_TYPE_KIND_INT64;
+    return BJVM_TYPE_KIND_LONG;
   }
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_floats[ctx->pc], test)) {
-    return BJVM_WASM_TYPE_KIND_FLOAT32;
+    return BJVM_TYPE_KIND_FLOAT;
   }
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_ints[ctx->pc], test)) {
-    return BJVM_WASM_TYPE_KIND_INT32;
+    return BJVM_TYPE_KIND_INT;
   }
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_references[ctx->pc], test)) {
-    return BJVM_WASM_TYPE_KIND_INT32;
+    return BJVM_TYPE_KIND_REFERENCE;
   }
   return BJVM_WASM_TYPE_KIND_VOID;
+}
+
+// Given the offset from the top of the stack
+static bjvm_type_kind inspect_stack_kind(int32_t offset) {
+  return inspect_jvm_value_impl(ctx->sd + offset);
+}
+
+static bjvm_wasm_value_type inspect_local_kind(int32_t offset) {
+  return inspect_jvm_value_impl(ctx->code->max_stack + offset);
 }
 
 void dumb_lower_dup_like(bjvm_bytecode_insn *insn) {
