@@ -108,9 +108,9 @@ typedef struct {
 
 // represents a native method somewhere in this binary
 typedef struct {
-  bjvm_utf8 class_path;
-  bjvm_utf8 method_name;
-  bjvm_utf8 method_descriptor;
+  slice class_path;
+  slice method_name;
+  slice method_descriptor;
   bjvm_native_callback callback;
 } bjvm_native_t;
 
@@ -199,7 +199,7 @@ DECLARE_ASYNC(
       )
 );
 
-DECLARE_ASYNC(struct bjvm_native_MethodType *, resolve_mh_mt, locals(),
+DECLARE_ASYNC(struct bjvm_native_MethodType *, resolve_mh_mt, locals(bjvm_handle *ptypes_array),
               arguments(bjvm_thread *thread; bjvm_cp_method_handle_info *info),
               invoked_methods(
                 invoked_method(bjvm_initialize_class)
@@ -216,7 +216,7 @@ DECLARE_ASYNC(bjvm_obj_header*, resolve_mh_vh,
 );
 
 DECLARE_ASYNC(bjvm_obj_header*, resolve_mh_invoke,
-  locals(),
+  locals(bjvm_handle *member; bjvm_cp_method *m),
   arguments(bjvm_thread *thread; bjvm_cp_method_handle_info *info),
   invoked_methods(
     invoked_method(bjvm_initialize_class)
@@ -372,7 +372,7 @@ typedef struct bjvm_module {
   // TODO add exports, imports, yada yada
 } bjvm_module;
 
-int bjvm_define_module(bjvm_vm *vm, bjvm_utf8 module_name, bjvm_obj_header *module);
+int bjvm_define_module(bjvm_vm *vm, slice module_name, bjvm_obj_header *module);
 
 typedef struct {
   // Write byte of stdout/stderr (if nullptr, uses the default implementation)
@@ -385,9 +385,9 @@ typedef struct {
   size_t heap_size;
   // Classpath for built-in files, e.g. rt.jar. Must have definitions for
   // Object.class, etc.
-  bjvm_utf8 runtime_classpath;
+  slice runtime_classpath;
   // Colon-separated custom classpath.
-  bjvm_utf8 classpath;
+  slice classpath;
 } bjvm_vm_options;
 
 // Stack frame associated with a Java method.
@@ -554,8 +554,6 @@ bjvm_vm *bjvm_create_vm(bjvm_vm_options options);
 
 bjvm_vm_options *bjvm_default_vm_options_ptr();
 
-void bjvm_major_gc(bjvm_vm *vm);
-
 typedef struct {
   uint32_t stack_space;
   // Whether to enable JavaScript JIT compilation
@@ -579,16 +577,15 @@ void bjvm_free_classfile(bjvm_classdesc cf);
 
 void bjvm_free_vm(bjvm_vm *vm);
 
-bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread, bjvm_utf8 name);
-bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, bjvm_utf8 name, bool raise_class_not_found);
-bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, bjvm_utf8 chars, const uint8_t *classfile_bytes,
+bjvm_classdesc *bootstrap_lookup_class(bjvm_thread *thread, slice name);
+bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, slice name, bool raise_class_not_found);
+bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, slice chars, const uint8_t *classfile_bytes,
                                             size_t classfile_len);
-int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc);
-bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc, const bjvm_utf8 name, const bjvm_utf8 descriptor,
+bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *classdesc, const slice name, const slice descriptor,
                                    bool superclasses, bool superinterfaces);
 
-void bjvm_register_native(bjvm_vm *vm, const bjvm_utf8 class_name, const bjvm_utf8 method_name,
-                          const bjvm_utf8 method_descriptor, bjvm_native_callback callback);
+void bjvm_register_native(bjvm_vm *vm, const slice class_name, const slice method_name,
+                          const slice method_descriptor, bjvm_native_callback callback);
 
 bjvm_obj_header *new_object(bjvm_thread *thread, bjvm_classdesc *classdesc);
 bjvm_classdesc *bjvm_unmirror_class(bjvm_obj_header *mirror);
@@ -602,19 +599,8 @@ bjvm_cp_method **bjvm_unmirror_ctor(bjvm_obj_header *mirror);
 void bjvm_set_field(bjvm_obj_header *obj, bjvm_cp_field *field, bjvm_stack_value bjvm_stack_value);
 int bjvm_resolve_field(bjvm_thread *thread, bjvm_cp_field_info *info);
 bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field);
-bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc, bjvm_utf8 const name, bjvm_utf8 const descriptor);
-bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc, const bjvm_utf8 name, const bjvm_utf8 descriptor);
-bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
-int bjvm_raise_vm_exception(bjvm_thread *thread, const bjvm_utf8 exception_name, const bjvm_utf8 exception_string);
-void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj);
-void bjvm_null_pointer_exception(bjvm_thread *thread);
-void bjvm_array_index_oob_exception(bjvm_thread *thread, int index, int length);
-void bjvm_array_store_exception(bjvm_thread *thread, bjvm_utf8 class_name);
-void bjvm_negative_array_size_exception(bjvm_thread *thread, int count);
-void bjvm_incompatible_class_change_error(bjvm_thread *thread, bjvm_utf8 complaint);
-void bjvm_unsatisfied_link_error(bjvm_thread *thread, const bjvm_cp_method *method);
-void bjvm_abstract_method_error(bjvm_thread *thread, const bjvm_cp_method *method);
-void bjvm_arithmetic_exception(bjvm_thread *thread, const bjvm_utf8 complaint);
+bjvm_cp_field *bjvm_field_lookup(bjvm_classdesc *classdesc, slice const name, slice const descriptor);
+bjvm_cp_field *bjvm_easy_field_lookup(bjvm_classdesc *classdesc, const slice name, const slice descriptor);
 int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame, struct bjvm_multianewarray_data *multianewarray,
                         uint16_t *sd);
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame);
@@ -622,8 +608,6 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame);
 // e.g. int.class
 struct bjvm_native_Class *bjvm_primitive_class_mirror(bjvm_thread *thread, bjvm_type_kind prim_kind);
 
-bjvm_obj_header *bjvm_intern_string(bjvm_thread *thread, const bjvm_utf8 chars);
-bjvm_obj_header *make_string(bjvm_thread *thread, bjvm_utf8 string);
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 
 #include "natives_gen.h"
@@ -631,13 +615,7 @@ int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info);
 struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc);
 struct bjvm_native_ConstantPool *bjvm_get_constant_pool_mirror(bjvm_thread *thread, bjvm_classdesc *classdesc);
 
-int read_string_to_utf8(bjvm_thread *thread, heap_string *result, bjvm_obj_header *obj);
-bjvm_utf8 bjvm_unparse_field_descriptor(bjvm_utf8 str, const bjvm_field_descriptor *desc);
-void bjvm_reflect_initialize_field(bjvm_thread *thread, bjvm_classdesc *classdesc, bjvm_cp_field *field);
-void bjvm_reflect_initialize_constructor(bjvm_thread *thread, bjvm_classdesc *classdesc, bjvm_cp_method *method);
-void bjvm_reflect_initialize_method(bjvm_thread *thread, bjvm_classdesc *classdesc, bjvm_cp_method *method);
-bjvm_obj_header *bjvm_reflect_get_method_parameters(bjvm_thread *thread, bjvm_cp_method *method);
-bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread, bjvm_utf8 name);
+bjvm_classdesc *load_class_of_field_descriptor(bjvm_thread *thread, slice name);
 int bjvm_get_line_number(const bjvm_attribute_code *method, uint16_t pc);
 void store_stack_value(void *field_location, bjvm_stack_value value, bjvm_type_kind kind);
 bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind);

@@ -8,7 +8,7 @@
 EMSCRIPTEN_KEEPALIVE
 bjvm_vm *bjvm_ffi_create_vm(const char* classpath, bjvm_write_byte stdout_, bjvm_write_byte stderr_) {
   bjvm_vm_options options = bjvm_default_vm_options();
-  options.classpath = (bjvm_utf8){ .chars=(char*)classpath, .len=(int)strlen(classpath)};
+  options.classpath = (slice){ .chars=(char*)classpath, .len=(int)strlen(classpath)};
   options.write_stdout = stdout_;
   options.write_stderr = stderr_;
   options.write_byte_param = nullptr;
@@ -25,7 +25,7 @@ bjvm_thread *bjvm_ffi_create_thread(bjvm_vm *vm) {
 
 EMSCRIPTEN_KEEPALIVE
 bjvm_classdesc *bjvm_ffi_get_class(bjvm_thread *thr, const char *name) {
-  bjvm_classdesc *clazz = bootstrap_lookup_class(thr, (bjvm_utf8){.chars=(char*)name, .len=(int)strlen(name)});
+  bjvm_classdesc *clazz = bootstrap_lookup_class(thr, (slice){.chars=(char*)name, .len=(int)strlen(name)});
   if (!clazz) return nullptr;
   bjvm_initialize_class_t ctx = {.args = {thr, clazz}};
   future_t fut = bjvm_initialize_class(&ctx);

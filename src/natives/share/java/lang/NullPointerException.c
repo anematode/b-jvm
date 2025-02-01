@@ -16,7 +16,7 @@ DECLARE_NATIVE("java/lang", NullPointerException, getExtendedNPEMessage, "()Ljav
   if (get_extended_npe_message(method, pc, &message)) {
     return value_null();
   }
-  bjvm_obj_header *result = make_string(thread, hslc(message));
+  bjvm_obj_header *result = MakeJStringFromModifiedUTF8(thread, hslc(message), false);
   free_heap_str(message);
   return (bjvm_stack_value){.obj = result};
 }

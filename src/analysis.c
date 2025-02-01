@@ -484,25 +484,6 @@ bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
   return is_kind_wide(desc.base_kind) && !desc.dimensions;
 }
 
-bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
-  switch (kind) {
-  case BJVM_TYPE_KIND_BOOLEAN:
-  case BJVM_TYPE_KIND_CHAR:
-  case BJVM_TYPE_KIND_BYTE:
-  case BJVM_TYPE_KIND_SHORT:
-  case BJVM_TYPE_KIND_INT:
-    return BJVM_TYPE_KIND_INT;
-  default:
-    return kind;
-  }
-}
-
-bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
-  if (field->dimensions)
-    return BJVM_TYPE_KIND_REFERENCE;
-  return kind_to_representable_kind(field->base_kind);
-}
-
 void write_kinds_to_bitset(const bjvm_analy_stack_state *inferred_stack,
                            int offset,
                            bjvm_compressed_bitset *bjvm_compressed_bitset,
@@ -2053,7 +2034,7 @@ static int extended_npe_phase2(const bjvm_cp_method *method,
   bjvm_code_analysis *analy = method->code_analysis;
   bjvm_attribute_local_variable_table *lvt = method->code->local_variable_table;
   int original_pc = method->code->code[insn_i].original_pc;
-  const bjvm_utf8 *ent;
+  const slice *ent;
 
   switch (source->kind) {
   case BJVM_VARIABLE_SRC_KIND_PARAMETER:
@@ -2255,7 +2236,7 @@ int get_extended_npe_message(bjvm_cp_method *method, uint16_t pc, heap_string *r
                                phase2_builder.write_pos, phase2_builder.data);
   }
 
-  *result = make_heap_str_from((bjvm_utf8) {builder.data, builder.write_pos});
+  *result = make_heap_str_from((slice) {builder.data, builder.write_pos});
 
 error:
   bjvm_string_builder_free(&builder);

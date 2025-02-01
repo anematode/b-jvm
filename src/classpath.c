@@ -157,7 +157,7 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
     memcpy(&cdr, jar->data + cd_offset, CDR_SIZE_BYTES);
     if (cdr.header != CDR_HEADER)
       return strdup("missing cdr header bytes");
-    bjvm_utf8 filename = {.chars = jar->data + cd_offset + CDR_SIZE_BYTES,
+    slice filename = {.chars = jar->data + cd_offset + CDR_SIZE_BYTES,
                           .len = cdr.filename_len};
     uint32_t header_offset, data_offset;
     memcpy(&header_offset, cdr.local_header_offset, sizeof(data_offset));
@@ -251,7 +251,7 @@ inval:
   return strdup(error);
 }
 
-static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
+static char *add_classpath_entry(bjvm_classpath *cp, slice entry) {
   // If entry ends in .jar, load it as a JAR, otherwise treat it as a folder
   if (entry.len >= 4 && memcmp(entry.chars + entry.len - 4, ".jar", 4) == 0) {
     bjvm_mapped_jar *jar = calloc(1, sizeof(bjvm_mapped_jar));
@@ -277,14 +277,14 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
   return nullptr;
 }
 
-char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path) {
+char *bjvm_init_classpath(bjvm_classpath *cp, slice path) {
   cp->entries = nullptr;
   cp->entries_cap = cp->entries_len = 0;
   cp->as_colon_separated = make_heap_str_from(path);
   int start = 0;
   for (int i = 0; i <= path.len; i++) {
     if (i == path.len || path.chars[i] == ':') {
-      bjvm_utf8 entry = slice_to(path, start, i);
+      slice entry = subslice_to(path, start, i);
       if (entry.len > 0) {
         char *err = add_classpath_entry(cp, entry);
         if (err) {
@@ -313,7 +313,7 @@ void bjvm_free_classpath(bjvm_classpath *cp) {
 enum jar_lookup_result { NOT_FOUND, FOUND, CORRUPT };
 
 // Returns true if found
-enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
+enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, slice filename,
                                   uint8_t **bytes, size_t *len) {
   bjvm_jar_entry *jar_entry =
       bjvm_hash_table_lookup(&jar->entries, filename.chars, filename.len);
@@ -367,17 +367,17 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, bjvm_utf8 filename,
   return NOT_FOUND;
 }
 
-static heap_string concat_path(heap_string name, bjvm_utf8 filename) {
+static heap_string concat_path(heap_string name, slice filename) {
   bool slash = !name.len || name.chars[name.len - 1] != '/';
   heap_string result = make_heap_str(name.len + slash + filename.len);
-  [[maybe_unused]] bjvm_utf8 slice =
+  [[maybe_unused]] slice slice =
       bprintf(hslc(result), "%.*s%s%.*s", fmt_slice(name), slash ? "/" : "",
               fmt_slice(filename));
   assert(slice.len == result.len);
   return result;
 }
 
-bool bad_filename(const bjvm_utf8 filename) {
+bool bad_filename(const slice filename) {
   for (int i = 0; i < filename.len - 1; ++i) {
     if (filename.chars[i] == '.' && filename.chars[i + 1] == '.') {
       return true;
@@ -386,7 +386,7 @@ bool bad_filename(const bjvm_utf8 filename) {
   return false;
 }
 
-int bjvm_lookup_classpath(bjvm_classpath *cp, const bjvm_utf8 filename,
+int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
                           uint8_t **bytes, size_t *len) {
   *bytes = nullptr;
   *len = 0;

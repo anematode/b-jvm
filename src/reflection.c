@@ -5,21 +5,22 @@
 #include "objects.h"
 
 #include <cached_classdescs.h>
+#include <reflection.h>
 
-bjvm_utf8 bjvm_unparse_field_descriptor(bjvm_utf8 str,
+slice bjvm_unparse_field_descriptor(slice str,
                                         const bjvm_field_descriptor *desc) {
-  bjvm_utf8 write = str;
+  slice write = str;
   // Print '[' repeatedly
   int dims = desc->dimensions;
   while (dims--) {
     write.chars[0] = '[';
-    write = slice(write, 1);
+    write = subslice(write, 1);
   }
   if (desc->base_kind == BJVM_TYPE_KIND_REFERENCE) {
     write =
-        slice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
+        subslice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
   } else {
-    write = slice(write, bprintf(write, "%c", desc->base_kind).len);
+    write = subslice(write, bprintf(write, "%c", desc->base_kind).len);
   }
   str.len = write.chars - str.chars;
   return str;
@@ -40,7 +41,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
   field->reflection_field = (void *)F;
 
   F->reflected_field = field;
-  F->name = bjvm_intern_string(thread, field->name);
+  F->name = MakeJStringFromModifiedUTF8(thread, field->name, true);
   F->clazz = (void *)bjvm_get_class_mirror(thread, classdesc);
   F->type = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, field->descriptor));
@@ -107,11 +108,11 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
   M->reflected_method = method;
   M->modifiers = method->access_flags;
 
-  if (!((M->name = bjvm_intern_string(thread, method->name))))
+  if (!((M->name = MakeJStringFromModifiedUTF8(thread, method->name, true))))
     goto oom;
   if (!((M->clazz = (void *)bjvm_get_class_mirror(thread, classdesc))))
     goto oom;
-  if (!((M->signature = make_string(thread, method->unparsed_descriptor))))
+  if (!((M->signature = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, false))))
     goto oom;
 
   for (int i = 0; i < method->attributes_count; ++i) {
@@ -144,13 +145,13 @@ void bjvm_reflect_initialize_method(bjvm_thread *thread,
       method->descriptor->args_count);
   INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
-    bjvm_utf8 desc =
+    slice desc =
         bjvm_unparse_field_descriptor(str, &method->descriptor->args[i]);
     ((void **)ArrayData(M->parameterTypes))[i] = (void *)bjvm_get_class_mirror(
         thread, load_class_of_field_descriptor(thread, desc));
   }
 
-  bjvm_utf8 ret_desc =
+  slice ret_desc =
       bjvm_unparse_field_descriptor(str, &method->descriptor->return_type);
   M->returnType = (void *)bjvm_get_class_mirror(
       thread, load_class_of_field_descriptor(thread, ret_desc));
@@ -180,7 +181,7 @@ static bjvm_obj_header * get_method_parameters_impl(bjvm_thread * thread, bjvm_c
 
     if (!P)
       goto oom;
-    P->name = bjvm_intern_string(thread, mparams.params[j].name);
+    P->name = MakeJStringFromModifiedUTF8(thread, mparams.params[j].name, true);
     if (!P->name)
       goto oom;
     P->executable = method->reflection_method ? (void*)method->reflection_method : (void*)method->reflection_ctor;

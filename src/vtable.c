@@ -71,7 +71,7 @@ static bjvm_itable copy_itable(const bjvm_itable *src) {
 }
 
 // Concatenate the method name and descriptor, separated by a colon.
-static bjvm_utf8 identify(bjvm_utf8 *scratch, const bjvm_cp_method *method) {
+static slice identify(slice *scratch, const bjvm_cp_method *method) {
   char *write = stpncpy(scratch->chars, method->name.chars, scratch->len);
   *write++ = ':';
   write = stpncpy(write, method->unparsed_descriptor.chars,
@@ -102,7 +102,7 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
 
     // Now check if the method is ambiguous
     bjvm_cp_method *d_method = get_unambiguous_method(d);
-    bjvm_utf8 identifier = identify(&scratch, d_method);
+    slice identifier = identify(&scratch, d_method);
     if (bjvm_hash_table_lookup(&poisoned, identifier.chars, identifier.len)) {
       result = mark_ambiguous(result);
     }
@@ -155,7 +155,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
         // priority over superinterfaces
         if (!(underlying->my_class->access_flags & BJVM_ACCESS_INTERFACE))
           continue;
-        bjvm_utf8 ident = identify(&scratch, underlying);
+        slice ident = identify(&scratch, underlying);
         void *existing =
             bjvm_hash_table_lookup(&discovered, ident.chars, ident.len);
         if ((existing && existing != underlying) || is_ambiguous(ref)) {

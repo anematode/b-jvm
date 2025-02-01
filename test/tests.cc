@@ -42,7 +42,7 @@ double get_time() {
 }
 
 TEST_CASE("Test STR() macro") {
-  bjvm_utf8 utf = STR("abc");
+  slice utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
   REQUIRE(utf.chars[2] == 'c');

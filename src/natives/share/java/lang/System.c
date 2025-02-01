@@ -11,14 +11,16 @@
 
 DECLARE_NATIVE("java/lang", System, mapLibraryName,
                "(Ljava/lang/String;)Ljava/lang/String;") {
-  heap_string str = AsHeapString(args[0].handle->obj, on_oom);
+  struct bjvm_native_String *orig_name = (struct bjvm_native_String *)args[0].handle->obj;
+
+  heap_string str = AsHeapString((object)orig_name, on_oom);
 
   if (heap_str_append(&str, STR(".bjvm_lib"))) {
     thread->current_exception = thread->out_of_mem_error;
     goto on_oom;
   }
 
-  bjvm_obj_header *result = MakeJavaStringSlice(thread, hslc(str));
+  bjvm_obj_header *result = MakeJStringFromData(thread, hslc(str), orig_name->coder);
   if (!result) {
     thread->current_exception = thread->out_of_mem_error;
     goto on_oom;

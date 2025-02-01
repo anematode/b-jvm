@@ -47,6 +47,25 @@ static const char *cp_kind_to_string(bjvm_cp_kind kind) {
   }
 }
 
+bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
+  switch (kind) {
+  case BJVM_TYPE_KIND_BOOLEAN:
+  case BJVM_TYPE_KIND_CHAR:
+  case BJVM_TYPE_KIND_BYTE:
+  case BJVM_TYPE_KIND_SHORT:
+  case BJVM_TYPE_KIND_INT:
+    return BJVM_TYPE_KIND_INT;
+  default:
+    return kind;
+  }
+}
+
+bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
+  if (field->dimensions)
+    return BJVM_TYPE_KIND_REFERENCE;
+  return kind_to_representable_kind(field->base_kind);
+}
+
 void free_method(bjvm_cp_method *method) {
   free_code_analysis(method->code_analysis);
 }
@@ -140,11 +159,11 @@ typedef struct {
 } bjvm_classfile_parse_ctx;
 
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
-bjvm_utf8 parse_modified_utf8(const uint8_t *bytes, int len, arena *arena) {
+slice parse_modified_utf8(const uint8_t *bytes, int len, arena *arena) {
   char *result = arena_alloc(arena, len + 1, sizeof(char));
   memcpy(result, bytes, len);
   result[len] = '\0';
-  return (bjvm_utf8){.chars = result, .len = len};
+  return (slice){.chars = result, .len = len};
 }
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_kinds,
@@ -164,7 +183,7 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_k
   format_error_dynamic(strdup(buf));
 }
 
-const bjvm_utf8 * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table){
+const slice * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table){
   // Linear scan throught the whole array
   for (int i = 0; i < table->entries_count; ++i) {
     bjvm_attribute_lvt_entry *entry = table->entries + i;
@@ -189,12 +208,12 @@ bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
   return bjvm_check_cp_entry(&pool->entries[index], expected_kinds, reason);
 }
 
-bjvm_utf8 checked_get_utf8(bjvm_constant_pool *pool, int index,
+slice checked_get_utf8(bjvm_constant_pool *pool, int index,
                            const char *reason) {
   return checked_cp_entry(pool, index, BJVM_CP_KIND_UTF8, reason)->utf8;
 }
 
-char *parse_complete_field_descriptor(const bjvm_utf8 entry,
+char *parse_complete_field_descriptor(const slice entry,
                                       bjvm_field_descriptor *result,
                                       bjvm_classfile_parse_ctx *ctx) {
   const char *chars = entry.chars;
@@ -328,7 +347,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
     uint16_t name_index = reader_next_u16(reader, "name index");
     uint16_t descriptor_index = reader_next_u16(reader, "descriptor index");
 
-    bjvm_utf8 name = skip_linking ? null_str()
+    slice name = skip_linking ? null_str()
                                   : checked_get_utf8(ctx->cp, name_index,
                                                      "name and type name");
 
@@ -344,7 +363,7 @@ bjvm_cp_entry parse_constant_pool_entry(cf_byteslice *reader,
   case CONSTANT_Utf8: {
     uint16_t length = reader_next_u16(reader, "utf8 length");
     cf_byteslice bytes_reader = reader_get_slice(reader, length, "utf8 data");
-    bjvm_utf8 utf8 = {nullptr};
+    slice utf8 = {nullptr};
     if (skip_linking) {
       utf8 = parse_modified_utf8(bytes_reader.bytes, length, ctx->arena);
     }
@@ -1661,7 +1680,7 @@ bjvm_attribute_code parse_code_attribute(cf_byteslice attr_reader,
 }
 
 // 4.2.2. Unqualified Names
-void check_unqualified_name(bjvm_utf8 name, bool is_method,
+void check_unqualified_name(slice name, bool is_method,
                             const char *reading) {
   // "An unqualified name must contain at least one Unicode code point and must
   // not contain any of the ASCII characters . ; [ /"
@@ -1756,7 +1775,7 @@ void parse_attribute(cf_byteslice *reader, bjvm_classfile_parse_ctx *ctx,
       // "If the value of the name_index item is zero, then this parameters
       // element indicates a formal parameter with no name"
       if (name_index) {
-        bjvm_utf8 param_name =
+        slice param_name =
             checked_get_utf8(ctx->cp, name_index, "method parameter name");
         check_unqualified_name(param_name, false, "method parameter name");
         params[i].name = param_name;
@@ -1938,7 +1957,7 @@ char *parse_field_descriptor(const char **chars, size_t len,
       "Expected field descriptor character, but reached end of string");
 }
 
-char *parse_method_descriptor(const bjvm_utf8 entry,
+char *parse_method_descriptor(const slice entry,
                               bjvm_method_descriptor *result, arena *arena) {
   // MethodDescriptor:
   // ( { ParameterDescriptor } )
@@ -2007,7 +2026,7 @@ parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
     arena_uninit(&cf->arena); // clean up our shit
     free(ctx.temp_allocation);
     if (error) {
-      *error = make_heap_str_from((bjvm_utf8){.chars = format_error_msg,
+      *error = make_heap_str_from((slice){.chars = format_error_msg,
                                               .len = strlen(format_error_msg)});
     }
     if (format_error_needs_free)

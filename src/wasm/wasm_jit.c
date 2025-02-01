@@ -208,14 +208,14 @@ void *wasm_runtime_new_object(bjvm_thread *thread, bjvm_classdesc *classdesc) {
 
 EMSCRIPTEN_KEEPALIVE
 int wasm_runtime_raise_npe(bjvm_thread *thread) {
-  bjvm_null_pointer_exception(thread);
+  raise_null_pointer_exception(thread);
   return BJVM_ASYNC_RUN_RESULT_EXC;
 }
 
 EMSCRIPTEN_KEEPALIVE
 int
 wasm_runtime_raise_array_index_oob(bjvm_thread *thread, int index, int length) {
-  bjvm_array_index_oob_exception(thread, index, length);
+  raise_array_index_oob_exception(thread, index, length);
   return BJVM_ASYNC_RUN_RESULT_EXC;
 }
 

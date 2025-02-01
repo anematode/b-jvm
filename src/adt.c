@@ -82,11 +82,11 @@ void *arena_alloc(arena *a, size_t count, size_t bytes) {
   return result;
 }
 
-bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len) {
+slice arena_make_str(arena *a, const char *bytes, int len) {
   char *copy = arena_alloc(a, len + 1, sizeof(char));
   memcpy(copy, bytes, len);
   copy[len] = '\0';
-  return (bjvm_utf8){.chars = copy, .len = len};
+  return (slice){.chars = copy, .len = len};
 }
 
 void arena_uninit(arena *a) {

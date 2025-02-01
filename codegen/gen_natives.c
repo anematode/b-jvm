@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include "../src/bjvm.h"
+#include "../src/linkage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +118,7 @@ int main(int argc, char **argv) {
   printf("/** BEGIN CODEGEN SECTION (gen_natives.c) */\n");
 
   for (int i = 0; i < class_count; ++i) {
-    bjvm_classdesc *desc = bootstrap_lookup_class(thread, (bjvm_utf8) { .chars = classes[i].name, .len = strlen(classes[i].name) });
+    bjvm_classdesc *desc = bootstrap_lookup_class(thread, (slice) { .chars = classes[i].name, .len = strlen(classes[i].name) });
     assert(desc);
     bjvm_link_class(thread, desc);
 

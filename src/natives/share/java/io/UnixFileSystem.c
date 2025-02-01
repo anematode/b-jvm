@@ -45,18 +45,18 @@ DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
   ASYNC_END(value_null());
 }
 
-static heap_string canonicalize_path(bjvm_utf8 path) {
-  bjvm_utf8 *components = nullptr;
+static heap_string canonicalize_path(slice path) {
+  slice *components = nullptr;
   int count = 0, cap = 0;
 
   int i = 0;
   for (int j = 0; j <= path.len; ++j) {
     if (path.chars[j] == '/' || j == path.len) {
-      bjvm_utf8 slice = (bjvm_utf8){path.chars + i, j - i};
-      if (utf8_equals(slice, "..")) {
+      slice slc = (slice){path.chars + i, j - i};
+      if (utf8_equals(slc, "..")) {
         count = count > 0 ? count - 1 : 0;
-      } else if (!utf8_equals(slice, ".") && i < j) {
-        *VECTOR_PUSH(components, count, cap) = slice;
+      } else if (!utf8_equals(slc, ".") && i < j) {
+        *VECTOR_PUSH(components, count, cap) = slc;
       }
       i = j + 1;
     }
@@ -77,19 +77,25 @@ static heap_string canonicalize_path(bjvm_utf8 path) {
 
 DECLARE_NATIVE("java/io", UnixFileSystem, canonicalize0,
                "(Ljava/lang/String;)Ljava/lang/String;") {
+  if (!args[0].handle->obj) {
+    raise_null_pointer_exception(thread);
+    return value_null();
+  }
+
   // Concatenate the current working directory with the given path
-  heap_string path = AsHeapString(args[0].handle->obj, on_oom);
+  object raw = RawStringData(thread, args[0].handle->obj);
+  slice data = (slice) {.chars = ArrayData(raw), .len = *ArrayLength(raw)};
 
-  heap_string canonical = canonicalize_path(hslc(path)); // todo: deal with oom here
+  heap_string canonical = canonicalize_path(data); // todo: deal with oom here
 
-  bjvm_obj_header *result = make_string(thread, hslc(canonical));
+  // canonicalize_path only is looking for sequences of .. and /, whcih look the same regardless of the coding.
+  // It passes other elements on as-is, meaning the canonicalized string has the same encoding as the input string
+  string_coder_kind coder = ((struct bjvm_native_String *)args[0].handle->obj)->coder;
+  bjvm_obj_header *result = MakeJStringFromData(thread, hslc(canonical), coder);
+
   free_heap_str(canonical);
-  free_heap_str(path);
 
   return (bjvm_stack_value){.obj = result};
-
-  on_oom:
-  return value_null();
 }
 
 DECLARE_NATIVE("java/io", UnixFileSystem, getLastModifiedTime,

@@ -900,7 +900,7 @@ void bjvm_wasm_push_export(bjvm_wasm_instantiation_result *result,
   bjvm_wasm_instantiation_export *exp =
       *VECTOR_PUSH(result->exports, result->export_count, result->export_cap);
   exp->name = make_heap_str_from(
-      (bjvm_utf8){.chars = (char *)name, .len = strlen(name)});
+      (slice){.chars = (char *)name, .len = strlen(name)});
   exp->export_ = exported_func;
 }
 

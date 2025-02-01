@@ -120,7 +120,7 @@ bool EndsWith(const std::string &s, const std::string &suffix) {
   return s.substr(s.size() - suffix.size()) == suffix;
 }
 
-int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+int load_classfile(slice filename, void *param, uint8_t **bytes,
                    size_t *len) {
   const char **classpath = (const char **)param;
   const char **classpath_end = classpath;
@@ -197,7 +197,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   TestCaseResult result{};
 
-  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
+  options.classpath = (slice){.chars = (char *)classpath.c_str(),
                                   .len = static_cast<uint16_t>(classpath.size())};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
@@ -216,7 +216,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   }
   bjvm_thread *thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
+  slice m{.chars = (char *)main_class.c_str(),
               .len = static_cast<uint16_t>(main_class.size())};
 
   bjvm_classdesc *desc = bootstrap_lookup_class(thread, m);

@@ -20,11 +20,11 @@ typedef enum {
 } fs_result;
 
 typedef struct {
-  fs_result (*get_attributes)(bjvm_utf8 file_name, boolean_attributes *result);
-  void (*create_virtual_file)(bjvm_utf8 file_name, boolean_attributes attributes, char const* data, size_t size);
+  fs_result (*get_attributes)(slice file_name, boolean_attributes *result);
+  void (*create_virtual_file)(slice file_name, boolean_attributes attributes, char const* data, size_t size);
 } fs;
 
-static inline bjvm_utf8 fs_result_to_string(fs_result result) {
+static inline slice fs_result_to_string(fs_result result) {
   switch (result) {
   case FS_OK:
     return STR("FS_OK");

@@ -1,5 +1,6 @@
 #include "analysis.h"
 
+#include <linkage.h>
 #include <natives-dsl.h>
 
 bool frame_mentions_object(bjvm_stack_frame *raw_frame,
@@ -78,10 +79,10 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
             : bjvm_get_line_number(method->code, frame->plain.program_counter);
     E->declaringClassObject = (void*) bjvm_get_class_mirror(thread, method->my_class);
     E->declaringClass =
-        bjvm_intern_string(thread, hslc(method->my_class->name));
-    E->methodName = bjvm_intern_string(thread, method->name);
+        MakeJStringFromModifiedUTF8(thread, hslc(method->my_class->name), true);
+    E->methodName = MakeJStringFromModifiedUTF8(thread, method->name, true);
     bjvm_attribute_source_file *sf = method->my_class->source_file;
-    E->fileName = sf ? bjvm_intern_string(thread, sf->name) : nullptr;
+    E->fileName = sf ? MakeJStringFromModifiedUTF8(thread, sf->name, true) : nullptr;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
 #undef E
