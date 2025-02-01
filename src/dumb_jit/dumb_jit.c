@@ -397,7 +397,7 @@ static void dumb_lower_arraystore(bjvm_bytecode_insn *insn) {
   local_set(stack_value(I.wasm_type, -2));
 }
 
-static void dumb_lower_long_binop(bjvm_bytecode_insn *insn) {
+static void dumb_lower_longdiv(bjvm_bytecode_insn *insn) {
   bjvm_wasm_binary_op_kind ops[] = {
     [bjvm_insn_ladd] = BJVM_WASM_OP_KIND_I64_ADD,
     [bjvm_insn_lsub] = BJVM_WASM_OP_KIND_I64_SUB,
@@ -444,7 +444,7 @@ static void dumb_lower_long_binop(bjvm_bytecode_insn *insn) {
   }
 }
 
-static void dumb_lower_int_binop(bjvm_bytecode_insn *insn) {
+static void dumb_lower_intdiv(bjvm_bytecode_insn *insn) {
   bjvm_wasm_binary_op_kind ops[] = {
     [bjvm_insn_iadd] = BJVM_WASM_OP_KIND_I32_ADD,
     [bjvm_insn_isub] = BJVM_WASM_OP_KIND_I32_SUB,
@@ -641,20 +641,22 @@ void dumb_lower_athrow() {
   return_zero();
 }
 
-void dumb_lower_unop(bjvm_wasm_value_type in, bjvm_wasm_value_type out, bjvm_wasm_unary_op_kind op) {
+int dumb_lower_unop(bjvm_wasm_value_type in, bjvm_wasm_value_type out, bjvm_wasm_unary_op_kind op) {
   local_get(stack_value(in, -1));
   if (op > 0xFF) {
     byte(op >> 8);
   }
   byte(op & 0xFF);
   local_set(stack_value(out, -1));
+  return 0;
 }
 
-void dumb_lower_binop(bjvm_wasm_value_type in1, bjvm_wasm_value_type in2, bjvm_wasm_value_type out, bjvm_wasm_binary_op_kind op) {
+int dumb_lower_binop(bjvm_wasm_value_type in1, bjvm_wasm_value_type in2, bjvm_wasm_value_type out, bjvm_wasm_binary_op_kind op) {
   local_get(stack_value(in1, -2));
   local_get(stack_value(in2, -1));
   byte(op);
   local_set(stack_value(out, -2));
+  return 0;
 }
 
 static bjvm_type_kind inspect_jvm_value_impl(int32_t test) {
@@ -690,6 +692,108 @@ void dumb_lower_dup_like(bjvm_bytecode_insn *insn) {
 
 }
 
+void bjvm_lower_getfield_resolved(bjvm_bytecode_insn *insn) {
+  struct info {
+    bjvm_wasm_value_type ty;
+    bjvm_wasm_load_op_kind load_op;
+  };
+  struct info infos[] = {
+   [bjvm_insn_getfield_B] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD8_S },
+   [bjvm_insn_getfield_C] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD16_U },
+   [bjvm_insn_getfield_S] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD16_S },
+   [bjvm_insn_getfield_I] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD },
+   [bjvm_insn_getfield_J] = { BJVM_WASM_TYPE_KIND_INT64, BJVM_WASM_OP_KIND_I64_LOAD },
+   [bjvm_insn_getfield_F] = { BJVM_WASM_TYPE_KIND_FLOAT32, BJVM_WASM_OP_KIND_F32_LOAD },
+   [bjvm_insn_getfield_D] = { BJVM_WASM_TYPE_KIND_FLOAT64, BJVM_WASM_OP_KIND_F64_LOAD },
+   [bjvm_insn_getfield_Z] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD8_U },
+   [bjvm_insn_getfield_L] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD },
+  };
+
+  // null check
+  local_get(stack_int(-1));
+  byte(BJVM_WASM_OP_KIND_I32_EQZ);
+  if_();
+  dumb_raise_npe();
+  endif();
+  local_get(stack_int(-1));
+  struct info I = infos[insn->kind];
+  load(I.load_op, (int)insn->ic2);
+  local_set(stack_value(I.ty, -1));
+}
+
+void bjvm_lower_putfield_resolved(bjvm_bytecode_insn *insn) {
+  struct info {
+    bjvm_wasm_value_type ty;
+    bjvm_wasm_store_op_kind store_op;
+  };
+  struct info infos[] = {
+   [bjvm_insn_putfield_B] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE8 },
+   [bjvm_insn_putfield_C] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE16 },
+   [bjvm_insn_putfield_S] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE16 },
+   [bjvm_insn_putfield_I] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE },
+   [bjvm_insn_putfield_J] = { BJVM_WASM_TYPE_KIND_INT64, BJVM_WASM_OP_KIND_I64_STORE },
+   [bjvm_insn_putfield_F] = { BJVM_WASM_TYPE_KIND_FLOAT32, BJVM_WASM_OP_KIND_F32_STORE },
+   [bjvm_insn_putfield_D] = { BJVM_WASM_TYPE_KIND_FLOAT64, BJVM_WASM_OP_KIND_F64_STORE },
+   [bjvm_insn_putfield_Z] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE8 },
+   [bjvm_insn_putfield_L] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE },
+  };
+
+  local_get(stack_int(-2));
+  byte(BJVM_WASM_OP_KIND_I32_EQZ);
+  if_();
+  dumb_raise_npe();
+  endif();
+  local_get(stack_int(-2));
+  local_get(stack_int(-1));
+  struct info I = infos[insn->kind];
+  store(I.store_op, (int)insn->ic2);
+}
+
+void bjvm_lower_getstatic_resolved(bjvm_bytecode_insn *insn) {
+  struct info {
+    bjvm_wasm_value_type ty;
+    bjvm_wasm_load_op_kind load_op;
+  };
+  struct info infos[] = {
+   [bjvm_insn_getstatic_B] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD8_S },
+   [bjvm_insn_getstatic_C] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD16_U },
+   [bjvm_insn_getstatic_S] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD16_S },
+   [bjvm_insn_getstatic_I] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD },
+   [bjvm_insn_getstatic_J] = { BJVM_WASM_TYPE_KIND_INT64, BJVM_WASM_OP_KIND_I64_LOAD },
+   [bjvm_insn_getstatic_F] = { BJVM_WASM_TYPE_KIND_FLOAT32, BJVM_WASM_OP_KIND_F32_LOAD },
+   [bjvm_insn_getstatic_D] = { BJVM_WASM_TYPE_KIND_FLOAT64, BJVM_WASM_OP_KIND_F64_LOAD },
+   [bjvm_insn_getstatic_Z] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD8_U },
+   [bjvm_insn_getstatic_L] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_LOAD },
+  };
+
+  struct info I = infos[insn->kind];
+  load(I.load_op, (int)insn->ic2);
+  local_set(stack_value(I.ty, -1));
+}
+
+void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
+  struct info {
+    bjvm_wasm_value_type ty;
+    bjvm_wasm_store_op_kind store_op;
+  };
+  struct info infos[] = {
+   [bjvm_insn_putstatic_B] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE8 },
+   [bjvm_insn_putstatic_C] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE16 },
+   [bjvm_insn_putstatic_S] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE16 },
+   [bjvm_insn_putstatic_I] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE },
+   [bjvm_insn_putstatic_J] = { BJVM_WASM_TYPE_KIND_INT64, BJVM_WASM_OP_KIND_I64_STORE },
+   [bjvm_insn_putstatic_F] = { BJVM_WASM_TYPE_KIND_FLOAT32, BJVM_WASM_OP_KIND_F32_STORE },
+   [bjvm_insn_putstatic_D] = { BJVM_WASM_TYPE_KIND_FLOAT64, BJVM_WASM_OP_KIND_F64_STORE },
+   [bjvm_insn_putstatic_Z] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE8 },
+   [bjvm_insn_putstatic_L] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE },
+  };
+
+  iconst((int)insn->ic2);
+  local_get(stack_int(-1));
+  struct info I = infos[insn->kind];
+  store(I.store_op, 0);
+}
+
 // Returns non-zero if it failed to lower the instruction (and so a conversion to interpreter should be issued)
 static int dumb_lower_instruction(int pc) {
   bjvm_bytecode_insn *insn = &ctx->code->code[pc];
@@ -707,12 +811,20 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_baload:
   case bjvm_insn_caload:
   case bjvm_insn_daload:
+  case bjvm_insn_faload:
+  case bjvm_insn_iaload:
+  case bjvm_insn_saload:
+  case bjvm_insn_laload:
     dumb_lower_arrayload(insn);
     break;
   case bjvm_insn_aastore:
   case bjvm_insn_bastore:
   case bjvm_insn_castore:
   case bjvm_insn_dastore:
+  case bjvm_insn_fastore:
+  case bjvm_insn_iastore:
+  case bjvm_insn_sastore:
+  case bjvm_insn_lastore:
     dumb_lower_arraystore(insn);
     break;
   case bjvm_insn_aconst_null:
@@ -720,6 +832,10 @@ static int dumb_lower_instruction(int pc) {
     break;
   case bjvm_insn_areturn:
   case bjvm_insn_dreturn:
+  case bjvm_insn_freturn:
+  case bjvm_insn_ireturn:
+  case bjvm_insn_lreturn:
+  case bjvm_insn_return:
     dumb_lower_return(insn);
     break;
   case bjvm_insn_arraylength:
@@ -729,34 +845,27 @@ static int dumb_lower_instruction(int pc) {
     dumb_lower_athrow();
     break;
   case bjvm_insn_d2f:
-    dumb_lower_unop(F64, F32, BJVM_WASM_OP_KIND_F32_DEMOTE_F64);
-    break;
+    return dumb_lower_unop(F64, F32, BJVM_WASM_OP_KIND_F32_DEMOTE_F64);
   case bjvm_insn_d2i:
-    dumb_lower_unop(F64, I32, BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F64_S);
-    break;
+    return dumb_lower_unop(F64, I32, BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F64_S);
   case bjvm_insn_d2l:
-    dumb_lower_unop(F64, I64, BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F64_S);
-    break;
+    return dumb_lower_unop(F64, I64, BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F64_S);
   case bjvm_insn_dadd:
-    dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_ADD);
-    break;
+    return dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_ADD);
   case bjvm_insn_dcmpg:
   case bjvm_insn_dcmpl:
     return -1;
   case bjvm_insn_ddiv:
-    dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_DIV);
-    break;
+    return dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_DIV);
   case bjvm_insn_dmul:
-    dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_MUL);
-    break;
+    return dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_MUL);
   case bjvm_insn_dneg:
-    dumb_lower_unop(F64, F64, BJVM_WASM_OP_KIND_F64_NEG);
-    break;
-  case bjvm_insn_drem:
+    return dumb_lower_unop(F64, F64, BJVM_WASM_OP_KIND_F64_NEG);
+  case bjvm_insn_frem:
+  case bjvm_insn_drem:  // not used in practice
     return -1;
   case bjvm_insn_dsub:
-    dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_SUB);
-    break;
+    return dumb_lower_binop(F64, F64, F64, BJVM_WASM_OP_KIND_F64_SUB);
   case bjvm_insn_dup:
   case bjvm_insn_dup_x1:
   case bjvm_insn_dup_x2:
@@ -765,70 +874,106 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_dup2_x2:
     dumb_lower_dup_like(insn);
     break;
-break;case bjvm_insn_f2d:
-break;case bjvm_insn_f2i:
-break;case bjvm_insn_f2l:
-break;case bjvm_insn_fadd:
-break;case bjvm_insn_faload:
-break;case bjvm_insn_fastore:
-break;case bjvm_insn_fcmpg:
-break;case bjvm_insn_fcmpl:
-break;case bjvm_insn_fdiv:
-break;case bjvm_insn_fmul:
-break;case bjvm_insn_fneg:
-break;case bjvm_insn_frem:
-break;case bjvm_insn_freturn:
-break;case bjvm_insn_fsub:
-break;case bjvm_insn_i2b:
-break;case bjvm_insn_i2c:
-break;case bjvm_insn_i2d:
-break;case bjvm_insn_i2f:
-break;case bjvm_insn_i2l:
-break;case bjvm_insn_i2s:
-break;case bjvm_insn_iadd:
-break;case bjvm_insn_iaload:
-break;case bjvm_insn_iand:
-break;case bjvm_insn_iastore:
-break;case bjvm_insn_idiv:
-break;case bjvm_insn_imul:
-break;case bjvm_insn_ineg:
-break;case bjvm_insn_ior:
-break;case bjvm_insn_irem:
-break;case bjvm_insn_ireturn:
-break;case bjvm_insn_ishl:
-break;case bjvm_insn_ishr:
-break;case bjvm_insn_isub:
-break;case bjvm_insn_iushr:
-break;case bjvm_insn_ixor:
-break;case bjvm_insn_l2d:
-break;case bjvm_insn_l2f:
-break;case bjvm_insn_l2i:
-break;case bjvm_insn_ladd:
-break;case bjvm_insn_laload:
-break;case bjvm_insn_land:
-break;case bjvm_insn_lastore:
-break;case bjvm_insn_lcmp:
-break;case bjvm_insn_ldiv:
-break;case bjvm_insn_lmul:
-break;case bjvm_insn_lneg:
-break;case bjvm_insn_lor:
-break;case bjvm_insn_lrem:
-break;case bjvm_insn_lreturn:
-break;case bjvm_insn_lshl:
-break;case bjvm_insn_lshr:
-break;case bjvm_insn_lsub:
-break;case bjvm_insn_lushr:
-break;case bjvm_insn_lxor:
-break;case bjvm_insn_monitorenter:
-break;case bjvm_insn_monitorexit:
-break;case bjvm_insn_pop:
-break;case bjvm_insn_pop2:
-break;case bjvm_insn_return:
-break;case bjvm_insn_saload:
-break;case bjvm_insn_sastore:
-  case bjvm_insn_swap:
+  case bjvm_insn_f2d:
+    return dumb_lower_unop(F32, F64, BJVM_WASM_OP_KIND_F64_PROMOTE_F32);
+  case bjvm_insn_f2i:
+    return dumb_lower_unop(F32, I32, BJVM_WASM_OP_KIND_I32_TRUNC_SAT_F32_S);
+  case bjvm_insn_f2l:
+    return dumb_lower_unop(F32, I64, BJVM_WASM_OP_KIND_I64_TRUNC_SAT_F32_S);
+  case bjvm_insn_fadd:
+    return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_ADD);
+  case bjvm_insn_fcmpg:
+  case bjvm_insn_fcmpl:
+  case bjvm_insn_lcmp:
+    return -1; // unfused compare
+  case bjvm_insn_fdiv:
+    return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_DIV);
+  case bjvm_insn_fmul:
+    return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_MUL);
+  case bjvm_insn_fneg:
+    return dumb_lower_unop(F32, F32, BJVM_WASM_OP_KIND_F32_NEG);
+  case bjvm_insn_fsub:
+    return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_SUB);
+  case bjvm_insn_i2b:
+    dumb_lower_i2b(insn);
+    break;
+  case bjvm_insn_i2c:
+    dumb_lower_i2c(insn);
+    break;
+  case bjvm_insn_i2d:
+    return dumb_lower_unop(I32, F64, BJVM_WASM_OP_KIND_F64_CONVERT_S_I32);
+  case bjvm_insn_i2f:
+    return dumb_lower_unop(I32, F32, BJVM_WASM_OP_KIND_F32_CONVERT_S_I32);
+  case bjvm_insn_i2l:
+    return dumb_lower_unop(I32, I64, BJVM_WASM_OP_KIND_I64_EXTEND_S_I32);
+  case bjvm_insn_i2s:
+    return dumb_lower_i2s(insn);
+  case bjvm_insn_iadd:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_ADD);
+  case bjvm_insn_iand:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_AND);
+  case bjvm_insn_idiv:
+    dumb_lower_intdiv(insn);
+    break;
+  case bjvm_insn_imul:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_MUL);
+  case bjvm_insn_ineg:
+    dumb_lower_ineg(insn);
+    break;
+  case bjvm_insn_ior:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_OR);
+  case bjvm_insn_irem:
+    dumb_lower_intdiv(insn);
+    break;
+  case bjvm_insn_ishl:
+    // WASM wraps as Java requires "Return the result of shifting i1 left by k bits, modulo 2^N."
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_SHL);
+  case bjvm_insn_ishr:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_SHR_S);
+  case bjvm_insn_isub:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_SUB);
+  case bjvm_insn_iushr:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_SHR_U);
+  case bjvm_insn_ixor:
+    return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_XOR);
+  case bjvm_insn_l2d:
+    return dumb_lower_unop(I64, F64, BJVM_WASM_OP_KIND_F64_CONVERT_S_I64);
+  case bjvm_insn_l2f:  // no double rounding here :)
+    return dumb_lower_unop(I64, F32, BJVM_WASM_OP_KIND_F32_CONVERT_S_I64);
+  case bjvm_insn_l2i:
+    return dumb_lower_unop(I64, I32, BJVM_WASM_OP_KIND_I32_WRAP_I64);
+  case bjvm_insn_ladd:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_ADD);
+  case bjvm_insn_land:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_AND);
+  case bjvm_insn_ldiv:
+  case bjvm_insn_lrem:
+    dumb_lower_longdiv(insn);
+    break;
+  case bjvm_insn_lmul:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_MUL);
+  case bjvm_insn_lneg:
+    dumb_lower_lneg(insn);
+    break;
+  case bjvm_insn_lor:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_OR);
+  case bjvm_insn_lshl:
+  case bjvm_insn_lshr:
+  case bjvm_insn_lushr:
+    return dumb_lower_long_shiftop(insn);
+  case bjvm_insn_lsub:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_SUB);
+  case bjvm_insn_lxor:
+    return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_XOR);
+  case bjvm_insn_monitorenter:
+  case bjvm_insn_monitorexit:
+    return -1;  // for now
+  case bjvm_insn_pop:
+  case bjvm_insn_pop2:
+    return 0;  // no work involved
+  case bjvm_insn_swap:  // Not used in practice
     return -1;
-  case bjvm_insn_anewarray:
+  case bjvm_insn_anewarray:  // Unresolved instructions
   case bjvm_insn_checkcast:
   case bjvm_insn_getfield:
   case bjvm_insn_getstatic:
@@ -840,21 +985,24 @@ break;case bjvm_insn_sastore:
   case bjvm_insn_invokevirtual:
   case bjvm_insn_invokespecial:
   case bjvm_insn_invokestatic:
+  case bjvm_insn_invokeinterface:
     return -1;
   case bjvm_insn_ldc:
-break;case bjvm_insn_ldc2_w:
-break;case bjvm_insn_dload:
-break;case bjvm_insn_fload:
-break;case bjvm_insn_iload:
-break;case bjvm_insn_lload:
-break;case bjvm_insn_dstore:
-break;case bjvm_insn_fstore:
-break;case bjvm_insn_istore:
-break;case bjvm_insn_lstore:
-break;case bjvm_insn_aload:
-break;case bjvm_insn_astore:
+  case bjvm_insn_ldc2_w:
+    dumb_lower_ldc(insn);
+    break;
+  case bjvm_insn_dload:
+  case bjvm_insn_fload:
+  case bjvm_insn_iload:
+  case bjvm_insn_lload:
+  case bjvm_insn_dstore:
+  case bjvm_insn_fstore:
+  case bjvm_insn_istore:
+  case bjvm_insn_lstore:
+  case bjvm_insn_aload:
+  case bjvm_insn_astore:
+    dumb_lower_local_access(insn);
 break;case bjvm_insn_goto:
-break;case bjvm_insn_jsr:
 break;case bjvm_insn_if_acmpeq:
 break;case bjvm_insn_if_acmpne:
 break;case bjvm_insn_if_icmpeq:
@@ -871,17 +1019,32 @@ break;case bjvm_insn_ifgt:
 break;case bjvm_insn_ifle:
 break;case bjvm_insn_ifnonnull:
 break;case bjvm_insn_ifnull:
-break;case bjvm_insn_iconst:
-break;case bjvm_insn_dconst:
-break;case bjvm_insn_fconst:
-break;case bjvm_insn_lconst:
-break;case bjvm_insn_iinc:
-break;case bjvm_insn_invokeinterface:
-break;case bjvm_insn_multianewarray:
-break;case bjvm_insn_newarray:
-break;case bjvm_insn_tableswitch:
-break;case bjvm_insn_lookupswitch:
-break;case bjvm_insn_ret:
+  case bjvm_insn_iconst:
+    dumb_lower_iconst(insn);
+    break;
+  case bjvm_insn_dconst:
+    dumb_lower_dconst(insn);
+    break;
+  case bjvm_insn_fconst:
+    dumb_lower_fconst(insn);
+    break;
+  case bjvm_insn_lconst:
+    dumb_lower_lconst(insn);
+    break;
+  case bjvm_insn_iinc:
+    dumb_lower_iinc(insn);
+    break;
+  case bjvm_insn_multianewarray:
+    return -1; // for now
+  case bjvm_insn_newarray:
+    dumb_lower_newarray(insn);
+    break;
+  case bjvm_insn_tableswitch:
+  case bjvm_insn_lookupswitch:
+    return -1;  // will become a br_table
+  case bjvm_insn_ret:
+  case bjvm_insn_jsr:
+    return -1; // not used in practice
 break;case bjvm_insn_anewarray_resolved:
 break;case bjvm_insn_checkcast_resolved:
 break;case bjvm_insn_instanceof_resolved:
@@ -890,19 +1053,22 @@ break;case bjvm_insn_invokevtable_monomorphic:
 break;case bjvm_insn_invokevtable_polymorphic:
 break;case bjvm_insn_invokeitable_monomorphic:
 break;case bjvm_insn_invokeitable_polymorphic:
-break;case bjvm_insn_invokespecial_resolved:
-break;case bjvm_insn_invokestatic_resolved:
+  case bjvm_insn_invokespecial_resolved:
+  case bjvm_insn_invokestatic_resolved:
 break;case bjvm_insn_invokecallsite:
-break;case bjvm_insn_invokesigpoly:
-break;case bjvm_insn_getfield_B:
-break;case bjvm_insn_getfield_C:
-break;case bjvm_insn_getfield_S:
-break;case bjvm_insn_getfield_I:
-break;case bjvm_insn_getfield_J:
-break;case bjvm_insn_getfield_F:
-break;case bjvm_insn_getfield_D:
-break;case bjvm_insn_getfield_Z:
-break;case bjvm_insn_getfield_L:
+  case bjvm_insn_invokesigpoly:
+    return -1;
+  case bjvm_insn_getfield_B:
+  case bjvm_insn_getfield_C:
+  case bjvm_insn_getfield_S:
+  case bjvm_insn_getfield_I:
+  case bjvm_insn_getfield_J:
+  case bjvm_insn_getfield_F:
+  case bjvm_insn_getfield_D:
+  case bjvm_insn_getfield_Z:
+  case bjvm_insn_getfield_L:
+    bjvm_lower_getfield_resolved(insn);
+    break;
 break;case bjvm_insn_putfield_B:
 break;case bjvm_insn_putfield_C:
 break;case bjvm_insn_putfield_S:
@@ -934,5 +1100,11 @@ break;case bjvm_insn_dsqrt:
 break;}
 
   return -1;
+}
+
+// pc + 1 is one of ifle, ifge, iflt or ifgt and pc is an lcmp or fcmp instruction. Although it's legal for lcmp/fcmp to
+// be emitted without a jump, it doesn't happen in practice.
+static int dumb_lower_fused_compare(int pc) {
+
 }
 

@@ -26,6 +26,9 @@ static int dumb_jit_compile(bjvm_cp_method *method, dumb_jit_options options);
 // Call the given method (method->jit_entry) with the given arguments, and write the result into the given pointer.
 typedef void (*jit_adapter_t)(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, bjvm_stack_value *result);
 
+void *create_adapter_to_interpreter(const bjvm_cp_method *method);
+jit_adapter_t create_adapter_to_jit(const bjvm_cp_method *method);
+
 #ifdef __cplusplus
 }
 #endif

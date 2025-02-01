@@ -70,6 +70,8 @@ void try_interpreter_void(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stac
   assert(fut.status == FUTURE_READY);
 }
 
+/** END INTERPRETER ADAPTERS */
+
 static bjvm_wasm_expression *thread(bjvm_wasm_module *module) {
   return bjvm_wasm_local_get(module, THREAD_PARAM, bjvm_wasm_int32());
 }
@@ -133,23 +135,7 @@ static void *create_adapter_to_interpreter_impl(bjvm_wasm_value_type *args_types
 
   for (int i = 0; i < argc; ++i) {
     bjvm_wasm_expression *base = bjvm_wasm_local_get(module, args_base_local, bjvm_wasm_int32());
-    bjvm_wasm_store_op_kind store_op;
-    switch (args_types[i]) {
-      case BJVM_WASM_TYPE_KIND_INT32:
-        store_op = BJVM_WASM_OP_KIND_I32_STORE;
-        break;
-      case BJVM_WASM_TYPE_KIND_INT64:
-        store_op = BJVM_WASM_OP_KIND_I64_STORE;
-        break;
-      case BJVM_WASM_TYPE_KIND_FLOAT32:
-        store_op = BJVM_WASM_OP_KIND_F32_STORE;
-        break;
-      case BJVM_WASM_TYPE_KIND_FLOAT64:
-        store_op = BJVM_WASM_OP_KIND_F64_STORE;
-        break;
-      default:
-        UNREACHABLE();
-    }
+    bjvm_wasm_store_op_kind store_op = store_ops[args_types[i]];
     bjvm_wasm_expression *get_arg = bjvm_wasm_local_get(module, i + 2, (bjvm_wasm_type) { args_types[i] });
     arrput(seq, bjvm_wasm_store(module, store_op, base, get_arg, 1, i * sizeof(bjvm_stack_value)));
   }
