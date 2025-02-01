@@ -25,6 +25,7 @@ typedef struct bjvm_gc_ctx {
   {                                                                            \
     __typeof(x) v = (x);                                                       \
     if (*v) {                                                                  \
+      printf("Pushing root %p %d\n", *v, __LINE__);                                         \
       *VECTOR_PUSH(ctx->roots, ctx->roots_count, ctx->roots_cap) =             \
           (bjvm_obj_header **)v;                                               \
     }                                                                          \
@@ -335,6 +336,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
   int *bitset_list[1000] = {nullptr}, capacity[1000] = {0};
   for (int i = 0; i < ctx.roots_count; ++i) {
     bjvm_obj_header *root = *ctx.roots[i];
+    printf("Root: %p\n", root);
     if (!(root->mark_word & REACHABLE_BIT))
       bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
   }

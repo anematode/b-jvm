@@ -1275,7 +1275,7 @@ bool sources_equal(bjvm_stack_variable_source src1, bjvm_stack_variable_source s
 }
 
 bool filter_locals(bjvm_analy_stack_state *s1,
-                   const bjvm_analy_stack_state *s2) {
+                   bjvm_analy_stack_state *s2) {
   if (s1->entries_count != s2->entries_count) {
     printf("%s\n%s\n", print_analy_stack_state(s1),
            print_analy_stack_state(s2));
@@ -1286,6 +1286,7 @@ bool filter_locals(bjvm_analy_stack_state *s1,
     if (s1->entries[i].type != BJVM_TYPE_KIND_VOID &&
         s1->entries[i].type != s2->entries[i].type) {
       s1->entries[i].type = BJVM_TYPE_KIND_VOID;
+      s2->entries[i].type = BJVM_TYPE_KIND_VOID;
       changed = true;
     }
   }

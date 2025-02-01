@@ -20,7 +20,7 @@
 // read back, e.g. for GC purposes, or when interrupting), the TOS value and
 
 #define DEBUG_CHECK
-#if 0
+#if 1
 #undef DEBUG_CHECK
 #define DEBUG_CHECK                                                                                                    \
   SPILL_VOID                                                                                                           \
@@ -1535,10 +1535,8 @@ static int64_t newarray_impl_int(ARGS_INT) {
 }
 
 static int64_t anewarray_impl_int(ARGS_INT) {
-
   DEBUG_CHECK
   bjvm_cp_class_info *info = &insn->cp->class_info;
-  SPILL(tos)
   if (bjvm_resolve_class(thread, info)) {
     return 0;
   }
@@ -1553,11 +1551,10 @@ static int64_t anewarray_impl_int(ARGS_INT) {
 
 // <length> -> <object>
 static int64_t anewarray_resolved_impl_int(ARGS_INT) {
-
   DEBUG_CHECK
   int count = tos;
-  SPILL(tos)
   if (count < 0) {
+    SPILL_VOID
     raise_negative_array_size_exception(thread, count);
     return 0;
   }
@@ -2230,8 +2227,7 @@ static int64_t ldc_impl_void(ARGS_VOID) {
   }
   case BJVM_CP_KIND_STRING: {
     if (likely(ent->string.interned)) {
-      bjvm_obj_header *s = ent->string.interned;
-      NEXT_INT(s);
+      NEXT_INT(ent->string.interned);
     }
     slice s = ent->string.chars;
     SPILL_VOID

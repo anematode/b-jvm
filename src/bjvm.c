@@ -544,7 +544,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 23;
+  options.heap_size = 1 << 18;
   options.runtime_classpath = STR("./jdk23.jar");
   return options;
 }
