@@ -787,24 +787,27 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bootstrap_lookup_class(thr, STR("java/lang/reflect/Field"));
   bootstrap_lookup_class(thr, STR("java/lang/reflect/Constructor"));
 
-  struct bjvm_native_Thread *java_thr = (void *)new_object(thr, vm->cached_classdescs->thread);
+  bjvm_handle *java_thread = bjvm_make_handle(thr, new_object(thr, vm->cached_classdescs->thread));
+#define java_thr ((struct bjvm_native_Thread *)java_thread->obj)
   thr->thread_obj = java_thr;
 
   java_thr->vm_thread = thr;
   java_thr->name = MakeJStringFromCString(thr, "main", true);
+
+  // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
+  bjvm_cp_method *make_thread = bjvm_method_lookup(vm->cached_classdescs->thread, STR("<init>"),
+                                                   STR("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"), false, false);
 
   bjvm_obj_header *main_thread_group = options.thread_group;
   if (!main_thread_group) {
     main_thread_group = get_main_thread_group(thr);
   }
 
-  // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
-  bjvm_cp_method *make_thread = bjvm_method_lookup(vm->cached_classdescs->thread, STR("<init>"),
-                                                   STR("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"), false, false);
-
   call_interpreter_synchronous(thr, make_thread,
                        (bjvm_stack_value[]){{.obj = (void *)java_thr}, {.obj = main_thread_group}, {.obj = java_thr->name}});
 
+#undef java_thr
+  bjvm_drop_handle(thr, java_thread);
   slice const phases[3] = {STR("initPhase1"), STR("initPhase2"), STR("initPhase3")};
   slice const signatures[3] = {STR("()V"), STR("(ZZ)I"), STR("()V")};
 
@@ -1391,6 +1394,8 @@ void bjvm_out_of_memory(bjvm_thread *thread) {
   vm->heap_capacity = original_capacity;
 }
 
+#define GC_EVERY_ALLOCATION 1
+
 void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
@@ -1398,7 +1403,7 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
 #if AGGRESSIVE_DEBUG
   printf("Allocating %zu bytes, %zu used, %zu capacity\n", bytes, vm->heap_used, vm->heap_capacity);
 #endif
-  if (vm->heap_used + bytes > vm->heap_capacity) {
+  if (vm->heap_used + bytes > vm->heap_capacity || GC_EVERY_ALLOCATION) {
     bjvm_major_gc(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {
       bjvm_out_of_memory(thread);
@@ -1830,7 +1835,11 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread, bjvm_classd
     UNREACHABLE();
   }
 
-  struct bjvm_native_Class *class_mirror = classdesc->mirror = (void *)new_object(thread, java_lang_Class);
+  classdesc->mirror = (void *)new_object(thread, java_lang_Class);
+  bjvm_handle *cm_handle = bjvm_make_handle(thread, (void*)classdesc->mirror);
+
+#define class_mirror ((struct bjvm_native_Class *)cm_handle->obj)
+
   if (class_mirror) {
     class_mirror->reflected_class = classdesc;
     if (classdesc->module)
@@ -1838,8 +1847,10 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread, bjvm_classd
     class_mirror->componentType =
         classdesc->one_fewer_dim ? (void *)bjvm_get_class_mirror(thread, classdesc->one_fewer_dim) : nullptr;
   }
-
-  return class_mirror;
+  struct bjvm_native_Class *result = class_mirror;
+  bjvm_drop_handle(thread, cm_handle);
+  return result;
+#undef class_mirror
 }
 
 bool bjvm_instanceof_interface(const bjvm_classdesc *o, const bjvm_classdesc *classdesc) {

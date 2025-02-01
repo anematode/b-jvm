@@ -170,6 +170,9 @@ static void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     bjvm_hash_table_iterator_next(&it);
   }
 
+  // main thread group
+  PUSH_ROOT(&vm->main_thread_group);
+
   // Modules
   it = bjvm_hash_table_get_iterator(&vm->modules);
   bjvm_module *module;
