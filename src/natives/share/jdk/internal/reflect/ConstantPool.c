@@ -1,4 +1,4 @@
-#include <natives-dsl.h>
+#include "natives-dsl.h"
 
 bjvm_cp_entry *lookup_entry(bjvm_obj_header *obj, int index,
                             bjvm_cp_kind expected) {

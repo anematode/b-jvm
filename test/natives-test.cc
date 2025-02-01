@@ -53,8 +53,8 @@ TEST_CASE("Async natives") {
   bjvm_cp_method *method = bjvm_method_lookup(desc, STR("asyncNativeMethod"), STR("(I)I"), false, false);
   REQUIRE(method != nullptr);
 
-  run_thread_t ctx = {.args = {.thread = thread, .method = method, .args = args}};
+  call_interpreter_t ctx = {.args = {.thread = thread, .method = method, .args = args}};
   future_t fut = {};
   while (fut.status == FUTURE_NOT_READY)
-    fut = run_thread(&ctx);
+    fut = call_interpreter(&ctx);
 }

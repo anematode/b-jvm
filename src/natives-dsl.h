@@ -6,6 +6,10 @@
 #include <natives-dsl.h>
 #include <stddef.h>
 
+#ifdef EMSCRIPTEN
+#include <emscripten.h>
+#endif
+
 maybe_extern_begin;
 void push_bjvm_native(bjvm_utf8 class_name, bjvm_utf8 method_name, bjvm_utf8 signature, bjvm_native_callback native);
 
@@ -164,7 +168,8 @@ extern bjvm_native_t *bjvm_natives;
   check_field_offset(name, args.obj, args.obj);                                                                             \
   check_field_offset(name, args.args, args.args);                                                                           \
   check_field_offset(name, args.argc, args.argc);                                                                           \
-  check_field_offset(name, _state, stage);
+  check_field_offset(name, _state, stage); \
+  check_field_offset(name, _result, result);
 
 #undef _DECLARE_CACHED_STATE
 #undef _RELOAD_CACHED_STATE
@@ -184,20 +189,15 @@ extern bjvm_native_t *bjvm_natives;
   } while (0)
 
 #define DECLARE_ASYNC_NATIVE_(package_path, class_name_, method_name_, method_descriptor_, locals,                     \
-                              invoked_async_methods, modifier, start_index)                                            \
+                              invoked_async_methods, modifier)                                            \
   create_async_declaration(class_name_##_##method_name_##_cb##modifier, locals, invoked_async_methods);                \
   create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier,                       \
                           sizeof(struct class_name_##_##method_name_##_cb##modifier##_s), async);                      \
-  DEFINE_ASYNC_SL(class_name_##_##method_name_##_cb##modifier, start_index)
-
-#define DECLARE_ASYNC_NATIVE_SL(package_path, class_name_, method_name_, method_descriptor_, locals,                   \
-                                invoked_async_methods, start_index)                                                    \
-  force_expand_args(DECLARE_ASYNC_NATIVE_, package_path, class_name_, method_name_, method_descriptor_, locals,        \
-                    invoked_async_methods, __COUNTER__, start_index)
+  DEFINE_ASYNC(class_name_##_##method_name_##_cb##modifier)
 
 #define DECLARE_ASYNC_NATIVE(package_path, class_name_, method_name_, method_descriptor_, locals,                      \
                              invoked_async_methods)                                                                    \
-  DECLARE_ASYNC_NATIVE_SL(package_path, class_name_, method_name_, method_descriptor_, locals, invoked_async_methods, 0)
+  force_expand_args(DECLARE_ASYNC_NATIVE_, package_path, class_name_, method_name_, method_descriptor_, locals, invoked_async_methods, __COUNTER__)
 
 #define empty(...)
 
@@ -205,10 +205,10 @@ extern bjvm_native_t *bjvm_natives;
   DECLARE_ASYNC(return_type, binding_name, \
     locals(), \
     bjvm_thread *thread; object receiver; args_;, \
-    invoked_methods(invoked_method(run_thread)) \
+    invoked_methods(invoked_method(call_interpreter)) \
   );                                                         \
                                                                                                                        \
-  DEFINE_ASYNC_SL_(empty, binding_name, 0) {                                                                           \
+  DEFINE_ASYNC_(, empty, binding_name) {                                                                           \
     /* inline cache here? */                                                                                           \
     bjvm_cp_method *method =                                                                                           \
         bjvm_method_lookup(self->args.receiver->descriptor, STR(method_name), STR(method_descriptor), true, true);     \
@@ -216,9 +216,9 @@ extern bjvm_native_t *bjvm_natives;
     assert((sizeof(self->args) - sizeof(bjvm_thread *)) / sizeof(bjvm_stack_value) ==                                  \
            method->descriptor->args_count + 1);                                                                        \
     assert((sizeof(self->args) - sizeof(bjvm_thread *)) % sizeof(bjvm_stack_value) == 0);                              \
-    AWAIT_INNER_(empty, &self->invoked_async_methods.run_thread, run_thread, self->args.thread, method,                \
+    AWAIT_INNER_(empty, &self->invoked_async_methods.call_interpreter, call_interpreter, self->args.thread, method,                \
                  (bjvm_stack_value *)self->args.receiver);                                                             \
-    bjvm_stack_value result = get_async_result(run_thread);                                                            \
+    bjvm_stack_value result = get_async_result(call_interpreter);                                                            \
     ASYNC_END(*((return_type *)&result));                                                                              \
   }
 
@@ -228,9 +228,9 @@ extern bjvm_native_t *bjvm_natives;
     assert(method);                                                                                                    \
     bjvm_stack_value args[] = {receiver, __VA_ARGS__};                                                                 \
     assert((sizeof(args) / sizeof(args[0])) == method->descriptor.args_count);                                         \
-    AWAIT(run_thread, thread, method, &args);                                                                          \
+    AWAIT(call_interpreter, thread, method, &args);                                                                          \
     if (result != nullptr) {                                                                                           \
-      *result = get_async_result(run_thread);                                                                          \
+      *result = get_async_result(call_interpreter);                                                                          \
     }                                                                                                                  \
   } while (0)
 #endif

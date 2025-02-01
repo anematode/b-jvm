@@ -1,5 +1,5 @@
 build
-cmake-build-debug*
+cmake-build-*
 test/jre8
 website
 test/jdk23-exploded

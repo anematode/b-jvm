@@ -262,10 +262,15 @@ static char *add_classpath_entry(bjvm_classpath *cp, bjvm_utf8 entry) {
     char *error = load_filesystem_jar(filename, jar);
     free(filename);
 
+    if (error) {
+      printf("JAR loading error: %s\n", error);
+      return error;
+    }
+
     *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
         (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
 
-    return error;
+    return nullptr;
   }
   *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
       (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};

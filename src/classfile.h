@@ -373,6 +373,16 @@ typedef enum {
   BJVM_MH_KIND_LAST = 9
 } bjvm_method_handle_kind;
 
+static inline bool mh_is_invoke(bjvm_method_handle_kind kind) {
+  return kind >= BJVM_MH_KIND_INVOKE_VIRTUAL && kind <= BJVM_MH_KIND_INVOKE_INTERFACE;
+}
+
+static inline bool mh_is_vh(bjvm_method_handle_kind kind) {
+  // return kind & (BJVM_MH_KIND_GET_FIELD | BJVM_MH_KIND_GET_STATIC |
+  //                BJVM_MH_KIND_PUT_FIELD | BJVM_MH_KIND_PUT_STATIC);
+  return kind <= BJVM_MH_KIND_PUT_STATIC && kind >= BJVM_MH_KIND_GET_FIELD;
+}
+
 typedef struct {
   bjvm_method_handle_kind handle_kind;
   bjvm_cp_entry *reference;
@@ -416,6 +426,11 @@ enum bjvm_cp_kind : uint32_t {
   BJVM_CP_KIND_PACKAGE = 1 << 16,
   BJVM_CP_KIND_LAST = 1 << 16
 };
+
+static inline bool cp_kind_is_primitive(bjvm_cp_kind kind) {
+  return kind == BJVM_CP_KIND_INTEGER || kind == BJVM_CP_KIND_FLOAT ||
+         kind == BJVM_CP_KIND_LONG || kind == BJVM_CP_KIND_DOUBLE;
+}
 
 typedef struct bjvm_cp_entry {
   bjvm_cp_kind kind;

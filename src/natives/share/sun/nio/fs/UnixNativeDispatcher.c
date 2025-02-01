@@ -11,8 +11,7 @@ static bjvm_obj_header* create_unix_exception(bjvm_thread *thread, int errno_cod
   bjvm_obj_header *obj = new_object(thread, classdesc);
 
   bjvm_cp_method *method = bjvm_method_lookup(classdesc, STR("<init>"), STR("(I)V"), true, false);
-  int result = bjvm_thread_run_leaf(thread, method, (bjvm_stack_value[]){{.obj = obj}, {.i = errno_code}}, nullptr);
-  assert(result == 0);
+  call_interpreter_synchronous(thread, method, (bjvm_stack_value[]){{.obj = obj}, {.i = errno_code}}); // constructor is void method
 
   return obj;
 }

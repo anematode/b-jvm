@@ -199,25 +199,29 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
   return (bjvm_stack_value){.obj = (void *)mn->obj};
 }
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
-               "(Ljava/lang/invoke/MemberName;)Ljava/lang/Object;") {
-  // Create object array of length 2. Make the first element the vmtarget and
-  // the second the vmindex as a boxed Long.
+DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
+               "(Ljava/lang/invoke/MemberName;)Ljava/lang/Object;",
+               locals(), invoked_methods(invoked_method(call_interpreter))) {
+  // Create object array of length 2. Returns {vmindex, vmtarget},
+  // boxing the vmindex as a Long.
   assert(argc == 1);
-  struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
-  bjvm_obj_header *array = CreateObjectArray1D(
-      thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 2);
-
-  bjvm_obj_header **data = ArrayData(array);
+#define mn ((struct bjvm_native_MemberName *) args[0].handle->obj)
 
   bjvm_classdesc *Long = bootstrap_lookup_class(thread, STR("java/lang/Long"));
-  bjvm_cp_method *valueFrom = bjvm_method_lookup(
+  bjvm_cp_method *valueOf = bjvm_method_lookup(
       Long, STR("valueOf"), STR("(J)Ljava/lang/Long;"), false, false);
 
-  bjvm_stack_value result;
-  bjvm_thread_run_root(thread, valueFrom, (bjvm_stack_value[]){{.l = mn->vmindex}},
-                  &result);
-  data[0] = result.obj;
+
+  AWAIT(call_interpreter, thread, valueOf, (bjvm_stack_value[]){{.l = mn->vmindex}});
+  bjvm_stack_value vmindex_long_obj = get_async_result(call_interpreter);
+  // todo: check exception
+
+  bjvm_obj_header *array = CreateObjectArray1D(
+      thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 2);
+  // todo check exception (out of memory error)
+
+  bjvm_obj_header **data = ArrayData(array);
+  data[0] = vmindex_long_obj.obj;
 
   // either mn->type or mn itself depending on the kind
   switch (unpack_mn_kind(mn)) {
@@ -232,13 +236,14 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   case BJVM_MH_KIND_NEW_INVOKE_SPECIAL:
   case BJVM_MH_KIND_INVOKE_VIRTUAL:
   case BJVM_MH_KIND_INVOKE_INTERFACE:
-    data[1] = (void *)mn;
+    data[1] = (void *) mn;
     break;
   default:
     UNREACHABLE();
   }
 
-  return (bjvm_stack_value){.obj = array};
+  ASYNC_END((bjvm_stack_value) { .obj = array });
+#undef mn
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,

@@ -66,7 +66,7 @@ bjvm_stack_value define_class(bjvm_thread *thread, bjvm_handle *loader, bjvm_han
   if (initialize) {
     bjvm_initialize_class_t pox = {.args = {thread, result}};
     future_t fut = bjvm_initialize_class(&pox);
-    assert(fut.status == FUTURE_READY);
+    BJVM_CHECK(fut.status == FUTURE_READY);
   }
   if (result) {
     return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, result)};

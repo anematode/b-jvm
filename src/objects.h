@@ -11,8 +11,7 @@ static inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string)
 
   auto method = bjvm_method_lookup(string->descriptor, STR("length"),
                                    STR("()I"), false, false);
-  bjvm_stack_value result;
-  bjvm_thread_run_root(thread, method, (bjvm_stack_value[]){}, &result);
+  bjvm_stack_value result = call_interpreter_synchronous(thread, method, (bjvm_stack_value[]){});
 
   return result.i;
 }

@@ -344,7 +344,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
       malloc(ctx.objs_count * sizeof(bjvm_obj_header *));
 
   // For now, create a new heap of the same size
-  uint8_t *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
+  [[maybe_unused]] uint8_t *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
           *end = new_heap + vm->true_heap_capacity;
   uint8_t *write_ptr = new_heap;
 

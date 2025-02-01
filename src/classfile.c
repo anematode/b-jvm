@@ -168,7 +168,6 @@ const bjvm_utf8 * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribu
   // Linear scan throught the whole array
   for (int i = 0; i < table->entries_count; ++i) {
     bjvm_attribute_lvt_entry *entry = table->entries + i;
-    printf("Entry: %d %d %d %d %d %.*s\n", entry->start_pc, entry->end_pc, entry->index, index, original_pc, entry->name.len, entry->name.chars);
     if (entry->index == index && entry->start_pc <= original_pc && entry->end_pc > original_pc) {
       return &entry->name;
     }

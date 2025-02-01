@@ -53,6 +53,12 @@ typedef struct future {
   DECLARE_ASYNC_VOID(name, return_type _result; locals ;                      \
                      , arguments, invoked_async_methods)
 
+/// Declares a static async function.  Should be followed by a block containing any
+/// locals that the async function needs (accessibly via self->).
+#define DECLARE_STATIC_ASYNC(return_type, name, locals, arguments, invoked_async_methods)                              \
+  typedef return_type name##_return_t;                                                                                 \
+  DECLARE_STATIC_ASYNC_VOID(name, return_type _result; locals;, arguments, invoked_async_methods)
+
 // async declaration mini dsl
 #define invoked_methods(...) __VA_ARGS__
 #define invoked_method(name) name##_t name;
@@ -89,6 +95,15 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
 /// block containing any locals that the async function needs (accessibly via
 /// self->).
 #define DECLARE_ASYNC_VOID(name, locals, arguments, invoked_async_methods_)                                            \
+  DECLARE_ASYNC_VOID_(, name, locals, arguments, invoked_async_methods_)
+
+/// Declares a static function that returns nothing.  Should be followed by a
+/// block containing any locals that the async function needs (accessibly via
+/// self->)
+#define DECLARE_STATIC_ASYNC_VOID(name, locals, arguments, invoked_async_methods_)                                     \
+  DECLARE_ASYNC_VOID_(static, name, locals, arguments, invoked_async_methods_)
+
+#define DECLARE_ASYNC_VOID_(method_mods, name, locals, arguments, invoked_async_methods_)                              \
   maybe_extern_begin;                                                                                                  \
   struct name##_s;                                                                                                     \
   typedef struct name##_s name##_t;                                                                                    \
@@ -100,7 +115,7 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
   POP_EXTERN_C;                                                                                                        \
-  future_t name(void *self_);                                                                                          \
+  method_mods future_t name(void *self_);                                                                                          \
   struct name##_s {                                                                                                    \
     FixTypeSize(struct name##_args) args;                                                                              \
     uint32_t _state;                                                                                                   \
@@ -127,22 +142,16 @@ extern "C++" {
 #define ZeroInternalState(thing) thing = (typeof(thing)){.args = (thing).args, ._state = (thing)._state};
 #endif
 
-/// Defines a async function, with a custom starting label idx
-/// for cases. Should be followed by a block containing the code of the async
-/// function.  MUST end with ASYNC_END, or ASYNC_END_VOID if the function is
-/// guaranteed to call ASYNC_RETURN() before it reaches the end statement.
-#define DEFINE_ASYNC_SL(name, start_idx) DEFINE_ASYNC_SL_(cached_state_prelude, name, start_idx)
-
-#define DEFINE_ASYNC_SL_(prelude, name, start_idx)                                                                     \
+#define DEFINE_ASYNC_(modifiers, prelude, name)                                                                        \
   maybe_extern_begin;                                                                                                  \
-  future_t name(void *self_) {                                                                                         \
+  modifiers future_t name(void *self_) {                                                                               \
     name##_t *self = (name##_t *)self_;                                                                                \
     assert(self);                                                                                                      \
     prelude(name);                                                                                                     \
-    start_counter(label_counter, (start_idx) + 1);                                                                     \
-    self->_state = (self->_state == 0) ? (start_idx) : self->_state;                                                   \
+    start_counter(label_counter, (0) + 1);                                                                             \
+    self->_state = (self->_state == 0) ? (0) : self->_state;                                                           \
     switch (self->_state) {                                                                                            \
-    case (start_idx):                                                                                                  \
+    case (0):                                                                                                          \
       ZeroInternalState(*self);
 
 #define cached_state_prelude(name)                                                                                     \
@@ -154,7 +163,14 @@ extern "C++" {
 /// ASYNC_END_VOID if the function is guaranteed to call ASYNC_RETURN() before
 /// it reaches the end statement. Use DEFINE_ASYNC_SL if this is nested in
 /// another switch/case
-#define DEFINE_ASYNC(name) DEFINE_ASYNC_SL(name, 0)
+#define DEFINE_ASYNC(name) DEFINE_ASYNC_(, cached_state_prelude, name)
+
+/// Defines a static value-returning async function. Should be followed by a block
+/// containing the code of the async function.  MUST end with ASYNC_END, or
+/// ASYNC_END_VOID if the function is guaranteed to call ASYNC_RETURN() before
+/// it reaches the end statement. Use DEFINE_ASYNC_SL if this is nested in
+/// another switch/case
+#define DEFINE_STATIC_ASYNC(name) DEFINE_ASYNC_(static, cached_state_prelude, name)
 
 /// reload the cached state from the self pointer
 #define _RELOAD_CACHED_STATE()                                                                                         \
@@ -249,13 +265,13 @@ extern "C++" {
   do {                                                                                                                 \
     self->_state = 0;                                                                                                  \
     self->_result = (return_value);                                                                                    \
-    return future_ready();                                                                \
+    return future_ready();                                                                                             \
   } while (0)
 
 #define ASYNC_RETURN_VOID()                                                                                            \
   do {                                                                                                                 \
     self->_state = 0;                                                                                                  \
-    return future_ready();                                                                \
+    return future_ready();                                                                                             \
   } while (0)
 
 /// Yields control back to the caller.  Must be used inside an async function.

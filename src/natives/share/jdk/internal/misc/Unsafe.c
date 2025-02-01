@@ -27,7 +27,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, ensureClassInitialized0,
   if (desc->state != BJVM_CD_STATE_INITIALIZED) {
     bjvm_initialize_class_t pox = {.args = {thread, desc}};
     future_t f = bjvm_initialize_class(&pox);
-    assert(f.status == FUTURE_READY);
+    BJVM_CHECK(f.status == FUTURE_READY);
   }
   return value_null();
 }
@@ -46,7 +46,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset1,
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   heap_string name;
   int err = read_string_to_utf8(thread, &name, args[1].handle->obj);
-  assert(!err);
+  BJVM_CHECK(!err);
 
   int64_t result = 0;
 
@@ -299,7 +299,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
 
   bjvm_initialize_class_t pox = {.args = {thread, result}};
   future_t f = bjvm_initialize_class(&pox);
-  assert(f.status == FUTURE_READY);
+  BJVM_CHECK(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};

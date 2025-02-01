@@ -61,7 +61,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
   bjvm_handle *props = make_string_array(thread, FIXED_LENGTH);
 
   INIT_STACK_STRING(cwd, 1024);
-  assert(cwd.chars == getcwd(cwd.chars, 1024));
+  BJVM_CHECK(cwd.chars == getcwd(cwd.chars, 1024));
   cwd.len = (int)strlen(cwd.chars);
 
   INIT_STACK_STRING(jre, 1024);
@@ -113,7 +113,9 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
   SET_PROP(_user_name_NDX, STR("user"));
   SET_PROP(_user_home_NDX, STR("/home/user"));
 
-  return (bjvm_stack_value){.obj = props->obj};
+  bjvm_stack_value result = (bjvm_stack_value){.obj = props->obj};
+  bjvm_drop_handle(thread, props);
+  return result;
 }
 
 DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
@@ -122,7 +124,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
 
   SET_PROP(0, STR("java.home"));
   char cwd[1024] = {0};
-  assert(cwd == getcwd(cwd, 1024));
+  BJVM_CHECK(cwd == getcwd(cwd, 1024));
 
   INIT_STACK_STRING(java_home, 1024);
   java_home = bprintf(java_home, "%s/jdk23", cwd);

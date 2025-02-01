@@ -30,7 +30,7 @@ DECLARE_NATIVE(
 
   bjvm_initialize_class_t pox = {.args = {thread, result}};
   future_t f = bjvm_initialize_class(&pox); // TODO convert
-  assert(f.status == FUTURE_READY);
+  BJVM_CHECK(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};

@@ -45,6 +45,18 @@ extern "C" {
   } while (0)
 #endif
 
+/// Checks the condition is true;  if not, optionally prints a message and aborts.
+/// This check is not removed in release builds.
+#define BJVM_CHECK(condition, ...)                                                                                          \
+  do {                                                                                                                 \
+    if (!(condition)) {                                                                                                \
+      fprintf(stderr, "%s: %s%d: CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
+      fprintf(stderr, "" __VA_ARGS__);                                                                                 \
+      fprintf(stderr, "\n");                                                                                           \
+      abort();                                                                                                         \
+    }                                                                                                                  \
+  } while (0)
+
 static inline void *__vector_push(size_t element_size, void **vector, int *vector_count, int *vector_cap) {
   if (__builtin_expect((*vector_count) >= (*vector_cap), 0)) {
     int new_cap = *vector_cap * 2 + 1;

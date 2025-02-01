@@ -69,7 +69,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;")
   bjvm_obj_header *array = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 3);
   bjvm_obj_header **data = ArrayData(array);
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
-  assert(!error);
+  BJVM_CHECK(!error);
   data[0] = (void *)enclosing_method.class_info->classdesc->mirror;
   if (enclosing_method.nat != nullptr) {
     data[1] = bjvm_intern_string(thread, enclosing_method.nat->name);
@@ -89,7 +89,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaringClass0, "()Ljava/lang/Class;") {
     return value_null();
   }
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
-  assert(!error);
+  BJVM_CHECK(!error);
   return (bjvm_stack_value){.obj = (void *)enclosing_method.class_info->classdesc->mirror};
 }
 
@@ -155,7 +155,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   if (c && args[1].i) {
     bjvm_initialize_class_t ctx = {.args = {thread, c}};
     future_t f = bjvm_initialize_class(&ctx);
-    assert(f.status == FUTURE_READY);
+    BJVM_CHECK(f.status == FUTURE_READY);
 
     if (ctx._result) {
       return value_null();

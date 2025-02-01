@@ -1,39 +1,41 @@
 #include <natives-dsl.h>
 
-static bjvm_stack_value impl(bjvm_thread *thread, bjvm_obj_header *target,
-                             bjvm_obj_header *context) {
-  bjvm_classdesc *classdesc = target->descriptor;
-  (void)context;
+// invokes call_interpreter and returns the result
+#define IMPL_RUN_ASYNC(thread_, target_, context_) bjvm_stack_value ret; do { \
+  bjvm_thread * thread__ = thread_; \
+  bjvm_obj_header *target__ = target_; \
+  bjvm_obj_header *context__ = context_; \
+  bjvm_classdesc *classdesc__ = target_->descriptor; \
+  (void) context__; /* stop the compiler complaining */ \
+  \
+  assert(classdesc__->kind == BJVM_CD_KIND_ORDINARY); \
+  bjvm_cp_method *method__ = bjvm_method_lookup(classdesc__, STR("run"), null_str(), true, true); \
+  if (!method__) { \
+    /* TODO figure out what JVM normally does here */ \
+    UNREACHABLE(); \
+  } \
+  bjvm_stack_value method_args__[1] = { (bjvm_stack_value) { .obj = target__ } }; \
+  AWAIT(call_interpreter, thread__, method__, method_args__); \
+  ret = get_async_result(call_interpreter); \
+} while (0); \
+ASYNC_END(ret);
 
-  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
-  bjvm_cp_method *method =
-      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
-  if (!method) {
-    // TODO figure out what JVM normally does here
-    UNREACHABLE();
-  }
-
-  bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
-  bjvm_stack_value ret;
-  bjvm_thread_run_root(thread, method, method_args, &ret);
-  return ret;
-}
-
-DECLARE_NATIVE("java/security", AccessController, doPrivileged,
+DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedExceptionAction;Ljava/security/"
-               "AccessControlContext;)Ljava/lang/Object;") {
+               "AccessControlContext;)Ljava/lang/Object;",
+               locals(), invoked_methods(invoked_method(call_interpreter))) {
   assert(argc == 2);
 
-  return impl(thread, args[0].handle->obj, args[1].handle->obj);
+  IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
 }
 
-DECLARE_NATIVE(
+DECLARE_ASYNC_NATIVE(
     "java/security", AccessController, doPrivileged,
-    "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;") {
-  // Look up method "run" on obj
+    "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
+    locals(), invoked_methods(invoked_method(call_interpreter))) {
   assert(argc == 1);
 
-  return impl(thread, args[0].handle->obj, nullptr);
+  IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
 }
 
 DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
@@ -41,26 +43,13 @@ DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
   return value_null();
 }
 
-DECLARE_NATIVE("java/security", AccessController, doPrivileged,
+DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;Ljava/security/"
-               "AccessControlContext;)Ljava/lang/Object;") {
+               "AccessControlContext;)Ljava/lang/Object;",
+               locals(), invoked_methods(invoked_method(call_interpreter))) {
   assert(argc == 2);
 
-  bjvm_obj_header *target = args[0].handle->obj;
-  bjvm_classdesc *classdesc = target->descriptor;
-
-  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
-  bjvm_cp_method *method =
-      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
-  if (!method) {
-    // TODO figure out what JVM normally does here
-    UNREACHABLE();
-  }
-
-  bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
-  bjvm_stack_value ret;
-  bjvm_thread_run_root(thread, method, method_args, &ret);
-  return ret;
+  IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
 }
 
 DECLARE_NATIVE("java/security", AccessController, ensureMaterializedForStackWalk,
@@ -68,24 +57,11 @@ DECLARE_NATIVE("java/security", AccessController, ensureMaterializedForStackWalk
   return value_null();
 }
 
-DECLARE_NATIVE("java/security", AccessController, doPrivileged,
-               "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;") {
+DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
+               "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
+               locals(), invoked_methods(invoked_method(call_interpreter))) {
   // Look up method "run" on obj
   assert(argc == 1);
 
-  bjvm_obj_header *target = args[0].handle->obj;
-  bjvm_classdesc *classdesc = target->descriptor;
-
-  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY);
-  bjvm_cp_method *method =
-      bjvm_method_lookup(classdesc, STR("run"), null_str(), true, true);
-  if (!method) {
-    // TODO figure out what JVM normally does here
-    UNREACHABLE();
-  }
-
-  bjvm_stack_value method_args[1] = {(bjvm_stack_value){.obj = target}};
-  bjvm_stack_value ret;
-  bjvm_thread_run_root(thread, method, method_args, &ret);
-  return ret;
+  IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
 }

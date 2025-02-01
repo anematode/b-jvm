@@ -27,25 +27,12 @@ bjvm_thread *bjvm_ffi_create_thread(bjvm_vm *vm) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_async_run_ctx *bjvm_ffi_run_main(bjvm_thread *thr) {
-  bjvm_classdesc *desc = bootstrap_lookup_class(thr, STR("Main"));
-  bjvm_stack_value args[1] = {{.obj = nullptr}};
-
-  bjvm_cp_method *method;
-  bjvm_initialize_class(thr, desc);
-
-  method = bjvm_method_lookup(desc, STR("main"),
-                                   STR("([Ljava/lang/String;)V"), false, false);
-
-  bjvm_async_run_ctx *ctx = create_run_ctx(thr, method, args, nullptr);
-  return ctx;
-}
-
-EMSCRIPTEN_KEEPALIVE
 bjvm_classdesc *bjvm_ffi_get_class(bjvm_thread *thr, const char *name) {
   bjvm_classdesc *clazz = bootstrap_lookup_class(thr, (bjvm_utf8){.chars=(char*)name, .len=(int)strlen(name)});
   if (!clazz) return nullptr;
-  bjvm_initialize_class(thr, clazz);  // TODO step this
+  bjvm_initialize_class_t ctx = {.args = {thr, clazz}};
+  future_t fut = bjvm_initialize_class(&ctx);
+  assert(fut.status == FUTURE_READY);
   return clazz;
 }
 
@@ -65,8 +52,24 @@ bjvm_classdesc *bjvm_ffi_get_classdesc(bjvm_obj_header *obj) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-bool bjvm_ffi_run_step(bjvm_async_run_ctx *ctx) {
-  return bjvm_async_run_step(ctx);
+call_interpreter_t *bjvm_ffi_async_run(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args) {
+  call_interpreter_t *ctx = malloc(sizeof(call_interpreter_t));
+  *ctx = (call_interpreter_t){.args = {thread, method, args}};
+  return ctx;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool bjvm_ffi_run_step(call_interpreter_t *ctx, bjvm_stack_value *result) {
+  future_t fut = call_interpreter(ctx);
+  if (fut.status == FUTURE_READY && result) {
+    *result = ctx->_result;
+  }
+  return fut.status == FUTURE_READY;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void bjvm_ffi_free_async_run_ctx(call_interpreter_t *ctx) {
+  free(ctx);
 }
 
 
@@ -163,22 +166,6 @@ char *bjvm_ffi_get_class_json(bjvm_classdesc *desc) {
   char *result = strdup(out.data);
   bjvm_string_builder_free(&out);
   return result;
-}
-
-EMSCRIPTEN_KEEPALIVE
-int print_error(void *ctx) {
-  bjvm_async_run_ctx *run_ctx = (bjvm_async_run_ctx *)ctx;
-  bjvm_thread *thr = run_ctx->thread;
-  if (thr->current_exception) {
-    printf("Exception was raised!\n");
-    // bjvm_thread_run_root printStackTrace
-    bjvm_stack_value args[1] = {{.obj = thr->current_exception}};
-    bjvm_cp_method *method = bjvm_method_lookup(
-            thr->current_exception->descriptor, STR("printStackTrace"), STR("()V"), true, false);
-    thr->current_exception = nullptr;
-    bjvm_thread_run_root(thr, method, args, nullptr);
-  }
-  return 0;
 }
 
 int main() {
