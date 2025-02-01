@@ -236,8 +236,8 @@ class Thread {
             for (let i = 0; i < args.length - +isInstanceMethod; i++, j++) {
                 setJavaType(this.vm, argsPtr + j * 8, parsed.parameterTypes[i], args[j]);
             }
-            let ctx = module._bjvm_thread_async_run(this.ptr, method.methodPointer, argsPtr, resultPtr);
-            while (!module._bjvm_async_run_step(ctx)) {
+            let ctx = module._bjvm_ffi_async_run(this.ptr, method.methodPointer, argsPtr);
+            while (!module._bjvm_ffi_run_step(ctx, resultPtr)) {
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
             this.throwThreadException();
@@ -329,118 +329,10 @@ class VM {
     }
 }
 
-const runtimeFilesList = `jre/lib/cmm/sRGB.pf
-jre/lib/cmm/CIEXYZ.pf
-jre/lib/cmm/PYCC.pf
-jre/lib/cmm/GRAY.pf
-jre/lib/cmm/LINEAR_RGB.pf
-jre/lib/tzmappings
-jre/lib/psfontj2d.properties
-jre/lib/fontconfig.properties.src
-jre/lib/logging.properties
-jre/lib/jconsole.jar
-jre/lib/sound.properties
-jre/lib/currency.data
-jre/lib/calendars.properties
-jre/lib/hijrah-config-umalqura.properties
-jre/lib/security/public_suffix_list.dat
-jre/lib/security/trusted.libraries
-jre/lib/security/blacklisted.certs
-jre/lib/security/java.security
-jre/lib/security/blacklist
-jre/lib/security/java.policy
-jre/lib/security/cacerts
-jre/lib/security/javaws.policy
-jre/lib/security/policy/unlimited/local_policy.jar
-jre/lib/security/policy/unlimited/US_export_policy.jar
-jre/lib/security/policy/limited/local_policy.jar
-jre/lib/security/policy/limited/US_export_policy.jar
-jre/lib/jfr/default.jfc
-jre/lib/jfr/profile.jfc
-jre/lib/images/cursors/win32_MoveDrop32x32.gif
-jre/lib/images/cursors/cursors.properties
-jre/lib/images/cursors/win32_CopyDrop32x32.gif
-jre/lib/images/cursors/win32_LinkDrop32x32.gif
-jre/lib/images/cursors/win32_LinkNoDrop32x32.gif
-jre/lib/images/cursors/invalid32x32.gif
-jre/lib/images/cursors/win32_CopyNoDrop32x32.gif
-jre/lib/images/cursors/win32_MoveNoDrop32x32.gif
-jre/lib/orb.idl
-jre/lib/net.properties
-jre/lib/rt.jar
-jre/lib/deploy/messages_de.properties
-jre/lib/deploy/splash.gif
-jre/lib/deploy/splash_11-lic.gif
-jre/lib/deploy/messages_ko.properties
-jre/lib/deploy/messages_fr.properties
-jre/lib/deploy/ffjcext.zip
-jre/lib/deploy/messages_zh_TW.properties
-jre/lib/deploy/messages_pt_BR.properties
-jre/lib/deploy/messages_zh_HK.properties
-jre/lib/deploy/messages_ja.properties
-jre/lib/deploy/messages_zh_CN.properties
-jre/lib/deploy/messages_es.properties
-jre/lib/deploy/messages_sv.properties
-jre/lib/deploy/messages_it.properties
-jre/lib/deploy/splash@2x.gif
-jre/lib/deploy/splash_11@2x-lic.gif
-jre/lib/deploy/messages.properties
-jre/lib/javafx.properties
-jre/lib/accessibility.properties
-jre/lib/tzdb.dat
-jre/lib/tools.jar
-jre/lib/ext/sunmscapi.jar
-jre/lib/ext/sunec.jar
-jre/lib/ext/nashorn.jar
-jre/lib/ext/access-bridge-64.jar
-jre/lib/ext/cldrdata.jar
-jre/lib/ext/jfxrt.jar
-jre/lib/ext/dnsns.jar
-jre/lib/ext/localedata.jar
-jre/lib/ext/sunjce_provider.jar
-jre/lib/ext/meta-index
-jre/lib/ext/sunpkcs11.jar
-jre/lib/ext/jaccess.jar
-jre/lib/ext/zipfs.jar
-jre/lib/amd64/jvm.cfg
-jre/lib/deploy.jar
-jre/lib/management/jmxremote.access
-jre/lib/management/snmp.acl.template
-jre/lib/management/management.properties
-jre/lib/management/jmxremote.password.template
-jre/lib/javaws.jar
-jre/lib/jfr.jar
-jre/lib/jsse.jar
-jre/lib/plugin.jar
-jre/lib/ant-javafx.jar
-jre/lib/jfxswt.jar
-jre/lib/ct.sym
-jre/lib/charsets.jar
-jre/lib/resources.jar
-jre/lib/jvm.hprof.txt
-jre/lib/javafx-mx.jar
-jre/lib/packager.jar
-jre/lib/content-types.properties
-jre/lib/fontconfig.bfc
-jre/lib/dt.jar
-jre/lib/meta-index
-jre/lib/management-agent.jar
-jre/lib/jce.jar
-jre/lib/flavormap.properties
-jre/lib/psfont.properties.ja
-jre/lib/fonts/LucidaSansRegular.ttf
-jre/lib/fonts/LucidaTypewriterRegular.ttf
-jre/lib/fonts/LucidaBrightDemiBold.ttf
-jre/lib/fonts/LucidaSansDemiBold.ttf
-jre/lib/fonts/LucidaBrightRegular.ttf
-jre/lib/fonts/LucidaBrightItalic.ttf
-jre/lib/fonts/LucidaBrightDemiItalic.ttf
-jre/lib/fonts/LucidaTypewriterBold.ttf
-jre/lib/classlist
-jre/lib/ir.idl
-jre/lib/jexec
-Main.class
-jre/lib/sa-jdi.jar`.split('\n');
+const runtimeFilesList = `./jdk23/lib/modules
+./jdk23.jar
+./test_files/n_body_problem/NBodyProblem$Body.class
+./test_files/n_body_problem/NBodyProblem.class`.split('\n');
 
 const dbName = 'bjvm';
 
@@ -490,14 +382,29 @@ function getFile(db: IDBDatabase, name: string): Promise<{ name: string; data: U
     });
 }
 
-const TOTAL_BYTES = 152392939;
+const TOTAL_BYTES = 0;
 
 async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, total: number) => void) {
     let totalLoaded = 0;
 
+    const db = await openDatabase();
+
     // Spawn fetch requests
     const requests = runtimeFilesList.map(async (file) => {
-        const response = await fetch(`${baseUrl}/${file}`);
+        // Check whether the file is already in the database
+        const cached = await getFile(db, file);
+        if (cached) {
+            totalLoaded += cached.data.length;
+            progress?.(totalLoaded, TOTAL_BYTES);
+            return {file, data: cached.data};
+        }
+
+        const response = await fetch(`${baseUrl}/${file}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/octet-stream',
+            }
+        });
         const contentLength = response.headers.get('Content-Length');
         const total = contentLength ? parseInt(contentLength) : 0;
 
@@ -513,6 +420,8 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
             totalLoaded += value.length;
             progress?.(totalLoaded, TOTAL_BYTES);
         }
+        // Insert into the DB
+        await addFile(db, file, data);
         return {file, data};
     });
 
@@ -528,7 +437,7 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
         for (let i = 0; i < file.length; i++) {
             if (file[i] === '/') {
                 const dir = file.substring(0, i);
-                if (!module.FS.analyzePath(dir, true).exists)
+                if (!module.FS.analyzePath(dir).exists)
                     module.FS.mkdir(dir, 0o777);
             }
         }

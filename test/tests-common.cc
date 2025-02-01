@@ -8,7 +8,7 @@
 
 #include "tests-common.h"
 
-#include "natives.h"
+#include "catch2/catch_test_macros.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -120,7 +120,7 @@ bool EndsWith(const std::string &s, const std::string &suffix) {
   return s.substr(s.size() - suffix.size()) == suffix;
 }
 
-int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+int load_classfile(slice filename, void *param, uint8_t **bytes,
                    size_t *len) {
   const char **classpath = (const char **)param;
   const char **classpath_end = classpath;
@@ -197,8 +197,8 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   TestCaseResult result{};
 
-  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
-                                  .len = (int)classpath.size()};
+  options.classpath = (slice){.chars = (char *)classpath.c_str(),
+                                  .len = static_cast<uint16_t>(classpath.size())};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stdout_ += (char)ch;
@@ -216,8 +216,8 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   }
   bjvm_thread *thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
-              .len = (int)main_class.size()};
+  slice m{.chars = (char *)main_class.c_str(),
+              .len = static_cast<uint16_t>(main_class.size())};
 
   bjvm_classdesc *desc = bootstrap_lookup_class(thread, m);
   if (!desc) {
@@ -229,37 +229,37 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   bjvm_initialize_class_t pox = { .args = {thread, desc}};
   future_t f = bjvm_initialize_class(&pox);
-  assert(f.status == FUTURE_READY);
+  BJVM_CHECK(f.status == FUTURE_READY);
 
   method = bjvm_method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"),
                               false, false);
 
-  bjvm_thread_run_root(thread, method, args, nullptr);
+  call_interpreter_synchronous(thread, method, args); // void, no result
 
   if (thread->current_exception) {
     method =
         bjvm_method_lookup(thread->current_exception->descriptor, STR("toString"),
                            STR("()Ljava/lang/String;"), true, false);
-    bjvm_stack_value args[1] = {{.obj = thread->current_exception}}, result;
+    bjvm_stack_value to_string_args[1] = {{.obj = thread->current_exception}};
     thread->current_exception = nullptr;
-    bjvm_thread_run_root(thread, method, args, &result);
-    heap_string read = AsHeapString(result.obj, on_oom);
+
+    bjvm_stack_value to_string_invoke_args = call_interpreter_synchronous(thread, method, to_string_args);
+    heap_string read;
+    REQUIRE(!read_string_to_utf8(thread, &read, to_string_invoke_args.obj));
+
     std::cout << "Exception thrown!\n" << read.chars << '\n' << '\n';
     free_heap_str(read);
 
     // Then call printStackTrace ()V
-    method = bjvm_method_lookup(args[0].obj->descriptor, STR("printStackTrace"),
+    method = bjvm_method_lookup(to_string_args[0].obj->descriptor, STR("printStackTrace"),
                                 STR("()V"), true, false);
-    bjvm_thread_run_root(thread, method, args, nullptr);
+    call_interpreter_synchronous(thread, method, to_string_args);
   }
 
   bjvm_free_thread(thread);
   bjvm_free_vm(vm);
 
   return result;
-
-  on_oom:
-  UNREACHABLE();
 }
 
 } // namespace Bjvm::Tests

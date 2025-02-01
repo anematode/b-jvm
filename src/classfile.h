@@ -264,10 +264,10 @@ typedef enum : uint8_t {
 } bjvm_insn_code_kind;
 
 typedef enum : uint8_t {
-  TOS_VOID,
-  TOS_DOUBLE,
-  TOS_INT,
-  TOS_FLOAT,
+  TOS_VOID = 0,
+  TOS_DOUBLE = 1,
+  TOS_INT = 2,
+  TOS_FLOAT = 3,
 } bjvm_reduced_tos_kind;
 
 typedef enum : char {
@@ -282,6 +282,8 @@ typedef enum : char {
   BJVM_TYPE_KIND_VOID = 'V',
   BJVM_TYPE_KIND_REFERENCE = 'L'
 } bjvm_type_kind;
+
+bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field);
 
 typedef enum {
   BJVM_CD_KIND_ORDINARY,
@@ -306,21 +308,21 @@ typedef struct bjvm_bootstrap_method bjvm_bootstrap_method;
 
 typedef struct {
   bjvm_classdesc *classdesc;
-  bjvm_utf8 name;
+  slice name;
 
   void *vm_object; // linkage error (todo) or resolved class
 } bjvm_cp_class_info;
 
 typedef struct bjvm_cp_name_and_type {
-  bjvm_utf8 name;
-  bjvm_utf8 descriptor;
+  slice name;
+  slice descriptor;
 } bjvm_cp_name_and_type;
 
 struct bjvm_field_descriptor {
   bjvm_type_kind base_kind;
   // Can be nonzero for any kind
   int dimensions;
-  bjvm_utf8 class_name; // For reference and array types only
+  slice class_name; // For reference and array types only
 };
 
 typedef struct bjvm_cp_field bjvm_cp_field;
@@ -346,7 +348,7 @@ typedef struct {
 } bjvm_cp_method_info;
 
 typedef struct {
-  bjvm_utf8 chars;
+  slice chars;
   void *interned;  // pointer to the interned string, if instantiated
 } bjvm_cp_string_info;
 
@@ -373,6 +375,16 @@ typedef enum {
   BJVM_MH_KIND_LAST = 9
 } bjvm_method_handle_kind;
 
+static inline bool mh_is_invoke(bjvm_method_handle_kind kind) {
+  return kind >= BJVM_MH_KIND_INVOKE_VIRTUAL && kind <= BJVM_MH_KIND_INVOKE_INTERFACE;
+}
+
+static inline bool mh_is_vh(bjvm_method_handle_kind kind) {
+  // return kind & (BJVM_MH_KIND_GET_FIELD | BJVM_MH_KIND_GET_STATIC |
+  //                BJVM_MH_KIND_PUT_FIELD | BJVM_MH_KIND_PUT_STATIC);
+  return kind <= BJVM_MH_KIND_PUT_STATIC && kind >= BJVM_MH_KIND_GET_FIELD;
+}
+
 typedef struct {
   bjvm_method_handle_kind handle_kind;
   bjvm_cp_entry *reference;
@@ -381,7 +393,7 @@ typedef struct {
 } bjvm_cp_method_handle_info;
 
 typedef struct {
-  bjvm_utf8 descriptor;
+  slice descriptor;
   bjvm_method_descriptor *parsed_descriptor;
 
   struct bjvm_native_MethodType *resolved_mt;
@@ -417,13 +429,18 @@ enum bjvm_cp_kind : uint32_t {
   BJVM_CP_KIND_LAST = 1 << 16
 };
 
+static inline bool cp_kind_is_primitive(bjvm_cp_kind kind) {
+  return kind == BJVM_CP_KIND_INTEGER || kind == BJVM_CP_KIND_FLOAT ||
+         kind == BJVM_CP_KIND_LONG || kind == BJVM_CP_KIND_DOUBLE;
+}
+
 typedef struct bjvm_cp_entry {
   bjvm_cp_kind kind;
   // Index of this entry within the constant pool
   int my_index;
 
   union {
-    bjvm_utf8 utf8;
+    slice utf8;
     bjvm_cp_string_info string;
 
     bjvm_cp_floating_info floating;
@@ -522,8 +539,8 @@ typedef struct {
 typedef struct {
   int start_pc, end_pc;
   int index;
-  bjvm_utf8 name;
-  bjvm_utf8 descriptor;
+  slice name;
+  slice descriptor;
 } bjvm_attribute_lvt_entry;
 
 // Local variable table
@@ -534,10 +551,10 @@ typedef struct {
 
 // Look up an entry in the local variable table, according to a swizzled local index but the original instruction
 // program counter.
-const bjvm_utf8 *bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table) ;
+const slice *bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_local_variable_table *table) ;
 
 typedef struct {
-  bjvm_utf8 name;
+  slice name;
   uint16_t access_flags;
 } bjvm_method_parameter_info;
 
@@ -662,16 +679,16 @@ typedef struct {
 } bjvm_attribute_annotation_default;
 
 typedef struct {
-  bjvm_utf8 utf8;
+  slice utf8;
 } bjvm_attribute_signature;
 
 typedef struct {
-  bjvm_utf8 name;
+  slice name;
 } bjvm_attribute_source_file;
 
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
-  bjvm_utf8 name;
+  slice name;
   uint32_t length;
 
   union {
@@ -697,8 +714,8 @@ typedef struct bjvm_code_analysis bjvm_code_analysis;
 typedef struct bjvm_cp_method {
   bjvm_access_flags access_flags;
 
-  bjvm_utf8 name;
-  bjvm_utf8 unparsed_descriptor;
+  slice name;
+  slice unparsed_descriptor;
 
   bjvm_method_descriptor *descriptor;
   bjvm_code_analysis *code_analysis;
@@ -711,9 +728,9 @@ typedef struct bjvm_cp_method {
   bjvm_classdesc *my_class;
 
   // Index in the vtable, if applicable. Only set at class link time.
-  int vtable_index;
+  size_t vtable_index;
   // Index in the itable, if applicable.
-  int itable_index;
+  size_t itable_index;
   void *native_handle; // bjvm_native_callback
 
   struct bjvm_native_Constructor *reflection_ctor;
@@ -735,8 +752,8 @@ typedef struct bjvm_cp_method {
 
 typedef struct bjvm_cp_field {
   bjvm_access_flags access_flags;
-  bjvm_utf8 name;
-  bjvm_utf8 descriptor;
+  slice name;
+  slice descriptor;
 
   int attributes_count;
   bjvm_attribute *attributes;
@@ -781,7 +798,7 @@ typedef struct bjvm_classdesc {
   uint8_t *static_fields;
   // Number of bytes (including the object header) which an instance of this
   // class takes up. Unused for array types.
-  int instance_bytes;
+  size_t instance_bytes;
 
   struct bjvm_native_Class *mirror;
   struct bjvm_native_ConstantPool *cp_mirror;
@@ -815,7 +832,7 @@ heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);
 
 char *parse_field_descriptor(const char **chars, size_t len,
                              bjvm_field_descriptor *result, arena *arena);
-char *parse_method_descriptor(bjvm_utf8 entry,
+char *parse_method_descriptor(slice entry,
                               bjvm_method_descriptor *result, arena *arena);
 
 typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;

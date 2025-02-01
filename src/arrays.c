@@ -7,6 +7,7 @@
 #include "objects.h"
 
 #include <assert.h>
+#include <linkage.h>
 #include <stdlib.h>
 
 // Symmetry with make_array_classdesc
@@ -28,7 +29,7 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   base->access_flags =
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
 
-  bjvm_utf8 name = STR("java/lang/Object");
+  slice name = STR("java/lang/Object");
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
   info->classdesc = bootstrap_lookup_class(thread, name);
   info->name = name;

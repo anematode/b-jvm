@@ -23,11 +23,11 @@ static inline std::string_view to_string_view(heap_string str) {
     return {str.chars, (size_t)str.len};
 }
 
-    static inline std::string_view to_string_view(bjvm_utf8 str) {
+    static inline std::string_view to_string_view(slice str) {
         return {str.chars, (size_t)str.len};
     }
 
-int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+int load_classfile(slice filename, void *param, uint8_t **bytes,
                           size_t *len);
     std::unique_ptr<bjvm_vm, void(*)(bjvm_vm*)> CreateTestVM(bjvm_vm_options options = bjvm_default_vm_options());
   optional<vector<uint8_t>> ResolveClassPath(string const& filename, vector<string> const& extra_paths);

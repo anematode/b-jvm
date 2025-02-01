@@ -76,7 +76,7 @@ struct bjvm_cached_classdescs {
 };
 
 // should be layout-compatible with an array of pointers
-_Static_assert(sizeof(struct bjvm_cached_classdescs) ==
+static_assert(sizeof(struct bjvm_cached_classdescs) ==
                sizeof(struct bjvm_cached_classdescs *[cached_classdesc_count]));
 
 #undef __CACHED_EXCEPTION_CLASSES

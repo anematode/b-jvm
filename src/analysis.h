@@ -79,14 +79,12 @@ typedef struct {
 // variables are references, so that the GC can follow them.
 typedef struct bjvm_code_analysis {
   union {
-    struct {
-      // wasm jit depends on the order here
-      bjvm_compressed_bitset *insn_index_to_references;
-      bjvm_compressed_bitset *insn_index_to_ints;
-      bjvm_compressed_bitset *insn_index_to_floats;
-      bjvm_compressed_bitset *insn_index_to_doubles;
-      bjvm_compressed_bitset *insn_index_to_longs;
-    };
+    // wasm jit depends on the order here
+    bjvm_compressed_bitset *insn_index_to_references;
+    bjvm_compressed_bitset *insn_index_to_ints;
+    bjvm_compressed_bitset *insn_index_to_floats;
+    bjvm_compressed_bitset *insn_index_to_doubles;
+    bjvm_compressed_bitset *insn_index_to_longs;
 
     bjvm_compressed_bitset *insn_index_to_kinds[5];
   };
@@ -96,7 +94,9 @@ typedef struct bjvm_code_analysis {
 
   // For each instruction that might participate in extended NPE message resolution,
   // the sources of its first two operands.
-  struct { bjvm_stack_variable_source a, b; } *sources;
+  struct {
+    bjvm_stack_variable_source a, b;
+  } *sources;
 
   // block 0 = entry point
   bjvm_basic_block *blocks;
@@ -114,13 +114,11 @@ typedef struct bjvm_code_analysis {
  */
 int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error);
 void free_code_analysis(bjvm_code_analysis *analy);
-int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
-                           bjvm_code_analysis *analy);
+int bjvm_scan_basic_blocks(const bjvm_attribute_code *code, bjvm_code_analysis *analy);
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy);
 void bjvm_dump_cfg_to_graphviz(FILE *out, const bjvm_code_analysis *analysis);
 // Returns true iff dominator dominates dominated. dom dom dom.
-bool bjvm_query_dominance(const bjvm_basic_block *dominator,
-                          const bjvm_basic_block *dominated);
+bool bjvm_query_dominance(const bjvm_basic_block *dominator, const bjvm_basic_block *dominated);
 // Try to reduce the CFG and mark the edges/blocks accordingly.
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
 const char *bjvm_insn_code_name(bjvm_insn_code_kind code);

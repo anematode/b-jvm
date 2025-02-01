@@ -71,7 +71,7 @@ static bjvm_itable copy_itable(const bjvm_itable *src) {
 }
 
 // Concatenate the method name and descriptor, separated by a colon.
-static bjvm_utf8 identify(bjvm_utf8 *scratch, const bjvm_cp_method *method) {
+static slice identify(slice *scratch, const bjvm_cp_method *method) {
   char *write = stpncpy(scratch->chars, method->name.chars, scratch->len);
   *write++ = ':';
   write = stpncpy(write, method->unparsed_descriptor.chars,
@@ -90,6 +90,8 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
     assert(s != 0 && "i-table method must not be null");
     assert(d != 0 && "i-table method must not be null");
+
+    [[maybe_unused]]
     bool d_abs = get_unambiguous_method(d)->access_flags & BJVM_ACCESS_ABSTRACT,
          c_abs = get_unambiguous_method(s)->access_flags & BJVM_ACCESS_ABSTRACT;
     if (d_abs || d == s) {
@@ -100,7 +102,7 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
 
     // Now check if the method is ambiguous
     bjvm_cp_method *d_method = get_unambiguous_method(d);
-    bjvm_utf8 identifier = identify(&scratch, d_method);
+    slice identifier = identify(&scratch, d_method);
     if (bjvm_hash_table_lookup(&poisoned, identifier.chars, identifier.len)) {
       result = mark_ambiguous(result);
     }
@@ -153,7 +155,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
         // priority over superinterfaces
         if (!(underlying->my_class->access_flags & BJVM_ACCESS_INTERFACE))
           continue;
-        bjvm_utf8 ident = identify(&scratch, underlying);
+        slice ident = identify(&scratch, underlying);
         void *existing =
             bjvm_hash_table_lookup(&discovered, ident.chars, ident.len);
         if ((existing && existing != underlying) || is_ambiguous(ref)) {
@@ -219,7 +221,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   // are overridden.
   if (classdesc->super_class) {
     bjvm_classdesc *super = classdesc->super_class->classdesc;
-    for (int i = 0; i < arrlen(super->vtable.methods); ++i) {
+    for (size_t i = 0; i < arrlenu(super->vtable.methods); ++i) {
       bjvm_cp_method *method = super->vtable.methods[i];
       bjvm_cp_method *replacement = bjvm_method_lookup(
           classdesc, method->name, method->unparsed_descriptor, false, false);
@@ -257,7 +259,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   for (int i = 0; i < classdesc->methods_count; ++i) {
     bjvm_cp_method *method = classdesc->methods + i;
     if (vtable_include(method)) {
-      method->vtable_index = arrlen(vtable->methods);
+      method->vtable_index = arrlenu(vtable->methods);
       arrpush(vtable->methods, method);
     }
   }

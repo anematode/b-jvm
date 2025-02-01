@@ -62,6 +62,16 @@ static inline void ReferenceArrayStore(bjvm_obj_header *array, int index,
   *((bjvm_obj_header **)ArrayData(array) + index) = val;
 }
 
+static inline void ByteArrayStoreBlock(object array, int32_t offset, int32_t length, uint8_t const *data) {
+  assert(Is1DPrimitiveArray(array));
+  assert(offset >= 0);
+  assert(length >= 0);
+  assert(data != nullptr);
+  assert((*ArrayLength(array) - offset) <= length);
+
+  memcpy(ArrayData(array), data, length);
+}
+
 #define MAKE_PRIMITIVE_LOAD_STORE(name, type)                                  \
   static inline type name##ArrayLoad(bjvm_obj_header *array, int index) {      \
     assert(Is1DPrimitiveArray(array));                                         \

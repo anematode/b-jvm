@@ -47,9 +47,9 @@ typedef struct {
 } bjvm_classpath;
 
 // Returns nullptr if all elements in the path were loaded ok.
-[[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path);
+[[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, slice path);
 void bjvm_free_classpath(bjvm_classpath *cp);
-int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
+int bjvm_lookup_classpath(bjvm_classpath *cp, slice filename,
                           uint8_t **bytes, size_t *len);
 
 #ifdef __cplusplus

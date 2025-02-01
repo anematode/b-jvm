@@ -4,7 +4,7 @@ project(bjvm)
 enable_testing()
 
 set(CMAKE_C_STANDARD 23)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 Include(FetchContent)
 
 FetchContent_Declare(
@@ -26,50 +26,47 @@ FetchContent_MakeAvailable(zlib)
 endif()
 
 # If doing emscripten
+set(BASE_C_FLAGS "-foptimize-sibling-calls -O2 -fms-extensions -Wno-pragmas -Wall -Wno-pragmas -Wno-unused-parameter -fno-strict-aliasing -Wno-missing-field-initializers -Wno-format-zero-length")
+set(BASE_CXX_FLAGS "-O2 -Wall -Wno-c99-extensions -Wno-extra-semi -Wno-format-zero-length")
+
 if (EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "-O2 -fms-extensions -Wno-pragmas -Wall -Wextra -Wpedantic -sUSE_ZLIB=1 -mtail-call -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers")
-    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wpedantic")
-    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -gsource-map -sSTACK_SIZE=500000 -sWASMFS -sFORCE_FILESYSTEM=1 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
+    set(PLATFORM_C_FLAGS "-sUSE_ZLIB=1 -mtail-call")
+    set(PLATFORM_CXX_FLAGS "-O2 -Wall -Wpedantic")
+    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -sSTACK_SIZE=500000 -Wl,--whole-archive -sWASMFS -sFORCE_FILESYSTEM=1 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
 elseif (APPLE)
-    set(CMAKE_C_FLAGS "-O2 -fms-extensions -Wno-pragmas  -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers")
-    set(CMAKE_CXX_FLAGS "-O2 -Wall -Wextra -Wimplicit-fallthrough -g -Werror=incompatible-pointer-types -Wno-missing-field-initializers") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
-    set(EmscriptenFlags "")
+    set(PLATFORM_C_FLAGS "-g -Werror")
+    set(PLATFORM_CXX_FLAGS "-g -Werror -O2 -Wall -Wextra -Wimplicit-fallthrough -g -Wno-missing-field-initializers") # -openmp -Xclang -fopenmp -L/opt/homebrew/opt/libomp/lib -I/opt/homebrew/opt/libomp/include -lomp -g")
 else ()
-    set(CMAKE_C_FLAGS "-O2 -fms-extensions -Wno-pragmas -Wall -Wextra -g -Werror=incompatible-pointer-types -march=native -fno-strict-aliasing")
-    set(CMAKE_CXX_FLAGS "-O2 -fms-extensions -Wall -g -fopenmp -march=native -Werror=incompatible-pointer-types -fno-strict-aliasing")
-    set(EmscriptenFlags "")
+    set(PLATFORM_C_FLAGS "-g -march=native -fPIC")
+    set(PLATFORM_CXX_FLAGS "-g -O2 -fms-extensions -Wall -g -fopenmp -march=native -fno-strict-aliasing -fPIC")
 endif ()
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} -O3 -DNDEBUG")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O2")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -DNDEBUG")
+set(CMAKE_C_FLAGS "${BASE_C_FLAGS} ${PLATFORM_C_FLAGS}")
+set(CMAKE_CXX_FLAGS "${BASE_CXX_FLAGS} ${PLATFORM_CXX_FLAGS}")
 
-if (FALSE AND NOT EMSCRIPTEN)
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto -fomit-frame-pointer -DNDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -flto -fomit-frame-pointer -DNDEBUG")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND APPLE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
+file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "src/wasm/*.c" "src/wasm/*.h")
 
-add_library(bjvm OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
+if (EMSCRIPTEN)
+    list(APPEND bjvm_SRC ${bjvm_wasm_SRC})
+endif()
+
+add_library(bjvm SHARED ${bjvm_SRC} ${bjvm_NATIVES}
         vendor/stb_ds.h
         vendor/stb_ds.c
-        src/natives/java/lang/reflect/Executable.c
-        src/wasm_adapter.c
-        src/wasm_adapter.h
-        src/natives/jdk/internal/misc/CDS.c
-        src/natives/java/lang/NullPointerException.c
-        src/natives/java/lang/StringUTF16.c
-        src/natives/jdk/internal/misc/Signal.c
-        src/natives/jdk/internal/loader/BootLoader.c
-        src/natives/java/lang/Module.c)
+        )
 target_include_directories(bjvm PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR})
 
 if (NOT EMSCRIPTEN)
-target_link_libraries(bjvm PRIVATE zlibstatic)
-else()
 target_link_libraries(bjvm PRIVATE z)
 endif()
 
@@ -80,23 +77,24 @@ target_link_libraries(bjvm_async_test PRIVATE bjvm)
 
 if (EMSCRIPTEN)
     add_executable(bjvm_main src/bin/main.c)  # for now
+    # add bjvm with -Wl,--whole-archive
     target_link_libraries(bjvm_main PRIVATE bjvm)
     set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags} -sMODULARIZE -sEXPORT_ES6=1")
 endif()
 
-if (NOT APPLE)
-    set_target_properties(bjvm PROPERTIES LINK_DEPENDS ${CMAKE_SOURCE_DIR}/natives_table.ld)
-endif ()
-
 add_executable(gen_natives codegen/gen_natives.c)
 target_link_libraries(gen_natives PRIVATE bjvm)
-set_target_properties(gen_natives PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
 add_executable(tests test/tests.cc test/arrays-test.cc test/tests-common.cc test/wasm-tests.cc
         test/async-tests.cc
         test/analysis-tests.cc
         test/classpath-tests.cc
+        test/natives-test.cc
         test/benches.cc)
+if (NOT EMSCRIPTEN)
+    target_sources(tests PRIVATE ${bjvm_wasm_SRC})
+endif()
+target_link_libraries(tests PRIVATE z)
 target_link_libraries(tests PRIVATE bjvm)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")

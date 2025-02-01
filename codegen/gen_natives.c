@@ -1,33 +1,12 @@
 #include <assert.h>
 
 #include "../src/bjvm.h"
+#include "../src/linkage.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
-static int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
-                          size_t *len) {
-  const char *jre_dir = (const char *)param;
-  char path[1024];
-  snprintf(path, sizeof(path), "%s/%.*s", jre_dir, fmt_slice(filename));
-
-  FILE *f = fopen(path, "rb");
-  if (!f) {
-    return -1;
-  }
-
-  fseek(f, 0, SEEK_END);
-  *len = ftell(f);
-  fseek(f, 0, SEEK_SET);
-
-  *bytes = (uint8_t *)malloc(*len);
-  fread(*bytes, 1, *len, f);
-  fclose(f);
-
-  return 0;
-}
 
 struct class_def {
   char *name;
@@ -55,6 +34,21 @@ void print_field(const bjvm_cp_field *field) {
   case BJVM_TYPE_KIND_REFERENCE:
     name = "bjvm_obj_header *";
     break;
+  case BJVM_TYPE_KIND_BOOLEAN:
+    name = "_Alignas(4) bool ";
+    break;
+  case BJVM_TYPE_KIND_CHAR:
+    name = "_Alignas(4) uint16_t ";
+    break;
+  case BJVM_TYPE_KIND_BYTE:
+    name = "_Alignas(4) int8_t ";
+    break;
+  case BJVM_TYPE_KIND_SHORT:
+    name = "_Alignas(4) int16_t ";
+    break;
+  default:
+  case BJVM_TYPE_KIND_VOID:
+    UNREACHABLE();
   }
   printf("  %s%.*s;  // %.*s\n", name, fmt_slice(field->name),
          fmt_slice(field->descriptor));
@@ -66,7 +60,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  char *jre_dir = argv[2];
   bjvm_vm_options options = bjvm_default_vm_options();
 
   bjvm_vm *vm = bjvm_create_vm(options);
@@ -125,7 +118,7 @@ int main(int argc, char **argv) {
   printf("/** BEGIN CODEGEN SECTION (gen_natives.c) */\n");
 
   for (int i = 0; i < class_count; ++i) {
-    bjvm_classdesc *desc = bootstrap_lookup_class(thread, (bjvm_utf8) { .chars = classes[i].name, .len = strlen(classes[i].name) });
+    bjvm_classdesc *desc = bootstrap_lookup_class(thread, (slice) { .chars = classes[i].name, .len = strlen(classes[i].name) });
     assert(desc);
     bjvm_link_class(thread, desc);
 

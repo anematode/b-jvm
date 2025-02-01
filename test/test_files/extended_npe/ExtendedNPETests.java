@@ -26,6 +26,7 @@ public class ExtendedNPETests {
             int j = 0;
             a().b[i][j] = 99;
         } catch (NullPointerException e) {
+            System.out.println(e.getMessage());
             assert e.getMessage().equals("Cannot store to int array because \"ExtendedNPETests.a().b[i]\" is null");
         }
 
