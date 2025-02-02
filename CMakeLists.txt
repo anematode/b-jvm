@@ -53,6 +53,7 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -flto -fomit-frame-pointer -
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND APPLE AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
+    set(DTRACE_SUPPORT 1)
 endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
@@ -63,11 +64,19 @@ if (EMSCRIPTEN)
     list(APPEND bjvm_SRC ${bjvm_wasm_SRC})
 endif()
 
-add_library(bjvm SHARED ${bjvm_SRC} ${bjvm_NATIVES}
+add_library(bjvm_prebuild OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
         vendor/stb_ds.h
         vendor/stb_ds.c
         )
-target_include_directories(bjvm PUBLIC src ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(bjvm_prebuild PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
+set(BJVM_LINK_OBJECTS "$<TARGET_OBJECTS:bjvm_prebuild>")
+
+if (DTRACE_SUPPORT)
+    include(probes.cmake)
+endif()
+
+add_library(bjvm SHARED ${BJVM_LINK_OBJECTS})
+target_link_libraries(bjvm PUBLIC bjvm_prebuild)
 
 if (NOT EMSCRIPTEN)
 target_link_libraries(bjvm PRIVATE z)

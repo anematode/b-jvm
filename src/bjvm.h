@@ -362,6 +362,9 @@ typedef struct bjvm_vm {
 
   // Vector of allocations done via mmap, to be unmapped
   mmap_allocation *mmap_allocations;
+
+  // Latest TID
+  u32 next_tid;
 } bjvm_vm;
 
 // Java Module
@@ -523,6 +526,8 @@ typedef struct bjvm_thread {
   async_stack_t *async_stack;
 
   int allocations_so_far;
+
+  u64 tid;
 
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;

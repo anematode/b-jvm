@@ -29,6 +29,7 @@
 #include <sys/mman.h>
 
 #include <linkage.h>
+#include <probes.h>
 
 /// Looks up a class and initializes it if it needs to be initialized.
 /// This will abort() if the class's <clinit> either throws an excpetion or
@@ -624,6 +625,8 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   vm->write_stderr = options.write_stderr;
   vm->write_byte_param = options.write_byte_param;
 
+  vm->next_tid = 0;
+
   bjvm_native_t const *natives;
   size_t natives_reg_count = bjvm_get_natives_list(&natives);
   for (size_t i = 0; i < natives_reg_count; ++i) {
@@ -771,6 +774,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->lang_exception_frame = -1;
 
   thr->async_stack = calloc(1, 0x20);
+
+  thr->tid = vm->next_tid++;
 
   bjvm_vm_init_primitive_classes(thr);
   init_unsafe_constants(thr);
