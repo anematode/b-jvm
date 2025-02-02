@@ -1403,10 +1403,10 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
 #if AGGRESSIVE_DEBUG
   printf("Allocating %zu bytes, %zu used, %zu capacity\n", bytes, vm->heap_used, vm->heap_capacity);
 #endif
-  if (vm->heap_used + bytes > vm->heap_capacity || GC_EVERY_ALLOCATION) {
+  if (vm->heap_used + bytes > vm->heap_capacity || (GC_EVERY_ALLOCATION && thread->allocations_so_far++ > 69770)) {
     bjvm_major_gc(thread->vm);
+    // printf("GC!\n");
     if (vm->heap_used + bytes > vm->heap_capacity) {
-      printf("OUT OF MEMORY\n");
       bjvm_out_of_memory(thread);
       return nullptr;
     }

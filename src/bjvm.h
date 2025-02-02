@@ -522,6 +522,8 @@ typedef struct bjvm_thread {
   /// Secondary stack for async calls from the interpreter
   async_stack_t *async_stack;
 
+  int allocations_so_far;
+
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
