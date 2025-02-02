@@ -127,12 +127,12 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
 // deal with the fallout of FixTypeSize
 #ifdef __cplusplus
 extern "C++" {
-  template <typename T> T ZeroInternalState_(T t) {
-    if constexpr (sizeof(t.args) == 0)
-      return (T){._state = t._state};
-    else
-      return (T){.args = t.args, ._state = t._state};
-  }
+template <typename T> T ZeroInternalState_(T t) {
+  if constexpr (sizeof(t.args) == 0)
+    return (T){._state = t._state};
+  else
+    return (T){.args = t.args, ._state = t._state};
+}
 }
 
 #define DoArgsDecl(name) [[maybe_unused]] auto args = &self->args;
@@ -282,7 +282,7 @@ extern "C++" {
     self->_state = state_index;                                                                                        \
     return future_not_ready((waker));                                                                                  \
   case state_index:;                                                                                                   \
-    args = &self->args;                                                                                                \
+    _RELOAD_CACHED_STATE();                                                                                            \
   } while (0)
 
 #ifdef __cplusplus

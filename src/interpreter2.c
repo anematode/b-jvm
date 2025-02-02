@@ -2567,12 +2567,14 @@ static s64 async_resume(ARGS_VOID) {
     result = bjvm_interpret_2(&fut, thread, cont.ctx.interp_call.frame);
     sp -= cont.ctx.interp_call.argc; // todo: wrong union member
     has_result = cont.ctx.interp_call.returns;
+    advance_pc = true;
     break;
 
   case CONT_INVOKESIGPOLY:
     fut = bjvm_invokevirtual_signature_polymorphic(&cont.ctx.sigpoly);
     sp -= cont.ctx.interp_call.argc; // todo: wrong union member
     has_result = cont.ctx.interp_call.returns;
+    advance_pc = true;
     break;
 
   default:

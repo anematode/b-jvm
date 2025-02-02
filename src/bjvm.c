@@ -29,7 +29,6 @@
 #include <sys/mman.h>
 
 #include <linkage.h>
-#include <probes.h>
 
 /// Looks up a class and initializes it if it needs to be initialized.
 /// This will abort() if the class's <clinit> either throws an excpetion or
