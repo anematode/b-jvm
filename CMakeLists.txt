@@ -55,7 +55,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND APPLE AND CMAKE_C_COMPILER_ID STREQUAL
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address,undefined")
 endif ()
 
-file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
+file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/dumb_jit/*.c" "src/*.h")
 file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/*.c" "src/natives/*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "src/wasm/*.c" "src/wasm/*.h")
 

@@ -787,6 +787,29 @@ void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
   store(I.store_op, 0);
 }
 
+int dumb_lower_i2s(bjvm_bytecode_insn *insn) {
+  local_get(stack_int(-1));
+  iconst(0xffff);
+  byte(BJVM_WASM_OP_KIND_I32_AND);
+  local_set(stack_int(-1));
+  return 0;
+}
+
+int dumb_lower_ineg(bjvm_bytecode_insn * insn) {
+  iconst(0);
+  local_get(stack_int(-1));
+  byte(BJVM_WASM_OP_KIND_I32_SUB);
+  local_set(stack_int(-1));
+  return 0;
+}
+
+void dumb_lower_lneg(bjvm_bytecode_insn * insn) {
+  lconst(0);
+  local_get(stack_long(-1));
+  byte(BJVM_WASM_OP_KIND_I64_SUB);
+  local_set(stack_long(-1));
+}
+
 // Returns non-zero if it failed to lower the instruction (and so a conversion to interpreter should be issued)
 [[maybe_unused]] static int dumb_lower_instruction(int pc) {
   bjvm_bytecode_insn *insn = &ctx->code->code[pc];
@@ -900,7 +923,7 @@ void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
   case bjvm_insn_i2l:
     return dumb_lower_unop(I32, I64, BJVM_WASM_OP_KIND_I64_EXTEND_S_I32);
   case bjvm_insn_i2s:
-    //return dumb_lower_i2s(insn);
+    return dumb_lower_i2s(insn);
   case bjvm_insn_iadd:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_ADD);
   case bjvm_insn_iand:
@@ -911,8 +934,7 @@ void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
   case bjvm_insn_imul:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_MUL);
   case bjvm_insn_ineg:
-    // dumb_lower_ineg(insn);
-    break;
+    return dumb_lower_ineg(insn);
   case bjvm_insn_ior:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_OR);
   case bjvm_insn_irem:
@@ -946,7 +968,7 @@ void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
   case bjvm_insn_lmul:
     return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_MUL);
   case bjvm_insn_lneg:
-    // dumb_lower_lneg(insn);
+    dumb_lower_lneg(insn);
     break;
   case bjvm_insn_lor:
     return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_OR);
