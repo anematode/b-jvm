@@ -641,12 +641,6 @@ TEST_CASE("Playground") {
   auto result = run_test_case("test_files/compiler", false);
 }
 
-TEST_CASE("benchmark startup") {
-  for (int i = 0; i < 100; i++) {
-    auto result = run_test_case("test_files/basic_lambda", true);
-  }
-}
-
 #if 0
 TEST_CASE("Filesystem") {
   auto result = run_test_case("test_files/filesystem", true, "Filesystem");
