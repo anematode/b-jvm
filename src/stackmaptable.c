@@ -37,7 +37,7 @@ static validation_type implicit_top = { STACK_MAP_FRAME_VALIDATION_TYPE_TOP, (vo
 // Create the initial stack frame for the method
 static void init_locals(iterator *iter, const bjvm_cp_method *method) {
   iter->locals = allocate_validation_buffer(method->code->max_locals);
-  int32_t i = 0;
+  s32 i = 0;
   bool is_ctor = utf8_equals(method->name, "<init>");
   if (!(method->access_flags & BJVM_ACCESS_STATIC)) {
     // Write "this"
@@ -96,7 +96,7 @@ bool stack_map_frame_iterator_has_next(const stack_map_frame_iterator *iter) {
 }
 
 // Try to read a 16-bit integer, returning nonzero on failure
-static int read_u8(impl *I, uint8_t *val, const char **error) {
+static int read_u8(impl *I, u8 *val, const char **error) {
   if (unlikely(I->table_copy.length == 0)) {
     *error = "Unexpected end of stackmaptable";
     return -1;
@@ -106,7 +106,7 @@ static int read_u8(impl *I, uint8_t *val, const char **error) {
   return 0;
 }
 
-static int read_u16(impl *I, uint16_t *val, const char **error) {
+static int read_u16(impl *I, u16 *val, const char **error) {
   if (unlikely(I->table_copy.length < 2)) {
     *error = "Unexpected end of stackmaptable";
     return -1;
@@ -118,7 +118,7 @@ static int read_u16(impl *I, uint16_t *val, const char **error) {
 }
 
 static int read_verification_type(iterator *iter, validation_type *result, bool *is_wide, const char **error) {
-  uint8_t type_kind;
+  u8 type_kind;
   if (read_u8(iter->_impl, &type_kind, error))
     return -1;
   if (type_kind > STACK_MAP_FRAME_VALIDATION_TYPE_UNINIT) {
@@ -128,7 +128,7 @@ static int read_verification_type(iterator *iter, validation_type *result, bool 
   result->kind = type_kind;
   if (type_kind == STACK_MAP_FRAME_VALIDATION_TYPE_OBJECT || type_kind == STACK_MAP_FRAME_VALIDATION_TYPE_UNINIT) {
     // Read the name
-    uint16_t index;
+    u16 index;
     if (read_u16(iter->_impl, &index, error))
       return -1;
     result->name = nullptr;  // TODO
@@ -159,10 +159,10 @@ int stack_map_frame_iterator_next(stack_map_frame_iterator *iter, const char **e
   int max_locals = I->code->max_locals;
   int max_stack = I->code->max_stack;
 
-  uint8_t frame_kind = 0;
+  u8 frame_kind = 0;
   if (read_u8(iter->_impl, &frame_kind, error))
     return -1;
-  uint16_t offset_delta;
+  u16 offset_delta;
   bool is_wide;
   if (frame_kind <= 63) {
     // same_frame, just set stack to zero
@@ -223,7 +223,7 @@ int stack_map_frame_iterator_next(stack_map_frame_iterator *iter, const char **e
     assert(frame_kind == 255);
     if (read_u16(iter->_impl, &offset_delta, error))
       return -1;
-    uint16_t num_locals, num_stack;
+    u16 num_locals, num_stack;
     if (read_u16(iter->_impl, &num_locals, error))
       return -1;
     iter->locals_size = 0;
