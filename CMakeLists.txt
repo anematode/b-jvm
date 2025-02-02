@@ -5,6 +5,10 @@ enable_testing()
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 20)
+
+list (APPEND CMAKE_MODULE_PATH ${bjvm_SOURCE_DIR}/cmake)
+
+include(probes)
 Include(FetchContent)
 Set(FETCHCONTENT_QUIET FALSE)
 
@@ -19,15 +23,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 if (NOT EMSCRIPTEN)
-FetchContent_Declare(
-        zlib
-        GIT_REPOSITORY https://github.com/madler/zlib.git
-        GIT_TAG        v1.3.1
-        GIT_PROGRESS TRUE
-        GIT_SHALLOW TRUE
-)
+    FetchContent_Declare(
+            zlib
+            GIT_REPOSITORY https://github.com/madler/zlib.git
+            GIT_TAG        v1.3.1
+            GIT_PROGRESS TRUE
+            GIT_SHALLOW TRUE
+    )
 
-FetchContent_MakeAvailable(zlib)
+    FetchContent_MakeAvailable(zlib)
 endif()
 
 # If doing emscripten
@@ -72,7 +76,7 @@ target_include_directories(bjvm_prebuild PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src 
 set(BJVM_LINK_OBJECTS "$<TARGET_OBJECTS:bjvm_prebuild>")
 
 if (DTRACE_SUPPORT)
-    include(probes.cmake)
+    add_dtrace_support(bjvm_prebuild "${CMAKE_CURRENT_SOURCE_DIR}/src/probes.d")
 endif()
 
 add_library(bjvm SHARED ${BJVM_LINK_OBJECTS})

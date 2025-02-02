@@ -2604,7 +2604,7 @@ static s64 async_resume(ARGS_VOID) {
   }
 }
 
-static bjvm_stack_value interpret_native_frame(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
+static inline bjvm_stack_value interpret_native_frame(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
   bjvm_run_native_t ctx;
 
   if (!frame_->is_async_suspended) {
@@ -2616,13 +2616,6 @@ static bjvm_stack_value interpret_native_frame(future_t *fut, bjvm_thread *threa
   }
 
   *fut = bjvm_run_native(&ctx);
-
-  BJVM_METHOD_ENTRY(
-    thread->tid,
-    frame_->method->my_class->name.chars, frame_->method->my_class->name.len,
-    frame_->method->name.chars, frame_->method->name.len,
-    frame_->method->unparsed_descriptor.chars, frame_->method->unparsed_descriptor.len
-  );
 
   if (likely(fut->status == FUTURE_READY)) {
     frame_->is_async_suspended = false;
@@ -2636,24 +2629,12 @@ static bjvm_stack_value interpret_native_frame(future_t *fut, bjvm_thread *threa
   }
 }
 
-// NOLINTNEXTLINE(misc-no-recursion)
-bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
+static inline bjvm_stack_value interpret_java_frame(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
   bjvm_stack_value result;
-  HOTSPOT_METHOD_ENTRY(
-    thread->tid,
-    frame_->method->my_class->name.chars, frame_->method->my_class->name.len,
-    frame_->method->name.chars, frame_->method->name.len,
-    frame_->method->unparsed_descriptor.chars, frame_->method->unparsed_descriptor.len
-  );
-
-  // Handle native frames
-  if (unlikely(bjvm_is_frame_native(frame_))) {
-    MUSTTAIL return interpret_native_frame(fut, thread, frame_);
-  }
 
   do {
-  interpret_begin:
-    bjvm_plain_frame *frame = bjvm_get_plain_frame(frame_);
+    interpret_begin:
+      bjvm_plain_frame *frame = bjvm_get_plain_frame(frame_);
     bjvm_stack_value *sp_ = &frame->stack[stack_depth(frame_)];
     u16 pc_ = frame->program_counter;
     bjvm_bytecode_insn *insns = frame_->method->code->code;
@@ -2669,15 +2650,6 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
       // reconstruct future to return
       async_wakeup_info *wk = async_stack_top(thread);
       *fut = (future_t){FUTURE_NOT_READY, wk};
-
-       HOTSPOT_METHOD_RETURN(
-          thread->tid,
-          frame_->method->my_class->name.chars, frame_->method->my_class->name.len,
-          frame_->method->name.chars, frame_->method->name.len,
-          frame_->method->unparsed_descriptor.chars, frame_->method->unparsed_descriptor.len
-      );
-
-
       return (bjvm_stack_value){0};
     }
 
@@ -2698,12 +2670,23 @@ bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack
   bjvm_pop_frame(thread, frame_);
   *fut = (future_t){FUTURE_READY};
 
-  HOTSPOT_METHOD_RETURN(
-      thread->tid,
-      frame_->method->my_class->name.chars, frame_->method->my_class->name.len,
-      frame_->method->name.chars, frame_->method->name.len,
-      frame_->method->unparsed_descriptor.chars, frame_->method->unparsed_descriptor.len
-  );
+  return result;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+bjvm_stack_value bjvm_interpret_2(future_t *fut, bjvm_thread *thread, bjvm_stack_frame *frame_) {
+  InstrumentMethodEntry(thread, frame_);
+
+  bjvm_stack_value result;
+  if (unlikely(bjvm_is_frame_native(frame_))) {
+    result = interpret_native_frame(fut, thread, frame_);
+  } else {
+    result = interpret_java_frame(fut, thread, frame_);
+  }
+
+  if (likely(fut->status == FUTURE_READY)) {
+    InstrumentMethodReturn(thread, frame_);
+  }
 
   return result;
 }
