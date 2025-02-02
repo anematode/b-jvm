@@ -7,7 +7,7 @@
 
 #include "bjvm.h"
 #include "wasm_utils.h"
-#include <stdint.h>
+#include <types.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus

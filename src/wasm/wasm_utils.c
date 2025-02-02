@@ -78,7 +78,7 @@ void write_byte(bjvm_bytevector *ctx, int byte) {
 }
 
 // Write the bytes to the serialization context
-void write_slice(bjvm_bytevector *ctx, const uint8_t *bytes, size_t len) {
+void write_slice(bjvm_bytevector *ctx, const u8 *bytes, size_t len) {
   size_t new_length = ctx->bytes_len + len;
   if (new_length > ctx->bytes_cap) {
     size_t new_cap = ctx->bytes_cap * 2;
@@ -92,20 +92,20 @@ void write_slice(bjvm_bytevector *ctx, const uint8_t *bytes, size_t len) {
   ctx->bytes_len = new_length;
 }
 
-void write_u32(bjvm_bytevector *ctx, uint32_t value) {
-  uint8_t out[4];
+void write_u32(bjvm_bytevector *ctx, u32 value) {
+  u8 out[4];
   memcpy(out, &value, 4);
   write_slice(ctx, out, 4);
 }
 
 void write_f32(bjvm_bytevector *ctx, float value) {
-  uint8_t out[4];
+  u8 out[4];
   memcpy(out, &value, 4);
   write_slice(ctx, out, 4);
 }
 
 void write_f64(bjvm_bytevector *ctx, double value) {
-  uint8_t out[8];
+  u8 out[8];
   memcpy(out, &value, 8);
   write_slice(ctx, out, 8);
 }
@@ -113,7 +113,7 @@ void write_f64(bjvm_bytevector *ctx, double value) {
 void write_string(bjvm_bytevector *ctx, const char *str) {
   size_t len = strlen(str);
   bjvm_wasm_writeuint(ctx, len);
-  write_slice(ctx, (const uint8_t *)str, len); // lol what r u gonna do about it
+  write_slice(ctx, (const u8 *)str, len); // lol what r u gonna do about it
 }
 
 bjvm_wasm_type bjvm_wasm_void() {
@@ -136,20 +136,20 @@ bjvm_wasm_type bjvm_wasm_int64() {
   return (bjvm_wasm_type){.val = BJVM_WASM_TYPE_KIND_INT64};
 }
 
-void bjvm_wasm_writeuint(bjvm_bytevector *ctx, uint64_t value) {
+void bjvm_wasm_writeuint(bjvm_bytevector *ctx, u64 value) {
   // Credit: https://en.wikipedia.org/wiki/LEB128
-  uint8_t out[16], *write = out;
+  u8 out[16], *write = out;
   do {
-    uint8_t byte = value & 0x7F;
+    u8 byte = value & 0x7F;
     value >>= 7;
     *write++ = byte | (value != 0) << 7;
   } while (value != 0);
   write_slice(ctx, out, write - out);
 }
 
-void bjvm_wasm_writeint(bjvm_bytevector *ctx, int64_t value) {
+void bjvm_wasm_writeint(bjvm_bytevector *ctx, s64 value) {
   // Credit: https://en.wikipedia.org/wiki/LEB128
-  uint8_t byte;
+  u8 byte;
   while (true) {
     byte = value & 0x7F;
     value >>= 7;
@@ -167,7 +167,7 @@ bjvm_wasm_module *bjvm_wasm_module_create() {
   return module;
 }
 
-uint32_t bjvm_register_function_type(bjvm_wasm_module *module,
+u32 bjvm_register_function_type(bjvm_wasm_module *module,
                                        bjvm_wasm_type params,
                                        bjvm_wasm_type results) {
   bjvm_wasm_ser_function_type search = {params, results};
@@ -224,7 +224,7 @@ void serialize_functionsection(bjvm_bytevector *result,
   bjvm_wasm_writeuint(&sect, module->function_count);
   for (int i = 0; i < module->function_count; ++i) {
     bjvm_wasm_function *fn = module->functions[i];
-    uint32_t typeidx = bjvm_register_function_type(module, fn->params, fn->results);
+    u32 typeidx = bjvm_register_function_type(module, fn->params, fn->results);
     bjvm_wasm_writeuint(&sect, typeidx);
     fn->my_index = module->fn_index++;
   }
@@ -277,9 +277,9 @@ typedef struct expression_ser_ctx {
   struct expression_ser_ctx *prev_block_ctx;
 } expression_ser_ctx;
 
-uint32_t walk_to_find_label(expression_ser_ctx *ctx,
+u32 walk_to_find_label(expression_ser_ctx *ctx,
                             bjvm_wasm_expression *break_to) {
-  uint32_t i = 0;
+  u32 i = 0;
   while (ctx && ctx->associated_block != break_to) {
     // printf("Seeking block %p, found %p\n", break_to, ctx->associated_block);
     ++i;
@@ -325,7 +325,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
     write_byte(body, expr->literal.kind);
     switch (expr->literal.kind) { // int
     case BJVM_WASM_LITERAL_KIND_I32:
-      int32_t value;
+      s32 value;
       memcpy(&value, expr->literal.bytes, 4);
       bjvm_wasm_writeint(body, value);
       break;
@@ -342,7 +342,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
       break;
     }
     case BJVM_WASM_LITERAL_KIND_I64: {
-      int64_t value;
+      s64 value;
       memcpy(&value, expr->literal.bytes, 8);
       bjvm_wasm_writeint(body, value);
       break;
@@ -432,7 +432,7 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
       serialize_expression(ctx, body, expr->br.condition);
     }
     write_byte(body, expr->br.condition ? 0x0D : 0x0C);
-    uint32_t label_index = walk_to_find_label(ctx, expr->br.break_to);
+    u32 label_index = walk_to_find_label(ctx, expr->br.break_to);
     bjvm_wasm_writeuint(body, label_index);
     break;
   }
@@ -442,10 +442,10 @@ void serialize_expression(expression_ser_ctx *ctx, bjvm_bytevector *body,
     write_byte(body, 0x0E);
     bjvm_wasm_writeuint(body, expr->br_table.expr_count);
     for (int i = 0; i < expr->br_table.expr_count; ++i) {
-      uint32_t label_index = walk_to_find_label(ctx, expr->br_table.exprs[i]);
+      u32 label_index = walk_to_find_label(ctx, expr->br_table.exprs[i]);
       bjvm_wasm_writeuint(body, label_index);
     }
-    uint32_t label_index = walk_to_find_label(ctx, expr->br_table.dflt);
+    u32 label_index = walk_to_find_label(ctx, expr->br_table.dflt);
     bjvm_wasm_writeuint(body, label_index);
     break;
   }
@@ -700,7 +700,7 @@ bjvm_wasm_expression *bjvm_wasm_f64_const(bjvm_wasm_module *module,
 }
 
 bjvm_wasm_expression *bjvm_wasm_i32_const(bjvm_wasm_module *module,
-                                          int32_t value) {
+                                          s32 value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x41;
   memcpy(result->literal.bytes, &value, 4);
@@ -708,7 +708,7 @@ bjvm_wasm_expression *bjvm_wasm_i32_const(bjvm_wasm_module *module,
 }
 
 bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module,
-                                          int64_t value) {
+                                          s64 value) {
   bjvm_wasm_expression *result = module_expr(module, BJVM_WASM_EXPR_KIND_CONST);
   result->literal.kind = 0x42;
   memcpy(result->literal.bytes, &value, 8);
@@ -716,7 +716,7 @@ bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module,
 }
 
 bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module,
-                                          uint32_t index, bjvm_wasm_type kind) {
+                                          u32 index, bjvm_wasm_type kind) {
   bjvm_wasm_expression *result =
       module_expr(module, BJVM_WASM_EXPR_KIND_GET_LOCAL);
   result->local_get = index;
@@ -725,7 +725,7 @@ bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module,
 }
 
 bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module,
-                                          uint32_t index,
+                                          u32 index,
                                           bjvm_wasm_expression *value) {
   bjvm_wasm_expression *result =
       module_expr(module, BJVM_WASM_EXPR_KIND_SET_LOCAL);
@@ -825,7 +825,7 @@ bjvm_wasm_expression *bjvm_wasm_call_indirect(bjvm_wasm_module *module,
                                               bjvm_wasm_expression *index,
                                               bjvm_wasm_expression **args,
                                               int arg_count,
-                                              uint32_t functype) {
+                                              u32 functype) {
   bjvm_wasm_expression *result =
       module_expr(module, BJVM_WASM_EXPR_KIND_CALL_INDIRECT);
   bjvm_wasm_expression **cpy =

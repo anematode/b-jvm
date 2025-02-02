@@ -1,10 +1,11 @@
 #include "util.h"
 
-#include <stdint.h>
+#include <types.h>
 #include <stdlib.h>
 
 bool utf8_equals(const slice entry, const char *str) {
-  return entry.len == (int)strlen(str) &&
+  size_t str_len = strlen(str);
+  return str_len < U32_MAX && entry.len == (u32)str_len &&
          memcmp(entry.chars, str, entry.len) == 0;
 }
 

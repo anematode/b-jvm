@@ -31,7 +31,7 @@ typedef struct bjvm_basic_block {
   // the TAKEN branch is FIRST, and the FALLTHROUGH branch is SECOND. For
   // lookupswitch and tableswitch, the default branch is last.
   int *next;
-  uint8_t *is_backedge;
+  u8 *is_backedge;
   int next_count;
   int next_cap;
 
@@ -41,20 +41,20 @@ typedef struct bjvm_basic_block {
   int prev_cap;
 
   // Pre- and postorder in a DFS on the original CFG
-  uint32_t dfs_pre, dfs_post;
+  u32 dfs_pre, dfs_post;
   // Immediate dominator of this block
-  uint32_t idom;
+  u32 idom;
   // Blocks that this block immediately dominates
   bjvm_dominated_list_t idominates;
   // Pre- and postorder in the immediate dominator tree
-  uint32_t idom_pre, idom_post;
+  u32 idom_pre, idom_post;
   // Whether this block is the target of a backedge
   bool is_loop_header;
   // Whether we can get here in the method without an exception being thrown
   bool nothrow_accessible;
 } bjvm_basic_block;
 
-typedef enum : uint16_t {
+typedef enum : u16 {
   // The nth parameter to the function (0 = implicit 'this')
   BJVM_VARIABLE_SRC_KIND_PARAMETER,
   // The nth local (not parameter) of the function
@@ -67,7 +67,7 @@ typedef enum : uint16_t {
 } bjvm_variable_source_kind;
 
 typedef struct {
-  uint16_t index;
+  u16 index;
   bjvm_variable_source_kind kind;
 } bjvm_stack_variable_source;
 
@@ -89,7 +89,7 @@ typedef struct bjvm_code_analysis {
     bjvm_compressed_bitset *insn_index_to_kinds[5];
   };
 
-  uint16_t *insn_index_to_stack_depth;
+  u16 *insn_index_to_stack_depth;
   int insn_count;
 
   // For each instruction that might participate in extended NPE message resolution,
@@ -123,7 +123,7 @@ bool bjvm_query_dominance(const bjvm_basic_block *dominator, const bjvm_basic_bl
 int bjvm_attempt_reduce_cfg(bjvm_code_analysis *analy);
 const char *bjvm_insn_code_name(bjvm_insn_code_kind code);
 
-int get_extended_npe_message(bjvm_cp_method *method, uint16_t pc, heap_string *result);
+int get_extended_npe_message(bjvm_cp_method *method, u16 pc, heap_string *result);
 
 #ifdef __cplusplus
 }

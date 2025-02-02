@@ -47,10 +47,10 @@ DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
 
 static heap_string canonicalize_path(slice path) {
   slice *components = nullptr;
-  int count = 0, cap = 0;
+  u32 count = 0, cap = 0;
 
-  int i = 0;
-  for (int j = 0; j <= path.len; ++j) {
+  u32 i = 0;
+  for (u32 j = 0; j <= path.len; ++j) {
     if (path.chars[j] == '/' || j == path.len) {
       slice slc = (slice){path.chars + i, j - i};
       if (utf8_equals(slc, "..")) {
@@ -64,9 +64,9 @@ static heap_string canonicalize_path(slice path) {
 
   i = 0;
   heap_string result = make_heap_str(path.len);
-  for (int component_i = 0; component_i < count; ++component_i) {
+  for (u32 component_i = 0; component_i < count; ++component_i) {
     result.chars[i++] = '/';
-    for (int j = 0; j < components[component_i].len; ++j) {
+    for (u32 j = 0; j < components[component_i].len; ++j) {
       result.chars[i++] = components[component_i].chars[j];
     }
   }

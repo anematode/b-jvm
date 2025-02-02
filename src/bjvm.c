@@ -49,7 +49,7 @@
 DECLARE_ASYNC(int, init_cached_classdescs,
   locals(
     bjvm_classdesc * *cached_classdescs;
-    uint16_t i;
+    u16 i;
   ),
   arguments(bjvm_thread *thread),
   invoked_methods(
@@ -85,7 +85,7 @@ DEFINE_ASYNC(init_cached_classdescs) {
 
 #define MAX_CF_NAME_LENGTH 1000
 
-uint16_t stack_depth(const bjvm_stack_frame *frame) {
+u16 stack_depth(const bjvm_stack_frame *frame) {
   assert(!bjvm_is_frame_native(frame) && "Can't get stack depth of native frame");
   assert(frame->method && "Can't get stack depth of fake frame");
   int pc = frame->plain.program_counter;
@@ -171,7 +171,7 @@ void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle) {
 // between bjvm_stack_value and bjvm_value
 static void make_handles_array(bjvm_thread *thread, const bjvm_method_descriptor *descriptor, bool is_static,
                                bjvm_stack_value *stack_args, bjvm_value *args) {
-  uint8_t argc = descriptor->args_count;
+  u8 argc = descriptor->args_count;
   int j = 0;
   if (!is_static) {
     args[j].handle = bjvm_make_handle(thread, stack_args[j].obj);
@@ -198,7 +198,7 @@ static void drop_handles_array(bjvm_thread *thread, const bjvm_cp_method *method
 
 bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *method,
                                          const bjvm_method_descriptor *descriptor, bjvm_stack_value *args,
-                                         uint8_t argc) {
+                                         u8 argc) {
   bjvm_native_callback *native = method->native_handle;
   if (!native) {
     raise_unsatisfied_link_error(thread, method);
@@ -236,7 +236,7 @@ bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *me
 }
 
 bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args,
-                                        uint8_t argc) {
+                                        u8 argc) {
   const bjvm_attribute_code *code = method->code;
   if (!code) {
     raise_abstract_method_error(thread, method);
@@ -289,7 +289,7 @@ bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *met
 //
 // Interrupt behavior:
 //   - No interrupts will occur as a result of executing this function.
-bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, uint8_t argc) {
+bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, u8 argc) {
   assert(method != nullptr && "Method is null");
   [[maybe_unused]] bool argc_ok = argc == method->descriptor->args_count + !(method->access_flags & BJVM_ACCESS_STATIC);
   assert(argc_ok && "Wrong argc");
@@ -406,7 +406,7 @@ void bjvm_register_native(bjvm_vm *vm, const slice class, const slice method_nam
 bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor, slice name, slice method_descriptor,
                                    bool search_superclasses, bool search_superinterfaces);
 
-void read_string(bjvm_thread *, bjvm_obj_header *obj, int8_t **buf, size_t *len) {
+void read_string(bjvm_thread *, bjvm_obj_header *obj, s8 **buf, size_t *len) {
   assert(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
   bjvm_obj_header *array = ((struct bjvm_native_String *)obj)->value;
   *buf = ArrayData(array);
@@ -416,7 +416,7 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, int8_t **buf, size_t *len)
 int read_string_to_utf8(bjvm_thread *thread, heap_string *result, bjvm_obj_header *obj) {
   assert(obj && "String is null");
 
-  int8_t *buf;
+  s8 *buf;
   size_t len;
   read_string(nullptr, obj, &buf, &len);
   char *cbuf = malloc(len + 1);
@@ -930,8 +930,8 @@ struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjv
 typedef struct {
   bjvm_classdesc *rtype;
   bjvm_classdesc **ptypes;
-  size_t ptypes_count;
-  size_t ptypes_capacity;
+  u32 ptypes_count;
+  u32 ptypes_capacity;
 } mh_type_info_t;
 
 static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info *info, mh_type_info_t *result) {
@@ -1016,7 +1016,7 @@ DEFINE_ASYNC(resolve_mh_mt) {
 
   self->ptypes_array = bjvm_make_handle(
       args->thread, CreateObjectArray1D(args->thread, args->thread->vm->cached_classdescs->klass, info.ptypes_count));
-  for (int i = 0; i < info.ptypes_count; ++i) {
+  for (u32 i = 0; i < info.ptypes_count; ++i) {
     *((bjvm_obj_header **)ArrayData(self->ptypes_array->obj) + i) =
         (void *)bjvm_get_class_mirror(args->thread, info.ptypes[i]);
   }
@@ -1193,7 +1193,7 @@ bool is_builtin_class(slice chars) {
          strncmp(chars.chars, "jdk/", 4) == 0 || strncmp(chars.chars, "sun/", 4) == 0;
 }
 
-bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, slice chars, const uint8_t *classfile_bytes,
+bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, slice chars, const u8 *classfile_bytes,
                                             size_t classfile_len) {
   bjvm_vm *vm = thread->vm;
   bjvm_classdesc *class = calloc(1, sizeof(bjvm_classdesc));
@@ -1328,7 +1328,7 @@ bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, const slice nam
     memcpy(filename.chars + chars.len, cf_ending.chars, cf_ending.len);
     filename.len = chars.len + cf_ending.len;
 
-    uint8_t *bytes;
+    u8 *bytes;
     size_t cf_len;
     int read_status = bjvm_lookup_classpath(&vm->classpath, filename, &bytes, &cf_len);
     if (read_status) {
@@ -1342,7 +1342,7 @@ bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, const slice nam
         abort();
       }
 
-      int i = 0;
+      u32 i = 0;
       for (; (i < chars.len) && (filename.chars[i] != '.'); ++i)
         filename.chars[i] = filename.chars[i] == '/' ? '.' : filename.chars[i];
       // ClassNotFoundException: com.google.DontBeEvil
@@ -1612,7 +1612,7 @@ bjvm_async_run_ctx *create_run_ctx(bjvm_thread *thread, bjvm_cp_method *method, 
   }
 
   int nonstatic = !(method->access_flags & BJVM_ACCESS_STATIC);
-  uint8_t argc = method->descriptor->args_count + nonstatic;
+  u8 argc = method->descriptor->args_count + nonstatic;
 
   bjvm_stack_value *stack_top = (bjvm_stack_value *)(thread->frame_buffer + thread->frame_buffer_used);
   size_t args_size = sizeof(bjvm_stack_value) * argc;
@@ -1709,7 +1709,7 @@ void store_stack_value(void *field_location, bjvm_stack_value value, bjvm_type_k
   case BJVM_TYPE_KIND_CHAR:
     [[fallthrough]];
   case BJVM_TYPE_KIND_SHORT:
-    *(jshort *)field_location = (int16_t)value.i;
+    *(jshort *)field_location = (s16)value.i;
     break;
   case BJVM_TYPE_KIND_FLOAT:
     *(jfloat *)field_location = value.f;
@@ -1737,13 +1737,13 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
   switch (kind) {
   case BJVM_TYPE_KIND_BOOLEAN:
   case BJVM_TYPE_KIND_BYTE: // sign-extend the byte
-    result.i = (int)*(int8_t *)field_location;
+    result.i = (int)*(s8 *)field_location;
     break;
   case BJVM_TYPE_KIND_CHAR:
-    result.i = *(uint16_t *)field_location;
+    result.i = *(u16 *)field_location;
     break;
   case BJVM_TYPE_KIND_SHORT:
-    result.i = *(int16_t *)field_location;
+    result.i = *(s16 *)field_location;
     break;
   case BJVM_TYPE_KIND_FLOAT:
     result.f = *(float *)field_location;
@@ -1755,7 +1755,7 @@ bjvm_stack_value load_stack_value(void *field_location, bjvm_type_kind kind) {
     result.i = *(int *)field_location;
     break;
   case BJVM_TYPE_KIND_LONG:
-    result.l = *(int64_t *)field_location;
+    result.l = *(s64 *)field_location;
     break;
   case BJVM_TYPE_KIND_REFERENCE:
     result.obj = *(void **)field_location;
@@ -2053,7 +2053,7 @@ DEFINE_ASYNC(resolve_methodref) {
 }
 
 int bjvm_multianewarray(bjvm_thread *thread, bjvm_plain_frame *frame, struct bjvm_multianewarray_data *multianewarray,
-                        uint16_t *sd) {
+                        u16 *sd) {
   int dims = multianewarray->dimensions;
   assert(*sd >= dims);
   // assert(stack_depth(frame) >= dims);
@@ -2227,7 +2227,7 @@ DEFINE_ASYNC(bjvm_run_native) {
   bool is_static = frame->method->access_flags & BJVM_ACCESS_STATIC;
   bjvm_handle *target_handle = is_static ? nullptr : bjvm_get_native_args(frame)[0].handle;
   bjvm_value *native_args = bjvm_get_native_args(frame) + (is_static ? 0 : 1);
-  uint16_t argc = frame->num_locals - !is_static;
+  u16 argc = frame->num_locals - !is_static;
 
   if (!handle->async_ctx_bytes) {
     bjvm_stack_value result = handle->sync(thread, target_handle, native_args, argc);
@@ -2268,7 +2268,7 @@ DEFINE_ASYNC(bjvm_interpret) {
 }
 // #pragma GCC diagnostic pop
 
-int bjvm_get_line_number(const bjvm_attribute_code *code, uint16_t pc) {
+int bjvm_get_line_number(const bjvm_attribute_code *code, u16 pc) {
   assert(code && "code is null");
   bjvm_attribute_line_number_table *table = code->line_number_table;
   if (!table || pc >= code->insn_count)

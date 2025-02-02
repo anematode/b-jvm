@@ -5,7 +5,7 @@
 #ifndef VTABLE_H
 #define VTABLE_H
 
-#include <stdint.h>
+#include <types.h>
 #include <stddef.h>
 
 #ifdef __cplusplus

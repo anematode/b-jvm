@@ -48,7 +48,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset1,
   int err = read_string_to_utf8(thread, &name, args[1].handle->obj);
   BJVM_CHECK(!err);
 
-  int64_t result = 0;
+  s64 result = 0;
 
   for (int i = 0; i < desc->fields_count; ++i) {
     bjvm_cp_field *field = &desc->fields[i];
@@ -101,7 +101,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getIntVolatile, "(Ljava/lang/Object;
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLongVolatile, "(Ljava/lang/Object;J)J") {
   assert(argc == 2);
   return (bjvm_stack_value){
-      .l = *(int64_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
+      .l = *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putReferenceVolatile,
@@ -121,7 +121,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, putOrderedReference,
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putOrderedLong, "(Ljava/lang/Object;JJ)V") {
   assert(argc == 3);
-  *(int64_t *)((void *)args[0].handle->obj + args[1].l) = args[2].l;
+  *(s64 *)((void *)args[0].handle->obj + args[1].l) = args[2].l;
   return value_null();
 }
 
@@ -136,7 +136,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetInt,
                "(Ljava/lang/Object;JII)Z") {
   assert(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
-  int64_t offset = args[1].l;
+  s64 offset = args[1].l;
   int expected = args[2].i, update = args[3].i;
   int ret = __sync_bool_compare_and_swap((int *)((uintptr_t)target + offset),
                                          expected, update);
@@ -147,9 +147,9 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetLong,
                "(Ljava/lang/Object;JJJ)Z") {
   assert(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
-  int64_t offset = args[1].l;
-  int64_t expected = args[2].l, update = args[3].l;
-  int ret = __sync_bool_compare_and_swap((int64_t *)((uintptr_t)target + offset),
+  s64 offset = args[1].l;
+  s64 expected = args[2].l, update = args[3].l;
+  int ret = __sync_bool_compare_and_swap((s64 *)((uintptr_t)target + offset),
                                          expected, update);
   return (bjvm_stack_value){.l = ret};
 }
@@ -158,7 +158,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetReference,
                "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
   assert(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
-  int64_t offset = args[1].l;
+  s64 offset = args[1].l;
   uintptr_t expected = (uintptr_t)args[2].handle->obj,
             update = (uintptr_t)args[3].handle->obj;
   int ret = __sync_bool_compare_and_swap((uintptr_t *)((uintptr_t)target + offset),
@@ -174,7 +174,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
   assert(argc == 1);
   void *l = malloc(args[0].l);
   arrput(thread->vm->unsafe_allocations, l);
-  return (bjvm_stack_value){.l = (int64_t)l};
+  return (bjvm_stack_value){.l = (s64)l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class;)Ljava/lang/Object;") {
@@ -200,19 +200,19 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {
   assert(argc == 2);
-  *(int64_t *)args[0].l = args[1].l;
+  *(s64 *)args[0].l = args[1].l;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putInt, "(Ljava/lang/Object;JI)V") {
   assert(argc == 3);
-  *(int32_t *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
+  *(s32 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putByte, "(Ljava/lang/Object;JB)V") {
   assert(argc == 3);
-  *(int8_t *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
+  *(s8 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
   return value_null();
 }
 
@@ -238,18 +238,18 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getShort, "(Ljava/lang/Object;J)S") 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(Ljava/lang/Object;J)B") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .i = *(int8_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
+    .i = *(s8 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLong, "(Ljava/lang/Object;J)J") {
   assert(argc == 2);
   return (bjvm_stack_value){
-    .l = *(int64_t *)((uintptr_t)args[0].handle->obj + args[1].l)};
+    .l = *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(J)B") {
   assert(argc == 1);
-  return (bjvm_stack_value){.i = *(int8_t *)args[0].l};
+  return (bjvm_stack_value){.i = *(s8 *)args[0].l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReferenceVolatile,
@@ -277,10 +277,10 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
   (void)pd;
 
   heap_string name_str = AsHeapString(name, on_oom);
-  uint8_t *bytes = ArrayData(data) + offset;
+  u8 *bytes = ArrayData(data) + offset;
 
   // Replace name_str with slashes
-  for (int i = 0; i < name_str.len; ++i) {
+  for (u32 i = 0; i < name_str.len; ++i) {
     if (name_str.chars[i] == '.') {
       name_str.chars[i] = '/';
     }

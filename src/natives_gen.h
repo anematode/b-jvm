@@ -3,9 +3,9 @@ struct bjvm_native_String {
   bjvm_obj_header base;
   // my fields
   bjvm_obj_header *value;  // [B
-  int32_t coder;  // B
-  int32_t hash;  // I
-  int32_t hashIsZero;  // Z
+  s32 coder;  // B
+  s32 hash;  // I
+  s32 hashIsZero;  // Z
 };
 struct bjvm_native_StackTraceElement {
   bjvm_obj_header base;
@@ -17,8 +17,8 @@ struct bjvm_native_StackTraceElement {
   bjvm_obj_header *declaringClass;  // Ljava/lang/String;
   bjvm_obj_header *methodName;  // Ljava/lang/String;
   bjvm_obj_header *fileName;  // Ljava/lang/String;
-  int32_t lineNumber;  // I
-  int32_t format;  // B
+  s32 lineNumber;  // I
+  s32 format;  // B
 };
 struct bjvm_native_Throwable {
   bjvm_obj_header base;
@@ -32,22 +32,22 @@ struct bjvm_native_Throwable {
   bjvm_obj_header *detailMessage;  // Ljava/lang/String;
   bjvm_obj_header *cause;  // Ljava/lang/Throwable;
   bjvm_obj_header *stackTrace;  // [Ljava/lang/StackTraceElement;
-  int32_t depth;  // I
+  s32 depth;  // I
   bjvm_obj_header *suppressedExceptions;  // Ljava/util/List;
 };
 struct bjvm_native_LambdaForm {
   bjvm_obj_header base;
   // my fields
-  int32_t arity;  // I
-  int32_t result;  // I
-  int32_t forceInline;  // Z
+  s32 arity;  // I
+  s32 result;  // I
+  s32 forceInline;  // Z
   bjvm_obj_header *customized;  // Ljava/lang/invoke/MethodHandle;
   bjvm_obj_header *names;  // [Ljava/lang/invoke/LambdaForm$Name;
   bjvm_obj_header *kind;  // Ljava/lang/invoke/LambdaForm$Kind;
   bjvm_obj_header *vmentry;  // Ljava/lang/invoke/MemberName;
-  int32_t isCompiled;  // Z
+  s32 isCompiled;  // Z
   bjvm_obj_header *transformCache;  // Ljava/lang/Object;
-  int32_t invocationCounter;  // I
+  s32 invocationCounter;  // I
 };
 struct bjvm_native_CallSite {
   bjvm_obj_header base;
@@ -77,7 +77,7 @@ struct bjvm_native_Class {
   bjvm_obj_header *packageName;  // Ljava/lang/String;
   bjvm_obj_header *componentType;  // Ljava/lang/Class;
   bjvm_obj_header *reflectionData;  // Ljava/lang/ref/SoftReference;
-  int32_t classRedefinedCount;  // I
+  s32 classRedefinedCount;  // I
   bjvm_obj_header *genericInfo;  // Lsun/reflect/generics/repository/ClassRepository;
   bjvm_obj_header *enumConstants;  // [Ljava/lang/Object;
   bjvm_obj_header *enumConstantDirectory;  // Ljava/util/Map;
@@ -89,9 +89,9 @@ struct bjvm_native_Parameter {
   bjvm_obj_header base;
   // my fields
   bjvm_obj_header *name;  // Ljava/lang/String;
-  int32_t modifiers;  // I
+  s32 modifiers;  // I
   bjvm_obj_header *executable;  // Ljava/lang/reflect/Executable;
-  int32_t index;  // I
+  s32 index;  // I
   bjvm_obj_header *parameterTypeCache;  // Ljava/lang/reflect/Type;
   bjvm_obj_header *parameterClassCache;  // Ljava/lang/Class;
   bjvm_obj_header *declaredAnnotations;  // Ljava/util/Map;
@@ -99,18 +99,18 @@ struct bjvm_native_Parameter {
 struct bjvm_native_Field {
   bjvm_obj_header base;
   // superclass fields
-  int32_t override;  // Z
+  s32 override;  // Z
   bjvm_obj_header *accessCheckCache;  // Ljava/lang/Object;
   // implementation-dependent fields
   bjvm_cp_field *reflected_field;
 
   // my fields
   bjvm_obj_header *clazz;  // Ljava/lang/Class;
-  int32_t slot;  // I
+  s32 slot;  // I
   bjvm_obj_header *name;  // Ljava/lang/String;
   bjvm_obj_header *type;  // Ljava/lang/Class;
-  int32_t modifiers;  // I
-  int32_t trustedFinal;  // Z
+  s32 modifiers;  // I
+  s32 trustedFinal;  // Z
   bjvm_obj_header *signature;  // Ljava/lang/String;
   bjvm_obj_header *genericInfo;  // Lsun/reflect/generics/repository/FieldRepository;
   bjvm_obj_header *annotations;  // [B
@@ -122,7 +122,7 @@ struct bjvm_native_Field {
 struct bjvm_native_Method {
   bjvm_obj_header base;
   // superclass fields
-  int32_t override;  // Z
+  s32 override;  // Z
   bjvm_obj_header *accessCheckCache;  // Ljava/lang/Object;
   bjvm_obj_header *parameterData;  // Ljava/lang/reflect/Executable$ParameterData;
   bjvm_obj_header *declaredAnnotations;  // Ljava/util/Map;
@@ -131,12 +131,12 @@ struct bjvm_native_Method {
 
   // my fields
   bjvm_obj_header *clazz;  // Ljava/lang/Class;
-  int32_t slot;  // I
+  s32 slot;  // I
   bjvm_obj_header *name;  // Ljava/lang/String;
   bjvm_obj_header *returnType;  // Ljava/lang/Class;
   bjvm_obj_header *parameterTypes;  // [Ljava/lang/Class;
   bjvm_obj_header *exceptionTypes;  // [Ljava/lang/Class;
-  int32_t modifiers;  // I
+  s32 modifiers;  // I
   bjvm_obj_header *signature;  // Ljava/lang/String;
   bjvm_obj_header *genericInfo;  // Lsun/reflect/generics/repository/MethodRepository;
   bjvm_obj_header *annotations;  // [B
@@ -144,12 +144,12 @@ struct bjvm_native_Method {
   bjvm_obj_header *annotationDefault;  // [B
   bjvm_obj_header *methodAccessor;  // Ljdk/internal/reflect/MethodAccessor;
   bjvm_obj_header *root;  // Ljava/lang/reflect/Method;
-  int32_t callerSensitive;  // B
+  s32 callerSensitive;  // B
 };
 struct bjvm_native_Constructor {
   bjvm_obj_header base;
   // superclass fields
-  int32_t override;  // Z
+  s32 override;  // Z
   bjvm_obj_header *accessCheckCache;  // Ljava/lang/Object;
   bjvm_obj_header *parameterData;  // Ljava/lang/reflect/Executable$ParameterData;
   bjvm_obj_header *declaredAnnotations;  // Ljava/util/Map;
@@ -158,10 +158,10 @@ struct bjvm_native_Constructor {
 
   // my fields
   bjvm_obj_header *clazz;  // Ljava/lang/Class;
-  int32_t slot;  // I
+  s32 slot;  // I
   bjvm_obj_header *parameterTypes;  // [Ljava/lang/Class;
   bjvm_obj_header *exceptionTypes;  // [Ljava/lang/Class;
-  int32_t modifiers;  // I
+  s32 modifiers;  // I
   bjvm_obj_header *signature;  // Ljava/lang/String;
   bjvm_obj_header *genericInfo;  // Lsun/reflect/generics/repository/ConstructorRepository;
   bjvm_obj_header *annotations;  // [B
@@ -175,10 +175,10 @@ struct bjvm_native_Thread {
   bjvm_thread *vm_thread;
 
   // my fields
-  int64_t eetop;  // J
-  int64_t tid;  // J
+  s64 eetop;  // J
+  s64 tid;  // J
   bjvm_obj_header *name;  // Ljava/lang/String;
-  int32_t interrupted;  // Z
+  s32 interrupted;  // Z
   bjvm_obj_header *contextClassLoader;  // Ljava/lang/ClassLoader;
   bjvm_obj_header *inheritedAccessControlContext;  // Ljava/security/AccessControlContext;
   bjvm_obj_header *holder;  // Ljava/lang/Thread$FieldHolder;
@@ -190,9 +190,9 @@ struct bjvm_native_Thread {
   bjvm_obj_header *nioBlocker;  // Lsun/nio/ch/Interruptible;
   bjvm_obj_header *cont;  // Ljdk/internal/vm/Continuation;
   bjvm_obj_header *uncaughtExceptionHandler;  // Ljava/lang/Thread$UncaughtExceptionHandler;
-  int64_t threadLocalRandomSeed;  // J
-  int32_t threadLocalRandomProbe;  // I
-  int32_t threadLocalRandomSecondarySeed;  // I
+  s64 threadLocalRandomSeed;  // J
+  s32 threadLocalRandomProbe;  // I
+  s32 threadLocalRandomSecondarySeed;  // I
   bjvm_obj_header *container;  // Ljdk/internal/vm/ThreadContainer;
   bjvm_obj_header *headStackableScopes;  // Ljdk/internal/vm/StackableScope;
 };
@@ -206,8 +206,8 @@ struct bjvm_native_MethodHandle {
   bjvm_obj_header *form;  // Ljava/lang/invoke/LambdaForm;
   bjvm_obj_header *asTypeCache;  // Ljava/lang/invoke/MethodHandle;
   bjvm_obj_header *asTypeSoftCache;  // Ljava/lang/ref/SoftReference;
-  int32_t customizationCount;  // B
-  int32_t updateInProgress;  // Z
+  s32 customizationCount;  // B
+  s32 updateInProgress;  // Z
 };
 struct bjvm_native_MethodType {
   bjvm_obj_header base;
@@ -233,7 +233,7 @@ struct bjvm_native_MemberName {
   bjvm_obj_header *clazz;  // Ljava/lang/Class;
   bjvm_obj_header *name;  // Ljava/lang/String;
   bjvm_obj_header *type;  // Ljava/lang/Object;
-  int32_t flags;  // I
+  s32 flags;  // I
   bjvm_obj_header *method;  // Ljava/lang/invoke/ResolvedMethodName;
   bjvm_obj_header *resolution;  // Ljava/lang/Object;
 };

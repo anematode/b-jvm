@@ -10,7 +10,7 @@ static bjvm_obj_header **get_fd(bjvm_obj_header *obj) {
   return (void *)obj + field->byte_offset;
 }
 
-static int64_t *get_native_handle(bjvm_obj_header *obj) {
+static s64 *get_native_handle(bjvm_obj_header *obj) {
   bjvm_cp_field *native_fd_field =
       bjvm_easy_field_lookup(obj->descriptor, STR("handle"), STR("J"));
   return (void *)obj + native_fd_field->byte_offset;
@@ -27,7 +27,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
     bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
                          hslc(filename));
   } else {
-    *get_native_handle(fd) = (int64_t)file;
+    *get_native_handle(fd) = (s64)file;
   }
   free_heap_str(filename);
 

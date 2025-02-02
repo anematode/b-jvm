@@ -16,7 +16,7 @@ extern "C" {
 typedef struct bjvm_cp_entry bjvm_cp_entry;
 typedef struct bjvm_field_descriptor bjvm_field_descriptor;
 
-enum bjvm_cp_kind : uint32_t;
+enum bjvm_cp_kind : u32;
 typedef enum bjvm_cp_kind bjvm_cp_kind;
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_kinds,
@@ -35,7 +35,7 @@ bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_k
  * sipush, iconst_<n>, iconst_<n> -> iconst, dconst_<d> -> dconst, fconst_<f> ->
  * fconst
  */
-typedef enum : uint8_t {
+typedef enum : u8 {
   /** No operands */
   bjvm_insn_nop, // stack polymorphic
 
@@ -263,7 +263,7 @@ typedef enum : uint8_t {
   bjvm_insn_dsqrt
 } bjvm_insn_code_kind;
 
-typedef enum : uint8_t {
+typedef enum : u8 {
   TOS_VOID = 0,
   TOS_DOUBLE = 1,
   TOS_INT = 2,
@@ -354,7 +354,7 @@ typedef struct {
 
 typedef struct {
   // Sign-extended if original entry was an Integer
-  int64_t value;
+  s64 value;
 } bjvm_cp_integral_info;
 
 typedef struct {
@@ -407,7 +407,7 @@ typedef struct {
   struct bjvm_native_MethodType *resolved_mt;
 } bjvm_cp_indy_info;
 
-enum bjvm_cp_kind : uint32_t {
+enum bjvm_cp_kind : u32 {
   BJVM_CP_KIND_INVALID = 0,
   BJVM_CP_KIND_UTF8 = 1 << 0,
   BJVM_CP_KIND_INTEGER = 1 << 1,
@@ -459,7 +459,7 @@ typedef struct bjvm_cp_entry {
 
 struct bjvm_multianewarray_data {
   bjvm_cp_class_info *entry;
-  uint8_t dimensions;
+  u8 dimensions;
 };
 
 typedef struct bjvm_constant_pool {
@@ -468,7 +468,7 @@ typedef struct bjvm_constant_pool {
 } bjvm_constant_pool;
 
 // Access flags. Same as given in the class file specification.
-typedef enum : uint16_t {
+typedef enum : u16 {
   BJVM_ACCESS_PUBLIC = 0x0001,
   BJVM_ACCESS_PRIVATE = 0x0002,
   BJVM_ACCESS_PROTECTED = 0x0004,
@@ -503,6 +503,7 @@ typedef enum {
   BJVM_ATTRIBUTE_KIND_ANNOTATION_DEFAULT,
   BJVM_ATTRIBUTE_KIND_NEST_HOST,
   BJVM_ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE,
+  BJVM_ATTRIBUTE_KIND_STACK_MAP_TABLE,
 } bjvm_attribute_kind;
 
 typedef struct bjvm_method_descriptor {
@@ -521,7 +522,7 @@ typedef struct {
 
 typedef struct {
   bjvm_exception_table_entry *entries;
-  uint16_t entries_count;
+  u16 entries_count;
 } bjvm_attribute_exception_table;
 
 typedef struct bjvm_attribute bjvm_attribute;
@@ -555,7 +556,7 @@ const slice *bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_lo
 
 typedef struct {
   slice name;
-  uint16_t access_flags;
+  u16 access_flags;
 } bjvm_method_parameter_info;
 
 typedef struct {
@@ -585,25 +586,25 @@ struct bjvm_bc_lookupswitch_data {
 };
 
 struct bjvm_bc_iinc_data {
-  uint16_t index;
-  int16_t const_;
+  u16 index;
+  s16 const_;
 };
 
 typedef struct bjvm_bytecode_insn {
   bjvm_insn_code_kind kind;
-  uint8_t args;
+  u8 args;
   bjvm_reduced_tos_kind tos_before;  // the (reduced) top-of-stack type before this instruction executes
   bjvm_reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
-  uint16_t original_pc;
+  u16 original_pc;
 
   union {
     // for newarray
     bjvm_type_kind array_type;
     // constant pool index or local variable index or branch target (instruction
     // index)
-    uint32_t index;
+    u32 index;
     // Integer or long immediate
-    int64_t integer_imm;
+    s64 integer_imm;
     // Float immediate
     float f_imm;
     // Double immediate
@@ -628,8 +629,8 @@ typedef struct bjvm_bytecode_insn {
 } bjvm_bytecode_insn;
 
 typedef struct {
-  uint16_t max_stack;
-  uint16_t max_locals;
+  u16 max_stack;
+  u16 max_locals;
   int insn_count;
   int max_formal_pc;
 
@@ -659,22 +660,22 @@ typedef struct {
 } bjvm_attribute_enclosing_method;
 
 typedef struct {
-  uint8_t *data;
+  u8 *data;
   int length;
 } bjvm_attribute_runtime_visible_annotations;
 
 typedef struct {
-  uint8_t *data;
+  u8 *data;
   int length;
 } bjvm_attribute_runtime_visible_parameter_annotations;
 
 typedef struct {
-  uint8_t *data;
+  u8 *data;
   int length;
 } bjvm_attribute_runtime_visible_type_annotations;
 
 typedef struct {
-  uint8_t *data;
+  u8 *data;
   int length;
 } bjvm_attribute_annotation_default;
 
@@ -686,10 +687,17 @@ typedef struct {
   slice name;
 } bjvm_attribute_source_file;
 
+// We leave the attribute unparsed until analysis time (which is technically incorrect I think, but whatever)
+typedef struct {
+  uint8_t *data;
+  int32_t length;
+  int32_t entries_count;
+} attribute_stack_map_table;
+
 typedef struct bjvm_attribute {
   bjvm_attribute_kind kind;
   slice name;
-  uint32_t length;
+  u32 length;
 
   union {
     bjvm_attribute_code code;
@@ -705,6 +713,7 @@ typedef struct bjvm_attribute {
     bjvm_attribute_annotation_default annotation_default;
     bjvm_attribute_signature signature;
     bjvm_attribute_local_variable_table lvt;
+    attribute_stack_map_table smt;
     bjvm_cp_class_info *nest_host;
   };
 } bjvm_attribute;
@@ -776,6 +785,7 @@ typedef struct bjvm_classdesc {
 
   bjvm_access_flags access_flags;
   heap_string name;
+  bjvm_cp_class_info *self;
   bjvm_cp_class_info *super_class;
   bjvm_cp_class_info *nest_host;
 
@@ -795,7 +805,7 @@ typedef struct bjvm_classdesc {
   bjvm_attribute *attributes;
   bjvm_classdesc *array_type;
 
-  uint8_t *static_fields;
+  u8 *static_fields;
   // Number of bytes (including the object header) which an instance of this
   // class takes up. Unused for array types.
   size_t instance_bytes;
@@ -848,7 +858,7 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @param result Where to write the result.
  * @param error Where to write the error string. If nullptr, error is ignored.
  */
-parse_result_t bjvm_parse_classfile(const uint8_t *bytes, size_t len,
+parse_result_t bjvm_parse_classfile(const u8 *bytes, size_t len,
                                     bjvm_classdesc *result, heap_string *error);
 
 #ifdef __cplusplus

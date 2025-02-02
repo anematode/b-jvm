@@ -6,7 +6,7 @@
 #include <bjvm.h>
 
 // https://github.com/openjdk/jdk11u-dev/blob/be6956b15653f0d870efae89fc1b5df657cca45f/src/java.base/share/classes/java/lang/StringLatin1.java#L52
-static bool do_latin1(const uint16_t *chars, size_t len) {
+static bool do_latin1(const u16 *chars, size_t len) {
   for (size_t i = 0; i < len; ++i) {
     if (chars[i] >> 8 != 0)
       return false;
@@ -14,19 +14,19 @@ static bool do_latin1(const uint16_t *chars, size_t len) {
   return true;
 }
 
-static int convert_modified_utf8_to_chars(const char *bytes, int len, uint16_t **result,
+static int convert_modified_utf8_to_chars(const char *bytes, int len, u16 **result,
                                    int *result_len, bool sloppy) {
   *result = malloc(len * sizeof(short)); // conservatively large
   int i = 0, j = 0;
 
-  uint16_t idxs[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  u16 idxs[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
   for (int i = 0; i < 16; ++i)
-    idxs[i] += (uint16_t)-256;
+    idxs[i] += (u16)-256;
 
   for (; i < len; ++i) {
     // "Code points in the range '\u0001' to '\u007F' are represented by a
     // single byte"
-    uint8_t byte = bytes[i];
+    u8 byte = bytes[i];
     if (byte >= 0x01 && byte <= 0x7F) {
       (*result)[j++] = byte;
     } else if ((bytes[i] & 0xE0) == 0xC0) {
@@ -34,7 +34,7 @@ static int convert_modified_utf8_to_chars(const char *bytes, int len, uint16_t *
       // bytes"
       if (i >= len - 1)
         goto inval;
-      (*result)[j++] = (((uint16_t)byte & 0x1F) << 6) | ((uint16_t)bytes[i + 1] & 0x3F);
+      (*result)[j++] = (((u16)byte & 0x1F) << 6) | ((u16)bytes[i + 1] & 0x3F);
       i++;
     } else if ((bytes[i] & 0xF0) == 0xE0) {
       // "Code points in the range '\u0800' to '\uFFFF' are represented by three
@@ -68,7 +68,7 @@ bjvm_obj_header *make_jstring_modified_utf8(bjvm_thread *thread, slice string) {
 
   bjvm_obj_header *result = nullptr;
 
-  uint16_t *chars = nullptr;
+  u16 *chars = nullptr;
   int len;
   if (convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true) == -1)
     return nullptr;
@@ -78,7 +78,7 @@ bjvm_obj_header *make_jstring_modified_utf8(bjvm_thread *thread, slice string) {
     if (!S->value)
       goto oom;
     for (int i = 0; i < len; ++i) {
-      ByteArrayStore(S->value, i, (int8_t)chars[i]);
+      ByteArrayStore(S->value, i, (s8)chars[i]);
     }
     S->coder = STRING_CODER_LATIN1; // LATIN1
     result = (void *)S;
@@ -106,12 +106,12 @@ object make_jstring_cstr(bjvm_thread *thread, char const* cstr) {
 
   size_t len_ = strlen(cstr);
   assert(len_ < INT32_MAX);
-  int32_t len = (int32_t)len_;
+  s32 len = (s32)len_;
 
   S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, len);
   if (!S->value)
     goto oom;
-  ByteArrayStoreBlock(S->value, 0, len, (uint8_t*)cstr);
+  ByteArrayStoreBlock(S->value, 0, len, (u8*)cstr);
   S->coder = STRING_CODER_LATIN1; // LATIN1
   result = (void *)S;
 
@@ -123,8 +123,8 @@ object make_jstring_cstr(bjvm_thread *thread, char const* cstr) {
 static object lookup_interned_jstring(bjvm_thread *thread, object s) {
   object raw = RawStringData(thread, s);
 
-  uint8_t *data = ArrayData(raw);
-  int32_t len = *ArrayLength(raw);
+  u8 *data = ArrayData(raw);
+  s32 len = *ArrayLength(raw);
 
   return bjvm_hash_table_lookup(&thread->vm->interned_strings, (char const*)data, len);
 }
@@ -132,8 +132,8 @@ static object lookup_interned_jstring(bjvm_thread *thread, object s) {
 static void insert_interned_jstring(bjvm_thread *thread, object s) {
   object raw = RawStringData(thread, s);
 
-  uint8_t *data = ArrayData(raw);
-  int32_t len = *ArrayLength(raw);
+  u8 *data = ArrayData(raw);
+  s32 len = *ArrayLength(raw);
 
   (void)bjvm_hash_table_insert(&thread->vm->interned_strings, (char const*) data, len, s);
 }
@@ -177,12 +177,12 @@ bjvm_obj_header *MakeJStringFromData(bjvm_thread *thread, slice data, string_cod
   bjvm_obj_header *result = nullptr;
 
   assert(data.len < INT32_MAX);
-  int32_t len = (int32_t)data.len;
+  s32 len = (s32)data.len;
 
   S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, len);
   if (!S->value)
     goto oom;
-  ByteArrayStoreBlock(S->value, 0, len, (uint8_t const*)data.chars);
+  ByteArrayStoreBlock(S->value, 0, len, (u8 const*)data.chars);
   S->coder = encoding; // LATIN1
   result = (void *)S;
 
@@ -198,16 +198,16 @@ bjvm_obj_header *InternJString(bjvm_thread *thread, object s) {
 
   object raw = RawStringData(thread, s);
 
-  uint8_t *data = ArrayData(raw);
-  int32_t len = *ArrayLength(raw);
+  u8 *data = ArrayData(raw);
+  s32 len = *ArrayLength(raw);
 
   (void)bjvm_hash_table_insert(&thread->vm->interned_strings, (char const*)data, len, s);
   return s;
 }
 
-uint64_t hash_code_rng = 0;
+u64 hash_code_rng = 0;
 
-uint64_t ObjNextHashCode() {
+u64 ObjNextHashCode() {
   hash_code_rng = hash_code_rng * 0x5DEECE66D + 0xB;
   return hash_code_rng >> 32;
 }

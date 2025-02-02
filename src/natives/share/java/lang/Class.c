@@ -143,7 +143,7 @@ DECLARE_NATIVE("java/lang", Class, initClassName, "()Ljava/lang/String;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
   INIT_STACK_STRING(name, 1000);
   bprintf(name, "%.*s", fmt_slice(classdesc->name));
-  for (int i = 0; i < classdesc->name.len; ++i) {
+  for (u32 i = 0; i < classdesc->name.len; ++i) {
     name.chars[i] = name.chars[i] == '/' ? '.' : name.chars[i];
   }
   name.len = classdesc->name.len;

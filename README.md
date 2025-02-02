@@ -5,7 +5,7 @@ Message me on Discord if you are interested in collaborating: forevermilk#0001
 
 ## Style guide
 
-Always use `int64_t` instead of `long` because Emscripten has `sizeof(long) == 4`. `int` can be assumed to be 32 bits.
+Always use `s64` instead of `long` because Emscripten has `sizeof(long) == 4`. `int` can be assumed to be 32 bits.
 
 Place all native functions in the corresponding folder in `src/natives`, and use the `DECLARE_NATIVE` macro to link them.
 

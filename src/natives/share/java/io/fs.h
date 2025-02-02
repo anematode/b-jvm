@@ -1,9 +1,9 @@
 #ifndef FS_H
 #define FS_H
 
-#include <stdint.h>
+#include <types.h>
 
-typedef enum : int32_t {
+typedef enum : s32 {
   BA_EXISTS = 0x01,
   BA_REGULAR = 0x02,
   BA_DIRECTORY = 0x04,

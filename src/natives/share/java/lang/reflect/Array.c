@@ -10,7 +10,7 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
   bjvm_initialize_class_t pox = {.args = {thread, class}};
   future_t f = bjvm_initialize_class(&pox);
   BJVM_CHECK(f.status == FUTURE_READY);
-  int32_t count = args[1].i;
+  s32 count = args[1].i;
   bjvm_obj_header *result;
   if (class->kind == BJVM_CD_KIND_PRIMITIVE) {
     result = CreatePrimitiveArray1D(thread, class->primitive_component, count);

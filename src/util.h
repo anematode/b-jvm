@@ -7,7 +7,7 @@ extern "C" {
 
 #include <assert.h>
 #include <stdarg.h>
-#include <stdint.h>
+#include <types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,13 +77,13 @@ static inline void *__vector_push(size_t element_size, void **vector, int *vecto
 
 typedef struct {
   char *chars;
-  uint32_t len;
+  u32 len;
 } slice;
 
 typedef struct {
   char *chars;
-  uint32_t len;
-  uint32_t cap; // including null byte
+  u32 len;
+  u32 cap; // including null byte
 } heap_string;
 
 #define INIT_STACK_STRING(name, buffer_size)                                                                           \
@@ -92,15 +92,15 @@ typedef struct {
 #define null_str() ((slice){.chars = nullptr, .len = 0})
 
 /// Slices the given string from the given start index to the end.
-static inline slice subslice(slice str, uint32_t start) {
+static inline slice subslice(slice str, u32 start) {
   assert(str.len >= start);
-  return (slice){.chars = str.chars + start, .len = (uint32_t)(str.len - start)};
+  return (slice){.chars = str.chars + start, .len = (u32)(str.len - start)};
 }
 
 /// Slices the given string from the given start index to the given end index.
-static inline slice subslice_to(slice str, uint32_t start, uint32_t end) {
+static inline slice subslice_to(slice str, u32 start, u32 end) {
   assert(end >= start);
-  return (slice){.chars = str.chars + start, .len = (uint32_t)(end - start)};
+  return (slice){.chars = str.chars + start, .len = (u32)(end - start)};
 }
 
 /// Uses the given format string and arguments to print a string into the given
@@ -112,7 +112,7 @@ static inline slice bprintf(slice buffer, const char *format, ...) {
   va_end(args);
   assert(len >= 0);
 
-  return (slice){.chars = buffer.chars, .len = (uint32_t)len};
+  return (slice){.chars = buffer.chars, .len = (u32)len};
 }
 
 /// Used to safely (?) build up a string in a heap-allocated buffer.
@@ -122,7 +122,7 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
 
   int len_ = vsnprintf(str->chars + write, str->len - write + 1, format, args);
   assert(len_ > 0);
-  uint32_t len = (uint32_t)len_;
+  u32 len = (u32)len_;
 
   va_end(args);
   if (len > str->len - write) {
@@ -145,9 +145,9 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
 }
 
 /// Mallocates a new heap string with the given length.
-static inline heap_string make_heap_str(uint32_t len) {
+static inline heap_string make_heap_str(u32 len) {
   assert(len < UINT32_MAX); // because we like to add a null terminator
-  return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len, .cap = (uint32_t)(len + 1)};
+  return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len, .cap = (u32)(len + 1)};
 }
 
 /// Creates a heap string from the given slice.
@@ -158,7 +158,7 @@ static inline heap_string make_heap_str_from(slice slice) {
 }
 
 /// Truncates the given heap string to the given length.
-static inline void heap_str_truncate(heap_string str, uint32_t len) {
+static inline void heap_str_truncate(heap_string str, u32 len) {
   assert(len <= str.len);
   str.len = len;
 }
@@ -214,7 +214,7 @@ static inline size_t align_up(size_t value, size_t alignment) {
 static inline slice str_to_utf8(const char *str) {
   size_t len = strlen(str);
   assert(len <= UINT32_MAX);
-  return (slice){.chars = (char *)str, .len = (uint32_t)len};
+  return (slice){.chars = (char *)str, .len = (u32)len};
 }
 
 #define fmt_slice(slice) (int)(slice).len, (slice).chars

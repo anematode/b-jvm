@@ -177,7 +177,7 @@ compiled_method_adapter_t create_adapter_to_compiled_method(bjvm_type_kind *kind
     //args_types[i + 2] = bjvm_jvm_type_to_wasm(kinds[i]);
   }
 
-  uint32_t type = bjvm_register_function_type(module, bjvm_wasm_make_tuple(module, args_types, kinds_len + 2), bjvm_wasm_int32());
+  u32 type = bjvm_register_function_type(module, bjvm_wasm_make_tuple(module, args_types, kinds_len + 2), bjvm_wasm_int32());
   bjvm_wasm_expression *call = bjvm_wasm_call_indirect(module, 0,
     bjvm_wasm_local_get(module, FN_PARAM, bjvm_wasm_int32()), args, kinds_len + 2, type);
   call->call_indirect.tail_call = true;

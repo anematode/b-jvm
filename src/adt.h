@@ -11,7 +11,7 @@
 #include <limits.h>
 #include <stdalign.h>
 #include <stddef.h>
-#include <stdint.h>
+#include <types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,14 +34,14 @@ slice arena_make_str(arena *a, const char *bytes, int len);
 void arena_uninit(arena *a);
 
 typedef struct {
-  uint64_t *bits;
-  uint32_t size_words;
+  u64 *bits;
+  u32 size_words;
 } heap_bitset;
 
 typedef struct {
   union {
     // Used if the # of bits is less than 63, and the lowest bit = 1
-    uint64_t bits_inl;
+    u64 bits_inl;
     heap_bitset ptr;
   };
 } bjvm_compressed_bitset;
@@ -62,7 +62,7 @@ bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
 typedef struct bjvm_hash_table_entry {
   struct bjvm_hash_table_entry *next;
   char *key;
-  uint32_t key_len;
+  u32 key_len;
   void *data;
 } bjvm_hash_table_entry;
 

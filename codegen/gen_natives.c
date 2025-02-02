@@ -26,10 +26,10 @@ void print_field(const bjvm_cp_field *field) {
     name = "double ";
     break;
   case BJVM_TYPE_KIND_INT:
-    name = "int32_t ";
+    name = "s32 ";
     break;
   case BJVM_TYPE_KIND_LONG:
-    name = "int64_t ";
+    name = "s64 ";
     break;
   case BJVM_TYPE_KIND_REFERENCE:
     name = "bjvm_obj_header *";
@@ -38,13 +38,13 @@ void print_field(const bjvm_cp_field *field) {
     name = "_Alignas(4) bool ";
     break;
   case BJVM_TYPE_KIND_CHAR:
-    name = "_Alignas(4) uint16_t ";
+    name = "_Alignas(4) u16 ";
     break;
   case BJVM_TYPE_KIND_BYTE:
-    name = "_Alignas(4) int8_t ";
+    name = "_Alignas(4) s8 ";
     break;
   case BJVM_TYPE_KIND_SHORT:
-    name = "_Alignas(4) int16_t ";
+    name = "_Alignas(4) s16 ";
     break;
   default:
   case BJVM_TYPE_KIND_VOID:

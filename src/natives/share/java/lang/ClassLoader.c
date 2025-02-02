@@ -6,7 +6,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0, "(Ljava/lang/String;)
   assert(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
-  for (int i = 0; i < read.len; ++i)
+  for (u32 i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
       read.chars[i] = '/';
   bjvm_classdesc *cd = bjvm_hash_table_lookup(&thread->vm->classes, read.chars, read.len);
@@ -21,7 +21,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass, "(Ljava/lang/String
   assert(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
-  for (int i = 0; i < read.len; ++i)
+  for (u32 i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
       read.chars[i] = '/';
   bjvm_classdesc *cd = bootstrap_lookup_class_impl(thread, hslc(read), false);
@@ -41,13 +41,13 @@ static int incr = 0;
 enum { CREATION_ANONYMOUS = 8 };
 
 bjvm_stack_value define_class(bjvm_thread *thread, bjvm_handle *loader, bjvm_handle *parent_class, bjvm_handle *name,
-                              uint8_t *data_bytes, int offset, int length, bjvm_handle *pd,
+                              u8 *data_bytes, int offset, int length, bjvm_handle *pd,
                               bool initialize, int flags, bjvm_handle *source) {
   assert(offset == 0);
 
   heap_string name_str = AsHeapString(name->obj, on_oom);
   // Replace . with / and then append . <random string>
-  for (int i = 0; i < name_str.len; ++i)
+  for (u32 i = 0; i < name_str.len; ++i)
     if (name_str.chars[i] == '.')
       name_str.chars[i] = '/';
 
@@ -85,7 +85,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass2, "(Ljava/lang/ClassLoader;
   bjvm_handle *pd = args[5].handle;       // ProtectionDomain
   // bjvm_handle *source = args[6].handle;   // String
 
-  uint8_t *data_bytes = (uint8_t *)LoadFieldLong(b->obj, "address");
+  u8 *data_bytes = (u8 *)LoadFieldLong(b->obj, "address");
 
   return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
 }
@@ -101,7 +101,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass1,
   bjvm_handle *pd = args[5].handle;
 
   assert(length <= *ArrayLength(data->obj));
-  uint8_t *data_bytes = ArrayData(data->obj);
+  u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
 }
@@ -121,7 +121,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
   bjvm_handle *source = args[9].handle;
 
   assert(length <= *ArrayLength(data->obj));
-  uint8_t *data_bytes = ArrayData(data->obj);
+  u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);
 }

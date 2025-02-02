@@ -123,7 +123,7 @@ TEST_CASE("Test classfile parsing") {
 
 TEST_CASE("Compressed bitset") {
   for (int size = 1; size < 256; ++size) {
-    std::vector<uint8_t> reference(size);
+    std::vector<u8> reference(size);
     bjvm_compressed_bitset bitset;
     bjvm_init_compressed_bitset(&bitset, size);
 
@@ -528,7 +528,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
     bjvm_compute_dominator_tree(analy);
   };
 
-  std::vector<std::pair<int, uint32_t>> doms = {
+  std::vector<std::pair<int, u32>> doms = {
       {1, 0},  {2, 1},  {3, 2},   {4, 3},   {5, 4},   {6, 5},
       {7, 6},  {8, 6},  {9, 6},   {10, 6},  {11, 6},  {12, 6},
       {13, 6}, {14, 5}, {15, 14}, {16, 14}, {17, 16}, {18, 5},
@@ -639,6 +639,12 @@ Done
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/compiler", false);
+}
+
+TEST_CASE("benchmark startup") {
+  for (int i = 0; i < 100; i++) {
+    auto result = run_test_case("test_files/basic_lambda", true);
+  }
 }
 
 #if 0

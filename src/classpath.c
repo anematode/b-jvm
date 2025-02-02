@@ -19,7 +19,7 @@
 
 struct loaded_bytes {
   char *bytes;
-  uint32_t length;
+  u32 length;
 };
 
 static struct loaded_bytes read_file(FILE *f) {
@@ -32,7 +32,7 @@ static struct loaded_bytes read_file(FILE *f) {
 
   assert(length <= UINT32_MAX);
 
-  return (struct loaded_bytes){.bytes = data, .length = (uint32_t) length};
+  return (struct loaded_bytes){.bytes = data, .length = (u32) length};
 }
 
 #ifdef EMSCRIPTEN
@@ -111,45 +111,45 @@ missing:
 
 // https://en.wikipedia.org/wiki/ZIP_(file_format)#End_of_central_directory_record_(EOCD)
 struct end_of_central_directory_record {
-  uint32_t signature;
-  uint16_t disk_number;
-  uint16_t disk_with_cd;
-  uint16_t num_entries;
-  uint16_t total_entries;
-  uint32_t cd_size;
-  uint32_t cd_offset;
-  uint16_t comment_len;
+  u32 signature;
+  u16 disk_number;
+  u16 disk_with_cd;
+  u16 num_entries;
+  u16 total_entries;
+  u32 cd_size;
+  u32 cd_offset;
+  u16 comment_len;
 };
 
 struct central_directory_record {
-  uint32_t header;
-  uint16_t version_made_by;
-  uint16_t version_needed;
-  uint16_t flags;
-  uint16_t compression;
-  uint16_t mod_time;
-  uint16_t mod_date;
-  uint32_t crc32;
-  uint32_t compressed_size;
-  uint32_t uncompressed_size;
-  uint16_t filename_len;
-  uint16_t extra_len;
-  uint16_t comment_len;
-  uint16_t disk_start;
-  uint16_t internal_attr;
-  uint16_t external_attr[2]; // bc padding gets inserted above
-  uint8_t local_header_offset[4];
+  u32 header;
+  u16 version_made_by;
+  u16 version_needed;
+  u16 flags;
+  u16 compression;
+  u16 mod_time;
+  u16 mod_date;
+  u32 crc32;
+  u32 compressed_size;
+  u32 uncompressed_size;
+  u16 filename_len;
+  u16 extra_len;
+  u16 comment_len;
+  u16 disk_start;
+  u16 internal_attr;
+  u16 external_attr[2]; // bc padding gets inserted above
+  u8 local_header_offset[4];
 };
 
 #define CDR_SIZE_BYTES 46
 #define CDR_HEADER 0x02014b50
 
-char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
-                              uint32_t expected) {
+char *parse_central_directory(bjvm_mapped_jar *jar, u64 cd_offset,
+                              u32 expected) {
   bjvm_hash_table_reserve(&jar->entries, expected);
   struct central_directory_record cdr = {0};
   char error[256];
-  for (uint32_t i = 0; i < expected; i++) {
+  for (u32 i = 0; i < expected; i++) {
     if (cd_offset + sizeof(cdr) > jar->size_bytes) {
       snprintf(error, sizeof(error), "cdr %d out of bounds", i);
       return strdup(error);
@@ -159,10 +159,10 @@ char *parse_central_directory(bjvm_mapped_jar *jar, uint64_t cd_offset,
       return strdup("missing cdr header bytes");
     slice filename = {.chars = jar->data + cd_offset + CDR_SIZE_BYTES,
                           .len = cdr.filename_len};
-    uint32_t header_offset, data_offset;
+    u32 header_offset, data_offset;
     memcpy(&header_offset, cdr.local_header_offset, sizeof(data_offset));
     // https://en.wikipedia.org/wiki/ZIP_(file_format)#Local_file_header
-    if ((uint64_t)header_offset + 30 + cdr.compressed_size > jar->size_bytes) {
+    if ((u64)header_offset + 30 + cdr.compressed_size > jar->size_bytes) {
       snprintf(error, sizeof(error), "cdr %d local header out of bounds", i);
       return strdup(error);
     }
@@ -282,7 +282,7 @@ char *bjvm_init_classpath(bjvm_classpath *cp, slice path) {
   cp->entries_cap = cp->entries_len = 0;
   cp->as_colon_separated = make_heap_str_from(path);
   int start = 0;
-  for (int i = 0; i <= path.len; i++) {
+  for (u32 i = 0; i <= path.len; i++) {
     if (i == path.len || path.chars[i] == ':') {
       slice entry = subslice_to(path, start, i);
       if (entry.len > 0) {
@@ -314,7 +314,7 @@ enum jar_lookup_result { NOT_FOUND, FOUND, CORRUPT };
 
 // Returns true if found
 enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, slice filename,
-                                  uint8_t **bytes, size_t *len) {
+                                  u8 **bytes, size_t *len) {
   bjvm_jar_entry *jar_entry =
       bjvm_hash_table_lookup(&jar->entries, filename.chars, filename.len);
   if (jar_entry) {
@@ -324,11 +324,11 @@ enum jar_lookup_result jar_lookup(bjvm_mapped_jar *jar, slice filename,
     }
 
     // Find the compressed data
-    uint16_t filename_len, extra_len;
+    u16 filename_len, extra_len;
     memcpy(&filename_len, jar_entry->header + 26, 2);
     memcpy(&extra_len, jar_entry->header + 28, 2);
-    uint32_t offset = 30 + filename_len + extra_len;
-    if ((uint64_t)offset + jar_entry->compressed_size +
+    u32 offset = 30 + filename_len + extra_len;
+    if ((u64)offset + jar_entry->compressed_size +
             (jar_entry->header - jar->data) >
         jar->size_bytes) {
       return CORRUPT;
@@ -378,7 +378,7 @@ static heap_string concat_path(heap_string name, slice filename) {
 }
 
 bool bad_filename(const slice filename) {
-  for (int i = 0; i < filename.len - 1; ++i) {
+  for (u32 i = 0; i < filename.len - 1; ++i) {
     if (filename.chars[i] == '.' && filename.chars[i + 1] == '.') {
       return true;
     }
@@ -387,7 +387,7 @@ bool bad_filename(const slice filename) {
 }
 
 int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
-                          uint8_t **bytes, size_t *len) {
+                          u8 **bytes, size_t *len) {
   *bytes = nullptr;
   *len = 0;
   if (bad_filename(filename)) {
@@ -424,7 +424,7 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
       lb = read_file(f);
       fclose(f);
     }
-    *bytes = (uint8_t *)lb.bytes;
+    *bytes = (u8 *)lb.bytes;
     *len = lb.length;
     return 0;
   }

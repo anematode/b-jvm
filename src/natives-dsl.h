@@ -124,7 +124,7 @@ extern bjvm_native_t *bjvm_natives;
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier)                                                   \
   static bjvm_stack_value class_name_##_##method_name_##_cb##modifier(                                                 \
       [[maybe_unused]] bjvm_thread *thread, [[maybe_unused]] bjvm_handle *obj, [[maybe_unused]] bjvm_value *args,      \
-      [[maybe_unused]] uint8_t argc)
+      [[maybe_unused]] u8 argc)
 
 #define create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, async_sz,       \
                                 variant)                                                                               \
@@ -159,7 +159,7 @@ extern bjvm_native_t *bjvm_natives;
     bjvm_stack_value, \
     name, \
     locals,\
-    arguments(bjvm_thread *thread; bjvm_handle *obj; bjvm_value *args; uint8_t argc), \
+    arguments(bjvm_thread *thread; bjvm_handle *obj; bjvm_value *args; u8 argc), \
     async_methods\
   );              \
   /* the arguments struct for this needs to be compatible with the async_natives_args struct */                        \
@@ -179,7 +179,7 @@ extern bjvm_native_t *bjvm_natives;
   [[maybe_unused]] bjvm_thread *thread = self->args.thread;                                                            \
   [[maybe_unused]] bjvm_value *args = self->args.args;                                                                 \
   [[maybe_unused]] bjvm_handle *obj = self->args.obj;                                                                  \
-  [[maybe_unused]] uint8_t argc = self->args.argc;
+  [[maybe_unused]] u8 argc = self->args.argc;
 
 #define _RELOAD_CACHED_STATE()                                                                                         \
   do {                                                                                                                 \

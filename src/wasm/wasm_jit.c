@@ -22,9 +22,9 @@ typedef struct {
   bjvm_wasm_function *invokestatic;
   bjvm_wasm_function *invokenonstatic;
 
-  uint32_t vm_local;
-  uint32_t heap_local;
-  uint32_t heap_used_local;
+  u32 vm_local;
+  u32 heap_local;
+  u32 heap_used_local;
 } runtime_helpers;
 
 typedef struct {
@@ -859,7 +859,7 @@ bjvm_wasm_expression *wasm_lower_new(compile_ctx *ctx,
   expression store_classdesc =
       bjvm_wasm_store(ctx->module, BJVM_WASM_OP_KIND_I32_STORE,
                       get_stack_value(ctx, sd, BJVM_TYPE_KIND_REFERENCE),
-                      bjvm_wasm_i32_const(ctx->module, (int32_t)class), 0,
+                      bjvm_wasm_i32_const(ctx->module, (s32)class), 0,
                       offsetof(bjvm_obj_header, descriptor));
 
   expression sequence = bjvm_wasm_block(
@@ -898,7 +898,7 @@ static expression compile_bb(compile_ctx *ctx, const bjvm_basic_block *bb,
     break;                                                                     \
   }
 
-  uint16_t *stack_depths = ctx->analysis->insn_index_to_stack_depth;
+  u16 *stack_depths = ctx->analysis->insn_index_to_stack_depth;
   bool outgoing_edges_processed = false;
 
   int expr_i = 0, i = 0, pc = bb->start_index;

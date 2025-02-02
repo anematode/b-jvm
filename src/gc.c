@@ -200,7 +200,7 @@ static void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   }
 }
 
-uint64_t REACHABLE_BIT = 1ULL << 33;
+u64 REACHABLE_BIT = 1ULL << 33;
 
 static int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
   return (uintptr_t)field - (uintptr_t)ctx->vm->heap <
@@ -350,14 +350,14 @@ void bjvm_major_gc(bjvm_vm *vm) {
       malloc(ctx.objs_count * sizeof(bjvm_obj_header *));
 
   // For now, create a new heap of the same size
-  [[maybe_unused]] uint8_t *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
+  [[maybe_unused]] u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
           *end = new_heap + vm->true_heap_capacity;
-  uint8_t *write_ptr = new_heap;
+  u8 *write_ptr = new_heap;
 
   // Copy object by object
   for (int i = 0; i < ctx.objs_count; ++i) {
     // Align to 8 bytes
-    write_ptr = (uint8_t *)(align_up((uintptr_t)write_ptr, 8));
+    write_ptr = (u8 *)(align_up((uintptr_t)write_ptr, 8));
     bjvm_obj_header *obj = ctx.objs[i];
     size_t sz = size_of_object(obj);
 

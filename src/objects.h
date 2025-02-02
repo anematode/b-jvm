@@ -4,10 +4,10 @@
 #ifndef OBJECTS_H
 #define OBJECTS_H
 
-uint64_t ObjNextHashCode();
+u64 ObjNextHashCode();
 
 
-typedef enum : int32_t {
+typedef enum : s32 {
   STRING_CODER_LATIN1 = 0,
   STRING_CODER_UTF16 = 1
 } string_coder_kind;
@@ -31,7 +31,7 @@ static inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string)
 
 /// Extracts the inner array of the given java.lang.String.
 /// The data are either UTF-16 or latin1 encoded.
-static inline bjvm_obj_header *RawStringData(bjvm_thread const *thread, bjvm_obj_header const *string) {
+static inline bjvm_obj_header *RawStringData([[maybe_unused]] bjvm_thread const *thread, bjvm_obj_header const *string) {
   assert(string->descriptor == thread->vm->cached_classdescs->string);
 
   return ((struct bjvm_native_String*)string)->value;
