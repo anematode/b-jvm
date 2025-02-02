@@ -1394,7 +1394,7 @@ void bjvm_out_of_memory(bjvm_thread *thread) {
   vm->heap_capacity = original_capacity;
 }
 
-#define GC_EVERY_ALLOCATION 1
+#define GC_EVERY_ALLOCATION 0
 
 void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   // round up to multiple of 8

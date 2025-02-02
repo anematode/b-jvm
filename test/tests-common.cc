@@ -193,7 +193,6 @@ std::optional<std::vector<u8>> ReadFile(const std::string &file) {
 
 TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
                              std::string main_class) {
-  printf("Test case: %s\n", classpath.c_str());
   bjvm_vm_options options = bjvm_default_vm_options();
 
   TestCaseResult result{};
