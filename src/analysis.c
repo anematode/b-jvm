@@ -577,11 +577,9 @@ struct edge {
 
 struct method_analysis_ctx {
   const bjvm_attribute_code *code;
-  bjvm_analy_stack_state stack, stack_before, locals;
+  bjvm_analy_stack_state stack, locals;
   bool stack_terminated;
   int *locals_swizzle;
-  bjvm_analy_stack_state *inferred_stacks;
-  bjvm_analy_stack_state *inferred_locals;
   char *insn_error;
   heap_string *error;
   struct edge *edges;
@@ -641,18 +639,8 @@ struct method_analysis_ctx {
 int push_branch_target(struct method_analysis_ctx *ctx, u32 curr,
                        u32 target) {
   assert((int)target < ctx->code->insn_count);
-  if (ctx->inferred_stacks[target].entries) {
-    if ((ctx->insn_error = expect_jump_target_compatible(
-             ctx->inferred_stacks[target], ctx->stack))) {
-      return -1;
-    }
-  } else {
-    copy_analy_stack_state(ctx->stack, &ctx->inferred_stacks[target]);
-    ctx->inferred_stacks[target].from_jump_target = true;
-
-    *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
-        (struct edge){.start = curr, .end = target};
-  }
+  *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
+      (struct edge){.start = curr, .end = target};
   return 0;
 }
 
@@ -1254,7 +1242,7 @@ error:;
 
   *ctx->error = make_heap_str(50000);
   heap_string insn_str = insn_to_string(insn, insn_index);
-  char *stack_str = print_analy_stack_state(&ctx->stack_before);
+  char *stack_str = print_analy_stack_state(&ctx->stack);
   char *locals_str = print_analy_stack_state(&ctx->locals);
   heap_string context = code_attribute_to_string(ctx->code);
   bprintf(hslc(*ctx->error),
@@ -1331,20 +1319,11 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   int result = 0;
   ctx.stack.entries =
       calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
+  ctx.stack.entries_cap = code->max_stack + 1;
 
   // After jumps, we can infer the stack and locals at these points
-  bjvm_analy_stack_state *inferred_stacks = ctx.inferred_stacks =
-      calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
-  bjvm_analy_stack_state *inferred_locals = ctx.inferred_locals =
-      calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   u16 *insn_index_to_stack_depth =
       calloc(code->insn_count, sizeof(u16));
-
-  // Initialize stack to the stack at exception handler entry
-  ctx.stack.entries_cap = code->max_stack + 1;
-  ctx.stack.entries_count = 1;
-  ctx.stack.entries[0].type = BJVM_TYPE_KIND_REFERENCE;
-  ctx.stack.entries[0].source.kind = BJVM_VARIABLE_SRC_KIND_UNK;  // caught exceptions will never be null
 
   if (code->local_variable_table) {
     for (int i = 0; i < code->local_variable_table->entries_count; ++i) {
@@ -1359,22 +1338,6 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
 
   ctx.error = error;
 
-  // Mark all exception handlers as having a stack which is just a reference
-  // (that reference is the exception object)
-  if (code->exception_table) {
-    for (int i = 0; i < code->exception_table->entries_count; ++i) {
-      bjvm_exception_table_entry *ent = code->exception_table->entries + i;
-      if (!inferred_stacks[ent->handler_insn].entries) {
-        bjvm_analy_stack_state *target = inferred_stacks + ent->handler_insn;
-        copy_analy_stack_state(ctx.stack, target);
-        target->is_exc_handler = true;
-        target->exc_handler_start = ent->start_insn;
-      }
-    }
-  }
-
-  ctx.stack.entries_count = 0;
-
   bjvm_code_analysis *analy = method->code_analysis = malloc(sizeof(bjvm_code_analysis));
 
   stack_map_frame_iterator iter;
@@ -1388,6 +1351,7 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   }
   analy->blocks = nullptr;
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
+  analy->sources = calloc(code->insn_count, sizeof(*analy->sources));
 
   for (int i = 0; i < code->insn_count; ++i) {
     bjvm_bytecode_insn *insn = &code->code[i];
@@ -1404,21 +1368,8 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
       }
     }
 
-    copy_analy_stack_state(ctx.stack, &ctx.stack_before);
-    copy_analy_stack_state(ctx.stack, &inferred_stacks[i]);
-    copy_analy_stack_state(ctx.locals, &inferred_locals[i]);
-
-    if (analyze_instruction(insn, i, &ctx)) {
-      result = -1;
-      goto done;
-    }
-  }
-
-  analy->sources = calloc(code->insn_count, sizeof(*analy->sources));
-  for (int i = 0; i < code->insn_count; ++i) {
-    bjvm_bytecode_insn *insn = code->code + i;
     bjvm_stack_variable_source a = {}, b = {};
-    bjvm_analy_stack_state *stack = &inferred_stacks[i];
+    bjvm_analy_stack_state *stack = &ctx.stack;
     int sd = stack->entries_count;
 
     // Instructions that can intrinsically raise NPE
@@ -1482,11 +1433,8 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
     }
     analy->sources[i].a = a;
     analy->sources[i].b = b;
-  }
 
-done:
-  for (int i = 0; i < code->insn_count; ++i) {
-    insn_index_to_stack_depth[i] = inferred_stacks[i].entries_count;
+    insn_index_to_stack_depth[i] = stack->entries_count;
 
     for (int j = 0; j < 5; ++j) {
       bjvm_type_kind order[5] = {BJVM_TYPE_KIND_REFERENCE, BJVM_TYPE_KIND_INT,
@@ -1495,24 +1443,23 @@ done:
       bjvm_compressed_bitset *bitset = analy->insn_index_to_kinds[j] + i;
       bjvm_init_compressed_bitset(bitset, code->max_stack + code->max_locals);
 
-      write_kinds_to_bitset(&inferred_stacks[i], 0, bitset, order[j]);
-      write_kinds_to_bitset(&inferred_locals[i], code->max_stack, bitset,
+      write_kinds_to_bitset(&ctx.stack, 0, bitset, order[j]);
+      write_kinds_to_bitset(&ctx.locals, code->max_stack, bitset,
                             order[j]);
     }
 
-    free(inferred_stacks[i].entries);
-    free(inferred_locals[i].entries);
+    if (analyze_instruction(insn, i, &ctx)) {
+      result = -1;
+      goto invalid_vt;
+    }
   }
 
   invalid_vt:
   stack_map_frame_iterator_uninit(&iter);
   free(ctx.stack.entries);
   free(ctx.locals.entries);
-  free(ctx.stack_before.entries);
   free(ctx.locals_swizzle);
   free(ctx.edges);
-  free(inferred_stacks);
-  free(inferred_locals);
 
   return result;
 }

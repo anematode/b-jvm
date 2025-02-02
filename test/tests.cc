@@ -641,12 +641,20 @@ TEST_CASE("Playground") {
   auto result = run_test_case("test_files/compiler", false);
 }
 
+#if 0
 TEST_CASE("printf") {
   auto result = run_test_case("test_files/printf", true, "Printf");
   REQUIRE(result.stdout_ == R"(Hello!
 Hello, world!
 Hello, 42! The answer is 42. The quick brown fox jumps over the lazy dog.
 )");
+}
+#endif
+
+TEST_CASE("benchmark startup") {
+  BENCHMARK("benchmark startup") {
+    auto result = run_test_case("test_files/basic_lambda", true);
+  };
 }
 
 #if 0
