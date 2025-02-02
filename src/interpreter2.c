@@ -20,7 +20,7 @@
 // read back, e.g. for GC purposes, or when interrupting), the TOS value and
 
 #define DEBUG_CHECK
-#if 1
+#if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK                                                                                                    \
   SPILL_VOID                                                                                                           \
@@ -30,8 +30,8 @@
   heap_string s = insn_to_string(insn, pc);                                                                            \
   printf("Insn kind: %.*s\n", fmt_slice(s));                                                                           \
   free_heap_str(s);                                                                                                    \
-  dump_frame(stderr, frame);                                                                                           \
-  assert(stack_depth(frame) == sp - frame->plain.stack);
+  dump_frame(stdout, frame);                                                                                           \
+  /* assert(stack_depth(frame) == sp - frame->plain.stack); */
 #endif
 
 // If true, use a sequence of tail calls rather than computed goto and an aggressively inlined function. We try to make
@@ -1536,6 +1536,7 @@ static s64 newarray_impl_int(ARGS_INT) {
 
 static s64 anewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK
+  SPILL_VOID
   bjvm_cp_class_info *info = &insn->cp->class_info;
   if (bjvm_resolve_class(thread, info)) {
     return 0;
@@ -1552,9 +1553,9 @@ static s64 anewarray_impl_int(ARGS_INT) {
 // <length> -> <object>
 static s64 anewarray_resolved_impl_int(ARGS_INT) {
   DEBUG_CHECK
+  SPILL_VOID
   int count = tos;
   if (count < 0) {
-    SPILL_VOID
     raise_negative_array_size_exception(thread, count);
     return 0;
   }

@@ -544,7 +544,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
-  options.heap_size = 1 << 18;
+  options.heap_size = 1 << 20;
   options.runtime_classpath = STR("./jdk23.jar");
   return options;
 }
@@ -1406,6 +1406,7 @@ void *bump_allocate(bjvm_thread *thread, size_t bytes) {
   if (vm->heap_used + bytes > vm->heap_capacity || GC_EVERY_ALLOCATION) {
     bjvm_major_gc(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {
+      printf("OUT OF MEMORY\n");
       bjvm_out_of_memory(thread);
       return nullptr;
     }
