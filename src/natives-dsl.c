@@ -1,8 +1,8 @@
 #include <natives-dsl.h>
 
-void push_bjvm_native(bjvm_utf8 class_name, bjvm_utf8 method_name, bjvm_utf8 signature, bjvm_native_callback cb) {
+void push_bjvm_native(slice class_name, slice method_name, slice signature, bjvm_native_callback cb) {
   if (class_name.chars[0] == '/')
-    class_name = slice(class_name, 1);
+    class_name = subslice(class_name, 1);
   bjvm_native_t native = {
         .class_path = class_name,
         .method_name = method_name,

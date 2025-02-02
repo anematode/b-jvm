@@ -3,12 +3,12 @@
 #include <stdint.h>
 #include "classfile.h"
 #include "dumb_jit.h"
+#include "exceptions.h"
 
 #include "analysis.h"
 #include "bjvm.h"
 #include "arrays.h"
 #include "cached_classdescs.h"
-#include "wasm/wasm_adapter.h"
 
 typedef struct {
   uint16_t pc;
@@ -76,7 +76,7 @@ static wasm_local_t stack_value(bjvm_wasm_value_type type, int32_t offset) {
 }
 
 // Get the WASM local for a local value at the given index
-static wasm_local_t local_value(bjvm_wasm_value_type type, uint32_t index) {
+[[maybe_unused]] static wasm_local_t local_value(bjvm_wasm_value_type type, uint32_t index) {
   assert(index < ctx->code->max_locals && "Invalid local offset");
   wasm_local_t *existing = &ctx->jvm_to_wasm[ctx->code->max_stack + index];
   if (*existing == (wasm_local_t)-1) {
@@ -87,10 +87,10 @@ static wasm_local_t local_value(bjvm_wasm_value_type type, uint32_t index) {
 
 // Get or create a local with the given name and type. This is used for named locals like "frame"
 static wasm_local_t get_or_create_local(bjvm_wasm_value_type type, const char *name) {
-  wasm_local_t local = (wasm_local_t)bjvm_hash_table_lookup(&ctx->named_locals, name, -1);
+  wasm_local_t local = (wasm_local_t)(uintptr_t)bjvm_hash_table_lookup(&ctx->named_locals, name, -1);
   if (local == 0) {
     local = ctx->next_local++;
-    (void)bjvm_hash_table_insert(&ctx->named_locals, name, -1, (void *)local);
+    (void)bjvm_hash_table_insert(&ctx->named_locals, name, -1, (void *)(uintptr_t)local);
   }
   return local;
 }
@@ -212,7 +212,7 @@ static void thread() {
 }
 
 static wasm_local_t frame_local() {
-  get_or_create_local(BJVM_WASM_TYPE_KIND_INT32, "frame");
+  return get_or_create_local(BJVM_WASM_TYPE_KIND_INT32, "frame");
 }
 
 static void set_program_counter() {
@@ -234,23 +234,23 @@ static bjvm_stack_value process_deopt(bjvm_thread *thread, bjvm_stack_frame *fra
   return result;
 }
 
-static double deopt_sled_double(bjvm_thread* thread, bjvm_stack_frame *frame) {
+[[maybe_unused]] static double deopt_sled_double(bjvm_thread* thread, bjvm_stack_frame *frame) {
   return process_deopt(thread, frame).d;
 }
 
-static int64_t deopt_sled_long(bjvm_thread *thread, bjvm_stack_frame *frame) {
+[[maybe_unused]] static int64_t deopt_sled_long(bjvm_thread *thread, bjvm_stack_frame *frame) {
   return process_deopt(thread, frame).l;
 }
 
-static int32_t deopt_sled_int(bjvm_thread *thread, bjvm_stack_frame *frame) {
+[[maybe_unused]] static int32_t deopt_sled_int(bjvm_thread *thread, bjvm_stack_frame *frame) {
   return process_deopt(thread, frame).i;
 }
 
-static void deopt_sled_void(bjvm_thread *thread, bjvm_stack_frame *frame) {
+[[maybe_unused]] static void deopt_sled_void(bjvm_thread *thread, bjvm_stack_frame *frame) {
   process_deopt(thread, frame);
 }
 
-static void deopt() {
+[[maybe_unused]] static void deopt() {
   // We need to set up a bjvm_plain_frame at the same location as our current frame, with all appropriate stack
   // variables and locals. We then need to call deopt_sled with the thread and frame, which will in turn call
   // bjvm_interpret.
@@ -259,27 +259,20 @@ static void deopt() {
 static void dumb_raise_npe() {
   set_program_counter();
   thread();
-  vm_call(bjvm_null_pointer_exception, bjvm_wasm_void(), "i");
+  vm_call(raise_null_pointer_exception, bjvm_wasm_void(), "i");
   return_zero();
 }
 
 static void dumb_raise_array_oob() {
   set_program_counter();
-  vm_call(bjvm_array_index_oob_exception, bjvm_wasm_void(), "iii");
+  vm_call(raise_array_index_oob_exception, bjvm_wasm_void(), "iii");
   return_zero();
 }
 
 static void dumb_jit_raise_div_zero() {
   set_program_counter();
-  vm_call(bjvm_arithmetic_exception, bjvm_wasm_void(), "i");
+  vm_call(raise_div0_arithmetic_exception, bjvm_wasm_void(), "i");
   return_zero();
-}
-
-static void dumb_lower_iadd(bjvm_bytecode_insn *insn) {
-  local_get(stack_int(-1));
-  local_get(stack_int(-2));
-  byte(BJVM_WASM_OP_KIND_I32_ADD);
-  local_set(stack_int(-2));
 }
 
 static void dumb_lower_arraylength(bjvm_bytecode_insn *insn) {
@@ -381,7 +374,7 @@ static void dumb_lower_arraystore(bjvm_bytecode_insn *insn) {
 
     else_();
     local_get(stack_int(-3));
-    load(BJVM_WASM_OP_KIND_I32_ADD, offsetof(bjvm_obj_header, descriptor));
+    load(BJVM_WASM_OP_KIND_I32_LOAD, offsetof(bjvm_obj_header, descriptor));
     // TODO
     endif();
   }
@@ -522,7 +515,7 @@ static void push_frame_helper(bjvm_thread *thread, bjvm_stack_frame *frame) {
 }
 
 // Push a "compiled frame" of the appropriate size, returning on stack overflow
-static void dumb_lower_push_frame() {
+[[maybe_unused]] static void dumb_lower_push_frame() {
   // The bjvm_stack_frame will begin at thread->frame_buffer + thread->frame_buffer_used
   thread();
   load(BJVM_WASM_OP_KIND_I32_LOAD, offsetof(bjvm_thread, frame_buffer));
@@ -605,7 +598,7 @@ static void dumb_lower_push_frame() {
   // Set the compiled program counter and oop count
   local_get(frame_local());
   iconst(0);
-  store(BJVM_WASM_OP_KIND_I32_LOAD, offsetof(bjvm_stack_frame, compiled));
+  store(BJVM_WASM_OP_KIND_I32_STORE, offsetof(bjvm_stack_frame, compiled));
 }
 
 void dumb_lower_aconst_null(bjvm_bytecode_insn * insn) {
@@ -676,15 +669,15 @@ static bjvm_type_kind inspect_jvm_value_impl(int32_t test) {
   if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_references[ctx->pc], test)) {
     return BJVM_TYPE_KIND_REFERENCE;
   }
-  return BJVM_WASM_TYPE_KIND_VOID;
+  return BJVM_TYPE_KIND_VOID;
 }
 
 // Given the offset from the top of the stack
-static bjvm_type_kind inspect_stack_kind(int32_t offset) {
+[[maybe_unused]] static bjvm_type_kind inspect_stack_kind(int32_t offset) {
   return inspect_jvm_value_impl(ctx->sd + offset);
 }
 
-static bjvm_wasm_value_type inspect_local_kind(int32_t offset) {
+[[maybe_unused]] static bjvm_type_kind inspect_local_kind(int32_t offset) {
   return inspect_jvm_value_impl(ctx->code->max_stack + offset);
 }
 
@@ -717,7 +710,7 @@ void bjvm_lower_getfield_resolved(bjvm_bytecode_insn *insn) {
   endif();
   local_get(stack_int(-1));
   struct info I = infos[insn->kind];
-  load(I.load_op, (int)insn->ic2);
+  load(I.load_op, (int)(uintptr_t)insn->ic2);
   local_set(stack_value(I.ty, -1));
 }
 
@@ -746,7 +739,7 @@ void bjvm_lower_putfield_resolved(bjvm_bytecode_insn *insn) {
   local_get(stack_int(-2));
   local_get(stack_int(-1));
   struct info I = infos[insn->kind];
-  store(I.store_op, (int)insn->ic2);
+  store(I.store_op, (int)(uintptr_t)insn->ic2);
 }
 
 void bjvm_lower_getstatic_resolved(bjvm_bytecode_insn *insn) {
@@ -767,7 +760,7 @@ void bjvm_lower_getstatic_resolved(bjvm_bytecode_insn *insn) {
   };
 
   struct info I = infos[insn->kind];
-  load(I.load_op, (int)insn->ic2);
+  load(I.load_op, (int)(uintptr_t)insn->ic2);
   local_set(stack_value(I.ty, -1));
 }
 
@@ -788,14 +781,14 @@ void bjvm_lower_putstatic_resolved(bjvm_bytecode_insn *insn) {
    [bjvm_insn_putstatic_L] = { BJVM_WASM_TYPE_KIND_INT32, BJVM_WASM_OP_KIND_I32_STORE },
   };
 
-  iconst((int)insn->ic2);
+  iconst((int)(uintptr_t)insn->ic2);
   local_get(stack_int(-1));
   struct info I = infos[insn->kind];
   store(I.store_op, 0);
 }
 
 // Returns non-zero if it failed to lower the instruction (and so a conversion to interpreter should be issued)
-static int dumb_lower_instruction(int pc) {
+[[maybe_unused]] static int dumb_lower_instruction(int pc) {
   bjvm_bytecode_insn *insn = &ctx->code->code[pc];
   ctx->sd = ctx->analy->insn_index_to_stack_depth[pc];
 
@@ -895,10 +888,10 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_fsub:
     return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_SUB);
   case bjvm_insn_i2b:
-    dumb_lower_i2b(insn);
+    // dumb_lower_i2b(insn);
     break;
   case bjvm_insn_i2c:
-    dumb_lower_i2c(insn);
+    // dumb_lower_i2c(insn);
     break;
   case bjvm_insn_i2d:
     return dumb_lower_unop(I32, F64, BJVM_WASM_OP_KIND_F64_CONVERT_S_I32);
@@ -907,7 +900,7 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_i2l:
     return dumb_lower_unop(I32, I64, BJVM_WASM_OP_KIND_I64_EXTEND_S_I32);
   case bjvm_insn_i2s:
-    return dumb_lower_i2s(insn);
+    //return dumb_lower_i2s(insn);
   case bjvm_insn_iadd:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_ADD);
   case bjvm_insn_iand:
@@ -918,7 +911,7 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_imul:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_MUL);
   case bjvm_insn_ineg:
-    dumb_lower_ineg(insn);
+    // dumb_lower_ineg(insn);
     break;
   case bjvm_insn_ior:
     return dumb_lower_binop(I32, I32, I32, BJVM_WASM_OP_KIND_I32_OR);
@@ -953,14 +946,14 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_lmul:
     return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_MUL);
   case bjvm_insn_lneg:
-    dumb_lower_lneg(insn);
+    // dumb_lower_lneg(insn);
     break;
   case bjvm_insn_lor:
     return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_OR);
   case bjvm_insn_lshl:
   case bjvm_insn_lshr:
   case bjvm_insn_lushr:
-    return dumb_lower_long_shiftop(insn);
+    // return dumb_lower_long_shiftop(insn);
   case bjvm_insn_lsub:
     return dumb_lower_binop(I64, I64, I64, BJVM_WASM_OP_KIND_I64_SUB);
   case bjvm_insn_lxor:
@@ -989,7 +982,7 @@ static int dumb_lower_instruction(int pc) {
     return -1;
   case bjvm_insn_ldc:
   case bjvm_insn_ldc2_w:
-    dumb_lower_ldc(insn);
+    // dumb_lower_ldc(insn);
     break;
   case bjvm_insn_dload:
   case bjvm_insn_fload:
@@ -1001,7 +994,7 @@ static int dumb_lower_instruction(int pc) {
   case bjvm_insn_lstore:
   case bjvm_insn_aload:
   case bjvm_insn_astore:
-    dumb_lower_local_access(insn);
+    // dumb_lower_local_access(insn);
 break;case bjvm_insn_goto:
 break;case bjvm_insn_if_acmpeq:
 break;case bjvm_insn_if_acmpne:
@@ -1032,12 +1025,12 @@ break;case bjvm_insn_ifnull:
     dumb_lower_lconst(insn);
     break;
   case bjvm_insn_iinc:
-    dumb_lower_iinc(insn);
+    // dumb_lower_iinc(insn);
     break;
   case bjvm_insn_multianewarray:
     return -1; // for now
   case bjvm_insn_newarray:
-    dumb_lower_newarray(insn);
+    // dumb_lower_newarray(insn);
     break;
   case bjvm_insn_tableswitch:
   case bjvm_insn_lookupswitch:
@@ -1104,7 +1097,7 @@ break;}
 
 // pc + 1 is one of ifle, ifge, iflt or ifgt and pc is an lcmp or fcmp instruction. Although it's legal for lcmp/fcmp to
 // be emitted without a jump, it doesn't happen in practice.
-static int dumb_lower_fused_compare(int pc) {
-
+[[maybe_unused]] static int dumb_lower_fused_compare(int pc) {
+  return 0;
 }
 

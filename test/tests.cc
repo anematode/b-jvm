@@ -42,7 +42,7 @@ double get_time() {
 }
 
 TEST_CASE("Test STR() macro") {
-  bjvm_utf8 utf = STR("abc");
+  slice utf = STR("abc");
   REQUIRE(utf.chars[0] == 'a');
   REQUIRE(utf.chars[1] == 'b');
   REQUIRE(utf.chars[2] == 'c');
@@ -123,7 +123,7 @@ TEST_CASE("Test classfile parsing") {
 
 TEST_CASE("Compressed bitset") {
   for (int size = 1; size < 256; ++size) {
-    std::vector<uint8_t> reference(size);
+    std::vector<u8> reference(size);
     bjvm_compressed_bitset bitset;
     bjvm_init_compressed_bitset(&bitset, size);
 
@@ -528,7 +528,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
     bjvm_compute_dominator_tree(analy);
   };
 
-  std::vector<std::pair<int, uint32_t>> doms = {
+  std::vector<std::pair<int, u32>> doms = {
       {1, 0},  {2, 1},  {3, 2},   {4, 3},   {5, 4},   {6, 5},
       {7, 6},  {8, 6},  {9, 6},   {10, 6},  {11, 6},  {12, 6},
       {13, 6}, {14, 5}, {15, 14}, {16, 14}, {17, 16}, {18, 5},
@@ -616,12 +616,14 @@ TEST_CASE("Class loading") {
 }
 #endif
 
-#if 0
 TEST_CASE("java.lang.reflect.Method", "[reflection]") {
-  auto result = run_test_case("test_files/reflection_method/", false, "ReflectionMethod");
-  REQUIRE(result.stdout_ == "abcdefghijklmnopqr");
+  auto result = run_test_case("test_files/reflection_method/", true, "ReflectionMethod");
+  REQUIRE(result.stdout_ == R"(Reached!
+Reached2!
+aReached3!
+Reached4!
+b3030ef)");
 }
-#endif
 
 TEST_CASE("Simple generic types") {
   auto result = run_test_case("test_files/generic_types/", true, "GenericBox");
@@ -637,6 +639,14 @@ Done
 
 TEST_CASE("Playground") {
   auto result = run_test_case("test_files/compiler", false);
+}
+
+TEST_CASE("printf") {
+  auto result = run_test_case("test_files/printf", true, "Printf");
+  REQUIRE(result.stdout_ == R"(Hello!
+Hello, world!
+Hello, 42! The answer is 42. The quick brown fox jumps over the lazy dog.
+)");
 }
 
 #if 0

@@ -3,6 +3,7 @@
 #include "analysis.h"
 #include "arrays.h"
 #include "bjvm.h"
+#include <gc.h>
 
 typedef struct bjvm_gc_ctx {
   bjvm_vm *vm;
@@ -29,7 +30,7 @@ typedef struct bjvm_gc_ctx {
     }                                                                          \
   }
 
-void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
+static void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
   // Push the mirrors of this base class and all of its array types
   bjvm_classdesc *array = desc;
   while (array) {
@@ -81,7 +82,7 @@ void enumerate_reflection_roots(bjvm_gc_ctx *ctx, bjvm_classdesc *desc) {
   }
 }
 
-void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
+static void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
   int *bitset_list = NULL, bs_list_len = 0, bs_list_cap = 0;
 
   PUSH_ROOT(&thr->thread_obj);
@@ -137,7 +138,7 @@ void push_thread_roots(bjvm_gc_ctx *ctx, bjvm_thread *thr) {
   free(bitset_list);
 }
 
-void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
+static void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
   if (vm->primitive_classes[0]) {
     for (size_t i = 0; i < lengthof(vm->primitive_classes); ++i) {
@@ -169,6 +170,9 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
     bjvm_hash_table_iterator_next(&it);
   }
 
+  // main thread group
+  PUSH_ROOT(&vm->main_thread_group);
+
   // Modules
   it = bjvm_hash_table_get_iterator(&vm->modules);
   bjvm_module *module;
@@ -195,14 +199,14 @@ void bjvm_major_gc_enumerate_gc_roots(bjvm_gc_ctx *ctx) {
   }
 }
 
-uint64_t REACHABLE_BIT = 1ULL << 33;
+u64 REACHABLE_BIT = 1ULL << 33;
 
-int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
+static int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
   return (uintptr_t)field - (uintptr_t)ctx->vm->heap <
          ctx->vm->true_heap_capacity;
 }
 
-void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
+static void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
                          int *capacities, int depth) {
   obj->mark_word |= REACHABLE_BIT;
   *VECTOR_PUSH(ctx->objs, ctx->objs_count, ctx->objs_cap) = obj;
@@ -236,11 +240,11 @@ void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
   }
 }
 
-int comparator(const void *a, const void *b) {
+static int comparator(const void *a, const void *b) {
   return *(bjvm_obj_header **)a - *(bjvm_obj_header **)b;
 }
 
-size_t size_of_object(bjvm_obj_header *obj) {
+static size_t size_of_object(bjvm_obj_header *obj) {
   if (obj->descriptor->kind == BJVM_CD_KIND_ORDINARY) {
     return obj->descriptor->instance_bytes;
   }
@@ -254,7 +258,7 @@ size_t size_of_object(bjvm_obj_header *obj) {
              sizeof_type_kind(obj->descriptor->primitive_component);
 }
 
-void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header **obj) {
+static void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header **obj) {
   if (!*obj)
     return;
 
@@ -266,7 +270,7 @@ void relocate_object(const bjvm_gc_ctx *ctx, bjvm_obj_header **obj) {
   }
 }
 
-void relocate_static_fields(bjvm_gc_ctx *ctx) {
+static void relocate_static_fields(bjvm_gc_ctx *ctx) {
   bjvm_vm *vm = ctx->vm;
 
   // Static fields of bootstrap-loaded classes
@@ -331,6 +335,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
   int *bitset_list[1000] = {nullptr}, capacity[1000] = {0};
   for (int i = 0; i < ctx.roots_count; ++i) {
     bjvm_obj_header *root = *ctx.roots[i];
+    // printf("Pushing roots: %p\n", root);
     if (!(root->mark_word & REACHABLE_BIT))
       bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
   }
@@ -344,14 +349,14 @@ void bjvm_major_gc(bjvm_vm *vm) {
       malloc(ctx.objs_count * sizeof(bjvm_obj_header *));
 
   // For now, create a new heap of the same size
-  [[maybe_unused]] uint8_t *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
+  [[maybe_unused]] u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
           *end = new_heap + vm->true_heap_capacity;
-  uint8_t *write_ptr = new_heap;
+  u8 *write_ptr = new_heap;
 
   // Copy object by object
   for (int i = 0; i < ctx.objs_count; ++i) {
     // Align to 8 bytes
-    write_ptr = (uint8_t *)(align_up((uintptr_t)write_ptr, 8));
+    write_ptr = (u8 *)(align_up((uintptr_t)write_ptr, 8));
     bjvm_obj_header *obj = ctx.objs[i];
     size_t sz = size_of_object(obj);
 
@@ -360,6 +365,8 @@ void bjvm_major_gc(bjvm_vm *vm) {
     obj->mark_word &= ~REACHABLE_BIT;
     memcpy(write_ptr, obj, sz);
 
+
+    // printf("Mapping %p -> %p\n", obj, write_ptr);
     new_location[i] = (bjvm_obj_header *)write_ptr;
     write_ptr += sz;
   }

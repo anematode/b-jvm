@@ -7,7 +7,7 @@ extern "C" {
 
 #include <assert.h>
 #include <stdarg.h>
-#include <stdint.h>
+#include <types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -77,42 +77,42 @@ static inline void *__vector_push(size_t element_size, void **vector, int *vecto
 
 typedef struct {
   char *chars;
-  uint32_t len;
-} bjvm_utf8;
+  u32 len;
+} slice;
 
 typedef struct {
   char *chars;
-  uint32_t len;
-  uint32_t cap; // including null byte
+  u32 len;
+  u32 cap; // including null byte
 } heap_string;
 
 #define INIT_STACK_STRING(name, buffer_size)                                                                           \
   char name##_chars[buffer_size + 1] = {0};                                                                            \
-  bjvm_utf8 name = {.chars = name##_chars, .len = buffer_size}
-#define null_str() ((bjvm_utf8){.chars = nullptr, .len = 0})
+  slice name = {.chars = name##_chars, .len = buffer_size}
+#define null_str() ((slice){.chars = nullptr, .len = 0})
 
 /// Slices the given string from the given start index to the end.
-static inline bjvm_utf8 slice(bjvm_utf8 str, uint32_t start) {
+static inline slice subslice(slice str, u32 start) {
   assert(str.len >= start);
-  return (bjvm_utf8){.chars = str.chars + start, .len = (uint32_t)(str.len - start)};
+  return (slice){.chars = str.chars + start, .len = (u32)(str.len - start)};
 }
 
 /// Slices the given string from the given start index to the given end index.
-static inline bjvm_utf8 slice_to(bjvm_utf8 str, uint32_t start, uint32_t end) {
+static inline slice subslice_to(slice str, u32 start, u32 end) {
   assert(end >= start);
-  return (bjvm_utf8){.chars = str.chars + start, .len = (uint32_t)(end - start)};
+  return (slice){.chars = str.chars + start, .len = (u32)(end - start)};
 }
 
 /// Uses the given format string and arguments to print a string into the given
 /// buffer; returns a slice of the buffer containing the string.
-static inline bjvm_utf8 bprintf(bjvm_utf8 buffer, const char *format, ...) {
+static inline slice bprintf(slice buffer, const char *format, ...) {
   va_list args;
   va_start(args, format);
   int len = vsnprintf(buffer.chars, buffer.len + 1, format, args);
   va_end(args);
   assert(len >= 0);
 
-  return (bjvm_utf8){.chars = buffer.chars, .len = (uint32_t)len};
+  return (slice){.chars = buffer.chars, .len = (u32)len};
 }
 
 /// Used to safely (?) build up a string in a heap-allocated buffer.
@@ -122,7 +122,7 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
 
   int len_ = vsnprintf(str->chars + write, str->len - write + 1, format, args);
   assert(len_ > 0);
-  uint32_t len = (uint32_t)len_;
+  u32 len = (u32)len_;
 
   va_end(args);
   if (len > str->len - write) {
@@ -145,26 +145,26 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
 }
 
 /// Mallocates a new heap string with the given length.
-static inline heap_string make_heap_str(uint32_t len) {
+static inline heap_string make_heap_str(u32 len) {
   assert(len < UINT32_MAX); // because we like to add a null terminator
-  return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len, .cap = (uint32_t)(len + 1)};
+  return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len, .cap = (u32)(len + 1)};
 }
 
 /// Creates a heap string from the given slice.
-static inline heap_string make_heap_str_from(bjvm_utf8 slice) {
+static inline heap_string make_heap_str_from(slice slice) {
   heap_string str = make_heap_str(slice.len);
   memcpy(str.chars, slice.chars, slice.len);
   return str;
 }
 
 /// Truncates the given heap string to the given length.
-static inline void heap_str_truncate(heap_string str, uint32_t len) {
+static inline void heap_str_truncate(heap_string str, u32 len) {
   assert(len <= str.len);
   str.len = len;
 }
 
 /// Exchange / and . in the class name.
-static inline void exchange_slashes_and_dots(bjvm_utf8 *dst, bjvm_utf8 src) {
+static inline void exchange_slashes_and_dots(slice *dst, slice src) {
   assert(dst->len >= src.len);
   memcpy(dst->chars, src.chars, src.len);
   for (size_t i = 0; i < src.len; ++i) {
@@ -178,7 +178,7 @@ static inline void exchange_slashes_and_dots(bjvm_utf8 *dst, bjvm_utf8 src) {
 }
 
 /// Appends the given slice to the heap string. Returns 0 if successful
-static inline int heap_str_append(heap_string *str, bjvm_utf8 slice) {
+static inline int heap_str_append(heap_string *str, slice slice) {
   if ((str->len + slice.len + 1) > str->cap) {
     size_t required_len = str->len + slice.len + 1;
     str->chars = (char *)realloc(str->chars, required_len + (required_len >> 1));
@@ -201,7 +201,7 @@ static inline void free_heap_str(heap_string str) {
 }
 
 /// Creates a slice of the given heap string.
-static inline bjvm_utf8 hslc(heap_string str) { return (bjvm_utf8){.chars = str.chars, .len = str.len}; }
+static inline slice hslc(heap_string str) { return (slice){.chars = str.chars, .len = str.len}; }
 
 /// Aligns the given value up to the given alignment.
 /// alignment must be a power of 2.
@@ -211,22 +211,21 @@ static inline size_t align_up(size_t value, size_t alignment) {
 }
 
 /// Converts the given null-terminated string to a slice. Use the STR macro for literals.
-static inline bjvm_utf8 str_to_utf8(const char *str) {
+static inline slice str_to_utf8(const char *str) {
   size_t len = strlen(str);
   assert(len <= UINT32_MAX);
-  return (bjvm_utf8){.chars = (char *)str, .len = (uint32_t)len};
+  return (slice){.chars = (char *)str, .len = (u32)len};
 }
 
 #define fmt_slice(slice) (int)(slice).len, (slice).chars
 
-#define STR(literal) ((bjvm_utf8){.chars = (char *)(literal), .len = sizeof(literal) - 1})
+#define STR(literal) ((slice){.chars = (char *)(literal), .len = sizeof(literal) - 1})
 
 #define force_inline __attribute__((always_inline)) inline
 
-bool utf8_equals(const bjvm_utf8 entry, const char *str);
-bool utf8_equals_utf8(const bjvm_utf8 left, const bjvm_utf8 right);
-bool utf8_ends_with(bjvm_utf8 str, bjvm_utf8 ending);
-int convert_modified_utf8_to_chars(const char *bytes, int len, uint16_t **result, int *result_len, bool sloppy);
+bool utf8_equals(const slice entry, const char *str);
+bool utf8_equals_utf8(const slice left, const slice right);
+bool utf8_ends_with(slice str, slice ending);
 
 #ifdef __cplusplus
 }

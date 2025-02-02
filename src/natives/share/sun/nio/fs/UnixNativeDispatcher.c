@@ -124,13 +124,13 @@ DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, map0, "(Ljava/io/FileDescri
     return value_null();
   }
   arrput(thread->vm->mmap_allocations, ((mmap_allocation) { result, len }));
-  return (bjvm_stack_value){.l = (int64_t)result};
+  return (bjvm_stack_value){.l = (s64)result};
 }
 
 DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, unmap0, "(JJ)V") {
   void* addr = (void*)args[0].l;
   size_t len = args[1].l;
-  for (size_t i = 0; i < arrlen(thread->vm->mmap_allocations); ++i) {
+  for (size_t i = 0; i < arrlenu(thread->vm->mmap_allocations); ++i) {
     if (thread->vm->mmap_allocations[i].ptr == addr) {
       arrdelswap(thread->vm->mmap_allocations, i);
       break;

@@ -7,6 +7,7 @@
 #include "objects.h"
 
 #include <assert.h>
+#include <linkage.h>
 #include <stdlib.h>
 
 // Symmetry with make_array_classdesc
@@ -28,7 +29,7 @@ static void fill_array_classdesc(bjvm_thread *thread, bjvm_classdesc *base) {
   base->access_flags =
       BJVM_ACCESS_PUBLIC | BJVM_ACCESS_FINAL | BJVM_ACCESS_ABSTRACT;
 
-  bjvm_utf8 name = STR("java/lang/Object");
+  slice name = STR("java/lang/Object");
   bjvm_cp_class_info *info = calloc(1, sizeof(bjvm_cp_class_info));
   info->classdesc = bootstrap_lookup_class(thread, name);
   info->name = name;
@@ -163,15 +164,19 @@ bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
     }
   }
 
-  auto arr = create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
+  auto arr = bjvm_make_handle(thread, create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]));
+  bjvm_obj_header *result = nullptr;
 
   for (int i = 0; i < dim_sizes[0]; i++) {
     bjvm_obj_header *subarray = CreateArray(
         thread, desc->one_fewer_dim, dim_sizes + 1, total_dimensions - 1);
     if (!subarray)
-      return nullptr;
-    ReferenceArrayStore(arr, i, subarray);
+      goto oom;
+    ReferenceArrayStore(arr->obj, i, subarray);
   }
 
-  return arr;
+  result = arr->obj;
+  oom:
+  bjvm_drop_handle(thread, arr);
+  return result;
 }

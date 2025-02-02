@@ -14,10 +14,10 @@ DECLARE_NATIVE(
   (void)loader;
 
   heap_string name_str = AsHeapString(name, on_oom);
-  uint8_t *bytes = ArrayData(data) + offset;
+  u8 *bytes = ArrayData(data) + offset;
 
   // Replace name_str with slashes
-  for (int i = 0; i < name_str.len; ++i) {
+  for (u32 i = 0; i < name_str.len; ++i) {
     if (name_str.chars[i] == '.') {
       name_str.chars[i] = '/';
     }

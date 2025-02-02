@@ -6,7 +6,7 @@
 #define BJVM_ARRAYS_H
 
 #include "bjvm.h"
-#include <stdint.h>
+#include <types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,6 +62,16 @@ static inline void ReferenceArrayStore(bjvm_obj_header *array, int index,
   *((bjvm_obj_header **)ArrayData(array) + index) = val;
 }
 
+static inline void ByteArrayStoreBlock(object array, s32 offset, s32 length, u8 const *data) {
+  assert(Is1DPrimitiveArray(array));
+  assert(offset >= 0);
+  assert(length >= 0);
+  assert(data != nullptr);
+  assert((*ArrayLength(array) - offset) <= length);
+
+  memcpy((s8*)ArrayData(array) + offset, data, length);
+}
+
 #define MAKE_PRIMITIVE_LOAD_STORE(name, type)                                  \
   static inline type name##ArrayLoad(bjvm_obj_header *array, int index) {      \
     assert(Is1DPrimitiveArray(array));                                         \
@@ -75,11 +85,11 @@ static inline void ReferenceArrayStore(bjvm_obj_header *array, int index,
     *((type *)ArrayData(array) + index) = val;                                 \
   }
 
-MAKE_PRIMITIVE_LOAD_STORE(Byte, int8_t)
-MAKE_PRIMITIVE_LOAD_STORE(Short, int16_t)
-MAKE_PRIMITIVE_LOAD_STORE(Char, uint16_t)
-MAKE_PRIMITIVE_LOAD_STORE(Int, int32_t)
-MAKE_PRIMITIVE_LOAD_STORE(Long, int64_t)
+MAKE_PRIMITIVE_LOAD_STORE(Byte, s8)
+MAKE_PRIMITIVE_LOAD_STORE(Short, s16)
+MAKE_PRIMITIVE_LOAD_STORE(Char, u16)
+MAKE_PRIMITIVE_LOAD_STORE(Int, s32)
+MAKE_PRIMITIVE_LOAD_STORE(Long, s64)
 MAKE_PRIMITIVE_LOAD_STORE(Float, float)
 MAKE_PRIMITIVE_LOAD_STORE(Double, double)
 
@@ -106,7 +116,7 @@ static inline bjvm_obj_header *CreatePrimitiveArray1D(bjvm_thread *thread,
 }
 
 static inline bjvm_obj_header *CreateByteArray(bjvm_thread *thread,
-                                               uint8_t *data, int length) {
+                                               u8 *data, int length) {
   bjvm_obj_header *result =
       CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, length);
   if (!result)

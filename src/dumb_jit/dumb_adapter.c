@@ -76,7 +76,7 @@ static bjvm_wasm_expression *thread(bjvm_wasm_module *module) {
   return bjvm_wasm_local_get(module, THREAD_PARAM, bjvm_wasm_int32());
 }
 
-static bjvm_wasm_load_op_kind load_ops[] = {
+[[maybe_unused]] static bjvm_wasm_load_op_kind load_ops[] = {
   [BJVM_WASM_TYPE_KIND_INT32] = BJVM_WASM_OP_KIND_I32_LOAD,
   [BJVM_WASM_TYPE_KIND_INT64] = BJVM_WASM_OP_KIND_I64_LOAD,
   [BJVM_WASM_TYPE_KIND_FLOAT32] = BJVM_WASM_OP_KIND_F32_LOAD,
@@ -193,7 +193,7 @@ void *create_adapter_to_interpreter(const bjvm_cp_method *method) {
   int argc = bjvm_argc(method);
   args[argc] = return_type;
   // Check for existing adapter
-  bjvm_wasm_instantiation_result *existing = bjvm_hash_table_lookup(&interpreter_adapters, args, i);
+  bjvm_wasm_instantiation_result *existing = bjvm_hash_table_lookup(&interpreter_adapters, (char*)args, argc + 1);
   if (existing) {
     return existing->run;
   }
@@ -254,6 +254,8 @@ jit_adapter_t create_adapter_to_jit(const bjvm_cp_method *method) {
     arrput(args_to_jit, load_expr);
   }
 
+  bjvm_wasm_expression *index = bjvm_wasm_load(module,
+    BJVM_WASM_OP_KIND_I32_LOAD, cp_method, 1, offsetof(bjvm_cp_method, jit_entry));
   bjvm_wasm_expression *call_expr = bjvm_wasm_call_indirect(module, 0, index, args_to_jit, argc + 2, jit_signature_ty);
 
   if (jit_return_ty != BJVM_WASM_TYPE_KIND_VOID) {

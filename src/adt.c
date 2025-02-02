@@ -21,7 +21,7 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
     free(bits.ptr.bits);
 }
 
-static void push_set_bits(uint64_t bits, int offset, int **existing_buf,
+static void push_set_bits(u64 bits, int offset, int **existing_buf,
                           int *length, int *capacity) {
   while (bits) {
     int shift = __builtin_ctzll(bits);
@@ -47,7 +47,7 @@ int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
   if (bjvm_is_bitset_compressed(bits)) {
     push_set_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
   } else {
-    for (uint32_t i = 0; i < bits.ptr.size_words; ++i)
+    for (u32 i = 0; i < bits.ptr.size_words; ++i)
       push_set_bits(bits.ptr.bits[i], (int)i << 6, &existing_buf, length,
                     capacity);
   }
@@ -82,11 +82,11 @@ void *arena_alloc(arena *a, size_t count, size_t bytes) {
   return result;
 }
 
-bjvm_utf8 arena_make_str(arena *a, const char *bytes, int len) {
+slice arena_make_str(arena *a, const char *bytes, int len) {
   char *copy = arena_alloc(a, len + 1, sizeof(char));
   memcpy(copy, bytes, len);
   copy[len] = '\0';
-  return (bjvm_utf8){.chars = copy, .len = len};
+  return (slice){.chars = copy, .len = len};
 }
 
 void arena_uninit(arena *a) {
@@ -103,8 +103,8 @@ void arena_uninit(arena *a) {
 void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs,
                                  int bits_capacity) {
   if (bits_capacity > 63) {
-    uint32_t size_words = (bits_capacity + 63) / 64;
-    uint64_t *buffer = calloc(size_words, sizeof(uint64_t));
+    u32 size_words = (bits_capacity + 63) / 64;
+    u64 *buffer = calloc(size_words, sizeof(u64));
     *bs = (bjvm_compressed_bitset){.ptr.bits = buffer,
                                    .ptr.size_words = size_words};
   } else {
@@ -115,8 +115,8 @@ void bjvm_init_compressed_bitset(bjvm_compressed_bitset *bs,
 }
 
 void get_compressed_bitset_word_and_offset(bjvm_compressed_bitset *bits,
-                                           size_t bit_index, uint64_t **word,
-                                           uint8_t *offset) {
+                                           size_t bit_index, u64 **word,
+                                           u8 *offset) {
   if (bjvm_is_bitset_compressed(*bits)) {
     assert(bit_index < 63);
     *word = &bits->bits_inl;
@@ -130,8 +130,8 @@ void get_compressed_bitset_word_and_offset(bjvm_compressed_bitset *bits,
 
 bool bjvm_test_compressed_bitset(const bjvm_compressed_bitset bits,
                                  size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
+  u64 *word;
+  u8 offset;
   get_compressed_bitset_word_and_offset((bjvm_compressed_bitset *)&bits,
                                         bit_index, &word, &offset);
   return *word & (1ULL << offset);
@@ -139,8 +139,8 @@ bool bjvm_test_compressed_bitset(const bjvm_compressed_bitset bits,
 
 bool bjvm_test_reset_compressed_bitset(bjvm_compressed_bitset *bits,
                                        size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
+  u64 *word;
+  u8 offset;
   get_compressed_bitset_word_and_offset(bits, bit_index, &word, &offset);
   bool test = *word & (1ULL << offset);
   *word &= ~(1ULL << offset);
@@ -149,8 +149,8 @@ bool bjvm_test_reset_compressed_bitset(bjvm_compressed_bitset *bits,
 
 bool bjvm_test_set_compressed_bitset(bjvm_compressed_bitset *bits,
                                      size_t bit_index) {
-  uint64_t *word;
-  uint8_t offset;
+  u64 *word;
+  u8 offset;
   get_compressed_bitset_word_and_offset(bits, bit_index, &word, &offset);
   bool test = *word & (1ULL << offset);
   *word |= 1ULL << offset;
@@ -234,21 +234,21 @@ bool bjvm_hash_table_iterator_next(bjvm_hash_table_iterator *iter) {
   return iter->current_base != iter->end;
 }
 
-static uint32_t fxhash_string(const char *key, size_t len) {
-  const uint64_t FXHASH_CONST = 0x517cc1b727220a95ULL;
-  uint64_t hash = 0;
+static u32 fxhash_string(const char *key, size_t len) {
+  const u64 FXHASH_CONST = 0x517cc1b727220a95ULL;
+  u64 hash = 0;
   for (size_t i = 0; i + 7 < len; i += 8) {
-    uint64_t word;
+    u64 word;
     memcpy(&word, key + i, 8);
     hash = ((hash << 5 | hash >> 59) ^ word) * FXHASH_CONST;
   }
   if (len & 7) {
-    uint64_t word = 0;
+    u64 word = 0;
     memcpy(&word, key + len - (len & 7), len & 7);
     hash = ((hash << 5 | hash >> 59) ^ word) * FXHASH_CONST;
   }
 
-  return (uint32_t) hash;
+  return (u32) hash;
 }
 
 bjvm_hash_table_entry *
@@ -257,7 +257,7 @@ bjvm_find_hash_table_entry(bjvm_string_hash_table *tbl, const char *key,
                            bjvm_hash_table_entry **prev_entry) {
   if (unlikely(tbl->entries_cap == 0))
     return nullptr;
-  uint32_t hash = fxhash_string(key, len);
+  u32 hash = fxhash_string(key, len);
   size_t index = hash % tbl->entries_cap;
   bjvm_hash_table_entry *ent = &tbl->entries[index], *prev = nullptr;
   while (ent) {

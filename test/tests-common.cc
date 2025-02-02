@@ -30,14 +30,14 @@ CreateTestVM(bjvm_vm_options options) {
   return {vm, bjvm_free_vm};
 }
 
-optional<vector<uint8_t>>
+optional<vector<u8>>
 ResolveClassPath(string const &filename,
                  std::vector<string> const &extra_paths) {
   std::vector<string> paths = extra_paths;
   paths.emplace_back("jdk23/"); // for testing
 
   for (const auto &path : paths) {
-    optional<vector<uint8_t>> file_data = ReadFile(path + filename);
+    optional<vector<u8>> file_data = ReadFile(path + filename);
     if (file_data.has_value()) {
       return file_data;
     }
@@ -78,8 +78,8 @@ std::vector<std::string> ListDirectory(const std::string &path,
       },
       path.c_str(), recursive);
 
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
+  u32 length = *reinterpret_cast<u32 *>(length_and_data);
+  u8 *data = reinterpret_cast<u8 *>(length_and_data) + 4;
 
   std::string s(data, data + length);
   free(length_and_data);
@@ -120,7 +120,7 @@ bool EndsWith(const std::string &s, const std::string &suffix) {
   return s.substr(s.size() - suffix.size()) == suffix;
 }
 
-int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
+int load_classfile(slice filename, void *param, u8 **bytes,
                    size_t *len) {
   const char **classpath = (const char **)param;
   const char **classpath_end = classpath;
@@ -135,7 +135,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
 
   auto file_data = ResolveClassPath(filename_sv, extra_paths);
   if (file_data.has_value()) {
-    *bytes = (uint8_t *)malloc(file_data->size());
+    *bytes = (u8 *)malloc(file_data->size());
     memcpy(*bytes, file_data->data(), file_data->size());
     *len = file_data->size();
     return 0;
@@ -144,7 +144,7 @@ int load_classfile(bjvm_utf8 filename, void *param, uint8_t **bytes,
   return -1;
 }
 
-std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
+std::optional<std::vector<u8>> ReadFile(const std::string &file) {
 #ifdef EMSCRIPTEN
   bool exists = EM_ASM_INT(
       {
@@ -169,14 +169,14 @@ std::optional<std::vector<uint8_t>> ReadFile(const std::string &file) {
       },
       file.c_str());
 
-  uint32_t length = *reinterpret_cast<uint32_t *>(length_and_data);
-  uint8_t *data = reinterpret_cast<uint8_t *>(length_and_data) + 4;
+  u32 length = *reinterpret_cast<u32 *>(length_and_data);
+  u8 *data = reinterpret_cast<u8 *>(length_and_data) + 4;
 
   std::vector result(data, data + length);
   free(length_and_data);
   return result;
 #else // !EMSCRIPTEN
-  std::vector<uint8_t> result;
+  std::vector<u8> result;
   if (std::filesystem::exists(file)) {
     std::ifstream ifs(file, std::ios::binary | std::ios::ate);
     std::ifstream::pos_type pos = ifs.tellg();
@@ -197,8 +197,8 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   TestCaseResult result{};
 
-  options.classpath = (bjvm_utf8){.chars = (char *)classpath.c_str(),
-                                  .len = static_cast<uint16_t>(classpath.size())};
+  options.classpath = (slice){.chars = (char *)classpath.c_str(),
+                                  .len = static_cast<u16>(classpath.size())};
   options.write_stdout = capture_stdio ? +[](int ch, void *param) {
     auto *result = (TestCaseResult *)param;
     result->stdout_ += (char)ch;
@@ -216,8 +216,8 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
   }
   bjvm_thread *thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 
-  bjvm_utf8 m{.chars = (char *)main_class.c_str(),
-              .len = static_cast<uint16_t>(main_class.size())};
+  slice m{.chars = (char *)main_class.c_str(),
+              .len = static_cast<u16>(main_class.size())};
 
   bjvm_classdesc *desc = bootstrap_lookup_class(thread, m);
   if (!desc) {

@@ -2,11 +2,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <wasm/wasm_utils.h>
-#include <wasm/wasm_adapter.h>
 
 TEST_CASE("write leb128 unsigned", "[wasm]") {
   bjvm_bytevector ctx = {nullptr};
-  const uint8_t expected[4] = {0x00, 0xE5, 0x8E, 0x26};
+  const u8 expected[4] = {0x00, 0xE5, 0x8E, 0x26};
   bjvm_wasm_writeuint(&ctx, 0);
   bjvm_wasm_writeuint(&ctx, 624485);
   REQUIRE(ctx.bytes_len == 4);
@@ -16,7 +15,7 @@ TEST_CASE("write leb128 unsigned", "[wasm]") {
 
 TEST_CASE("write leb128 signed", "[wasm]") {
   bjvm_bytevector ctx = {nullptr};
-  const uint8_t expected[4] = {0x00, 0xC0, 0xBB, 0x78};
+  const u8 expected[4] = {0x00, 0xC0, 0xBB, 0x78};
   bjvm_wasm_writeint(&ctx, 0);
   bjvm_wasm_writeint(&ctx, -123456);
   REQUIRE(ctx.bytes_len == 4);

@@ -5,7 +5,7 @@
 #ifndef UNIXLIKE_FILESYSTEM_H
 #define UNIXLIKE_FILESYSTEM_H
 
-#include <stdint.h>
+#include <types.h>
 #include <stddef.h>
 #include <bjvm.h>
 #include <adt.h>

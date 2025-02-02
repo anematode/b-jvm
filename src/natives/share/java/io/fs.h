@@ -1,9 +1,9 @@
 #ifndef FS_H
 #define FS_H
 
-#include <stdint.h>
+#include <types.h>
 
-typedef enum : int32_t {
+typedef enum : s32 {
   BA_EXISTS = 0x01,
   BA_REGULAR = 0x02,
   BA_DIRECTORY = 0x04,
@@ -20,11 +20,11 @@ typedef enum {
 } fs_result;
 
 typedef struct {
-  fs_result (*get_attributes)(bjvm_utf8 file_name, boolean_attributes *result);
-  void (*create_virtual_file)(bjvm_utf8 file_name, boolean_attributes attributes, char const* data, size_t size);
+  fs_result (*get_attributes)(slice file_name, boolean_attributes *result);
+  void (*create_virtual_file)(slice file_name, boolean_attributes attributes, char const* data, size_t size);
 } fs;
 
-static inline bjvm_utf8 fs_result_to_string(fs_result result) {
+static inline slice fs_result_to_string(fs_result result) {
   switch (result) {
   case FS_OK:
     return STR("FS_OK");

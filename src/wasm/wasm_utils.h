@@ -5,7 +5,7 @@
 
 #include "classfile.h"
 #include "util.h"
-#include <stdint.h>
+#include <types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -303,7 +303,7 @@ typedef struct {
   bjvm_wasm_expression *index;
 
   bjvm_wasm_expression **args;
-  uint32_t function_type;
+  u32 function_type;
   int arg_count;
   bool tail_call;
 } bjvm_wasm_call_indirect_expression;
@@ -338,7 +338,7 @@ typedef struct {
 } bjvm_wasm_literal;
 
 typedef struct {
-  uint32_t local_index;
+  u32 local_index;
   bjvm_wasm_expression *value;
 } bjvm_wasm_local_set_expression;
 
@@ -363,7 +363,7 @@ typedef struct bjvm_wasm_expression {
     bjvm_wasm_store_expression store;
     bjvm_wasm_local_set_expression local_set;
 
-    uint32_t local_get;
+    u32 local_get;
     bjvm_wasm_expression *return_expr;
   };
 } bjvm_wasm_expression;
@@ -375,7 +375,7 @@ typedef struct bjvm_wasm_function {
   // Tuple type, converted to a list of basic types during serialisation
   bjvm_wasm_type locals;
   bjvm_wasm_expression *body;
-  uint32_t my_index;
+  u32 my_index;
 
   bool exported;
 } bjvm_wasm_function;
@@ -386,7 +386,7 @@ typedef struct {
 } bjvm_wasm_ser_function_type;
 
 typedef struct {
-  uint32_t type;
+  u32 type;
   bjvm_wasm_function *associated;
 } bjvm_wasm_func_import;
 
@@ -426,7 +426,7 @@ typedef struct {
   int fn_types_count;
   int fn_types_cap;
 
-  uint32_t fn_index;
+  u32 fn_index;
 
   /** Allocation stuffs */
 
@@ -441,7 +441,7 @@ typedef struct {
 // Used when writing out the WASM to a series of bytes.
 typedef struct {
   // Bytes of the currenf
-  uint8_t *bytes;
+  u8 *bytes;
   size_t bytes_len;
   size_t bytes_cap;
 } bjvm_bytevector;
@@ -450,8 +450,8 @@ void write_byte(bjvm_bytevector *ctx, int byte);
 void write_slice(bjvm_bytevector *ctx, const uint8_t *bytes, size_t len);
 
 // LEB128 encodings
-void bjvm_wasm_writeuint(bjvm_bytevector *ctx, uint64_t value);
-void bjvm_wasm_writeint(bjvm_bytevector *ctx, int64_t value);
+void bjvm_wasm_writeuint(bjvm_bytevector *ctx, u64 value);
+void bjvm_wasm_writeint(bjvm_bytevector *ctx, s64 value);
 
 bjvm_wasm_module *bjvm_wasm_module_create();
 // It is the caller's responsibility to free the returned bytevector.
@@ -496,11 +496,11 @@ bjvm_wasm_expression *bjvm_wasm_f32_const(bjvm_wasm_module *module,
 bjvm_wasm_expression *bjvm_wasm_f64_const(bjvm_wasm_module *module,
                                           double value);
 bjvm_wasm_expression *bjvm_wasm_i64_const(bjvm_wasm_module *module,
-                                          int64_t value);
+                                          s64 value);
 bjvm_wasm_expression *bjvm_wasm_local_get(bjvm_wasm_module *module,
-                                          uint32_t index, bjvm_wasm_type kind);
+                                          u32 index, bjvm_wasm_type kind);
 bjvm_wasm_expression *bjvm_wasm_local_set(bjvm_wasm_module *module,
-                                          uint32_t index,
+                                          u32 index,
                                           bjvm_wasm_expression *value);
 bjvm_wasm_expression *bjvm_wasm_unreachable(bjvm_wasm_module *module);
 bjvm_wasm_expression *bjvm_wasm_unop(bjvm_wasm_module *module,
@@ -535,7 +535,7 @@ bjvm_wasm_expression *bjvm_wasm_call_indirect(bjvm_wasm_module *module,
                                               bjvm_wasm_expression *index,
                                               bjvm_wasm_expression **args,
                                               int arg_count,
-                                              uint32_t functype);
+                                              u32 functype);
 bjvm_wasm_expression *bjvm_wasm_load(bjvm_wasm_module *module,
                                      bjvm_wasm_load_op_kind op,
                                      bjvm_wasm_expression *addr, int align,
@@ -553,7 +553,7 @@ bjvm_wasm_expression *bjvm_wasm_if_else(bjvm_wasm_module *module,
 bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
                                        bjvm_wasm_expression *expr);
 
-  uint32_t bjvm_register_function_type(bjvm_wasm_module *module,
+  u32 bjvm_register_function_type(bjvm_wasm_module *module,
                                        bjvm_wasm_type params,
                                        bjvm_wasm_type results);
 

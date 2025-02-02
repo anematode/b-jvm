@@ -69,49 +69,49 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
 
 #define SET_PROP(index, value) \
   { \
-    bjvm_obj_header *str = bjvm_intern_string(thread, value); \
+    bjvm_obj_header *str = MakeJStringFromCString(thread, value, true); \
     ReferenceArrayStore(props->obj, index, str); \
   }
 
-  SET_PROP(_file_encoding_NDX, STR("UTF-8"));
-  SET_PROP(_stdout_encoding_NDX, STR("UTF-8"));
-  SET_PROP(_stderr_encoding_NDX, STR("UTF-8"));
-  SET_PROP(_file_separator_NDX, STR("/"));
-  SET_PROP(_java_io_tmpdir_NDX, STR("/tmp"));
-  SET_PROP(_line_separator_NDX, STR("\n"));
-  SET_PROP(_path_separator_NDX, STR(":"));
-  SET_PROP(_os_name_NDX, STR("Linux"));
-  SET_PROP(_os_arch_NDX, STR("x86_64"));
-  SET_PROP(_os_version_NDX, STR("5.4.0-1043-azure"));
-  SET_PROP(_sun_arch_abi_NDX, STR("64"));
-  SET_PROP(_sun_arch_data_model_NDX, STR("64"));
-  SET_PROP(_sun_cpu_endian_NDX, STR("little"));
-  SET_PROP(_sun_cpu_isalist_NDX, STR(""));
-  SET_PROP(_sun_io_unicode_encoding_NDX, STR("UTF-8"));
-  SET_PROP(_sun_jnu_encoding_NDX, STR("UTF-8"));
-  SET_PROP(_sun_os_patch_level_NDX, STR("azure"));
-  SET_PROP(_display_country_NDX, STR("US"));
-  SET_PROP(_display_language_NDX, STR("en"));
-  SET_PROP(_display_script_NDX, STR(""));
-  SET_PROP(_display_variant_NDX, STR(""));
-  SET_PROP(_format_country_NDX, STR("US"));
-  SET_PROP(_format_language_NDX, STR("en"));
-  SET_PROP(_format_script_NDX, STR(""));
-  SET_PROP(_format_variant_NDX, STR(""));
-  SET_PROP(_ftp_nonProxyHosts_NDX, STR(""));
-  SET_PROP(_ftp_proxyHost_NDX, STR(""));
-  SET_PROP(_ftp_proxyPort_NDX, STR(""));
-  SET_PROP(_http_nonProxyHosts_NDX, STR(""));
-  SET_PROP(_http_proxyHost_NDX, STR(""));
-  SET_PROP(_http_proxyPort_NDX, STR(""));
-  SET_PROP(_https_proxyHost_NDX, STR(""));
-  SET_PROP(_https_proxyPort_NDX, STR(""));
-  SET_PROP(_socksNonProxyHosts_NDX, STR(""));
-  SET_PROP(_socksProxyHost_NDX, STR(""));
-  SET_PROP(_socksProxyPort_NDX, STR(""));
-  SET_PROP(_user_dir_NDX, cwd);
-  SET_PROP(_user_name_NDX, STR("user"));
-  SET_PROP(_user_home_NDX, STR("/home/user"));
+  SET_PROP(_file_encoding_NDX, "UTF-8");
+  SET_PROP(_stdout_encoding_NDX, "UTF-8");
+  SET_PROP(_stderr_encoding_NDX, "UTF-8");
+  SET_PROP(_file_separator_NDX, "/");
+  SET_PROP(_java_io_tmpdir_NDX, "/tmp");
+  SET_PROP(_line_separator_NDX, "\n");
+  SET_PROP(_path_separator_NDX, ":");
+  SET_PROP(_os_name_NDX, "Linux");
+  SET_PROP(_os_arch_NDX, "x86_64");
+  SET_PROP(_os_version_NDX, "5.4.0-1043-azure");
+  SET_PROP(_sun_arch_abi_NDX, "64");
+  SET_PROP(_sun_arch_data_model_NDX, "64");
+  SET_PROP(_sun_cpu_endian_NDX, "little");
+  SET_PROP(_sun_cpu_isalist_NDX, "");
+  SET_PROP(_sun_io_unicode_encoding_NDX, "UTF-8");
+  SET_PROP(_sun_jnu_encoding_NDX, "UTF-8");
+  SET_PROP(_sun_os_patch_level_NDX, "azure");
+  SET_PROP(_display_country_NDX, "US");
+  SET_PROP(_display_language_NDX, "en");
+  SET_PROP(_display_script_NDX, "");
+  SET_PROP(_display_variant_NDX, "");
+  SET_PROP(_format_country_NDX, "US");
+  SET_PROP(_format_language_NDX, "en");
+  SET_PROP(_format_script_NDX, "");
+  SET_PROP(_format_variant_NDX, "");
+  SET_PROP(_ftp_nonProxyHosts_NDX, "");
+  SET_PROP(_ftp_proxyHost_NDX, "");
+  SET_PROP(_ftp_proxyPort_NDX, "");
+  SET_PROP(_http_nonProxyHosts_NDX, "");
+  SET_PROP(_http_proxyHost_NDX, "");
+  SET_PROP(_http_proxyPort_NDX, "");
+  SET_PROP(_https_proxyHost_NDX, "");
+  SET_PROP(_https_proxyPort_NDX, "");
+  SET_PROP(_socksNonProxyHosts_NDX, "");
+  SET_PROP(_socksProxyHost_NDX, "");
+  SET_PROP(_socksProxyPort_NDX, "");
+  SET_PROP(_user_dir_NDX, cwd.chars);
+  SET_PROP(_user_name_NDX, "user");
+  SET_PROP(_user_home_NDX, "/home/user");
 
   bjvm_stack_value result = (bjvm_stack_value){.obj = props->obj};
   bjvm_drop_handle(thread, props);
@@ -122,14 +122,14 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
                "()[Ljava/lang/String;") {
   bjvm_handle *props = make_string_array(thread, 2);
 
-  SET_PROP(0, STR("java.home"));
+  SET_PROP(0, "java.home");
   char cwd[1024] = {0};
   BJVM_CHECK(cwd == getcwd(cwd, 1024));
 
   INIT_STACK_STRING(java_home, 1024);
   java_home = bprintf(java_home, "%s/jdk23", cwd);
 
-  SET_PROP(1, java_home);
+  SET_PROP(1, java_home.chars);
 
   return (bjvm_stack_value){.obj = props->obj};
 }

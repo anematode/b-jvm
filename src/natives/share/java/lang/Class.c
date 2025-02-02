@@ -1,6 +1,10 @@
 #include "cached_classdescs.h"
+#include "objects.h"
 
+#include <exceptions.h>
+#include <linkage.h>
 #include <natives-dsl.h>
+#include <reflection.h>
 
 static bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc, bjvm_attribute_kind kind) {
   for (int i = 0; i < desc->attributes_count; ++i) {
@@ -15,34 +19,38 @@ DECLARE_NATIVE("java/lang", Class, registerNatives, "()V") { return value_null()
 
 DECLARE_NATIVE("java/lang", Class, getPrimitiveClass, "(Ljava/lang/String;)Ljava/lang/Class;") {
   assert(argc == 1);
-  int8_t *chars;
-  size_t len;
-  read_string(thread, args[0].handle->obj, &chars, &len);
+  if (args[0].handle->obj == nullptr) {
+    raise_null_pointer_exception(thread);
+    return value_null();
+  }
+
+  // this is fine because if it's a primitive type, it'll look the same regardless of how it's encoded
+  bjvm_obj_header *str_data = RawStringData(thread, args[0].handle->obj);
+  char *chars = ArrayData(str_data);
+  int len = *ArrayLength(str_data);
+
   if (len > 10) {
     return value_null();
   }
-  char as_cstr[11] = {0};
-  for (size_t i = 0; i < len; ++i) {
-    as_cstr[i] = chars[i];
-  }
+
   bjvm_type_kind kind;
-  if (strcmp(as_cstr, "boolean") == 0) {
+  if (strcmp(chars, "boolean") == 0) {
     kind = BJVM_TYPE_KIND_BOOLEAN;
-  } else if (strcmp(as_cstr, "byte") == 0) {
+  } else if (strcmp(chars, "byte") == 0) {
     kind = BJVM_TYPE_KIND_BYTE;
-  } else if (strcmp(as_cstr, "char") == 0) {
+  } else if (strcmp(chars, "char") == 0) {
     kind = BJVM_TYPE_KIND_CHAR;
-  } else if (strcmp(as_cstr, "short") == 0) {
+  } else if (strcmp(chars, "short") == 0) {
     kind = BJVM_TYPE_KIND_SHORT;
-  } else if (strcmp(as_cstr, "int") == 0) {
+  } else if (strcmp(chars, "int") == 0) {
     kind = BJVM_TYPE_KIND_INT;
-  } else if (strcmp(as_cstr, "long") == 0) {
+  } else if (strcmp(chars, "long") == 0) {
     kind = BJVM_TYPE_KIND_LONG;
-  } else if (strcmp(as_cstr, "float") == 0) {
+  } else if (strcmp(chars, "float") == 0) {
     kind = BJVM_TYPE_KIND_FLOAT;
-  } else if (strcmp(as_cstr, "double") == 0) {
+  } else if (strcmp(chars, "double") == 0) {
     kind = BJVM_TYPE_KIND_DOUBLE;
-  } else if (strcmp(as_cstr, "void") == 0) {
+  } else if (strcmp(chars, "void") == 0) {
     kind = BJVM_TYPE_KIND_VOID;
   } else {
     return value_null();
@@ -66,16 +74,21 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;")
   if (!enclosing_method.class_info) {
     return value_null();
   }
-  bjvm_obj_header *array = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 3);
-  bjvm_obj_header **data = ArrayData(array);
+  bjvm_handle *array = bjvm_make_handle(thread,
+    CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 3));
+#define data ((bjvm_obj_header **)ArrayData(array->obj))
+
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
   BJVM_CHECK(!error);
   data[0] = (void *)enclosing_method.class_info->classdesc->mirror;
   if (enclosing_method.nat != nullptr) {
-    data[1] = bjvm_intern_string(thread, enclosing_method.nat->name);
-    data[2] = bjvm_intern_string(thread, enclosing_method.nat->descriptor);
+    data[1] = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->name, true);
+    data[2] = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->descriptor, true);
   }
-  return (bjvm_stack_value){.obj = array};
+#undef data
+  bjvm_stack_value result = (bjvm_stack_value) { .obj = array->obj };
+  bjvm_drop_handle(thread, array);
+  return result;
 }
 
 DECLARE_NATIVE("java/lang", Class, getDeclaringClass0, "()Ljava/lang/Class;") {
@@ -130,11 +143,11 @@ DECLARE_NATIVE("java/lang", Class, initClassName, "()Ljava/lang/String;") {
   bjvm_classdesc *classdesc = bjvm_unmirror_class(obj->obj);
   INIT_STACK_STRING(name, 1000);
   bprintf(name, "%.*s", fmt_slice(classdesc->name));
-  for (int i = 0; i < classdesc->name.len; ++i) {
+  for (u32 i = 0; i < classdesc->name.len; ++i) {
     name.chars[i] = name.chars[i] == '/' ? '.' : name.chars[i];
   }
   name.len = classdesc->name.len;
-  return (bjvm_stack_value){.obj = bjvm_intern_string(thread, name)};
+  return (bjvm_stack_value){.obj = MakeJStringFromModifiedUTF8(thread, name, true)};
 }
 
 DECLARE_NATIVE("java/lang", Class, forName0,
@@ -142,13 +155,10 @@ DECLARE_NATIVE("java/lang", Class, forName0,
                "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
   bjvm_obj_header *name_obj = args[0].handle->obj;
-  int8_t *name;
-  size_t len;
-  read_string(thread, name_obj, &name, &len);
 
-  heap_string name_str = make_heap_str(len);
-  for (size_t i = 0; i < len; ++i) {
-    name_str.chars[i] = name[i] == '.' ? '/' : name[i];
+  heap_string name_str = AsHeapString(name_obj, oom);
+  for (size_t i = 0; i < name_str.len; ++i) {
+    name_str.chars[i] = name_str.chars[i] == '.' ? '/' : name_str.chars[i];
   }
   bjvm_classdesc *c = bootstrap_lookup_class(thread, hslc(name_str));
 
@@ -167,6 +177,8 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   if (c) {
     return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, c)};
   }
+
+  oom:
   return value_null();
 }
 
@@ -291,7 +303,7 @@ DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj->obj);
   if (!args[0].handle->obj) {
-    bjvm_null_pointer_exception(thread);
+    raise_null_pointer_exception(thread);
     return value_null();
   }
   bjvm_classdesc *other_desc = bjvm_unmirror_class(args[0].handle->obj);
@@ -376,7 +388,7 @@ DECLARE_NATIVE("java/lang", Class, getGenericSignature0, "()Ljava/lang/String;")
   bjvm_classdesc *desc = bjvm_unmirror_class(obj->obj);
   bjvm_attribute *attr = find_attribute_by_kind(desc, BJVM_ATTRIBUTE_KIND_SIGNATURE);
   if (attr) {
-    return (bjvm_stack_value){.obj = bjvm_intern_string(thread, attr->signature.utf8)};
+    return (bjvm_stack_value){.obj = MakeJStringFromModifiedUTF8(thread, attr->signature.utf8, true)};
   }
   return value_null();
 }

@@ -14,8 +14,8 @@ typedef struct {
   char data[];
 } virtual_file;
 
-static void create_virtual_file(bjvm_utf8 file_name, boolean_attributes attributes, char const *data, size_t size);
-static fs_result get_attributes(bjvm_utf8 file_name, boolean_attributes *result);
+static void create_virtual_file(slice file_name, boolean_attributes attributes, char const *data, size_t size);
+static fs_result get_attributes(slice file_name, boolean_attributes *result);
 
 __attribute__((constructor)) static void init() {
   active_fs.fs.create_virtual_file = create_virtual_file;
@@ -29,7 +29,7 @@ __attribute__((constructor)) static void init() {
   }
 }
 
-void create_virtual_file(bjvm_utf8 file_name, boolean_attributes attributes, char const *data, size_t size) {
+void create_virtual_file(slice file_name, boolean_attributes attributes, char const *data, size_t size) {
   virtual_file *file = (virtual_file *)malloc(sizeof(virtual_file) + size);
   file->attrs = attributes;
   file->length = size;
@@ -39,7 +39,7 @@ void create_virtual_file(bjvm_utf8 file_name, boolean_attributes attributes, cha
   if (result) free(result);
 }
 
-fs_result get_attributes(bjvm_utf8 file_name, boolean_attributes *result) {
+fs_result get_attributes(slice file_name, boolean_attributes *result) {
   virtual_file *virtual_file = bjvm_hash_table_lookup(&active_fs.synthetic_entries, file_name.chars, file_name.len);
   if (virtual_file) {
     *result = virtual_file->attrs;

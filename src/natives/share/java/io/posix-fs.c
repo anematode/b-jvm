@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 
 typedef struct {
-  fs_result (*original_get_attributes)(bjvm_utf8 file_name, boolean_attributes *result);
+  fs_result (*original_get_attributes)(slice file_name, boolean_attributes *result);
 } attributes;
 
 bool posix_fs_supported(void) { return true; }
@@ -38,7 +38,7 @@ static boolean_attributes _convert_attrs(char const *name, struct stat *st) {
   return attrs;
 }
 
-static int _posix_stat(bjvm_utf8 file_name, struct stat *st) {
+static int _posix_stat(slice file_name, struct stat *st) {
   int err = stat(file_name.chars, st);
   return (err == 0) ? 0 : errno;
 }
@@ -63,7 +63,7 @@ static fs_result _posix_convert_error(int e) {
   }
 }
 
-fs_result posix_fs_get_attributes(bjvm_utf8 file_name, boolean_attributes *attrs) {
+fs_result posix_fs_get_attributes(slice file_name, boolean_attributes *attrs) {
   struct stat st;
   int err;
 

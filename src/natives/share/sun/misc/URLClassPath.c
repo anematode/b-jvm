@@ -1,3 +1,4 @@
+#include <linkage.h>
 #include <natives-dsl.h>
 
 DECLARE_NATIVE("sun/misc", URLClassPath, getLookupCacheURLs,

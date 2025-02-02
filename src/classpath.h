@@ -4,7 +4,7 @@
 
 #include "adt.h"
 #include "util.h"
-#include <stdint.h>
+#include <types.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus
@@ -13,8 +13,8 @@ extern "C" {
 
 typedef struct {
   char *header; // pointer into the JAR memory
-  uint32_t compressed_size;
-  uint32_t claimed_uncompressed_size;
+  u32 compressed_size;
+  u32 claimed_uncompressed_size;
   bool is_compressed;
 } bjvm_jar_entry;
 
@@ -26,7 +26,7 @@ typedef struct {
   bjvm_string_hash_table entries;
 
   char *data;
-  uint32_t size_bytes;
+  u32 size_bytes;
   bool is_mmap; // true = mmap, false = heap allocation
 } bjvm_mapped_jar;
 
@@ -47,10 +47,10 @@ typedef struct {
 } bjvm_classpath;
 
 // Returns nullptr if all elements in the path were loaded ok.
-[[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, bjvm_utf8 path);
+[[nodiscard]] char *bjvm_init_classpath(bjvm_classpath *cp, slice path);
 void bjvm_free_classpath(bjvm_classpath *cp);
-int bjvm_lookup_classpath(bjvm_classpath *cp, bjvm_utf8 filename,
-                          uint8_t **bytes, size_t *len);
+int bjvm_lookup_classpath(bjvm_classpath *cp, slice filename,
+                          u8 **bytes, size_t *len);
 
 #ifdef __cplusplus
 }

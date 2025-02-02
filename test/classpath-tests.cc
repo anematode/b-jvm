@@ -12,7 +12,7 @@ TEST_CASE("Basic classpath operations", "[classpath]") {
 
   char *error2 = bjvm_init_classpath(&cp, STR("test_files/intact_jar/ok.jar"));
   REQUIRE(error2 == nullptr);
-  uint8_t *bytes;
+  u8 *bytes;
   size_t len;
   int ret_val = bjvm_lookup_classpath(&cp, STR("Egg.class"), &bytes, &len);
   REQUIRE(bytes != nullptr);
@@ -35,7 +35,7 @@ TEST_CASE("Folder in classpath", "[classpath]") {
       STR("./jdk23.jar:test_files/circularity:test_files/classpath_test"));
   REQUIRE(error == nullptr);
 
-  uint8_t *bytes;
+  u8 *bytes;
   size_t len;
   int ret_val =
       bjvm_lookup_classpath(&cp, STR("jdk/internal/misc/Unsafe.class"), &bytes, &len);

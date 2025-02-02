@@ -11,6 +11,7 @@
 
 #include <inttypes.h>
 #include <limits.h>
+#include <stackmaptable.h>
 
 typedef struct {
   bjvm_type_kind type;
@@ -459,19 +460,19 @@ void copy_analy_stack_state(bjvm_analy_stack_state st,
   out->entries_count = st.entries_count;
 }
 
-char *expect_analy_stack_states_equal(bjvm_analy_stack_state a,
-                                      bjvm_analy_stack_state b) {
-  if (a.entries_count != b.entries_count)
+char *expect_jump_target_compatible(bjvm_analy_stack_state target,
+                                      bjvm_analy_stack_state from) {
+  if (target.entries_count != from.entries_count)
     goto fail;
-  for (int i = 0; i < a.entries_count; ++i) {
-    if (a.entries[i].type != b.entries[i].type) {
+  for (int i = 0; i < target.entries_count; ++i) {
+    if (target.entries[i].type != BJVM_TYPE_KIND_VOID && target.entries[i].type != from.entries[i].type) {
       goto fail;
     }
   }
   return nullptr;
 fail:;
-  char *a_str = print_analy_stack_state(&a),
-       *b_str = print_analy_stack_state(&b);
+  char *a_str = print_analy_stack_state(&target),
+       *b_str = print_analy_stack_state(&from);
   char *buf = malloc(strlen(a_str) + strlen(b_str) + 128);
   snprintf(buf, strlen(a_str) + strlen(b_str) + 128,
            "Stack mismatch:\nPreviously inferred: %s\nFound: %s", a_str, b_str);
@@ -486,25 +487,6 @@ bool is_kind_wide(bjvm_type_kind kind) {
 
 bool bjvm_is_field_wide(bjvm_field_descriptor desc) {
   return is_kind_wide(desc.base_kind) && !desc.dimensions;
-}
-
-bjvm_type_kind kind_to_representable_kind(bjvm_type_kind kind) {
-  switch (kind) {
-  case BJVM_TYPE_KIND_BOOLEAN:
-  case BJVM_TYPE_KIND_CHAR:
-  case BJVM_TYPE_KIND_BYTE:
-  case BJVM_TYPE_KIND_SHORT:
-  case BJVM_TYPE_KIND_INT:
-    return BJVM_TYPE_KIND_INT;
-  default:
-    return kind;
-  }
-}
-
-bjvm_type_kind field_to_kind(const bjvm_field_descriptor *field) {
-  if (field->dimensions)
-    return BJVM_TYPE_KIND_REFERENCE;
-  return kind_to_representable_kind(field->base_kind);
 }
 
 void write_kinds_to_bitset(const bjvm_analy_stack_state *inferred_stack,
@@ -546,7 +528,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
   const bjvm_attribute_code *code = method->code;
   const bjvm_method_descriptor *desc = method->descriptor;
   assert(code);
-  uint16_t max_locals = code->max_locals;
+  u16 max_locals = code->max_locals;
   locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
   *locals_swizzle = malloc(max_locals * sizeof(int));
   for (int i = 0; i < max_locals; ++i) {
@@ -600,12 +582,9 @@ struct method_analysis_ctx {
   int *locals_swizzle;
   bjvm_analy_stack_state *inferred_stacks;
   bjvm_analy_stack_state *inferred_locals;
-  int *branch_q;
-  int branch_count;
   char *insn_error;
   heap_string *error;
   struct edge *edges;
-  bool *is_branch_target;  // if 1, this insn is the target of a branch
   int edges_count;
   int edges_cap;
 };
@@ -659,22 +638,20 @@ struct method_analysis_ctx {
       goto local_type_mismatch;                                                \
   }
 
-int push_branch_target(struct method_analysis_ctx *ctx, uint32_t curr,
-                       uint32_t target) {
+int push_branch_target(struct method_analysis_ctx *ctx, u32 curr,
+                       u32 target) {
   assert((int)target < ctx->code->insn_count);
   if (ctx->inferred_stacks[target].entries) {
-    if ((ctx->insn_error = expect_analy_stack_states_equal(
+    if ((ctx->insn_error = expect_jump_target_compatible(
              ctx->inferred_stacks[target], ctx->stack))) {
       return -1;
     }
   } else {
     copy_analy_stack_state(ctx->stack, &ctx->inferred_stacks[target]);
     ctx->inferred_stacks[target].from_jump_target = true;
-    ctx->branch_q[ctx->branch_count++] = target;
 
     *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
         (struct edge){.start = curr, .end = target};
-    ctx->is_branch_target[target] = true;
   }
   return 0;
 }
@@ -1081,7 +1058,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
     PUSH_ENTRY(insn_source(kind, insn_index))
     if (ent->kind == BJVM_CP_KIND_INTEGER) { // rewrite to iconst or lconst
       insn->kind = bjvm_insn_iconst;
-      insn->integer_imm = (int32_t)ent->integral.value;
+      insn->integer_imm = (s32)ent->integral.value;
     } else if (ent->kind == BJVM_CP_KIND_FLOAT) {
       insn->kind = bjvm_insn_fconst;
       insn->f_imm = (float)ent->floating.value;
@@ -1165,14 +1142,14 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
   }
   case bjvm_insn_goto: {
     if (push_branch_target(ctx, insn_index, insn->index))
-      return -1;
+      goto error;
     ctx->stack_terminated = true;
     break;
   }
   case bjvm_insn_jsr: {
     PUSH(REFERENCE)
     if (push_branch_target(ctx, insn_index, insn->index))
-      return -1;
+      goto error;
     break;
   }
   case bjvm_insn_if_acmpeq:
@@ -1180,7 +1157,7 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
     POP(REFERENCE)
     POP(REFERENCE)
     if (push_branch_target(ctx, insn_index, insn->index))
-      return -1;
+      goto error;
     break;
   }
   case bjvm_insn_if_icmpeq:
@@ -1199,14 +1176,14 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
   case bjvm_insn_ifle: {
     POP(INT)
     if (push_branch_target(ctx, insn_index, insn->index))
-      return -1;
+      goto error;
     break;
   }
   case bjvm_insn_ifnonnull:
   case bjvm_insn_ifnull: {
     POP(REFERENCE)
     if (push_branch_target(ctx, insn_index, insn->index))
-      return -1;
+      goto error;
     break;
   }
   case bjvm_insn_iconst:
@@ -1232,20 +1209,20 @@ int analyze_instruction(bjvm_bytecode_insn *insn, int insn_index, struct method_
   case bjvm_insn_tableswitch: {
     POP(INT)
     if (push_branch_target(ctx, insn_index, insn->tableswitch->default_target))
-      return -1;
+      goto error;
     for (int i = 0; i < insn->tableswitch->targets_count; ++i)
       if (push_branch_target(ctx, insn_index, insn->tableswitch->targets[i]))
-        return -1;
+        goto error;
     ctx->stack_terminated = true;
     break;
   }
   case bjvm_insn_lookupswitch: {
     POP(INT)
     if (push_branch_target(ctx, insn_index, insn->lookupswitch->default_target))
-      return -1;
+      goto error;
     for (int i = 0; i < insn->lookupswitch->targets_count; ++i)
       if (push_branch_target(ctx, insn_index, insn->lookupswitch->targets[i]))
-        return -1;
+        goto error;
     ctx->stack_terminated = true;
     break;
   }
@@ -1272,7 +1249,7 @@ stack_underflow:
   ctx->insn_error = strdup("Stack underflow:");
   goto error;
 stack_type_mismatch:
-  ctx->insn_error = "Stack type mismatch:";
+  ctx->insn_error = strdup("Stack type mismatch:");
 error:;
 
   *ctx->error = make_heap_str(50000);
@@ -1293,149 +1270,45 @@ error:;
   return -1;
 }
 
-bool sources_equal(bjvm_stack_variable_source src1, bjvm_stack_variable_source src2) {
-  return memcmp(&src1, &src2, sizeof(src1)) == 0;
+static bjvm_type_kind validation_type_kind_to_representation(stack_map_frame_validation_type_kind kind) {
+  switch (kind) {
+  case STACK_MAP_FRAME_VALIDATION_TYPE_INTEGER:
+    return BJVM_TYPE_KIND_INT;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_FLOAT:
+    return BJVM_TYPE_KIND_FLOAT;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_LONG:
+    return BJVM_TYPE_KIND_LONG;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_DOUBLE:
+    return BJVM_TYPE_KIND_DOUBLE;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_OBJECT:
+    return BJVM_TYPE_KIND_REFERENCE;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_NULL:
+    return BJVM_TYPE_KIND_REFERENCE;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_UNINIT_THIS:
+    return BJVM_TYPE_KIND_REFERENCE;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_UNINIT:
+    return BJVM_TYPE_KIND_REFERENCE;
+  case STACK_MAP_FRAME_VALIDATION_TYPE_TOP:
+    return BJVM_TYPE_KIND_VOID;
+  }
+  UNREACHABLE();
 }
 
-bool filter_locals(bjvm_analy_stack_state *s1,
-                   const bjvm_analy_stack_state *s2) {
-  if (s1->entries_count != s2->entries_count) {
-    printf("%s\n%s\n", print_analy_stack_state(s1),
-           print_analy_stack_state(s2));
+void use_stack_map_frame(struct method_analysis_ctx *ctx, const stack_map_frame_iterator *iter) {
+  ctx->stack.entries_count = iter->stack_size;
+  for (int i = 0; i < iter->stack_size; ++i) {
+    ctx->stack.entries[i].type = validation_type_kind_to_representation(iter->stack[i].kind);
   }
-  assert(s1->entries_count == s2->entries_count);
-  bool changed = false;
-  for (int i = 0; i < s1->entries_count; ++i) {
-    if (s1->entries[i].type != BJVM_TYPE_KIND_VOID &&
-        s1->entries[i].type != s2->entries[i].type) {
-      s1->entries[i].type = BJVM_TYPE_KIND_VOID;
-      changed = true;
-    }
+  // First set all locals to void
+  for (int i = 0; i < ctx->locals.entries_count; ++i) {
+    ctx->locals.entries[i].type = BJVM_TYPE_KIND_VOID;
   }
-  return changed;
-}
-
-bool insn_changes_locals_kinds(bjvm_bytecode_insn *insn) {
-  switch (insn->kind) {
-  case bjvm_insn_dstore:
-  case bjvm_insn_fstore:
-  case bjvm_insn_istore:
-  case bjvm_insn_lstore:
-  case bjvm_insn_astore:
-    return true;
-  default:
-    return false;
+  // Then use iterator locals, but don't forget to swizzle
+  for (int i = 0; i < iter->locals_size; ++i) {
+    ctx->locals.entries[ctx->locals_swizzle[i]].type =
+      validation_type_kind_to_representation(iter->locals[i].kind);
   }
 }
-
-bool gross_quadratic_algorithm_to_refine_local_references(
-    struct method_analysis_ctx *ctx) {
-  bool any_changed = false;
-
-  // Iterate over edges and intersect the target locals with the source locals.
-  // No branching instruction changes the locals state, so this is easy enough
-  // to write out
-  for (int i = 0; i < ctx->edges_count; ++i) {
-    struct edge edge = ctx->edges[i];
-    bool changed = filter_locals(ctx->inferred_locals + edge.end,
-                                 ctx->inferred_locals + edge.start);
-    any_changed = any_changed || changed;
-  }
-
-  // Now iterate over instructions and refine the locals state
-  bool stack_terminated = true;
-  for (int i = 0; i < ctx->code->insn_count; ++i) {
-    bjvm_bytecode_insn *insn = ctx->code->code + i;
-    if (stack_terminated || ctx->is_branch_target[i]) {
-      copy_analy_stack_state(ctx->inferred_locals[i], &ctx->locals);
-      stack_terminated = false;
-    } else {
-      filter_locals(ctx->inferred_locals + i, &ctx->locals);
-    }
-
-    switch (insn->kind) {
-    case bjvm_insn_goto:
-    case bjvm_insn_athrow:
-    case bjvm_insn_areturn:
-    case bjvm_insn_dreturn:
-    case bjvm_insn_freturn:
-    case bjvm_insn_ireturn:
-    case bjvm_insn_lreturn:
-    case bjvm_insn_return:
-    case bjvm_insn_jsr:
-    case bjvm_insn_ret:
-    case bjvm_insn_tableswitch:
-    case bjvm_insn_lookupswitch:
-      stack_terminated = true;
-      break;
-    case bjvm_insn_astore:
-      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_REFERENCE;
-      break;
-    case bjvm_insn_dstore:
-      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_DOUBLE;
-      break;
-    case bjvm_insn_fstore:
-      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_FLOAT;
-      break;
-    case bjvm_insn_istore:
-      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_INT;
-      break;
-    case bjvm_insn_lstore:
-      ctx->locals.entries[insn->index].type = BJVM_TYPE_KIND_LONG;
-      break;
-    default:
-      break;
-    }
-  }
-
-  return any_changed;
-}
-
-void add_exception_edges(struct method_analysis_ctx *ctx) {
-  // Add sufficient edges between instructions and accessible exception handlers
-  // such that the locals filtration works correctly when jumping to handlers.
-  bjvm_attribute_exception_table *exc = ctx->code->exception_table;
-  if (!exc)
-    return;
-
-  // jsr edges
-  for (int i = 0; i < ctx->code->insn_count; ++i) {
-    bjvm_bytecode_insn *insn = ctx->code->code + i;
-    if (insn->kind == bjvm_insn_jsr) {
-      *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
-          (struct edge){.start = i, .end = insn->index};
-    }
-  }
-
-  for (int i = 0; i < exc->entries_count; ++i) {
-    // Scan instructions in [start_pc, end_pc). For any instruction changing
-    // the locals state, add an edge from the instruction after to the handler.
-    bjvm_exception_table_entry ent = exc->entries[i];
-    *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
-        (struct edge){.start = ent.start_insn, .end = ent.handler_insn};
-    for (int j = ent.start_insn; j < ent.end_insn - 1; ++j) {
-      if (insn_changes_locals_kinds(ctx->code->code + j)) {
-        *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
-            (struct edge){.start = j + 1, .end = ent.handler_insn};
-      }
-    }
-  }
-}
-
-void intersect_analy_stack_state(bjvm_analy_stack_state *src, bjvm_analy_stack_state *dst) {
-  if (src->entries_count != dst->entries_count) {
-    // Malformed branch target! Will be caught in analyze_instruction
-    copy_analy_stack_state(*src, dst);
-  }
-  for (int i = 0; i < src->entries_count; ++i) {
-    if (!sources_equal(src->entries[i].source, dst->entries[i].source)) {
-      src->entries[i].source.kind = dst->entries[i].source.kind = BJVM_VARIABLE_SRC_KIND_UNK;
-    } else {
-      dst->entries[i].type = src->entries[i].type;
-    }
-  }
-}
-
 
 /**
  * Analyze the method's code attribute if it exists, rewriting instructions in
@@ -1458,15 +1331,14 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   int result = 0;
   ctx.stack.entries =
       calloc(code->max_stack + 1, sizeof(bjvm_analy_stack_entry));
-  ctx.is_branch_target = calloc(code->insn_count, sizeof(bool));
 
   // After jumps, we can infer the stack and locals at these points
   bjvm_analy_stack_state *inferred_stacks = ctx.inferred_stacks =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
   bjvm_analy_stack_state *inferred_locals = ctx.inferred_locals =
       calloc(code->insn_count, sizeof(bjvm_analy_stack_state));
-  uint16_t *insn_index_to_stack_depth =
-      calloc(code->insn_count, sizeof(uint16_t));
+  u16 *insn_index_to_stack_depth =
+      calloc(code->insn_count, sizeof(u16));
 
   // Initialize stack to the stack at exception handler entry
   ctx.stack.entries_cap = code->max_stack + 1;
@@ -1505,6 +1377,9 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
 
   bjvm_code_analysis *analy = method->code_analysis = malloc(sizeof(bjvm_code_analysis));
 
+  stack_map_frame_iterator iter;
+  stack_map_frame_iterator_init(&iter, method);
+
   analy->insn_count = code->insn_count;
   analy->dominator_tree_computed = false;
   for (int i = 0; i < 5; ++i) {
@@ -1513,79 +1388,31 @@ int bjvm_analyze_method_code(bjvm_cp_method *method, heap_string *error) {
   }
   analy->blocks = nullptr;
   analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
-  ctx.branch_q = calloc(code->max_formal_pc, sizeof(int));
 
   for (int i = 0; i < code->insn_count; ++i) {
-    if (inferred_stacks[i].entries) {
-      if (ctx.stack_terminated) {
-        copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
-      } else {
-        intersect_analy_stack_state(&inferred_stacks[i], &ctx.stack);
+    bjvm_bytecode_insn *insn = &code->code[i];
+    if (insn->original_pc == iter.pc) {
+      use_stack_map_frame(&ctx, &iter);
+      if (stack_map_frame_iterator_has_next(&iter)) {
+        const char *c_str_error;
+        if (stack_map_frame_iterator_next(&iter, &c_str_error)) {  // stackmaptable issue
+          *error = make_heap_str(strlen(c_str_error));
+          strncpy(error->chars, c_str_error, error->len);
+          result = -1;
+          goto invalid_vt;
+        }
       }
-
-      bjvm_analy_stack_state *this_locals = &inferred_locals[i];
-      if (inferred_locals[i].is_exc_handler) {
-        // At exception handlers, use the local variable table of the start of
-        // the exception block. Later we'll intersect this down.
-        copy_analy_stack_state(inferred_locals[this_locals->exc_handler_start],
-                               &ctx.locals);
-        copy_analy_stack_state(ctx.locals, this_locals);
-      }
-
-      inferred_stacks[i].from_jump_target = false;
-      ctx.stack_terminated = false;
-    }
-
-    if (inferred_locals[i].entries) {
-      copy_analy_stack_state(inferred_locals[i], &ctx.locals);
-    }
-
-    if (ctx.stack_terminated) {
-      // We expect to be able to recover the stack/locals from a previously
-      // encountered jump, or an exception handler. If this isn't possible then
-      // there will be weeping and wailing and gnashing of teeth, and we'll
-      // choose a different branch to continue analyzing from.
-      if (ctx.branch_count == 0) {
-        break;
-      }
-      i = ctx.branch_q[--ctx.branch_count];
-      copy_analy_stack_state(inferred_stacks[i], &ctx.stack);
-      copy_analy_stack_state(inferred_locals[i], &ctx.locals);
-      inferred_stacks[i].from_jump_target = false;
-      ctx.stack_terminated = false;
     }
 
     copy_analy_stack_state(ctx.stack, &ctx.stack_before);
-    if (!inferred_stacks[i].entries)
-      copy_analy_stack_state(ctx.stack, &inferred_stacks[i]);
-    if (!inferred_locals[i].entries)
-      copy_analy_stack_state(ctx.locals, &inferred_locals[i]);
+    copy_analy_stack_state(ctx.stack, &inferred_stacks[i]);
+    copy_analy_stack_state(ctx.locals, &inferred_locals[i]);
 
-    bjvm_bytecode_insn *insn = &code->code[i];
     if (analyze_instruction(insn, i, &ctx)) {
       result = -1;
       goto done;
     }
   }
-
-  add_exception_edges(&ctx);
-
-  // Check that all entries have been filled
-  for (int i = 0; i < code->insn_count; ++i) {
-    if (!inferred_stacks[i].entries) {
-      heap_string context = code_attribute_to_string(method->code);
-      heap_string unreachable_code_error = make_heap_str(context.len + 100);
-      bprintf(hslc(unreachable_code_error),
-              "Unreachable code detected at instruction %d\nContext:\n%.*s\n",
-              i, fmt_slice(context));
-      // TODO report
-      UNREACHABLE();
-      break;
-    }
-  }
-
-  while (gross_quadratic_algorithm_to_refine_local_references(&ctx))
-    ;
 
   analy->sources = calloc(code->insn_count, sizeof(*analy->sources));
   for (int i = 0; i < code->insn_count; ++i) {
@@ -1678,13 +1505,12 @@ done:
   }
 
   invalid_vt:
-  free(ctx.branch_q);
+  stack_map_frame_iterator_uninit(&iter);
   free(ctx.stack.entries);
   free(ctx.locals.entries);
   free(ctx.stack_before.entries);
   free(ctx.locals_swizzle);
   free(ctx.edges);
-  free(ctx.is_branch_target);
   free(inferred_stacks);
   free(inferred_locals);
 
@@ -1745,7 +1571,7 @@ int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
   if (analy->blocks)
     return 0; // already done
   // First, record all branch targets.
-  int *ts = calloc(code->max_formal_pc, sizeof(uint32_t));
+  int *ts = calloc(code->max_formal_pc, sizeof(u32));
   int tc = 0;
   ts[tc++] = 0; // mark entry point
   for (int i = 0; i < code->insn_count; ++i) {
@@ -1846,7 +1672,7 @@ static void get_dfs_tree(bjvm_basic_block *block, int *block_to_pre,
   block->dfs_post = (*postorder_clock)++;
 }
 
-static void idom_dfs(bjvm_basic_block *block, int *visited, uint32_t *clock) {
+static void idom_dfs(bjvm_basic_block *block, int *visited, u32 *clock) {
   block->idom_pre = (*clock)++;
   visited[block->my_index] = 1;
   bjvm_dominated_list_t *dlist = &block->idominates;
@@ -1935,7 +1761,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   for (int preorder_i = 1; preorder_i < block_count; ++preorder_i) {
     int i = pre_to_block[preorder_i];
     int idom = analy->blocks[i].idom =
-        i == reldom[i] ? semidom[i] : analy->blocks[reldom[i]].idom;
+        i == reldom[i] ? semidom[i] : (s32)analy->blocks[reldom[i]].idom;
     bjvm_dominated_list_t *sdlist = &analy->blocks[idom].idominates;
     *VECTOR_PUSH(sdlist->list, sdlist->count, sdlist->cap) = i;
   }
@@ -1946,7 +1772,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   free(reldom);
   // Now compute a DFS tree on the immediate dominator tree (still need a
   // "visited" array because there are duplicate edges)
-  uint32_t clock = 1;
+  u32 clock = 1;
   // Re-use F as the visited array
   memset(F, 0, block_count * sizeof(int));
   idom_dfs(analy->blocks, F, &clock);
@@ -2057,7 +1883,7 @@ static int extended_npe_phase2(const bjvm_cp_method *method,
   bjvm_code_analysis *analy = method->code_analysis;
   bjvm_attribute_local_variable_table *lvt = method->code->local_variable_table;
   int original_pc = method->code->code[insn_i].original_pc;
-  const bjvm_utf8 *ent;
+  const slice *ent;
 
   switch (source->kind) {
   case BJVM_VARIABLE_SRC_KIND_PARAMETER:
@@ -2171,7 +1997,7 @@ static int extended_npe_phase2(const bjvm_cp_method *method,
 
 // If a NullPointerException is thrown by the given instruction, generate a message like "Cannot load from char array
 // because the return value of "charAt" is null".
-int get_extended_npe_message(bjvm_cp_method *method, uint16_t pc, heap_string *result) {
+int get_extended_npe_message(bjvm_cp_method *method, u16 pc, heap_string *result) {
   // See https://openjdk.org/jeps/358 for more information on how this works, but there are basically two phases: One
   // which depends on the particular instruction that failed (e.g. caload -> cannot load from char array) and the other
   // which uses the instruction's sources to produce a more informative message.
@@ -2259,7 +2085,7 @@ int get_extended_npe_message(bjvm_cp_method *method, uint16_t pc, heap_string *r
                                phase2_builder.write_pos, phase2_builder.data);
   }
 
-  *result = make_heap_str_from((bjvm_utf8) {builder.data, builder.write_pos});
+  *result = make_heap_str_from((slice) {builder.data, builder.write_pos});
 
 error:
   bjvm_string_builder_free(&builder);

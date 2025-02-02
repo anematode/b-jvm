@@ -11,8 +11,8 @@ extern "C" {
 
 #include "util.h"
 #include <assert.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <types.h>
 #include <util.h>
 
 #ifdef __cplusplus
@@ -115,10 +115,10 @@ template <typename T> using pick_or_zero_sized_t = typename pick_or_zero_sized<T
     invoked_async_methods_;                                                                                            \
   };                                                                                                                   \
   POP_EXTERN_C;                                                                                                        \
-  method_mods future_t name(void *self_);                                                                                          \
+  method_mods future_t name(void *self_);                                                                              \
   struct name##_s {                                                                                                    \
     FixTypeSize(struct name##_args) args;                                                                              \
-    uint32_t _state;                                                                                                   \
+    u32 _state;                                                                                                        \
     locals;                                                                                                            \
     FixTypeSize(union name##_invoked_async_methods) invoked_async_methods;                                             \
   };                                                                                                                   \

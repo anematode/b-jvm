@@ -5,23 +5,24 @@
 #include "bjvm.h"
 #include <natives-dsl.h>
 #include <stddef.h>
+#include <exceptions.h>
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
 #endif
 
 maybe_extern_begin;
-void push_bjvm_native(bjvm_utf8 class_name, bjvm_utf8 method_name, bjvm_utf8 signature, bjvm_native_callback native);
+void push_bjvm_native(slice class_name, slice method_name, slice signature, bjvm_native_callback native);
 
-static inline void __obj_store_field(bjvm_obj_header *thing, bjvm_utf8 field_name, bjvm_stack_value value,
-                                     bjvm_utf8 desc) {
+static inline void __obj_store_field(bjvm_obj_header *thing, slice field_name, bjvm_stack_value value,
+                                     slice desc) {
   bjvm_cp_field *field = bjvm_easy_field_lookup(thing->descriptor, field_name, desc);
   assert(field);
 
   bjvm_set_field(thing, field, value);
 }
 
-static inline bjvm_stack_value __obj_load_field(bjvm_obj_header *thing, bjvm_utf8 field_name, bjvm_utf8 desc) {
+static inline bjvm_stack_value __obj_load_field(bjvm_obj_header *thing, slice field_name, slice desc) {
   bjvm_cp_field *field = bjvm_easy_field_lookup(thing->descriptor, field_name, desc);
   assert(field);
 
@@ -37,7 +38,7 @@ maybe_extern_end;
   do {                                                                                                                 \
     char msg[1024];                                                                                                    \
     size_t size = snprintf(msg, 1024, fmt, __VA_ARGS__);                                                               \
-    bjvm_utf8 msg_slice = {msg, size};                                                                                 \
+    slice msg_slice = {msg, size};                                                                                 \
     bjvm_raise_vm_exception(thread, STR("java/lang/" exception_name), msg_slice);                                      \
   } while (0)
 
@@ -56,11 +57,11 @@ static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) { return 
     __hstr;                                                                                                            \
   })
 
-static inline object __LoadFieldObject(bjvm_obj_header *thing, bjvm_utf8 desc, bjvm_utf8 name) {
+static inline object __LoadFieldObject(bjvm_obj_header *thing, slice desc, slice name) {
   return __obj_load_field(thing, name, desc).obj;
 }
 
-static inline void __StoreFieldObject(bjvm_obj_header *thing, bjvm_utf8 desc, bjvm_utf8 name, object value) {
+static inline void __StoreFieldObject(bjvm_obj_header *thing, slice desc, slice name, object value) {
   __obj_store_field(thing, name, (bjvm_stack_value){.obj = value}, desc);
 }
 
@@ -68,12 +69,12 @@ static inline void __StoreFieldObject(bjvm_obj_header *thing, bjvm_utf8 desc, bj
 #define LoadFieldObject(obj, type, name) __LoadFieldObject(obj, STR("L" type ";"), STR(name))
 
 #define GeneratePrimitiveStoreField(type_cap, type, stack_field, desc, modifier)                                       \
-  static inline void __StoreField##type_cap(bjvm_obj_header *thing, bjvm_utf8 name, type value) {                      \
+  static inline void __StoreField##type_cap(bjvm_obj_header *thing, slice name, type value) {                      \
     __obj_store_field(thing, name, (bjvm_stack_value){.stack_field = value modifier}, STR(#desc));                     \
   }
 
 #define GeneratePrimitiveLoadField(type_cap, type, stack_field, desc)                                                  \
-  static inline type __LoadField##type_cap(bjvm_obj_header *thing, bjvm_utf8 name) {                                   \
+  static inline type __LoadField##type_cap(bjvm_obj_header *thing, slice name) {                                   \
     return __obj_load_field(thing, name, STR(#desc)).stack_field;                                                      \
   }
 
@@ -123,7 +124,7 @@ extern bjvm_native_t *bjvm_natives;
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier)                                                   \
   static bjvm_stack_value class_name_##_##method_name_##_cb##modifier(                                                 \
       [[maybe_unused]] bjvm_thread *thread, [[maybe_unused]] bjvm_handle *obj, [[maybe_unused]] bjvm_value *args,      \
-      [[maybe_unused]] uint8_t argc)
+      [[maybe_unused]] u8 argc)
 
 #define create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, async_sz,       \
                                 variant)                                                                               \
@@ -149,7 +150,7 @@ extern bjvm_native_t *bjvm_natives;
 #else
 // this breaks clion for some reason
 #define check_field_offset(m_name, member_a, member_b)                                                                 \
-  _Static_assert(offsetof(struct m_name##_s, member_a) == offsetof(async_natives_args, member_b),                      \
+  static_assert(offsetof(struct m_name##_s, member_a) == offsetof(async_natives_args, member_b),                      \
                  #member_a " mismatch " #member_b);
 #endif
 
@@ -158,7 +159,7 @@ extern bjvm_native_t *bjvm_natives;
     bjvm_stack_value, \
     name, \
     locals,\
-    arguments(bjvm_thread *thread; bjvm_handle *obj; bjvm_value *args; uint8_t argc), \
+    arguments(bjvm_thread *thread; bjvm_handle *obj; bjvm_value *args; u8 argc), \
     async_methods\
   );              \
   /* the arguments struct for this needs to be compatible with the async_natives_args struct */                        \
@@ -178,7 +179,7 @@ extern bjvm_native_t *bjvm_natives;
   [[maybe_unused]] bjvm_thread *thread = self->args.thread;                                                            \
   [[maybe_unused]] bjvm_value *args = self->args.args;                                                                 \
   [[maybe_unused]] bjvm_handle *obj = self->args.obj;                                                                  \
-  [[maybe_unused]] uint8_t argc = self->args.argc;
+  [[maybe_unused]] u8 argc = self->args.argc;
 
 #define _RELOAD_CACHED_STATE()                                                                                         \
   do {                                                                                                                 \

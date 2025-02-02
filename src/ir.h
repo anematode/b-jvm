@@ -4,10 +4,10 @@
 #define IR_H
 
 #include "classfile.h"
-#include <stdint.h>
+#include <types.h>
 
-typedef uint32_t bjvm_var_t;
-typedef uint32_t bjvm_bb_t;
+typedef u32 bjvm_var_t;
+typedef u32 bjvm_bb_t;
 
 typedef enum {
   BJVM_IR_TYPE_INT,
