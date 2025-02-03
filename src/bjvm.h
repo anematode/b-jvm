@@ -406,7 +406,6 @@ typedef struct {
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
 typedef struct bjvm_plain_frame {
-  u16 values_count;
   u16 program_counter; // in instruction indices
   u16 max_stack;
 

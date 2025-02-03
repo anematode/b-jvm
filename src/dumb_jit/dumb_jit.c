@@ -1,4 +1,4 @@
-// Fast unoptimized JIT for WASM.
+// Fast but unoptimized JIT for WASM.
 
 #include <stdint.h>
 #include "classfile.h"
@@ -60,6 +60,45 @@ typedef struct {
   bjvm_wasm_module *module;
 } dumb_jit_ctx;
 
+typedef bjvm_wasm_expression* expression;
+
+typedef struct {
+  int start, end;
+} loop_range_t;
+
+typedef struct {
+  // these future blocks requested a wasm block to begin here, so that
+  // forward edges can be implemented with a br or br_if
+  int *requested;
+  int count;
+  int cap;
+} bb_creations_t;
+
+typedef struct {
+  // new order -> block index
+  int *topo_to_block;
+  // block index -> new order
+  int *block_to_topo;
+  // Mapping from topological # to the blocks (also in topo #) which requested
+  // a block begin here.
+  bb_creations_t *creations;
+  // Mapping from topological block index to a loop bjvm_wasm_expression such
+  // that backward edges should continue to this loop block.
+  bjvm_wasm_expression **loop_headers;
+  // Mapping from topological block index to a block bjvm_wasm_expression such
+  // that forward edges should break out of this block.
+  bjvm_wasm_expression **block_ends;
+  // Now implementation stuffs
+  int current_block_i;
+  int topo_i;
+  int loop_depth;
+  // For each block in topological indexing, the number of loops that contain
+  // it.
+  int *loop_depths;
+  int *visited, *incoming_count;
+  int blockc;
+} topo_ctx;
+
 // The current context
 dumb_jit_ctx *ctx;
 
@@ -90,6 +129,10 @@ static wasm_local_t get_or_create_local(bjvm_wasm_value_type type, const char *n
   wasm_local_t local = (wasm_local_t)(uintptr_t)bjvm_hash_table_lookup(&ctx->named_locals, name, -1);
   if (local == 0) {
     local = ctx->next_local++;
+    arrput(ctx->wasm_local_types, type);
+
+    assert(arrlen(ctx->wasm_local_types) == ctx->next_local);
+
     (void)bjvm_hash_table_insert(&ctx->named_locals, name, -1, (void *)(uintptr_t)local);
   }
   return local;
@@ -195,13 +238,43 @@ static void return_zero() {
   return_();
 }
 
+
+
+static bjvm_type_kind inspect_jvm_value_impl(int32_t test) {
+  assert(test >= 0 && test < ctx->code->max_stack + ctx->code->max_locals);
+  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_doubles[ctx->pc], test)) {
+    return BJVM_TYPE_KIND_DOUBLE;
+  }
+  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_longs[ctx->pc], test)) {
+    return BJVM_TYPE_KIND_LONG;
+  }
+  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_floats[ctx->pc], test)) {
+    return BJVM_TYPE_KIND_FLOAT;
+  }
+  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_ints[ctx->pc], test)) {
+    return BJVM_TYPE_KIND_INT;
+  }
+  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_references[ctx->pc], test)) {
+    return BJVM_TYPE_KIND_REFERENCE;
+  }
+  return BJVM_TYPE_KIND_VOID;
+}
+
+static bjvm_type_kind inspect_stack_kind_from_base(int32_t offset) {
+  return inspect_jvm_value_impl(offset);
+}
+
+static bjvm_type_kind inspect_local_kind(int32_t offset) {
+  return inspect_jvm_value_impl(ctx->code->max_stack + offset);
+}
+
 // Call the given function, with the given return type and argument types. Corresponds to a call_indirect instruction
 // into the function table.
-static void vm_call(void *function, bjvm_wasm_type returns, const char* params) {
+static void vm_call(void *function, bjvm_wasm_type returns, const char* params, bool musttail) {
   bjvm_wasm_type params_type = bjvm_wasm_string_to_tuple(ctx->module, params);
   uint32_t fn_type = bjvm_register_function_type(ctx->module, params_type, returns);
   iconst((int)(uintptr_t)function);
-  byte(0x11);
+  byte(musttail ? 0x13 : 0x11);
   bjvm_wasm_writeuint(&ctx->out, fn_type);
   byte(0x00); // table index
 }
@@ -226,7 +299,8 @@ static bjvm_stack_value process_deopt(bjvm_thread *thread, bjvm_stack_frame *fra
   frame->is_native = 0;
   bjvm_cp_method *method = frame->method;
   method->deopt_count++;
-  method->jit_entry = method->interpreter_entry;
+  method->jit_entry = method->interpreter_entry;  // Switch back to the interpreter
+  method->has_dumb_jit = false;
   memset(&frame->async_frame, 0, sizeof(frame->async_frame));
   future_t fut;
   bjvm_stack_value result = bjvm_interpret_2(&fut, thread, frame);
@@ -250,28 +324,113 @@ static bjvm_stack_value process_deopt(bjvm_thread *thread, bjvm_stack_frame *fra
   process_deopt(thread, frame);
 }
 
+static bjvm_wasm_load_op_kind load_ops[] = {
+  [BJVM_WASM_TYPE_KIND_INT32] = BJVM_WASM_OP_KIND_I32_LOAD,
+  [BJVM_WASM_TYPE_KIND_INT64] = BJVM_WASM_OP_KIND_I64_LOAD,
+  [BJVM_WASM_TYPE_KIND_FLOAT32] = BJVM_WASM_OP_KIND_F32_LOAD,
+  [BJVM_WASM_TYPE_KIND_FLOAT64] = BJVM_WASM_OP_KIND_F64_LOAD,
+};
+
+static bjvm_wasm_store_op_kind store_ops[] = {
+  [BJVM_WASM_TYPE_KIND_INT32] = BJVM_WASM_OP_KIND_I32_STORE,
+  [BJVM_WASM_TYPE_KIND_INT64] = BJVM_WASM_OP_KIND_I64_STORE,
+  [BJVM_WASM_TYPE_KIND_FLOAT32] = BJVM_WASM_OP_KIND_F32_STORE,
+  [BJVM_WASM_TYPE_KIND_FLOAT64] = BJVM_WASM_OP_KIND_F64_STORE,
+};
+
 [[maybe_unused]] static void deopt() {
   // We need to set up a bjvm_plain_frame at the same location as our current frame, with all appropriate stack
   // variables and locals. We then need to call deopt_sled with the thread and frame, which will in turn call
   // bjvm_interpret.
+
+  bjvm_stack_frame reference = {};
+  reference.is_native = 0;
+  reference.is_async_suspended = false;
+  reference.num_locals = ctx->code->max_locals;
+  reference.method = ctx->method;
+
+  int64_t first_8bytes = 0;
+  memcpy(&first_8bytes, &reference, sizeof(int64_t));
+
+  reference.plain.program_counter = ctx->pc;
+  reference.plain.max_stack = ctx->code->max_stack;
+
+  int32_t plain_header = 0;
+  memcpy(&plain_header, &reference.plain, sizeof(int32_t));
+
+  // Commit stores for data that will always be the same
+  local_get(frame_local());
+  lconst(first_8bytes);
+  store(BJVM_WASM_OP_KIND_I64_STORE, 0);
+
+  local_get(frame_local());
+  iconst(plain_header);
+  store(BJVM_WASM_OP_KIND_I32_STORE, offsetof(bjvm_stack_frame, plain));
+
+  // Now commit stores for all active stack and local variables
+  // Locals
+  for (int i = 0; i < ctx->code->max_locals; ++i) {
+    bjvm_type_kind ty = inspect_local_kind(i);
+    if (ty != BJVM_TYPE_KIND_VOID) {
+      bjvm_wasm_value_type w = bjvm_jvm_type_to_wasm(ty).val;
+      local_get(frame_local());
+      local_get(local_value(w, i));
+      bjvm_wasm_store_op_kind store_op = store_ops[w];
+      store(store_op, (int)(i - ctx->code->max_locals) * sizeof(bjvm_stack_value));
+    }
+  }
+
+  // Stack
+  for (int i = 0; i < ctx->code->max_stack; ++i) {
+    bjvm_type_kind ty = inspect_stack_kind_from_base(i);
+    if (ty != BJVM_TYPE_KIND_VOID) {
+      bjvm_wasm_value_type w = bjvm_jvm_type_to_wasm(ty).val;
+      local_get(frame_local());
+      local_get(stack_value(w, i));
+      bjvm_wasm_store_op_kind store_op = store_ops[w];
+      store(store_op, i * sizeof(bjvm_stack_value) + offsetof(bjvm_stack_frame, plain) + offsetof(bjvm_plain_frame, stack));
+    }
+  }
+
+  // Now tail call an appropriate deopt_sled
+  local_get(THREAD_PARAM);
+  local_get(frame_local());
+
+  switch (ctx->return_type) {
+  case BJVM_WASM_TYPE_KIND_INT32:
+    vm_call(deopt_sled_int, bjvm_wasm_int32(), "ii", true);
+    break;
+  case BJVM_WASM_TYPE_KIND_INT64:
+    vm_call(deopt_sled_long, bjvm_wasm_int64(), "ii", true);
+    break;
+  case BJVM_WASM_TYPE_KIND_FLOAT32:
+    vm_call(deopt_sled_double, bjvm_wasm_float32(), "ii", true);
+    break;
+  case BJVM_WASM_TYPE_KIND_FLOAT64:
+    vm_call(deopt_sled_double, bjvm_wasm_float64(), "ii", true);
+    break;
+  case BJVM_WASM_TYPE_KIND_VOID:
+    vm_call(deopt_sled_void, bjvm_wasm_void(), "ii", true);
+    break;
+  }
 }
 
 static void dumb_raise_npe() {
   set_program_counter();
   thread();
-  vm_call(raise_null_pointer_exception, bjvm_wasm_void(), "i");
+  vm_call(raise_null_pointer_exception, bjvm_wasm_void(), "i", false);
   return_zero();
 }
 
 static void dumb_raise_array_oob() {
   set_program_counter();
-  vm_call(raise_array_index_oob_exception, bjvm_wasm_void(), "iii");
+  vm_call(raise_array_index_oob_exception, bjvm_wasm_void(), "iii", false);
   return_zero();
 }
 
 static void dumb_jit_raise_div_zero() {
   set_program_counter();
-  vm_call(raise_div0_arithmetic_exception, bjvm_wasm_void(), "i");
+  vm_call(raise_div0_arithmetic_exception, bjvm_wasm_void(), "i", false);
   return_zero();
 }
 
@@ -542,7 +701,7 @@ static void push_frame_helper(bjvm_thread *thread, bjvm_stack_frame *frame) {
   byte(BJVM_WASM_OP_KIND_I32_GT_U);
   if_();
   thread();
-  vm_call(raise_stack_overflow, bjvm_wasm_void(), "i");
+  vm_call(raise_stack_overflow, bjvm_wasm_void(), "i", false);
   return_zero();
   endif();
 
@@ -562,7 +721,7 @@ static void push_frame_helper(bjvm_thread *thread, bjvm_stack_frame *frame) {
   if_();
   thread();
   local_get(frame_local());
-  vm_call(push_frame_helper, bjvm_wasm_void(), "ii");
+  vm_call(push_frame_helper, bjvm_wasm_void(), "ii", false);
   else_();
 
   local_get(frame_local());
@@ -650,35 +809,6 @@ int dumb_lower_binop(bjvm_wasm_value_type in1, bjvm_wasm_value_type in2, bjvm_wa
   byte(op);
   local_set(stack_value(out, -2));
   return 0;
-}
-
-static bjvm_type_kind inspect_jvm_value_impl(int32_t test) {
-  assert(test >= 0 && test < ctx->code->max_stack + ctx->code->max_locals);
-  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_doubles[ctx->pc], test)) {
-    return BJVM_TYPE_KIND_DOUBLE;
-  }
-  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_longs[ctx->pc], test)) {
-    return BJVM_TYPE_KIND_LONG;
-  }
-  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_floats[ctx->pc], test)) {
-    return BJVM_TYPE_KIND_FLOAT;
-  }
-  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_ints[ctx->pc], test)) {
-    return BJVM_TYPE_KIND_INT;
-  }
-  if (bjvm_test_compressed_bitset(ctx->analy->insn_index_to_references[ctx->pc], test)) {
-    return BJVM_TYPE_KIND_REFERENCE;
-  }
-  return BJVM_TYPE_KIND_VOID;
-}
-
-// Given the offset from the top of the stack
-[[maybe_unused]] static bjvm_type_kind inspect_stack_kind(int32_t offset) {
-  return inspect_jvm_value_impl(ctx->sd + offset);
-}
-
-[[maybe_unused]] static bjvm_type_kind inspect_local_kind(int32_t offset) {
-  return inspect_jvm_value_impl(ctx->code->max_stack + offset);
 }
 
 void dumb_lower_dup_like(bjvm_bytecode_insn *insn) {
@@ -810,6 +940,20 @@ void dumb_lower_lneg(bjvm_bytecode_insn * insn) {
   local_set(stack_long(-1));
 }
 
+void dumb_lower_i2b(bjvm_bytecode_insn * insn) {
+  iconst(0xff);
+  local_get(stack_int(-1));
+  byte(BJVM_WASM_OP_KIND_I32_AND);
+  local_set(stack_int(-1));
+}
+
+void dumb_lower_i2c(bjvm_bytecode_insn * insn) {
+  iconst(0xffff);
+  local_get(stack_int(-1));
+  byte(BJVM_WASM_OP_KIND_I32_AND);
+  local_set(stack_int(-1));
+}
+
 // Returns non-zero if it failed to lower the instruction (and so a conversion to interpreter should be issued)
 [[maybe_unused]] static int dumb_lower_instruction(int pc) {
   bjvm_bytecode_insn *insn = &ctx->code->code[pc];
@@ -911,10 +1055,10 @@ void dumb_lower_lneg(bjvm_bytecode_insn * insn) {
   case bjvm_insn_fsub:
     return dumb_lower_binop(F32, F32, F32, BJVM_WASM_OP_KIND_F32_SUB);
   case bjvm_insn_i2b:
-    // dumb_lower_i2b(insn);
+    dumb_lower_i2b(insn);
     break;
   case bjvm_insn_i2c:
-    // dumb_lower_i2c(insn);
+    dumb_lower_i2c(insn);
     break;
   case bjvm_insn_i2d:
     return dumb_lower_unop(I32, F64, BJVM_WASM_OP_KIND_F64_CONVERT_S_I32);
@@ -1017,23 +1161,24 @@ void dumb_lower_lneg(bjvm_bytecode_insn * insn) {
   case bjvm_insn_aload:
   case bjvm_insn_astore:
     // dumb_lower_local_access(insn);
-break;case bjvm_insn_goto:
-break;case bjvm_insn_if_acmpeq:
-break;case bjvm_insn_if_acmpne:
-break;case bjvm_insn_if_icmpeq:
-break;case bjvm_insn_if_icmpne:
-break;case bjvm_insn_if_icmplt:
-break;case bjvm_insn_if_icmpge:
-break;case bjvm_insn_if_icmpgt:
-break;case bjvm_insn_if_icmple:
-break;case bjvm_insn_ifeq:
-break;case bjvm_insn_ifne:
-break;case bjvm_insn_iflt:
-break;case bjvm_insn_ifge:
-break;case bjvm_insn_ifgt:
-break;case bjvm_insn_ifle:
-break;case bjvm_insn_ifnonnull:
-break;case bjvm_insn_ifnull:
+  case bjvm_insn_goto:
+  case bjvm_insn_if_acmpeq:
+  case bjvm_insn_if_acmpne:
+  case bjvm_insn_if_icmpeq:
+  case bjvm_insn_if_icmpne:
+  case bjvm_insn_if_icmplt:
+  case bjvm_insn_if_icmpge:
+  case bjvm_insn_if_icmpgt:
+  case bjvm_insn_if_icmple:
+  case bjvm_insn_ifeq:
+  case bjvm_insn_ifne:
+  case bjvm_insn_iflt:
+  case bjvm_insn_ifge:
+  case bjvm_insn_ifgt:
+  case bjvm_insn_ifle:
+  case bjvm_insn_ifnonnull:
+  case bjvm_insn_ifnull:
+    break;
   case bjvm_insn_iconst:
     dumb_lower_iconst(insn);
     break;
@@ -1056,21 +1201,21 @@ break;case bjvm_insn_ifnull:
     break;
   case bjvm_insn_tableswitch:
   case bjvm_insn_lookupswitch:
-    return -1;  // will become a br_table
+    return -1;  // will ultimately become a br_table
   case bjvm_insn_ret:
   case bjvm_insn_jsr:
     return -1; // not used in practice
-break;case bjvm_insn_anewarray_resolved:
-break;case bjvm_insn_checkcast_resolved:
-break;case bjvm_insn_instanceof_resolved:
-break;case bjvm_insn_new_resolved:
-break;case bjvm_insn_invokevtable_monomorphic:
-break;case bjvm_insn_invokevtable_polymorphic:
-break;case bjvm_insn_invokeitable_monomorphic:
-break;case bjvm_insn_invokeitable_polymorphic:
+  case bjvm_insn_anewarray_resolved:
+  case bjvm_insn_checkcast_resolved:
+  case bjvm_insn_instanceof_resolved:
+  case bjvm_insn_new_resolved:
+  case bjvm_insn_invokevtable_monomorphic:
+  case bjvm_insn_invokevtable_polymorphic:
+  case bjvm_insn_invokeitable_monomorphic:
+  case bjvm_insn_invokeitable_polymorphic:
   case bjvm_insn_invokespecial_resolved:
   case bjvm_insn_invokestatic_resolved:
-break;case bjvm_insn_invokecallsite:
+  case bjvm_insn_invokecallsite:
   case bjvm_insn_invokesigpoly:
     return -1;
   case bjvm_insn_getfield_B:
@@ -1084,37 +1229,45 @@ break;case bjvm_insn_invokecallsite:
   case bjvm_insn_getfield_L:
     bjvm_lower_getfield_resolved(insn);
     break;
-break;case bjvm_insn_putfield_B:
-break;case bjvm_insn_putfield_C:
-break;case bjvm_insn_putfield_S:
-break;case bjvm_insn_putfield_I:
-break;case bjvm_insn_putfield_J:
-break;case bjvm_insn_putfield_F:
-break;case bjvm_insn_putfield_D:
-break;case bjvm_insn_putfield_Z:
-break;case bjvm_insn_putfield_L:
-break;case bjvm_insn_getstatic_B:
-break;case bjvm_insn_getstatic_C:
-break;case bjvm_insn_getstatic_S:
-break;case bjvm_insn_getstatic_I:
-break;case bjvm_insn_getstatic_J:
-break;case bjvm_insn_getstatic_F:
-break;case bjvm_insn_getstatic_D:
-break;case bjvm_insn_getstatic_Z:
-break;case bjvm_insn_getstatic_L:
-break;case bjvm_insn_putstatic_B:
-break;case bjvm_insn_putstatic_C:
-break;case bjvm_insn_putstatic_S:
-break;case bjvm_insn_putstatic_I:
-break;case bjvm_insn_putstatic_J:
-break;case bjvm_insn_putstatic_F:
-break;case bjvm_insn_putstatic_D:
-break;case bjvm_insn_putstatic_Z:
-break;case bjvm_insn_putstatic_L:
-break;case bjvm_insn_dsqrt:
-break;}
+  case bjvm_insn_putfield_B:
+  case bjvm_insn_putfield_C:
+  case bjvm_insn_putfield_S:
+  case bjvm_insn_putfield_I:
+  case bjvm_insn_putfield_J:
+  case bjvm_insn_putfield_F:
+  case bjvm_insn_putfield_D:
+  case bjvm_insn_putfield_Z:
+  case bjvm_insn_putfield_L:
+    bjvm_lower_putfield_resolved(insn);
+    break;
+  case bjvm_insn_getstatic_B:
+  case bjvm_insn_getstatic_C:
+  case bjvm_insn_getstatic_S:
+  case bjvm_insn_getstatic_I:
+  case bjvm_insn_getstatic_J:
+  case bjvm_insn_getstatic_F:
+  case bjvm_insn_getstatic_D:
+  case bjvm_insn_getstatic_Z:
+  case bjvm_insn_getstatic_L:
+    bjvm_lower_getstatic_resolved(insn);
+    break;
+  case bjvm_insn_putstatic_B:
+  case bjvm_insn_putstatic_C:
+  case bjvm_insn_putstatic_S:
+  case bjvm_insn_putstatic_I:
+  case bjvm_insn_putstatic_J:
+  case bjvm_insn_putstatic_F:
+  case bjvm_insn_putstatic_D:
+  case bjvm_insn_putstatic_Z:
+  case bjvm_insn_putstatic_L:
+    bjvm_lower_putstatic_resolved(insn);
+    break;
+  case bjvm_insn_dsqrt:
+    dumb_lower_unop(F64, F64, BJVM_WASM_OP_KIND_F64_SQRT);
+    return 0;
+  }
 
-  return -1;
+  return 0;
 }
 
 // pc + 1 is one of ifle, ifge, iflt or ifgt and pc is an lcmp or fcmp instruction. Although it's legal for lcmp/fcmp to
@@ -1123,3 +1276,268 @@ break;}
   return 0;
 }
 
+void free_topo_ctx(topo_ctx ctx) {
+  free(ctx.topo_to_block);
+  free(ctx.block_to_topo);
+  free(ctx.visited);
+  free(ctx.incoming_count);
+  free(ctx.loop_depths);
+  free(ctx.block_ends);
+  free(ctx.loop_headers);
+  for (int i = 0; i < ctx.blockc; ++i) {
+    free(ctx.creations[i].requested);
+  }
+  free(ctx.creations);
+}
+void find_block_insertion_points(bjvm_code_analysis *analy, topo_ctx *ctx) {
+  // For each bb, if there is a bb preceding it (in the topological sort)
+  // which branches to that bb, which is NOT its immediate predecessor in the
+  // sort, we need to introduce a wasm (block) to handle the branch. We place
+  // it at the point in the topo sort where the depth becomes equal to the
+  // depth of the topological predecessor of bb.
+  for (int i = 0; i < analy->block_count; ++i) {
+    bjvm_basic_block *b = analy->blocks + i;
+    for (int j = 0; j < b->prev_count; ++j) {
+      int prev = b->prev[j];
+      if (ctx->block_to_topo[prev] >= ctx->block_to_topo[i] - 1)
+        continue;
+      bb_creations_t *creations = ctx->creations + ctx->block_to_topo[b->idom];
+      *VECTOR_PUSH(creations->requested, creations->count, creations->cap) =
+          (ctx->block_to_topo[i] << 1) + 1;
+      break;
+    }
+  }
+}
+void topo_walk_idom(bjvm_code_analysis *analy, topo_ctx *ctx) {
+  int current = ctx->current_block_i;
+  int start = ctx->topo_i;
+  ctx->visited[current] = 1;
+  ctx->block_to_topo[current] = ctx->topo_i;
+  ctx->topo_to_block[ctx->topo_i++] = current;
+  ctx->loop_depths[current] = ctx->loop_depth;
+  bjvm_basic_block *b = analy->blocks + current;
+  bool is_loop_header = b->is_loop_header;
+  // Sort successors by reverse post-order in the original DFS
+  bjvm_dominated_list_t idom = b->idominates;
+  int *sorted = calloc(idom.count, sizeof(int));
+  memcpy(sorted, idom.list, idom.count * sizeof(int));
+  for (int i = 1; i < idom.count; ++i) {
+    int j = i;
+    while (j > 0 && analy->blocks[sorted[j - 1]].dfs_post <
+                        analy->blocks[sorted[j]].dfs_post) {
+      int tmp = sorted[j];
+      sorted[j] = sorted[j - 1];
+      sorted[j - 1] = tmp;
+      j--;
+    }
+  }
+  // Recurse on the sorted successors
+  ctx->loop_depth += is_loop_header;
+  for (int i = 0; i < idom.count; ++i) {
+    int next = sorted[i];
+    ctx->current_block_i = next;
+    topo_walk_idom(analy, ctx);
+  }
+  ctx->loop_depth -= is_loop_header;
+  bb_creations_t *creations = ctx->creations + start;
+  if (is_loop_header)
+    *VECTOR_PUSH(creations->requested, creations->count, creations->cap) =
+        ctx->topo_i << 1;
+  free(sorted);
+}
+topo_ctx make_topo_sort_ctx(bjvm_code_analysis *analy) {
+  topo_ctx ctx;
+  ctx.topo_to_block = calloc(analy->block_count, sizeof(int));
+  ctx.block_to_topo = calloc(analy->block_count, sizeof(int));
+  ctx.visited = calloc(analy->block_count, sizeof(int));
+  ctx.incoming_count = calloc(analy->block_count, sizeof(int));
+  ctx.loop_depths = calloc(analy->block_count, sizeof(int));
+  ctx.creations = calloc(analy->block_count, sizeof(bb_creations_t));
+  ctx.block_ends = calloc(analy->block_count, sizeof(bjvm_wasm_expression *));
+  ctx.loop_headers = calloc(analy->block_count, sizeof(bjvm_wasm_expression *));
+  ctx.blockc = analy->block_count;
+  ctx.current_block_i = ctx.topo_i = ctx.loop_depth = 0;
+  for (int i = 0; i < analy->block_count; ++i) {
+    bjvm_basic_block *b = analy->blocks + i;
+    for (int j = 0; j < b->next_count; ++j)
+      ctx.incoming_count[b->next[j]] += !b->is_backedge[j];
+  }
+  // Perform a post-order traversal of the immediate dominator tree. Whenever
+  // reaching a loop header, output the loop header immediately, then everything
+  // in the subtree as one contiguous block. We output them in reverse postorder
+  // relative to a DFS on the original CFG, to guarantee that the final
+  // topological sort respects the forward edges in the original graph.
+  topo_walk_idom(analy, &ctx);
+  assert(ctx.topo_i == analy->block_count);
+  find_block_insertion_points(analy, &ctx);
+  return ctx;
+}
+typedef struct {
+  expression ref;
+  // Wasm block started here (in topological sort)
+  int started_at;
+  // Once we get to this basic block, close the wasm block and push the
+  // expression to the stack
+  int close_at;
+  // Whether to emit a (loop) for this block
+  bool is_loop;
+} inchoate_expression;
+static int cmp_ints_reverse(const void *a, const void *b) {
+  return *(int *)b - *(int *)a;
+}
+bjvm_wasm_instantiation_result *
+bjvm_wasm_jit_compile(bjvm_thread *thread, const bjvm_cp_method *method,
+                      bool debug) {
+  bjvm_wasm_instantiation_result *wasm = nullptr;
+  printf(
+      "Requesting compile for method %.*s on class %.*s with signature %.*s\n",
+      fmt_slice(method->name), fmt_slice(method->my_class->name),
+      fmt_slice(method->unparsed_descriptor));
+  // Resulting signature and (roughly) behavior is same as
+  // bjvm_bytecode_interpret:
+  // (bjvm_thread *thread, bjvm_stack_frame *frame, bjvm_stack_value *result)
+  // -> int
+  // The key difference is that the frame MUST be the topmost frame, and this
+  // must be the first invocation, whereas in the interpreter, we can interpret
+  // things after an interrupt.
+  assert(method->code);
+  bjvm_scan_basic_blocks(method->code, method->code_analysis);
+  bjvm_compute_dominator_tree(method->code_analysis);
+  if (bjvm_attempt_reduce_cfg(method->code_analysis))
+    // CFG is not reducible, so we can't compile it (yet! -- low prio)
+    goto error_1;
+  bjvm_code_analysis *analy = method->code_analysis;
+  dumb_jit_ctx ctx = {nullptr};
+  ctx.wasm_blocks = calloc(analy->block_count, sizeof(expression));
+  ctx.module = bjvm_wasm_module_create();
+  ctx.analy = analy;
+  // first three used by thread, frame, result
+  ctx.next_local = 3;
+  ctx.code = method->code;
+  int vtlmap_len = WASM_TYPES_COUNT *
+                   (method->code->max_locals + method->code->max_stack) *
+                   sizeof(int);
+  ctx.val_to_local_map = malloc(vtlmap_len);
+  memset(ctx.val_to_local_map, -1, vtlmap_len);
+  // Credit to
+  // https://medium.com/leaningtech/solving-the-structured-control-flow-problem-once-and-for-all-5123117b1ee2
+  // for the excellent explainer.
+  // Perform a topological sort using the DAG of forward edges, under the
+  // constraint that loop headers must be immediately followed by all bbs
+  // that they dominate, in some order. This is necessary to ensure that we
+  // can continue in the loops. We will wrap these bbs in a "(loop)" wasm block.
+  // Then for forward edges, we let consecutive blocks fall through, and
+  // otherwise place a (block) scope ending just before the target block,
+  // so that bbs who try to target it can break to it.
+  topo_ctx topo = make_topo_sort_ctx(analy);
+  add_runtime_imports(&ctx);
+  inchoate_expression *expr_stack = nullptr;
+  int stack_count = 0, stack_cap = 0;
+  // Push an initial boi
+  *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression){
+      bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), false), 0,
+      analy->block_count, false};
+  // Push a block to load stuff from the stack
+  *VECTOR_PUSH(expr_stack, stack_count, stack_cap) = (inchoate_expression){
+      spill_or_load_code(&ctx, 0, true, BJVM_ASYNC_RUN_RESULT_INT, 0, -1), 0, -1,
+      false};
+  for (topo.topo_i = 0; topo.topo_i <= analy->block_count; ++topo.topo_i) {
+    // First close off any blocks as appropriate
+    for (int i = stack_count - 1; i >= 0; --i) {
+      inchoate_expression *ie = expr_stack + i;
+      if (ie->close_at == topo.topo_i) {
+        // Take expressions i + 1 through stack_count - 1 inclusive and
+        // make them the contents of the block
+        expression *exprs = malloc((stack_count - i - 1) * sizeof(expression));
+        for (int j = i + 1; j < stack_count; ++j)
+          exprs[j - i - 1] = expr_stack[j].ref;
+        bjvm_wasm_update_block(ctx.module, ie->ref, exprs, stack_count - i - 1,
+                               bjvm_wasm_void(), ie->is_loop);
+        free(exprs);
+        // Update the handles for blocks and loops to break to
+        if (topo.topo_i < analy->block_count)
+          topo.block_ends[topo.topo_i] = nullptr;
+        if (ie->is_loop)
+          topo.loop_headers[ie->started_at] = nullptr;
+        ie->close_at = -1;
+        stack_count = i + 1;
+      }
+    }
+    // Done pushing expressions
+    if (topo.topo_i == analy->block_count)
+      break;
+    // Then create (block)s and (loop)s as appropriate. First create blocks
+    // in reverse order of the topological order of their targets. So, if
+    // at the current block we are to initiate blocks ending at block with
+    // topo indices 9, 12, and 13, push the block for 13 first.
+    // Blocks first
+    bb_creations_t *creations = topo.creations + topo.topo_i;
+    qsort(creations->requested, creations->count, sizeof(int),
+          cmp_ints_reverse);
+    for (int i = 0; i < creations->count; ++i) {
+      int block_i = creations->requested[i];
+      int is_loop = !(block_i & 1);
+      block_i >>= 1;
+      expression block =
+          bjvm_wasm_block(ctx.module, nullptr, 0, bjvm_wasm_void(), is_loop);
+      *VECTOR_PUSH(expr_stack, stack_count, stack_cap) =
+          (inchoate_expression){block, topo.topo_i, block_i, is_loop};
+      if (is_loop)
+        topo.loop_headers[topo.topo_i] = block;
+      else
+        topo.block_ends[block_i] = block;
+    }
+    int block_i = topo.topo_to_block[topo.topo_i];
+    bjvm_basic_block *bb = analy->blocks + block_i;
+    debug = utf8_equals(method->name, "encodeArrayLoop");
+    expression expr = compile_bb(&ctx, bb, &topo, debug);
+    if (!expr) {
+      goto error_2;
+    }
+    *VECTOR_PUSH(expr_stack, stack_count, stack_cap) =
+        (inchoate_expression){expr, topo.topo_i, -1, false};
+  }
+  expression body = expr_stack[0].ref;
+  free(expr_stack);
+  // Add a function whose expression is the first expression on the stack
+  bjvm_wasm_type params = bjvm_wasm_string_to_tuple(ctx.module, "iii");
+  bjvm_wasm_type locals =
+      bjvm_wasm_make_tuple(ctx.module, ctx.wvars, ctx.wvars_count);
+  bjvm_wasm_function *fn = bjvm_wasm_add_function(
+      ctx.module, params, bjvm_wasm_int32(), locals, body, "run");
+  bjvm_wasm_export_function(ctx.module, fn);
+  bjvm_bytevector result = bjvm_wasm_module_serialize(ctx.module);
+  wasm = bjvm_wasm_instantiate_module(ctx.module, method->name.chars);
+  if (wasm->status != BJVM_WASM_INSTANTIATION_SUCCESS) {
+    // printf("Error instantiating module for method %.*s\n",
+    // fmt_slice(method->name));
+  } else {
+    // printf("Successfully compiled method %.*s on class %.*s \n",
+    // fmt_slice(method->name), fmt_slice(method->my_class->name));
+  }
+  free(result.bytes);
+error_2:
+  free_topo_ctx(topo);
+error_1:
+  free(ctx.val_to_local_map);
+  free(ctx.wasm_blocks);
+  free(ctx.wvars);
+  bjvm_wasm_module_free(ctx.module);
+  return wasm;
+}
+void free_wasm_compiled_method(void *p) {
+  if (!p)
+    return;
+  bjvm_wasm_instantiation_result *compiled_method = p;
+  free(compiled_method->exports);
+  free(compiled_method);
+}
+
+int dumb_jit_compile(bjvm_cp_method *method, dumb_jit_options options) {
+  if (method->failed_jit)
+    return -1;
+  if (method->has_dumb_jit)
+    return 0;
+
+
+}
