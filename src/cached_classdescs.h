@@ -29,8 +29,8 @@
   X(direct_method_handle_holder, "java/lang/invoke/DirectMethodHandle$Holder") \
   X(delegating_method_handle_holder, "java/lang/invoke/DelegatingMethodHandle$Holder") \
   X(lf_holder, "java/lang/invoke/LambdaForm$Holder") \
-  X(illegal_state_exception, "java/lang/IllegalStateException")
-
+  X(illegal_state_exception, "java/lang/IllegalStateException")                \
+  X(io_exception, "java/io/IOException") \
 
 #define __CACHED_REFLECTION_CLASSES(X)                                         \
   X(klass, "java/lang/Class")                                                  \
