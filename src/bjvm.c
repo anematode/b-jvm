@@ -21,14 +21,15 @@
 #include "classloader.h"
 #include "objects.h"
 #include "util.h"
+#include <config.h>
 #include <exceptions.h>
 #include <gc.h>
 #include <reflection.h>
 
 #include "cached_classdescs.h"
-#include <sys/mman.h>
-
+#include <errno.h>
 #include <linkage.h>
+#include <sys/mman.h>
 
 /// Looks up a class and initializes it if it needs to be initialized.
 /// This will abort() if the class's <clinit> either throws an excpetion or
@@ -197,8 +198,7 @@ static void drop_handles_array(bjvm_thread *thread, const bjvm_cp_method *method
 }
 
 bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *method,
-                                         const bjvm_method_descriptor *descriptor, bjvm_stack_value *args,
-                                         u8 argc) {
+                                         const bjvm_method_descriptor *descriptor, bjvm_stack_value *args, u8 argc) {
   bjvm_native_callback *native = method->native_handle;
   if (!native) {
     raise_unsatisfied_link_error(thread, method);
@@ -235,8 +235,7 @@ bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *me
   return frame;
 }
 
-bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args,
-                                        u8 argc) {
+bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, u8 argc) {
   const bjvm_attribute_code *code = method->code;
   if (!code) {
     raise_abstract_method_error(thread, method);
@@ -388,8 +387,8 @@ size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
   return bjvm_native_count;
 }
 
-void bjvm_register_native(bjvm_vm *vm, const slice class, const slice method_name,
-                          const slice method_descriptor, bjvm_native_callback callback) {
+void bjvm_register_native(bjvm_vm *vm, const slice class, const slice method_name, const slice method_descriptor,
+                          bjvm_native_callback callback) {
   native_entries *existing = bjvm_hash_table_lookup(&vm->natives, class.chars, class.len);
   if (!existing) {
     existing = calloc(1, sizeof(native_entries));
@@ -538,10 +537,29 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
   }
 }
 
+static slice get_default_boot_cp() {
+#if defined(HAVE_GETENV)
+  char *boot_cp = getenv("BOOT_CLASSPATH");
+  if (boot_cp != nullptr && strlen(boot_cp) > 0) {
+    FILE *file = fopen(boot_cp, "r");
+    if (file == nullptr) {
+      fprintf(stderr, "Could not open BOOT_CLASSPATH %s: %s\n", boot_cp, strerror(errno));
+      exit(1);
+    }
+
+    fclose(file);
+    return (slice){.len = strlen(boot_cp), .chars = boot_cp};
+  }
+#endif
+
+  return STR("./jdk23.jar");
+}
+
 bjvm_vm_options bjvm_default_vm_options() {
   bjvm_vm_options options = {0};
   options.heap_size = 1 << 22;
-  options.runtime_classpath = STR("./jdk23.jar");
+  options.runtime_classpath = get_default_boot_cp();
+
   return options;
 }
 
@@ -682,8 +700,7 @@ bjvm_thread_options bjvm_default_thread_options() {
 
 /// Invokes a Java method.  Sets thread->current_exception if an exception is
 /// thrown and causes UB if
-bjvm_stack_value call_interpreter_synchronous(bjvm_thread *thread, bjvm_cp_method *method,
-                                                     bjvm_stack_value *args) {
+bjvm_stack_value call_interpreter_synchronous(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args) {
   if (args == nullptr) {
     args = (bjvm_stack_value[]){};
   }
@@ -801,8 +818,9 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
     main_thread_group = get_main_thread_group(thr);
   }
 
-  call_interpreter_synchronous(thr, make_thread,
-                       (bjvm_stack_value[]){{.obj = (void *)java_thr}, {.obj = main_thread_group}, {.obj = java_thr->name}});
+  call_interpreter_synchronous(
+      thr, make_thread,
+      (bjvm_stack_value[]){{.obj = (void *)java_thr}, {.obj = main_thread_group}, {.obj = java_thr->name}});
 
 #undef java_thr
   bjvm_drop_handle(thr, java_thread);
@@ -811,7 +829,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
   bjvm_cp_method *method;
   bjvm_stack_value ret;
-  for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); ++i) { // todo: these init phases should only be called once per VM
+  for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases);
+       ++i) { // todo: these init phases should only be called once per VM
     method = bjvm_method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
     assert(method);
     bjvm_stack_value args[2] = {{.i = 1}, {.i = 1}};
@@ -819,7 +838,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
     if (thr->current_exception) {
       // Failed to initialize
-      method = bjvm_method_lookup(thr->current_exception->descriptor, STR("getMessage"), STR("()Ljava/lang/String;"), true, true);
+      method = bjvm_method_lookup(thr->current_exception->descriptor, STR("getMessage"), STR("()Ljava/lang/String;"),
+                                  true, true);
       assert(method);
 
       bjvm_stack_value args[] = {{.obj = thr->current_exception}};
@@ -828,9 +848,8 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
       if (obj.obj) {
         BJVM_CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
       }
-      fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n",
-        fmt_slice(thr->current_exception->descriptor->name), fmt_slice(phases[i]),
-        obj.obj ? message.chars : "no message");
+      fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n", fmt_slice(thr->current_exception->descriptor->name),
+              fmt_slice(phases[i]), obj.obj ? message.chars : "no message");
       abort();
     }
 
@@ -904,8 +923,8 @@ struct bjvm_native_MethodType *bjvm_resolve_method_type(bjvm_thread *thread, bjv
                                                 "lang/invoke/MethodType;"),
                                             false, false);
 
-  bjvm_stack_value result = call_interpreter_synchronous(thread, init,
-                               (bjvm_stack_value[]){{.obj = (void *)rtype}, {.obj = ptypes->obj}, {.i = 1 /* trusted */}});
+  bjvm_stack_value result = call_interpreter_synchronous(
+      thread, init, (bjvm_stack_value[]){{.obj = (void *)rtype}, {.obj = ptypes->obj}, {.i = 1 /* trusted */}});
   // todo: check for exceptions
   bjvm_drop_handle(thread, ptypes);
   return (void *)result.obj;
@@ -1021,9 +1040,9 @@ DEFINE_ASYNC(resolve_mh_mt) {
   free(info.ptypes);
 
   AWAIT(call_interpreter, args->thread, make,
-                       (bjvm_stack_value[]){{.obj = (void *)bjvm_get_class_mirror(args->thread, info.rtype)},
-                                            {.obj = self->ptypes_array->obj},
-                                            {.i = 0}});
+        (bjvm_stack_value[]){{.obj = (void *)bjvm_get_class_mirror(args->thread, info.rtype)},
+                             {.obj = self->ptypes_array->obj},
+                             {.i = 0}});
   bjvm_stack_value result = get_async_result(call_interpreter);
   bjvm_drop_handle(args->thread, self->ptypes_array);
 
@@ -1039,8 +1058,8 @@ static bjvm_handle *make_member_name(bjvm_thread *thread, bjvm_cp_field_info *fi
   bjvm_cp_method *make_member =
       bjvm_method_lookup(MemberName, STR("<init>"), STR("(Ljava/lang/reflect/Field;)V"), false, false);
 
-  call_interpreter_synchronous(thread, make_member,
-                       (bjvm_stack_value[]){{.obj = (void *)member->obj}, {.obj = (void *)f->reflection_field}});
+  call_interpreter_synchronous(
+      thread, make_member, (bjvm_stack_value[]){{.obj = (void *)member->obj}, {.obj = (void *)f->reflection_field}});
 
   return member;
 }
@@ -1082,8 +1101,7 @@ DEFINE_ASYNC(resolve_mh_invoke) {
   AWAIT(bjvm_initialize_class, thread, info->reference->methodref.class_info->classdesc);
   method = &info->reference->methodref; // reload because of the await
 
-  m =
-      bjvm_method_lookup(method->class_info->classdesc, method->nat->name, method->nat->descriptor, true, true);
+  m = bjvm_method_lookup(method->class_info->classdesc, method->nat->name, method->nat->descriptor, true, true);
   if (BJVM_MH_KIND_NEW_INVOKE_SPECIAL == info->handle_kind) {
     bjvm_reflect_initialize_constructor(thread, method->class_info->classdesc, m);
   } else {
@@ -1098,10 +1116,9 @@ DEFINE_ASYNC(resolve_mh_invoke) {
   bjvm_cp_method *make_member = bjvm_method_lookup(
       MemberName, STR("<init>"),
       is_ctor ? STR("(Ljava/lang/reflect/Constructor;)V") : STR("(Ljava/lang/reflect/Method;)V"), false, false);
-  AWAIT(call_interpreter,
-      thread, make_member,
-      (bjvm_stack_value[]){{.obj = (void *)member->obj},
-                           {.obj = is_ctor ? (void *)m->reflection_ctor : (void *)m->reflection_method}});
+  AWAIT(call_interpreter, thread, make_member,
+        (bjvm_stack_value[]){{.obj = (void *)member->obj},
+                             {.obj = is_ctor ? (void *)m->reflection_ctor : (void *)m->reflection_method}});
 
   bjvm_classdesc *DirectMethodHandle = LoadClassSynchronous(thread, "java/lang/invoke/DirectMethodHandle");
   bjvm_cp_method *make = bjvm_method_lookup(DirectMethodHandle, STR("make"),
@@ -1558,8 +1575,7 @@ done:
 #undef thread
 }
 
-bool method_candidate_matches(const bjvm_cp_method *candidate, const slice name,
-                              const slice method_descriptor) {
+bool method_candidate_matches(const bjvm_cp_method *candidate, const slice name, const slice method_descriptor) {
   return utf8_equals_utf8(candidate->name, name) &&
          (candidate->is_signature_polymorphic || !method_descriptor.chars ||
           utf8_equals_utf8(candidate->unparsed_descriptor, method_descriptor));
@@ -1632,9 +1648,7 @@ bjvm_async_run_ctx *create_run_ctx(bjvm_thread *thread, bjvm_cp_method *method, 
   return ctx;
 }
 
-void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx) {
-  free(ctx);
-}
+void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx) { free(ctx); }
 
 DEFINE_ASYNC(call_interpreter) {
 #define method args->method
@@ -1644,7 +1658,7 @@ DEFINE_ASYNC(call_interpreter) {
   if (!self->ctx)
     ASYNC_RETURN((bjvm_stack_value){.l = 0});
 
-  self->ctx->interpreter_state.args = (struct bjvm_interpret_args){ thread, self->ctx->frame};
+  self->ctx->interpreter_state.args = (struct bjvm_interpret_args){thread, self->ctx->frame};
   AWAIT_FUTURE_EXPR(bjvm_interpret(&self->ctx->interpreter_state));
 
   bjvm_stack_value result = self->ctx->interpreter_state._result;
@@ -1834,7 +1848,7 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread, bjvm_classd
   }
 
   classdesc->mirror = (void *)new_object(thread, java_lang_Class);
-  bjvm_handle *cm_handle = bjvm_make_handle(thread, (void*)classdesc->mirror);
+  bjvm_handle *cm_handle = bjvm_make_handle(thread, (void *)classdesc->mirror);
 
 #define class_mirror ((struct bjvm_native_Class *)cm_handle->obj)
 
@@ -1966,8 +1980,7 @@ DEFINE_ASYNC(bjvm_invokevirtual_signature_polymorphic) {
     if (!asType)
       UNREACHABLE();
 
-    AWAIT(call_interpreter, thread, asType,
-                                      (bjvm_stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
+    AWAIT(call_interpreter, thread, asType, (bjvm_stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
     bjvm_stack_value result = get_async_result(call_interpreter);
     if (thread->current_exception != 0) // asType failed
       ASYNC_RETURN_VOID();
@@ -2177,7 +2190,7 @@ DEFINE_ASYNC(indy_resolve) {
                          STR("([Ljava/lang/Object;)Ljava/lang/Object;"), true, false);
 
   AWAIT(call_interpreter, thread, invokeWithArguments,
-                       (bjvm_stack_value[]){{.obj = self->bootstrap_handle->obj}, {.obj = self->invoke_array->obj}});
+        (bjvm_stack_value[]){{.obj = self->bootstrap_handle->obj}, {.obj = self->invoke_array->obj}});
   bjvm_stack_value res = get_async_result(call_interpreter);
 
   int result;
@@ -2293,7 +2306,7 @@ bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {
     bjvm_obj_header *thread_group = new_object(thread, ThreadGroup);
     vm->main_thread_group = thread_group;
     bjvm_stack_value args[1] = {(bjvm_stack_value){.obj = thread_group}};
-    call_interpreter_synchronous(thread, init, args); //ThreadGroup constructor doesn't do much
+    call_interpreter_synchronous(thread, init, args); // ThreadGroup constructor doesn't do much
   }
   return vm->main_thread_group;
 }

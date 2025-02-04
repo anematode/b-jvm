@@ -1,14 +1,15 @@
 #ifndef INSTRUMENTATION_H
 #define INSTRUMENTATION_H
 
+#include <config.h>
 #include <bjvm.h>
 
-#ifdef DTRACE_SUPPORT
+#ifdef DTRACE_ENABLED
 #include <probes.h>
 #endif
 
 static inline void InstrumentMethodEntry(bjvm_thread *thread, bjvm_stack_frame *frame) {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_METHOD_ENTRY(
     thread->tid,
     frame->method->my_class->name.chars, frame->method->my_class->name.len,
@@ -19,7 +20,7 @@ static inline void InstrumentMethodEntry(bjvm_thread *thread, bjvm_stack_frame *
 }
 
 static inline void InstrumentMethodReturn(bjvm_thread *thread, bjvm_stack_frame *frame) {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_METHOD_RETURN(
     thread->tid,
     frame->method->my_class->name.chars, frame->method->my_class->name.len,
@@ -30,37 +31,37 @@ static inline void InstrumentMethodReturn(bjvm_thread *thread, bjvm_stack_frame 
 }
 
 static inline void InstrumentVMInitBegin() {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_VM_INIT_BEGIN();
 #endif
 }
 
 static inline void InstrumentVMInitEnd() {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_VM_INIT_END();
 #endif
 }
 
 static inline void InstrumentVMShutdown() {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_VM_INIT_END();
 #endif
 }
 
 static inline void InstrumentGCBegin(bool is_heap_full) {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_GC_BEGIN(is_heap_full);
 #endif
 }
 
 static inline void InstrumentGCEnd() {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_GC_END();
 #endif
 }
 
 static inline void InstrumentObjectAlloc(bjvm_thread *thread, bjvm_classdesc *cd, size_t size) {
-#if defined(DTRACE_SUPPORT)
+#if defined(DTRACE_ENABLED)
   BJVM_OBJECT_ALLOC(thread->tid, cd->name.chars, cd->name.len, size);
 #endif
 }

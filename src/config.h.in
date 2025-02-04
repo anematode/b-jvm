@@ -1,0 +1,7 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#cmakedefine HAVE_GETENV
+#cmakedefine DTRACE_ENABLED
+
+#endif
