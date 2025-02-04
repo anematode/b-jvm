@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.25)
-project(bjvm)
+cmake_minimum_required(VERSION 3.15...3.31)
+project(bjvm VERSION 0.1
+            DESCRIPTION "Portable JVM implementation"
+            LANGUAGES C CXX)
 
 enable_testing()
 
@@ -61,19 +63,13 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND APPLE AND CMAKE_C_COMPILER_ID STREQUAL
 endif ()
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "src/*.c" "src/*.h")
-file(GLOB_RECURSE bjvm_NATIVES CONFIGURE_DEPENDS "src/natives/share/*.c" "src/natives/share/*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "src/wasm/*.c" "src/wasm/*.h")
-
-if (UNIX)
-    file(GLOB_RECURSE bjvm_posix_NATIVES CONFIGURE_DEPENDS "src/natives/posix/*.c" "src/natives/posix/*.h")
-    list(APPEND bjvm_SRC ${bjvm_posix_NATIVES})
-endif ()
 
 if (EMSCRIPTEN)
     list(APPEND bjvm_SRC ${bjvm_wasm_SRC})
 endif ()
 
-add_library(bjvm_prebuild OBJECT ${bjvm_SRC} ${bjvm_NATIVES}
+add_library(bjvm_prebuild OBJECT ${bjvm_SRC}
         vendor/stb_ds.h
         vendor/stb_ds.c
 )
@@ -84,8 +80,11 @@ if (DTRACE_SUPPORT)
     add_dtrace_support(bjvm_prebuild "${CMAKE_CURRENT_SOURCE_DIR}/src/probes.d")
 endif ()
 
+add_subdirectory("natives")
+
 add_library(bjvm SHARED ${BJVM_LINK_OBJECTS})
-target_link_libraries(bjvm PUBLIC bjvm_prebuild)
+target_link_libraries(bjvm PUBLIC bjvm_prebuild
+                            PRIVATE natives)
 
 if (NOT EMSCRIPTEN)
     target_link_libraries(bjvm PRIVATE z)
@@ -116,7 +115,7 @@ if (NOT EMSCRIPTEN)
     target_sources(tests PRIVATE ${bjvm_wasm_SRC})
 endif ()
 target_link_libraries(tests PRIVATE z)
-target_link_libraries(tests PRIVATE bjvm)
+target_link_libraries(tests PRIVATE bjvm natives)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
