@@ -46,8 +46,24 @@ DECLARE_NATIVE("java/lang", Thread, currentCarrierThread, "()Ljava/lang/Thread;"
   return (bjvm_stack_value){.obj = (void*)thread->thread_obj};
 }
 
+DECLARE_NATIVE("java/lang", Thread, interrupt0, "()V") {
+  StoreFieldBoolean(obj->obj, "interrupted", true);
+
+  [[maybe_unused]] rr_scheduler *scheduler = thread->vm->scheduler;
+  // todo: inform scheduler of interrupt, cause thread to potentially awake if yielded
+
+  return value_null();
+}
+
 DECLARE_ASYNC_NATIVE("java/lang", Thread, sleepNanos0, "(J)V", locals(), invoked_methods()) {
   assert(argc == 1);
+
+  bool interrupted = thread->thread_obj->interrupted;
+  if (interrupted) {
+    bjvm_raise_vm_exception(thread, STR("java/lang/InterruptedException"), STR("Thread interrupted before sleeping"));
+    ASYNC_RETURN_VOID();
+  }
+
   struct timeval tv;
   gettimeofday(&tv, NULL);
   u64 time = tv.tv_sec * 1000000 + tv.tv_usec;
@@ -58,4 +74,8 @@ DECLARE_ASYNC_NATIVE("java/lang", Thread, sleepNanos0, "(J)V", locals(), invoked
   wakeup_info->wakeup_us = end;
   ASYNC_YIELD((void*)wakeup_info);
   ASYNC_END_VOID();
+}
+
+DECLARE_NATIVE("java/lang", Thread, clearInterruptEvent, "()V") {
+  return value_null(); // openjdk only does something here on Windows devices
 }
