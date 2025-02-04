@@ -37,8 +37,8 @@ if (NOT EMSCRIPTEN)
 endif ()
 
 # If doing emscripten
-set(BASE_C_FLAGS "-g -O2 -Werror=sign-compare -Wall -Werror -Werror=uninitialized -foptimize-sibling-calls -fms-extensions -Wno-pragmas -Wno-unused-parameter -fno-strict-aliasing -Wno-missing-field-initializers -Wno-format-zero-length")
-set(BASE_CXX_FLAGS "-g -O2 -Werror=sign-compare -Wall -Werror=uninitialized -Wno-c99-extensions -Wno-extra-semi -Wno-format-zero-length")
+set(BASE_C_FLAGS "-g -Werror=sign-compare -Wall -Werror -Werror=uninitialized -fms-extensions -Wno-pragmas -Wno-unused-parameter -fno-strict-aliasing -Wno-missing-field-initializers -Wno-format-zero-length")
+set(BASE_CXX_FLAGS "-g -Werror=sign-compare -Wall -Werror=uninitialized -Wno-c99-extensions -Wno-extra-semi -Wno-format-zero-length")
 
 if (EMSCRIPTEN)
     set(PLATFORM_C_FLAGS "-Wno-limited-postlink-optimizations -sUSE_ZLIB=1 -mtail-call")
@@ -53,8 +53,8 @@ endif ()
 set(CMAKE_C_FLAGS "${BASE_C_FLAGS} ${PLATFORM_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${BASE_CXX_FLAGS} ${PLATFORM_CXX_FLAGS}")
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto -fomit-frame-pointer -DNDEBUG")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -flto -fomit-frame-pointer -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2 -flto -fomit-frame-pointer -DNDEBUG")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2 -flto -fomit-frame-pointer -DNDEBUG")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND APPLE AND CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address,undefined")

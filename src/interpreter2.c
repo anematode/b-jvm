@@ -74,6 +74,11 @@
 
 #include <instrumentation.h>
 
+#ifndef __OPTIMIZE__
+#pragma GCC optimize("O1")
+#endif
+#pragma GCC optimize("optimize-sibling-calls")
+
 typedef s64 (*bytecode_handler_t)(ARGS_VOID);
 
 // Used when the TOS is int (i.e., the stack is empty)
