@@ -20,6 +20,6 @@ endif()
 
 add_test(NAME tests
         COMMAND tests --skip-benchmarks
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 set_tests_properties(tests PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=1,detect_container_overflow=0")
 set_tests_properties(tests PROPERTIES ENVIRONMENT "BOOT_CLASSPATH=${CMAKE_CURRENT_SOURCE_DIR}/jdk23.jar")
