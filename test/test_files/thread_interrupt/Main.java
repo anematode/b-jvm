@@ -24,6 +24,7 @@ public class Main {
         }
         end = System.currentTimeMillis();
 
+        System.out.println("interrupted: " + currentThread.isInterrupted());
         System.out.println("slept for at least 1000 ms? " + ((end - start) >= 1000));
     }
 }

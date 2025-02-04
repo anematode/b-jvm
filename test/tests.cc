@@ -716,6 +716,7 @@ interrupted: false
 slept for at least 1000 ms? true
 interrupting
 interrupted while sleeping
+interrupted: false
 slept for at least 1000 ms? false
 )");
 }

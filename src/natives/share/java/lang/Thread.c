@@ -51,6 +51,7 @@ DECLARE_NATIVE("java/lang", Thread, interrupt0, "()V") {
 
   [[maybe_unused]] rr_scheduler *scheduler = thread->vm->scheduler;
   // todo: inform scheduler of interrupt, cause thread to potentially awake if yielded
+  // todo: maybe also only do this if previously wasn't interrupted already?
 
   return value_null();
 }
@@ -58,8 +59,8 @@ DECLARE_NATIVE("java/lang", Thread, interrupt0, "()V") {
 DECLARE_ASYNC_NATIVE("java/lang", Thread, sleepNanos0, "(J)V", locals(), invoked_methods()) {
   assert(argc == 1);
 
-  bool interrupted = thread->thread_obj->interrupted;
-  if (interrupted) {
+  if (thread->thread_obj->interrupted) {
+    thread->thread_obj->interrupted = false; // throw and reset flag
     bjvm_raise_vm_exception(thread, STR("java/lang/InterruptedException"), STR("Thread interrupted before sleeping"));
     ASYNC_RETURN_VOID();
   }
