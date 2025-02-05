@@ -58,6 +58,7 @@ jobs:
         with:
           path: ${{ github.workspace }}/build
           key: cmake-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
+          restore-keys: cmake-${{ runner.os }}-${{ matrix.compiler }}-
 
       - name: Configure CMake
         run: |
