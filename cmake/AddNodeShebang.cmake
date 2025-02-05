@@ -1,6 +1,5 @@
 function(AddNodeShebang target_name)
     add_custom_command(
-            DEPENDS ${target_name}
             TARGET ${target_name} POST_BUILD
             COMMAND echo "\\#!/usr/bin/env node" > "$<TARGET_FILE:${target_name}>.tmp"
             COMMAND cat "$<TARGET_FILE:${target_name}>" >> "$<TARGET_FILE:${target_name}>.tmp"
