@@ -57,14 +57,12 @@ jobs:
           tar -xzf ${{ github.workspace }}/jdk-23_linux-x64_bin.tar.gz -C ${{ github.workspace }}/test
           mv ${{ github.workspace }}/test/jdk-23.* ${{ github.workspace }}/test/jdk23
 
-      - name: Cache ccache
-        id: cache_ccache
+      - name: Cache cmake build dir
+        id: cache_cmake_build
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
+          path: ${{ github.workspace }}/build
           key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
-          restore-keys: |
-            ccache-${{ runner.os }}-
 
       - name: Configure ccache
         run: |
