@@ -27,13 +27,11 @@ if (BUILD_TESTING)
 endif ()
 
 add_library(bjvm_static STATIC)
-target_link_libraries(bjvm_static
-        PUBLIC vm
-        PUBLIC natives)
+target_link_libraries(bjvm_static PUBLIC vm natives)
 
 if (NOT EMSCRIPTEN)
     add_library(bjvm SHARED)
-    target_link_libraries(bjvm PUBLIC vm PUBLIC natives)
+    target_link_libraries(bjvm PUBLIC vm natives)
 endif()
 
 if (EMSCRIPTEN)

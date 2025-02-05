@@ -16,7 +16,7 @@ if (EMSCRIPTEN)
 endif()
 
 target_link_libraries(tests PRIVATE z)
-target_link_libraries(tests PRIVATE bjvm_static )
+target_link_libraries(tests PRIVATE bjvm_static natives)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 
 if(OpenMP_CXX_FOUND)
