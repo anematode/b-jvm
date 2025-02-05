@@ -29,7 +29,7 @@ if (NOT EMSCRIPTEN)
     target_link_libraries(vm PRIVATE z)
 else ()
     target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-mtail-call")
-    target_link_options(vm PRIVATE "-sUSE_ZLIB")
+    target_link_options(vm PUBLIC "-sUSE_ZLIB")
 endif ()
 
 if (APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
