@@ -16,7 +16,7 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
 
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
   s32 unix_fd = open(filename.chars, O_RDONLY);
   StoreFieldInt(fd, "fd", unix_fd);
 
@@ -34,10 +34,10 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
 }
 
 DECLARE_NATIVE("java/io", FileInputStream, read0, "()I") {
-  assert(argc == 0);
+  DCHECK(argc == 0);
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
   s32 unix_fd = LoadFieldInt(fd, "fd");
   if (unix_fd < 0) {
     bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
@@ -71,10 +71,10 @@ DECLARE_NATIVE("java/io", FileInputStream, read0, "()I") {
 }
 
 DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
   s32 unix_fd = LoadFieldInt(fd, "fd");
   if (unix_fd < 0) {
     bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
@@ -116,7 +116,7 @@ DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
 DECLARE_NATIVE("java/io", FileInputStream, close0, "()V") {
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
 
   s32 unix_fd = LoadFieldInt(fd, "fd");
   if (unix_fd != -1) close(unix_fd);
@@ -128,7 +128,7 @@ DECLARE_NATIVE("java/io", FileInputStream, close0, "()V") {
 DECLARE_NATIVE("java/io", FileInputStream, available0, "()I") {
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
   s32 unix_fd = LoadFieldInt(fd, "fd");
   if (unix_fd == -1) {
     return (bjvm_stack_value) { .i = 0 };

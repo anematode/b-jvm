@@ -48,40 +48,40 @@ static inline void *ArrayData(bjvm_obj_header *obj) {
 
 static inline bjvm_obj_header *ReferenceArrayLoad(bjvm_obj_header *array,
                                                   int index) {
-  assert(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-  assert(index >= 0 && index < *ArrayLength(array));
+  DCHECK(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
+  DCHECK(index >= 0 && index < *ArrayLength(array));
 
   return *((bjvm_obj_header **)ArrayData(array) + index);
 }
 
 static inline void ReferenceArrayStore(bjvm_obj_header *array, int index,
                                        bjvm_obj_header *val) {
-  assert(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
-  assert(index >= 0 && index < *ArrayLength(array));
+  DCHECK(array->descriptor->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
+  DCHECK(index >= 0 && index < *ArrayLength(array));
 
   *((bjvm_obj_header **)ArrayData(array) + index) = val;
 }
 
 static inline void ByteArrayStoreBlock(object array, s32 offset, s32 length, u8 const *data) {
-  assert(Is1DPrimitiveArray(array));
-  assert(offset >= 0);
-  assert(length >= 0);
-  assert(data != nullptr);
-  assert((*ArrayLength(array) - offset) <= length);
+  DCHECK(Is1DPrimitiveArray(array));
+  DCHECK(offset >= 0);
+  DCHECK(length >= 0);
+  DCHECK(data != nullptr);
+  DCHECK((*ArrayLength(array) - offset) <= length);
 
   memcpy((s8*)ArrayData(array) + offset, data, length);
 }
 
 #define MAKE_PRIMITIVE_LOAD_STORE(name, type)                                  \
   static inline type name##ArrayLoad(bjvm_obj_header *array, int index) {      \
-    assert(Is1DPrimitiveArray(array));                                         \
-    assert(index >= 0 && index < *ArrayLength(array));                         \
+    DCHECK(Is1DPrimitiveArray(array));                                         \
+    DCHECK(index >= 0 && index < *ArrayLength(array));                         \
     return *((type *)ArrayData(array) + index);                                \
   }                                                                            \
   static inline void name##ArrayStore(bjvm_obj_header *array, int index,       \
                                       type val) {                              \
-    assert(Is1DPrimitiveArray(array));                                         \
-    assert(index >= 0 && index < *ArrayLength(array));                         \
+    DCHECK(Is1DPrimitiveArray(array));                                         \
+    DCHECK(index >= 0 && index < *ArrayLength(array));                         \
     *((type *)ArrayData(array) + index) = val;                                 \
   }
 

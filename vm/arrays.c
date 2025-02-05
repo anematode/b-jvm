@@ -12,7 +12,7 @@
 
 // Symmetry with make_array_classdesc
 static void free_array_classdesc(bjvm_classdesc *classdesc) {
-  assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
+  DCHECK(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY ||
          classdesc->kind == BJVM_CD_KIND_PRIMITIVE_ARRAY);
   if (classdesc->array_type)
     free_array_classdesc(classdesc->array_type);
@@ -81,7 +81,7 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
     result->base_component = component->base_component;
     result->name = make_heap_str(component->name.len + 1);
     bprintf(hslc(result->name), "[%.*s", fmt_slice(component->name));
-    assert(result->dimensions == component->dimensions + 1);
+    DCHECK(result->dimensions == component->dimensions + 1);
   }
 
   // propagate to n-D primitive arrays
@@ -101,7 +101,7 @@ static bjvm_classdesc *ordinary_array_classdesc(bjvm_thread *thread,
 // given component. For example, J -> [J, [[J -> [[[J, Object -> [Object
 bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
                                      bjvm_classdesc *classdesc) {
-  assert(classdesc);
+  DCHECK(classdesc);
   if (!classdesc->array_type) {
     if (classdesc->kind == BJVM_CD_KIND_PRIMITIVE) {
       classdesc->array_type = primitive_array_classdesc(thread, classdesc);
@@ -116,12 +116,12 @@ bjvm_classdesc *make_array_classdesc(bjvm_thread *thread,
 static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
                                                   bjvm_type_kind array_type,
                                                   int count) {
-  assert(count >= 0);
+  DCHECK(count >= 0);
 
   int size = sizeof_type_kind(array_type);
   bjvm_classdesc *array_desc = make_array_classdesc(
       thread, bjvm_primitive_classdesc(thread, array_type));
-  assert(array_desc);
+  DCHECK(array_desc);
 
   bjvm_obj_header *array =
       AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
@@ -134,11 +134,11 @@ static bjvm_obj_header *create_1d_primitive_array(bjvm_thread *thread,
 static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
                                                bjvm_classdesc *classdesc,
                                                int count) {
-  assert(classdesc);
-  assert(count >= 0);
+  DCHECK(classdesc);
+  DCHECK(count >= 0);
 
   bjvm_classdesc *array_desc = make_array_classdesc(thread, classdesc);
-  assert(array_desc);
+  DCHECK(array_desc);
 
   bjvm_obj_header *array = AllocateObject(
       thread, array_desc, kArrayHeaderSize + count * sizeof(bjvm_obj_header *));
@@ -150,7 +150,7 @@ static bjvm_obj_header *create_1d_object_array(bjvm_thread *thread,
 
 bjvm_obj_header *CreateArray(bjvm_thread *thread, bjvm_classdesc *desc,
                              int const *dim_sizes, int total_dimensions) {
-  assert(total_dimensions > 0);
+  DCHECK(total_dimensions > 0);
 
   if (total_dimensions == 1) {
     switch (desc->kind) {

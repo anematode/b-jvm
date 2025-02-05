@@ -12,7 +12,7 @@ Object[] pns
 */
 DECLARE_NATIVE("java/lang", Module, defineModule0,
   "(Ljava/lang/Module;ZLjava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)V") {
-  assert(argc == 5);
+  DCHECK(argc == 5);
 
   bjvm_obj_header *name = LoadFieldObject(args[0].handle->obj, "java/lang/String", "name");
   heap_string s;
@@ -28,18 +28,18 @@ DECLARE_NATIVE("java/lang", Module, defineModule0,
 
 DECLARE_NATIVE("java/lang", Module, addReads0,
   "(Ljava/lang/Module;Ljava/lang/Module;)V") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", Module, addExportsToAll0,
   "(Ljava/lang/Module;Ljava/lang/String;)V") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", Module, addExports0,
   "(Ljava/lang/Module;Ljava/lang/String;Ljava/lang/Module;)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   return value_null();
 }

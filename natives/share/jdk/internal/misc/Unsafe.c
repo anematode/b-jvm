@@ -27,14 +27,14 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, ensureClassInitialized0,
   if (desc->state != BJVM_CD_STATE_INITIALIZED) {
     bjvm_initialize_class_t pox = {.args = {thread, desc}};
     future_t f = bjvm_initialize_class(&pox);
-    BJVM_CHECK(f.status == FUTURE_READY);
+    CHECK(f.status == FUTURE_READY);
   }
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset0,
                "(Ljava/lang/reflect/Field;)J") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].handle->obj);
   return (bjvm_stack_value){.l = reflect_field->byte_offset};
 }
@@ -42,11 +42,11 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset0,
 // objectFieldOffset1(Class<?> c, String name);
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset1,
                "(Ljava/lang/Class;Ljava/lang/String;)J") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   heap_string name;
   int err = read_string_to_utf8(thread, &name, args[1].handle->obj);
-  BJVM_CHECK(!err);
+  CHECK(!err);
 
   s64 result = 0;
 
@@ -64,14 +64,14 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, objectFieldOffset1,
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldOffset0,
                "(Ljava/lang/reflect/Field;)J") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].handle->obj);
   return (bjvm_stack_value){.l = reflect_field->byte_offset};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldBase,
                "(Ljava/lang/reflect/Field;)Ljava/lang/Object;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   // Return pointer to static_fields
   bjvm_cp_field *reflect_field = *bjvm_unmirror_field(args[0].handle->obj);
   return (bjvm_stack_value){.obj =
@@ -79,7 +79,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldBase,
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, arrayIndexScale0, "(Ljava/lang/Class;)I") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   switch (desc->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY:
@@ -93,20 +93,20 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, arrayIndexScale0, "(Ljava/lang/Class
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getIntVolatile, "(Ljava/lang/Object;J)I") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
       .i = *(int *)((void *)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLongVolatile, "(Ljava/lang/Object;J)J") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
       .l = *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putReferenceVolatile,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(void *volatile *)((uintptr_t)args[0].handle->obj + args[1].l) =
       args[2].handle->obj;
   return value_null();
@@ -114,27 +114,27 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, putReferenceVolatile,
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putOrderedReference,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(void **)((void *)args[0].handle->obj + args[1].l) = args[2].handle->obj;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putOrderedLong, "(Ljava/lang/Object;JJ)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(s64 *)((void *)args[0].handle->obj + args[1].l) = args[2].l;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putReference,
                "(Ljava/lang/Object;JLjava/lang/Object;)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(void **)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].handle->obj;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetInt,
                "(Ljava/lang/Object;JII)Z") {
-  assert(argc == 4);
+  DCHECK(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
   s64 offset = args[1].l;
   int expected = args[2].i, update = args[3].i;
@@ -145,7 +145,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetInt,
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetLong,
                "(Ljava/lang/Object;JJJ)Z") {
-  assert(argc == 4);
+  DCHECK(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
   s64 offset = args[1].l;
   s64 expected = args[2].l, update = args[3].l;
@@ -156,7 +156,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetLong,
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetReference,
                "(Ljava/lang/Object;JLjava/lang/Object;Ljava/lang/Object;)Z") {
-  assert(argc == 4);
+  DCHECK(argc == 4);
   bjvm_obj_header *target = args[0].handle->obj;
   s64 offset = args[1].l;
   uintptr_t expected = (uintptr_t)args[2].handle->obj,
@@ -171,21 +171,21 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, addressSize, "()I") {
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   void *l = malloc(args[0].l);
   arrput(thread->vm->unsafe_allocations, l);
   return (bjvm_stack_value){.l = (s64)l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class;)Ljava/lang/Object;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_classdesc *desc = bjvm_unmirror_class(args[0].handle->obj);
   bjvm_obj_header *o = AllocateObject(thread, desc, desc->instance_bytes);
   return (bjvm_stack_value){.obj = o };
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   free((void *)args[0].l);
   void **unsafe_allocations = thread->vm->unsafe_allocations;
   for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
@@ -199,62 +199,62 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   *(s64 *)args[0].l = args[1].l;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putInt, "(Ljava/lang/Object;JI)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(s32 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putByte, "(Ljava/lang/Object;JB)V") {
-  assert(argc == 3);
+  DCHECK(argc == 3);
   *(s8 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReference,
                "(Ljava/lang/Object;J)Ljava/lang/Object;") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
       .obj = *(void **)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getInt, "(Ljava/lang/Object;J)I") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
       .i = *(int *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getShort, "(Ljava/lang/Object;J)S") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
     .i = *(short *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(Ljava/lang/Object;J)B") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
     .i = *(s8 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLong, "(Ljava/lang/Object;J)J") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
     .l = *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(J)B") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   return (bjvm_stack_value){.i = *(s8 *)args[0].l};
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReferenceVolatile,
                "(Ljava/lang/Object;J)Ljava/lang/Object;") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   return (bjvm_stack_value){
       .obj = *(void **)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
@@ -262,7 +262,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReferenceVolatile,
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
                "(Ljava/lang/String;[BIILjava/lang/ClassLoader;Ljava/security/"
                "ProtectionDomain;)Ljava/lang/Class;") {
-  assert(argc == 6);
+  DCHECK(argc == 6);
 
   // TODO more validation of this stuff
 
@@ -299,7 +299,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
 
   bjvm_initialize_class_t pox = {.args = {thread, result}};
   future_t f = bjvm_initialize_class(&pox);
-  BJVM_CHECK(f.status == FUTURE_READY);
+  CHECK(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};
@@ -319,7 +319,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, fullFence, "()V") {
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, copyMemory0, "(Ljava/lang/Object;JLjava/lang/Object;JJ)V") {
-  assert(argc == 5);
+  DCHECK(argc == 5);
   void *src = (void*)((uintptr_t)args[0].handle->obj + args[1].l);
   void *dst = (void*)((uintptr_t)args[2].handle->obj + args[3].l);
   size_t len = args[4].l;

@@ -19,7 +19,7 @@ bjvm_obj_header *InternJString(bjvm_thread *thread, bjvm_obj_header *str);
 
 /// Helper for java.lang.String#length
 static inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string) {
-  assert(utf8_equals(hslc(string->descriptor->name), "java/lang/String"));
+  DCHECK(utf8_equals(hslc(string->descriptor->name), "java/lang/String"));
 
   auto method = bjvm_method_lookup(string->descriptor, STR("length"),
                                    STR("()I"), false, false);
@@ -32,7 +32,7 @@ static inline int JavaStringLength(bjvm_thread *thread, bjvm_obj_header *string)
 /// Extracts the inner array of the given java.lang.String.
 /// The data are either UTF-16 or latin1 encoded.
 static inline bjvm_obj_header *RawStringData([[maybe_unused]] bjvm_thread const *thread, bjvm_obj_header const *string) {
-  assert(string->descriptor == thread->vm->cached_classdescs->string);
+  DCHECK(string->descriptor == thread->vm->cached_classdescs->string);
 
   return ((struct bjvm_native_String*)string)->value;
 }
@@ -40,8 +40,8 @@ static inline bjvm_obj_header *RawStringData([[maybe_unused]] bjvm_thread const 
 static inline object AllocateObject(bjvm_thread *thread,
                                               bjvm_classdesc *descriptor,
                                               size_t data_size) {
-  assert(descriptor);
-  assert(descriptor->state >=
+  DCHECK(descriptor);
+  DCHECK(descriptor->state >=
          BJVM_CD_STATE_LINKED); // important to know the size
   object obj = (object)bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
   if (obj) {

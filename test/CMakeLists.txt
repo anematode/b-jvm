@@ -13,14 +13,11 @@ add_executable(tests tests.cc arrays-test.cc tests-common.cc wasm-tests.cc
 
 if (EMSCRIPTEN)
     AddNodeShebang(tests)
-#    target_compile_options(tests PRIVATE -sALLOW_MEMORY_GROWTH)
-    target_link_options(tests PRIVATE -sALLOW_MEMORY_GROWTH)
 endif()
 
 target_link_libraries(tests PRIVATE z)
-target_link_libraries(tests PRIVATE bjvm_static natives )
+target_link_libraries(tests PRIVATE bjvm_static )
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
-set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(tests PUBLIC OpenMP::OpenMP_CXX)

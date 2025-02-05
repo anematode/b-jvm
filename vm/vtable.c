@@ -84,12 +84,12 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
                          bjvm_string_hash_table poisoned,
                          bjvm_classdesc *classdesc) {
   INIT_STACK_STRING(scratch, 1024);
-  assert(dst->interface == src->interface);
-  assert(arrlen(dst->methods) == arrlen(src->methods));
+  DCHECK(dst->interface == src->interface);
+  DCHECK(arrlen(dst->methods) == arrlen(src->methods));
   for (int i = 0; i < arrlen(src->methods); ++i) {
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
-    assert(s != 0 && "i-table method must not be null");
-    assert(d != 0 && "i-table method must not be null");
+    DCHECK(s != 0 && "i-table method must not be null");
+    DCHECK(d != 0 && "i-table method must not be null");
 
     [[maybe_unused]]
     bool d_abs = get_unambiguous_method(d)->access_flags & BJVM_ACCESS_ABSTRACT,
@@ -126,7 +126,7 @@ static bool itable_include(const bjvm_cp_method *method) {
 
 static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
   bjvm_itables *itables = &classdesc->itables;
-  assert(!itables->interfaces && "i-tables already set up");
+  DCHECK(!itables->interfaces && "i-tables already set up");
 
   // Scan superinterface itables for conflicting methods, i.e., methods which
   // have the same name and descriptor.
@@ -143,7 +143,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
       iface = classdesc->interfaces[iface_i]->classdesc;
     else
       iface = super;
-    assert(iface && "Superclass or -interface not resolved");
+    DCHECK(iface && "Superclass or -interface not resolved");
     for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       bjvm_itable *super_itable = iface->itables.entries + itable_i;
@@ -182,7 +182,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
     iface = iface_i < classdesc->interfaces_count
                 ? classdesc->interfaces[iface_i]->classdesc
                 : super;
-    assert(iface && "Superclass or -interface not resolved");
+    DCHECK(iface && "Superclass or -interface not resolved");
     for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       // Look if we already implement this interface, and if so, merge with
@@ -192,7 +192,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
       for (int k = 0; k < arrlen(itables->interfaces); ++k) {
         if (itables->interfaces[k] == super_itable->interface) {
           merge_with = itables->entries + k;
-          assert(merge_with->interface == super_itable->interface);
+          DCHECK(merge_with->interface == super_itable->interface);
           goto merge;
         }
       }
@@ -208,14 +208,14 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
   }
 
   // make sure the lookup vector and the result vector have the same length
-  assert(arrlen(itables->interfaces) == arrlen(itables->entries));
+  DCHECK(arrlen(itables->interfaces) == arrlen(itables->entries));
   bjvm_free_hash_table(ambiguous);
 }
 
 // TODO consider optimizing final methods out of the tables?
 void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   bjvm_vtable *vtable = &classdesc->vtable;
-  assert(!vtable->methods && "v-table already set up");
+  DCHECK(!vtable->methods && "v-table already set up");
 
   // If the class has a superclass, copy its vtable, replacing methods which
   // are overridden.
@@ -227,7 +227,7 @@ void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
           classdesc, method->name, method->unparsed_descriptor, false, false);
       if (method_overrides(replacement, method)) {
         replacement->vtable_index = method->vtable_index;
-        assert(method->vtable_index == i);
+        DCHECK(method->vtable_index == i);
         method = replacement;
         replacement->overrides = true;
       }
@@ -275,7 +275,7 @@ void bjvm_free_function_tables(bjvm_classdesc *classdesc) {
 }
 
 bjvm_cp_method *bjvm_vtable_lookup(bjvm_classdesc const *classdesc, size_t index) {
-  assert(index < arrlenu(classdesc->vtable.methods) &&
+  DCHECK(index < arrlenu(classdesc->vtable.methods) &&
          "vtable index out of range");
   return classdesc->vtable.methods[index];
 }
@@ -285,7 +285,7 @@ bjvm_cp_method *bjvm_itable_lookup(bjvm_classdesc const *classdesc,
   for (int i = 0; i < arrlen(classdesc->itables.interfaces); ++i) {
     if (classdesc->itables.interfaces[i] == interface) {
       bjvm_itable itable = classdesc->itables.entries[i];
-      assert(index < arrlenu(itable.methods) &&
+      DCHECK(index < arrlenu(itable.methods) &&
              "itable index out of range");
       bjvm_itable_method_t m = itable.methods[index];
       if (m & BJVM_ITABLE_METHOD_BIT_INVALID) {

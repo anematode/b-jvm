@@ -8,7 +8,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToVirtual,
   // which should be used to resolve the method to call
   struct bjvm_native_MemberName *mn = (void *)args[argc - 1].handle->obj;
   bjvm_cp_method *method = mn->vmtarget;
-  assert(method);
+  DCHECK(method);
 
   self->unhandled = malloc(sizeof(bjvm_stack_value) * argc);
   if (!self->unhandled) {
@@ -26,7 +26,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToVirtual,
   }
 
   method = bjvm_vtable_lookup(args[0].handle->obj->descriptor, method->vtable_index);
-  assert(method);
+  DCHECK(method);
 
   AWAIT(call_interpreter, thread, method, self->unhandled);
 
@@ -41,7 +41,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToInterface,
   // which should be used to resolve the method to call
   struct bjvm_native_MemberName *mn = (void *)args[argc - 1].handle->obj;
   bjvm_cp_method *method = mn->vmtarget;
-  assert(method);
+  DCHECK(method);
 
   self->unhandled = malloc(sizeof(bjvm_stack_value) * argc);
   if (!self->unhandled) {
@@ -59,7 +59,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToInterface,
   }
 
   method = bjvm_itable_lookup(args[0].handle->obj->descriptor, method->my_class, method->itable_index);
-  assert(method);
+  DCHECK(method);
 
   AWAIT(call_interpreter, thread, method, self->unhandled);
   free(self->unhandled);
@@ -73,7 +73,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToSpecial,
   // which should be used to resolve the method to call
   struct bjvm_native_MemberName *mn = (void *)args[argc - 1].handle->obj;
   bjvm_cp_method *method = mn->vmtarget;
-  assert(method);
+  DCHECK(method);
 
   self->unhandled = malloc(sizeof(bjvm_stack_value) * argc);
   if (!self->unhandled) {
@@ -101,7 +101,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandle, linkToStatic,
                locals(bjvm_stack_value *unhandled;), invoked_methods(invoked_method(call_interpreter))) {
   struct bjvm_native_MemberName *mn = (void *)args[argc - 1].handle->obj;
   bjvm_cp_method *method = mn->vmtarget;
-  assert(method);
+  DCHECK(method);
 
   self->unhandled = malloc(sizeof(bjvm_stack_value) * argc);
   if (!self->unhandled) {

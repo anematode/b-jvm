@@ -49,7 +49,7 @@ static int init_locals(iterator *iter, const bjvm_cp_method *method) {
 
   // Write the remaining locals, one per argument
   bjvm_method_descriptor *d = method->descriptor;
-  assert(d && "Method has no descriptor");
+  DCHECK(d && "Method has no descriptor");
   for (int arg_i = 0; arg_i < d->args_count; ++local_i, ++arg_i) {
     bjvm_type_kind kind = field_to_kind(d->args + arg_i);
     iter->locals[local_i].kind = type_to_validation_type[kind];
@@ -70,7 +70,7 @@ int stack_map_frame_iterator_init(iterator *iter, const bjvm_cp_method *method) 
   if (!I)
     return -1;
   bjvm_attribute_code *code = I->code = method->code;
-  assert(code && "Method has no code");
+  DCHECK(code && "Method has no code");
   // Look for a StackMapTable, otherwise zero-init
   I->is_first = true;
   for (int i = 0; i < code->attributes_count; ++i) {
@@ -219,7 +219,7 @@ int stack_map_frame_iterator_next(iterator *iter, const char **error) {
     }
   } else {
     // full_frame, read everything
-    assert(frame_kind == 255);
+    DCHECK(frame_kind == 255);
     MAY_FAIL(read_u16(iter->_impl, &offset_delta, error));
     u16 num_locals, num_stack;
     MAY_FAIL(read_u16(iter->_impl, &num_locals, error));

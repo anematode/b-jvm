@@ -1,7 +1,7 @@
 #include <assert.h>
 
-#include "../src/bjvm.h"
-#include "../src/linkage.h"
+#include <bjvm.h>
+#include <linkage.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     if (read == -1) {
       break;
     }
-    assert(line_count < 100);
+    DCHECK(line_count < 100);
     lines[line_count++] = line;
   }
 
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
 
   for (int i = 0; i < class_count; ++i) {
     bjvm_classdesc *desc = bootstrap_lookup_class(thread, (slice) { .chars = classes[i].name, .len = strlen(classes[i].name) });
-    assert(desc);
+    DCHECK(desc);
     bjvm_link_class(thread, desc);
 
     char *last_slash = strrchr(classes[i].name, L'/');

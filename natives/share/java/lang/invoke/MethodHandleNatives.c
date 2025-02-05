@@ -8,7 +8,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, registerNatives,
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getConstant, "(I)I") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   enum { GC_COUNT_GWT = 4, GC_LAMBDA_SUPPORT = 5 };
   switch (args[0].i) {
   case GC_COUNT_GWT:
@@ -92,7 +92,7 @@ void fill_mn_with_field(bjvm_thread *thread, bjvm_handle *mn,
 
 void fill_mn_with_method(bjvm_thread *thread, bjvm_handle *mn,
                          bjvm_cp_method *method, bool dynamic_dispatch) {
-  assert(method);
+  DCHECK(method);
   bjvm_classdesc *search_on = method->my_class;
   if (method->is_ctor) {
     bjvm_reflect_initialize_constructor(thread, search_on, method);
@@ -182,7 +182,7 @@ method_resolve_result resolve_mn(bjvm_thread *thread, bjvm_handle *mn) {
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
                "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;IZ)Ljava/lang/"
                "invoke/MemberName;") {
-  assert(argc == 4);
+  DCHECK(argc == 4);
 
   bjvm_handle *mn = (void *)args[0].handle;
 
@@ -206,7 +206,7 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
                locals(), invoked_methods(invoked_method(call_interpreter))) {
   // Create object array of length 2. Returns {vmindex, vmtarget},
   // boxing the vmindex as a Long.
-  assert(argc == 1);
+  DCHECK(argc == 1);
 #define mn ((struct bjvm_native_MemberName *) args[0].handle->obj)
 
   bjvm_classdesc *Long = bootstrap_lookup_class(thread, STR("java/lang/Long"));
@@ -279,21 +279,21 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init,
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset,
                "(Ljava/lang/invoke/MemberName;)J") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   return (bjvm_stack_value){.l = mn->vmindex};
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, staticFieldBase,
                "(Ljava/lang/invoke/MemberName;)Ljava/lang/Object;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   return (bjvm_stack_value){.obj = (void*)bjvm_unmirror_class(mn->clazz)->static_fields};
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, staticFieldOffset,
                "(Ljava/lang/invoke/MemberName;)J") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   struct bjvm_native_MemberName *mn = (void *)args[0].handle->obj;
   return (bjvm_stack_value){.l = mn->vmindex};
 }
@@ -301,7 +301,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, staticFieldOffset,
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getMembers,
                "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/String;ILjava/"
                "lang/Class;I[Ljava/lang/invoke/MemberName;)I") {
-  assert(argc == 7);
+  DCHECK(argc == 7);
   // defc, matchName, matchSig, matchFlags, lookupClass, totalCount, buf
 
   return (bjvm_stack_value){.i = 0};

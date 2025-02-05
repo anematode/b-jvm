@@ -27,10 +27,10 @@ static struct loaded_bytes read_file(FILE *f) {
   size_t length = ftell(f);
   fseek(f, 0, SEEK_SET);
   char *data = malloc(length);
-  assert(data);
+  DCHECK(data);
   length = fread(data, 1, length, f);
 
-  assert(length <= UINT32_MAX);
+  DCHECK(length <= UINT32_MAX);
 
   return (struct loaded_bytes){.bytes = data, .length = (u32) length};
 }
@@ -373,7 +373,7 @@ static heap_string concat_path(heap_string name, slice filename) {
   [[maybe_unused]] slice slice =
       bprintf(hslc(result), "%.*s%s%.*s", fmt_slice(name), slash ? "/" : "",
               fmt_slice(filename));
-  assert(slice.len == result.len);
+  DCHECK(slice.len == result.len);
   return result;
 }
 
@@ -404,7 +404,7 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
     }
     // Concatenate with the desired filename (and optionally a / in between)
     heap_string search = concat_path(entry->name, filename);
-    assert(search.chars[search.len] == '\0' && "Must be null terminated");
+    DCHECK(search.chars[search.len] == '\0' && "Must be null terminated");
 
     struct loaded_bytes lb;
 #ifdef EMSCRIPTEN

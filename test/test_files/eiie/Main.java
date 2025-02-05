@@ -24,7 +24,7 @@ class Main {
             }
         } catch (ExceptionInInitializerError e) {
             System.out.println("Egg");
-            assert(e.getCause().getClass() == RuntimeException.class);
+            DCHECK(e.getCause().getClass() == RuntimeException.class);
         }
 
         try {

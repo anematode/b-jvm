@@ -36,7 +36,7 @@ on_oom:
 
 DECLARE_NATIVE("java/lang", System, arraycopy,
                "(Ljava/lang/Object;ILjava/lang/Object;II)V") {
-  assert(argc == 5);
+  DCHECK(argc == 5);
   bjvm_obj_header *src = args[0].handle->obj;
   bjvm_obj_header *dest = args[2].handle->obj;
   if (src == nullptr || dest == nullptr) {
@@ -161,7 +161,7 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 }
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
 }
 

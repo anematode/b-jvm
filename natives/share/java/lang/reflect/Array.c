@@ -3,13 +3,13 @@
 
 DECLARE_NATIVE("java/lang/reflect", Array, newArray,
                "(Ljava/lang/Class;I)Ljava/lang/Object;") {
-  assert(argc == 2);
+  DCHECK(argc == 2);
   if (!args[0].handle->obj)
     return value_null();
   bjvm_classdesc *class = bjvm_unmirror_class(args[0].handle->obj);
   bjvm_initialize_class_t pox = {.args = {thread, class}};
   future_t f = bjvm_initialize_class(&pox);
-  BJVM_CHECK(f.status == FUTURE_READY);
+  CHECK(f.status == FUTURE_READY);
   s32 count = args[1].i;
   bjvm_obj_header *result;
   if (class->kind == BJVM_CD_KIND_PRIMITIVE) {
@@ -21,6 +21,6 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray,
 }
 
 DECLARE_NATIVE("java/lang/reflect", Array, getLength, "(Ljava/lang/Object;)I") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   return (bjvm_stack_value){.i = *ArrayLength(args[0].handle->obj)};
 }

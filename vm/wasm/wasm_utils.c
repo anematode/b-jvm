@@ -73,7 +73,7 @@ static bjvm_wasm_expression *module_expr(bjvm_wasm_module *module,
 
 // Write the byte to the serialization context
 void write_byte(bjvm_bytevector *ctx, int byte) {
-  assert(byte >= 0 && byte <= 255);
+  DCHECK(byte >= 0 && byte <= 255);
   *VECTOR_PUSH(ctx->bytes, ctx->bytes_len, ctx->bytes_cap) = byte;
 }
 
@@ -85,7 +85,7 @@ void write_slice(bjvm_bytevector *ctx, const u8 *bytes, size_t len) {
     if (new_cap < new_length)
       new_cap = new_length;
     ctx->bytes = realloc(ctx->bytes, new_cap);
-    assert(ctx->bytes);
+    DCHECK(ctx->bytes);
     ctx->bytes_cap = new_cap;
   }
   memcpy(ctx->bytes + ctx->bytes_len, bytes, len);
@@ -285,7 +285,7 @@ u32 walk_to_find_label(expression_ser_ctx *ctx,
     ++i;
     ctx = ctx->prev_block_ctx;
   }
-  assert(ctx && "trying to branch to a non-enclosing block");
+  DCHECK(ctx && "trying to branch to a non-enclosing block");
   return i;
 }
 
@@ -602,7 +602,7 @@ bjvm_wasm_tuple_type *bjvm_wasm_get_tuple_type(bjvm_wasm_type type) {
 }
 
 bjvm_wasm_value_type bjvm_wasm_get_basic_type(bjvm_wasm_type type) {
-  assert(type.val < 255);
+  DCHECK(type.val < 255);
   return type.val;
 }
 
@@ -653,7 +653,7 @@ bjvm_wasm_type bjvm_wasm_string_to_tuple(bjvm_wasm_module *module,
                                          const char *str) {
   int len = strlen(str);
   bjvm_wasm_value_type types[256];
-  assert(len < 256);
+  DCHECK(len < 256);
   int i = 0;
   for (; i < len; ++i) {
     types[i] = char_to_basic_type(str[i]);

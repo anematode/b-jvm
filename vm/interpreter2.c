@@ -31,7 +31,7 @@
   printf("Insn kind: %.*s\n", fmt_slice(s));                                                                           \
   free_heap_str(s);                                                                                                    \
   dump_frame(stdout, frame);                                                                                           \
-  /* assert(stack_depth(frame) == sp - frame->plain.stack); */
+  /* DCHECK(stack_depth(frame) == sp - frame->plain.stack); */
 #endif
 
 // If true, use a sequence of tail calls rather than computed goto and an aggressively inlined function. We try to make
@@ -224,28 +224,28 @@ const static bytecode_handler_t *bytecode_tables[4] = {
 /** Helper functions */
 
 s32 java_idiv_(s32 const a, s32 const b) {
-  assert(b != 0);
+  DCHECK(b != 0);
   if (a == INT_MIN && b == -1)
     return INT_MIN;
   return a / b;
 }
 
 s64 java_irem_(s32 const a, s32 const b) {
-  assert(b != 0);
+  DCHECK(b != 0);
   if (a == INT_MIN && b == -1)
     return 0;
   return a % b;
 }
 
 s64 java_ldiv_(s64 const a, s64 const b) {
-  assert(b != 0);
+  DCHECK(b != 0);
   if (a == LONG_MIN && b == -1)
     return LONG_MIN;
   return a / b;
 }
 
 s64 java_lrem_(s64 const a, s64 const b) {
-  assert(b != 0);
+  DCHECK(b != 0);
   if (a == LONG_MIN && b == -1)
     return 0;
   return a % b;
@@ -394,12 +394,12 @@ static continuation_frame *async_stack_push(bjvm_thread *thread) {
 }
 
 static continuation_frame *async_stack_pop(bjvm_thread *thread) {
-  assert(thread->async_stack->height > 0);
+  DCHECK(thread->async_stack->height > 0);
   return &thread->async_stack->frames[--thread->async_stack->height];
 }
 
 static async_wakeup_info *async_stack_top(bjvm_thread *thread) {
-  assert(thread->async_stack->height > 0);
+  DCHECK(thread->async_stack->height > 0);
   return thread->async_stack->frames[thread->async_stack->height - 1].wakeup;
 }
 
@@ -532,7 +532,7 @@ FORWARD_TO_NULLARY(putstatic)
 
 force_inline static s64 getstatic_L_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT(*(bjvm_obj_header **)insn->ic)
 }
@@ -541,7 +541,7 @@ FORWARD_TO_NULLARY(getstatic_L)
 force_inline static s64 getstatic_F_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_FLOAT(*(float *)insn->ic)
 }
@@ -550,7 +550,7 @@ FORWARD_TO_NULLARY(getstatic_F)
 force_inline static s64 getstatic_D_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_DOUBLE(*(double *)insn->ic)
 }
@@ -559,7 +559,7 @@ FORWARD_TO_NULLARY(getstatic_D)
 force_inline static s64 getstatic_J_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT(*(s64 *)insn->ic)
 }
@@ -568,7 +568,7 @@ FORWARD_TO_NULLARY(getstatic_J)
 force_inline static s64 getstatic_I_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT(*(int *)insn->ic)
 }
@@ -577,7 +577,7 @@ FORWARD_TO_NULLARY(getstatic_I)
 force_inline static s64 getstatic_S_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s16 *)insn->ic)
 }
@@ -586,7 +586,7 @@ FORWARD_TO_NULLARY(getstatic_S)
 force_inline static s64 getstatic_C_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT((s64)*(u16 *)insn->ic)
 }
@@ -595,7 +595,7 @@ FORWARD_TO_NULLARY(getstatic_C)
 force_inline static s64 getstatic_B_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s8 *)insn->ic)
 }
@@ -604,7 +604,7 @@ FORWARD_TO_NULLARY(getstatic_B)
 force_inline static s64 getstatic_Z_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  assert(insn->ic && "Static field location not found");
+  DCHECK(insn->ic && "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s8 *)insn->ic)
 }
@@ -1502,7 +1502,7 @@ force_inline static s64 new_impl_void(ARGS_VOID) {
     init.args.thread = thread;
     init.args.classdesc = insn->cp->class_info.classdesc;
     future_t fut = bjvm_initialize_class(&init);
-    BJVM_CHECK(fut.status == FUTURE_READY); // for now
+    CHECK(fut.status == FUTURE_READY); // for now
     if (thread->current_exception)
       return 0;
   }
@@ -1549,7 +1549,7 @@ static s64 anewarray_impl_int(ARGS_INT) {
   if (bjvm_resolve_class(thread, info)) {
     return 0;
   }
-  assert(info->classdesc);
+  DCHECK(info->classdesc);
   if (bjvm_link_class(thread, info->classdesc)) {
     return 0;
   }
@@ -1633,7 +1633,7 @@ static inline u8 attempt_invoke(bjvm_thread *thread, bjvm_stack_frame *invoked_f
   future_t fut;
   bjvm_stack_value result_ = bjvm_interpret_2(&fut, thread, invoked_frame);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
-    assert(invoked_frame->is_async_suspended);
+    DCHECK(invoked_frame->is_async_suspended);
     continuation_frame *cont = async_stack_push(thread);
     *cont = (continuation_frame){.pnt = CONT_INVOKE,
                                  .wakeup = fut.wakeup,
@@ -1702,7 +1702,7 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   ctx.args.thread = thread;
   ctx.args.info = &insn->cp->methodref;
   future_t fut = resolve_methodref(&ctx);
-  BJVM_CHECK(fut.status == FUTURE_READY);
+  CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception) {
     return 0;
   }
@@ -1752,7 +1752,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   ctx.args.thread = thread;
   ctx.args.info = &insn->cp->methodref;
   future_t fut = resolve_methodref(&ctx);
-  BJVM_CHECK(fut.status == FUTURE_READY);
+  CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception) {
     return 0;
   }
@@ -1847,7 +1847,7 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   ctx.args.thread = thread;
   ctx.args.info = &insn->cp->methodref;
   future_t fut = resolve_methodref(&ctx);
-  BJVM_CHECK(fut.status == FUTURE_READY);
+  CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception)
     return 0;
 
@@ -1869,15 +1869,15 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
 FORWARD_TO_NULLARY(invokeinterface)
 
 __attribute__((noinline)) void make_invokevtable_polymorphic_(bjvm_bytecode_insn *inst) {
-  assert(inst->kind == bjvm_insn_invokevtable_monomorphic);
+  DCHECK(inst->kind == bjvm_insn_invokevtable_monomorphic);
   bjvm_cp_method *method = inst->ic;
-  assert(method);
+  DCHECK(method);
   inst->kind = bjvm_insn_invokevtable_polymorphic;
   inst->ic2 = (void *)method->vtable_index;
 }
 
 __attribute__((noinline)) void make_invokeitable_polymorphic_(bjvm_bytecode_insn *inst) {
-  assert(inst->kind == bjvm_insn_invokeitable_monomorphic);
+  DCHECK(inst->kind == bjvm_insn_invokeitable_monomorphic);
   inst->kind = bjvm_insn_invokeitable_polymorphic;
   inst->ic = (void *)inst->cp->methodref.resolved->my_class;
   inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
@@ -1962,7 +1962,7 @@ static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
     raise_abstract_method_error(thread, insn->cp->methodref.resolved);
     return 0;
   }
-  assert(target_method);
+  DCHECK(target_method);
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
@@ -1991,7 +1991,7 @@ static s64 invokevtable_polymorphic_impl_void(ARGS_VOID) {
     return 0;
   }
   bjvm_cp_method *target_method = bjvm_vtable_lookup(target->descriptor, (size_t)insn->ic2);
-  assert(target_method);
+  DCHECK(target_method);
   bjvm_stack_frame *invoked_frame = bjvm_push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
@@ -2023,13 +2023,13 @@ __attribute__((noinline)) static s64 invokedynamic_impl_void(ARGS_VOID) {
       insn;
   ctx.args.indy = indy;
   future_t fut = indy_resolve(&ctx);
-  BJVM_CHECK(fut.status == FUTURE_READY);
+  CHECK(fut.status == FUTURE_READY);
 
   if (thread->current_exception) {
     return 0;
   }
 
-  assert(insn->ic);
+  DCHECK(insn->ic);
   insn->kind = bjvm_insn_invokecallsite;
   struct bjvm_native_CallSite *cs = insn->ic;
   struct bjvm_native_MethodHandle *mh = (void *)cs->target;
@@ -2517,7 +2517,7 @@ static s64 sqrt_impl_double(ARGS_DOUBLE) {
 
 static bjvm_exception_table_entry *find_exception_handler(bjvm_thread *thread, bjvm_stack_frame *frame,
                                                           bjvm_classdesc *exception_type) {
-  assert(!frame->is_native);
+  DCHECK(!frame->is_native);
 
   bjvm_attribute_exception_table *table = frame->method->code->exception_table;
   if (!table)
@@ -2537,7 +2537,7 @@ static bjvm_exception_table_entry *find_exception_handler(bjvm_thread *thread, b
 
       if (!ent->catch_type || bjvm_instanceof(exception_type, ent->catch_type->classdesc)) {
         if (ent->catch_type)
-          assert(ent->catch_type->classdesc->state >= BJVM_CD_STATE_INITIALIZED);
+          DCHECK(ent->catch_type->classdesc->state >= BJVM_CD_STATE_INITIALIZED);
 
         return ent;
       }
@@ -2618,7 +2618,7 @@ static inline bjvm_stack_value interpret_native_frame(future_t *fut, bjvm_thread
     ctx = (bjvm_run_native_t){.args = {.thread = thread, .frame = frame_}};
   } else {
     continuation_frame *cont = async_stack_pop(thread);
-    assert(cont->pnt == CONT_RUN_NATIVE);
+    DCHECK(cont->pnt == CONT_RUN_NATIVE);
     ctx = cont->ctx.run_native;
   }
 

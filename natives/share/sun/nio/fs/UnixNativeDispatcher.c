@@ -100,7 +100,7 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, open0, "(JII)I") {
 }
 
 DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, size0, "(Ljava/io/FileDescriptor;)J") {
-  assert(args[0].handle->obj);
+  DCHECK(args[0].handle->obj);
   int fd = LoadFieldInt(args[0].handle->obj, "fd");
   struct stat st;
   int result = fstat(fd, &st);
@@ -117,7 +117,7 @@ DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, allocationGranularity0, "()
 
 // (fd: FileDescriptor, prot:Int, pos: Long, len: Long, isSync: Boolean) -> Long
 DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, map0, "(Ljava/io/FileDescriptor;IJJZ)J") {
-  assert(args[0].handle->obj);
+  DCHECK(args[0].handle->obj);
   int fd = LoadFieldInt(args[0].handle->obj, "fd");
   int prot = args[1].i;
   off_t pos = args[2].l;

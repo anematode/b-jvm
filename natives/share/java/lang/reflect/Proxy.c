@@ -3,7 +3,7 @@
 DECLARE_NATIVE(
     "java/lang/reflect", Proxy, defineClass0,
     "(Ljava/lang/ClassLoader;Ljava/lang/String;[BII)Ljava/lang/Class;") {
-  assert(argc == 5);
+  DCHECK(argc == 5);
 
   bjvm_obj_header *name = args[1].handle->obj;
   bjvm_obj_header *data = args[2].handle->obj;
@@ -30,7 +30,7 @@ DECLARE_NATIVE(
 
   bjvm_initialize_class_t pox = {.args = {thread, result}};
   future_t f = bjvm_initialize_class(&pox); // TODO convert
-  BJVM_CHECK(f.status == FUTURE_READY);
+  CHECK(f.status == FUTURE_READY);
 
   return (bjvm_stack_value){.obj =
                                 (void *)bjvm_get_class_mirror(thread, result)};

@@ -3,5 +3,6 @@
 
 #cmakedefine HAVE_GETENV
 #cmakedefine DTRACE_ENABLED
+#cmakedefine DCHECKS_ENABLED
 
 #endif

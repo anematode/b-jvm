@@ -94,7 +94,7 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
     }
   }
   if (classdesc->kind != BJVM_CD_KIND_ORDINARY) {
-    assert(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
+    DCHECK(classdesc->kind == BJVM_CD_KIND_ORDINARY_ARRAY);
     return link_array_class(thread, classdesc);
   }
   classdesc->state = BJVM_CD_STATE_LINKED;

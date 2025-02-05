@@ -51,7 +51,7 @@ enum {
 static bjvm_handle *make_string_array(bjvm_thread *thread, int length) {
   bjvm_handle *arr = bjvm_make_handle(thread,
   CreateArray(thread, thread->vm->cached_classdescs->string->array_type, (int[]) { length }, 1));
-  assert(arr->obj);
+  DCHECK(arr->obj);
   return arr;
 }
 
@@ -61,7 +61,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
   bjvm_handle *props = make_string_array(thread, FIXED_LENGTH);
 
   INIT_STACK_STRING(cwd, 1024);
-  BJVM_CHECK(cwd.chars == getcwd(cwd.chars, 1024));
+  CHECK(cwd.chars == getcwd(cwd.chars, 1024));
   cwd.len = (int)strlen(cwd.chars);
 
   INIT_STACK_STRING(jre, 1024);
@@ -124,7 +124,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
 
   SET_PROP(0, "java.home");
   char cwd[1024] = {0};
-  BJVM_CHECK(cwd == getcwd(cwd, 1024));
+  CHECK(cwd == getcwd(cwd, 1024));
 
   INIT_STACK_STRING(java_home, 1024);
   java_home = bprintf(java_home, "%s/jdk23", cwd);

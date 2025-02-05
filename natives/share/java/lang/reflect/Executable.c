@@ -3,7 +3,7 @@
 #include <reflection.h>
 
 DECLARE_NATIVE("java/lang/reflect", Executable, getParameters0, "()[Ljava/lang/reflect/Parameter;") {
-  assert(argc == 0);
+  DCHECK(argc == 0);
   // Could be a Method or a Constructor, check which one
   bjvm_obj_header *executable = obj->obj;
   bjvm_cp_method *method;

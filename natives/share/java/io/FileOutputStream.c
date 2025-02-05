@@ -45,7 +45,7 @@ DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
 DECLARE_NATIVE("java/io", FileOutputStream, close0, "()V") {
   // this method does no allocations or yielding, so we can use the same pointer
   bjvm_obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");
-  assert(fd);
+  DCHECK(fd);
 
   s32 unix_fd = LoadFieldInt(fd, "fd");
   if (unix_fd != -1) close(unix_fd);

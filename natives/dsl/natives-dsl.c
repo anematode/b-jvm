@@ -13,7 +13,7 @@ void push_bjvm_native(slice class_name, slice method_name, slice signature, bjvm
   if (bjvm_native_count == bjvm_native_capacity) {
     bjvm_native_capacity = bjvm_native_capacity ? bjvm_native_capacity * 2 : 16;
     bjvm_native_t *bjvm_natives_ = (bjvm_native_t *)realloc(bjvm_natives, bjvm_native_capacity * sizeof(bjvm_native_t));
-    assert(bjvm_natives_ != nullptr);
+    DCHECK(bjvm_natives_ != nullptr);
 
     bjvm_natives = bjvm_natives_;
   }

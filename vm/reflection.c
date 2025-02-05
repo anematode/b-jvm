@@ -67,7 +67,7 @@ void bjvm_reflect_initialize_field(bjvm_thread *thread,
 void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
                                          bjvm_classdesc *classdesc,
                                          bjvm_cp_method *method) {
-  assert(method->is_ctor && "Method is not a constructor");
+  DCHECK(method->is_ctor && "Method is not a constructor");
   bjvm_classdesc *reflect_Constructor = thread->vm->cached_classdescs->constructor;
 
   method->reflection_ctor = (void *)new_object(thread, reflect_Constructor);
@@ -97,7 +97,7 @@ void bjvm_reflect_initialize_constructor(bjvm_thread *thread,
 void bjvm_reflect_initialize_method(bjvm_thread *thread,
                                     bjvm_classdesc *classdesc,
                                     bjvm_cp_method *method) {
-  assert(!method->is_ctor && !method->is_clinit && "Method is a constructor or <clinit>");
+  DCHECK(!method->is_ctor && !method->is_clinit && "Method is a constructor or <clinit>");
   bjvm_classdesc *reflect_Method = thread->vm->cached_classdescs->method;
 
   bjvm_handle *result =
@@ -185,7 +185,7 @@ static bjvm_obj_header * get_method_parameters_impl(bjvm_thread * thread, bjvm_c
     if (!P->name)
       goto oom;
     P->executable = method->reflection_method ? (void*)method->reflection_method : (void*)method->reflection_ctor;
-    assert(P->executable);  // we should have already initialised the method
+    DCHECK(P->executable);  // we should have already initialised the method
 
     P->index = j;
     P->modifiers = mparams.params[j].access_flags;

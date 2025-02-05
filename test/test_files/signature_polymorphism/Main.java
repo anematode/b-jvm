@@ -5,7 +5,7 @@ import java.util.*;
 
 public class Main {
     public static void assertEquals(Object a, Object b) {
-        assert(a.equals(b));
+        DCHECK(a.equals(b));
     }
 
     public static void main(String[] args) throws Throwable {
@@ -26,7 +26,7 @@ public class Main {
         // mt is (Object[])List
         mt = MethodType.methodType(java.util.List.class, Object[].class);
         mh = lookup.findStatic(java.util.Arrays.class, "asList", mt);
-        assert(mh.isVarargsCollector());
+        DCHECK(mh.isVarargsCollector());
         x = mh.invoke("one", "two");
         // invoke(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
         assertEquals(x, java.util.Arrays.asList("one","two"));
@@ -41,7 +41,7 @@ public class Main {
         mh = lookup.findVirtual(java.util.List.class, "size", mt);
         i = (int) mh.invokeExact(java.util.Arrays.asList(1,2,3));
         // invokeExact(Ljava/util/List;)I
-        assert(i == 3);
+        DCHECK(i == 3);
         mt = MethodType.methodType(void.class, String.class);
         mh = lookup.findVirtual(java.io.PrintStream.class, "println", mt);
         mh.invokeExact(System.out, "Hello, world.");
@@ -58,7 +58,7 @@ public class Main {
         MethodHandle asList = publicLookup()
           .findStatic(Arrays.class, "asList", methodType(List.class, Object[].class));
         assertEquals(methodType(List.class, Object[].class), asList.type());
-        assert(asList.isVarargsCollector());
+        DCHECK(asList.isVarargsCollector());
         assertEquals("[]", asList.invoke().toString());
         assertEquals("[1]", asList.invoke(1).toString());
         assertEquals("[two, too]", asList.invoke("two", "too").toString());

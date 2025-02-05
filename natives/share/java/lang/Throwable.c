@@ -60,7 +60,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   for (int j = 0; i >= 0; --i, ++j) {
     // Check that all frames have an non-null method
     for (int i = 0; i < thread->frames_count; ++i) {
-      assert(bjvm_get_frame_method(thread->frames[i]));
+      DCHECK(bjvm_get_frame_method(thread->frames[i]));
     }
 
     bjvm_stack_frame *frame = thread->frames[i];
@@ -97,13 +97,13 @@ cleanup:
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
-  assert(argc == 0);
+  DCHECK(argc == 0);
   return (bjvm_stack_value){.i = *ArrayLength(*backtrace_object(obj->obj))};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement,
                "(I)Ljava/lang/StackTraceElement;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_obj_header *stack_trace = *backtrace_object(obj->obj);
   int index = args[0].i;
   if (index < 0 || index >= *ArrayLength(stack_trace)) {

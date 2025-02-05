@@ -454,7 +454,7 @@ void copy_analy_stack_state(bjvm_analy_stack_state st,
     out->entries_cap = st.entries_count + 2 /* we'll probably push more */;
     out->entries = realloc(out->entries,
                            out->entries_cap * sizeof(bjvm_analy_stack_entry));
-    assert(out->entries);
+    DCHECK(out->entries);
   }
   memcpy(out->entries, st.entries,
          st.entries_count * sizeof(bjvm_analy_stack_entry));
@@ -528,7 +528,7 @@ int bjvm_locals_on_method_entry(const bjvm_cp_method *method,
                                 int **locals_swizzle) {
   const bjvm_attribute_code *code = method->code;
   const bjvm_method_descriptor *desc = method->descriptor;
-  assert(code);
+  DCHECK(code);
   u16 max_locals = code->max_locals;
   locals->entries = calloc(max_locals, sizeof(bjvm_analy_stack_entry));
   *locals_swizzle = malloc(max_locals * sizeof(int));
@@ -639,7 +639,7 @@ struct method_analysis_ctx {
 
 int push_branch_target(struct method_analysis_ctx *ctx, u32 curr,
                        u32 target) {
-  assert((int)target < ctx->code->insn_count);
+  DCHECK((int)target < ctx->code->insn_count);
   *VECTOR_PUSH(ctx->edges, ctx->edges_count, ctx->edges_cap) =
       (struct edge){.start = curr, .end = target};
   return 0;
@@ -1515,7 +1515,7 @@ void dfs_nothrow_accessible(bjvm_basic_block *bs, int i) {
 // interpreted for the rest of its life.)
 int bjvm_scan_basic_blocks(const bjvm_attribute_code *code,
                            bjvm_code_analysis *analy) {
-  assert(analy);
+  DCHECK(analy);
   if (analy->blocks)
     return 0; // already done
   // First, record all branch targets.
@@ -1635,7 +1635,7 @@ static void idom_dfs(bjvm_basic_block *block, int *visited, u32 *clock) {
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // bjvm_dump_cfg_to_graphviz(stderr, analy);
-  assert(analy->blocks && "Basic blocks must have been already scanned");
+  DCHECK(analy->blocks && "Basic blocks must have been already scanned");
   if (analy->dominator_tree_computed)
     return;
   analy->dominator_tree_computed = true;
@@ -1692,7 +1692,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     bjvm_dominated_list_t *sdlist = &analy->blocks[i].idominates;
     for (int list_i = 0; list_i < sdlist->count; ++list_i) {
       int w = sdlist->list[list_i], walk = w, min = INT_MAX;
-      assert(semidom[w] == i && "Algorithm invariant");
+      DCHECK(semidom[w] == i && "Algorithm invariant");
       // Walk from w to i and record the minimizer of the semidominator value
       while (walk != i) {
         if (block_to_pre[walk] < min) {
@@ -1729,7 +1729,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
 
 bool bjvm_query_dominance(const bjvm_basic_block *dominator,
                           const bjvm_basic_block *dominated) {
-  assert(dominator->idom_pre != 0 && "dominator tree not computed");
+  DCHECK(dominator->idom_pre != 0 && "dominator tree not computed");
   return dominator->idom_pre <= dominated->idom_pre &&
          dominator->idom_post >= dominated->idom_post;
 }
@@ -1847,7 +1847,7 @@ static int extended_npe_phase2(const bjvm_cp_method *method,
     break;
   case BJVM_VARIABLE_SRC_KIND_LOCAL: {
     int index = source->index;
-    assert(index >= 0 && index < method->code->insn_count);
+    DCHECK(index >= 0 && index < method->code->insn_count);
     bjvm_bytecode_insn *insn = method->code->code + index;
 
     if (lvt && ((ent = bjvm_lvt_lookup(insn->index, original_pc, lvt)))) {
@@ -1859,7 +1859,7 @@ static int extended_npe_phase2(const bjvm_cp_method *method,
   }
   case BJVM_VARIABLE_SRC_KIND_INSN: {
     int index = source->index;
-    assert(index >= 0 && index < method->code->insn_count);
+    DCHECK(index >= 0 && index < method->code->insn_count);
     bjvm_bytecode_insn *insn = method->code->code + index;
 
     switch (insn->kind) {

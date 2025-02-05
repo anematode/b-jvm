@@ -3,7 +3,7 @@
 DECLARE_NATIVE("java/lang", ClassLoader, registerNatives, "()V") { return value_null(); }
 
 DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0, "(Ljava/lang/String;)Ljava/lang/Class;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
   for (u32 i = 0; i < read.len; ++i)
@@ -18,7 +18,7 @@ on_oom:
 }
 
 DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass, "(Ljava/lang/String;)Ljava/lang/Class;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
   // Replace . with /
   for (u32 i = 0; i < read.len; ++i)
@@ -43,7 +43,7 @@ enum { CREATION_ANONYMOUS = 8 };
 bjvm_stack_value define_class(bjvm_thread *thread, bjvm_handle *loader, bjvm_handle *parent_class, bjvm_handle *name,
                               u8 *data_bytes, int offset, int length, bjvm_handle *pd,
                               bool initialize, int flags, bjvm_handle *source) {
-  assert(offset == 0);
+  DCHECK(offset == 0);
 
   heap_string name_str = AsHeapString(name->obj, on_oom);
   // Replace . with / and then append . <random string>
@@ -66,7 +66,7 @@ bjvm_stack_value define_class(bjvm_thread *thread, bjvm_handle *loader, bjvm_han
   if (initialize) {
     bjvm_initialize_class_t pox = {.args = {thread, result}};
     future_t fut = bjvm_initialize_class(&pox);
-    BJVM_CHECK(fut.status == FUTURE_READY);
+    CHECK(fut.status == FUTURE_READY);
   }
   if (result) {
     return (bjvm_stack_value){.obj = (void *)bjvm_get_class_mirror(thread, result)};
@@ -100,7 +100,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass1,
   int length = args[4].i;
   bjvm_handle *pd = args[5].handle;
 
-  assert(length <= *ArrayLength(data->obj));
+  DCHECK(length <= *ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
@@ -120,7 +120,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
   int flags = args[8].i;
   bjvm_handle *source = args[9].handle;
 
-  assert(length <= *ArrayLength(data->obj));
+  DCHECK(length <= *ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);

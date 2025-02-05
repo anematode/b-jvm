@@ -45,9 +45,11 @@ extern "C" {
   } while (0)
 #endif
 
+// catch2 has a conflicting definition of CHECK
+#ifndef __cplusplus
 /// Checks the condition is true;  if not, optionally prints a message and aborts.
 /// This check is not removed in release builds.
-#define BJVM_CHECK(condition, ...)                                                                                          \
+#define CHECK(condition, ...)                                                                                          \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
       fprintf(stderr, "%s: %s%d: CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
@@ -56,6 +58,23 @@ extern "C" {
       abort();                                                                                                         \
     }                                                                                                                  \
   } while (0)
+#endif
+
+/// Checks the condition is true;  if not, optionally prints a message and aborts.
+/// This check is removed in release builds.
+#ifdef DCHECKS_ENABLED
+#define DCHECK(condition, ...)                                                                                          \
+  do {                                                                                                                 \
+    if (!(condition)) {                                                                                                \
+      fprintf(stderr, "%s: %s%d: CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
+      fprintf(stderr, "" __VA_ARGS__);                                                                                 \
+      fprintf(stderr, "\n");                                                                                           \
+      abort();                                                                                                         \
+    }                                                                                                                  \
+  } while (0)
+#else
+#define DCHECK(condition, ...) (void)(condition);
+#endif
 
 static inline void *__vector_push(size_t element_size, void **vector, int *vector_count, int *vector_cap) {
   if (__builtin_expect((*vector_count) >= (*vector_cap), 0)) {
@@ -93,13 +112,13 @@ typedef struct {
 
 /// Slices the given string from the given start index to the end.
 static inline slice subslice(slice str, u32 start) {
-  assert(str.len >= start);
+  DCHECK(str.len >= start);
   return (slice){.chars = str.chars + start, .len = (u32)(str.len - start)};
 }
 
 /// Slices the given string from the given start index to the given end index.
 static inline slice subslice_to(slice str, u32 start, u32 end) {
-  assert(end >= start);
+  DCHECK(end >= start);
   return (slice){.chars = str.chars + start, .len = (u32)(end - start)};
 }
 
@@ -110,7 +129,7 @@ static inline slice bprintf(slice buffer, const char *format, ...) {
   va_start(args, format);
   int len = vsnprintf(buffer.chars, buffer.len + 1, format, args);
   va_end(args);
-  assert(len >= 0);
+  DCHECK(len >= 0);
 
   return (slice){.chars = buffer.chars, .len = (u32)len};
 }
@@ -121,7 +140,7 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
   va_start(args, format);
 
   int len_ = vsnprintf(str->chars + write, str->len - write + 1, format, args);
-  assert(len_ > 0);
+  DCHECK(len_ > 0);
   u32 len = (u32)len_;
 
   va_end(args);
@@ -146,7 +165,7 @@ static inline int build_str(heap_string *str, int write, const char *format, ...
 
 /// Mallocates a new heap string with the given length.
 static inline heap_string make_heap_str(u32 len) {
-  assert(len < UINT32_MAX); // because we like to add a null terminator
+  DCHECK(len < UINT32_MAX); // because we like to add a null terminator
   return (heap_string){.chars = (char *)calloc(len + 1, 1), .len = len, .cap = (u32)(len + 1)};
 }
 
@@ -159,13 +178,13 @@ static inline heap_string make_heap_str_from(slice slice) {
 
 /// Truncates the given heap string to the given length.
 static inline void heap_str_truncate(heap_string str, u32 len) {
-  assert(len <= str.len);
+  DCHECK(len <= str.len);
   str.len = len;
 }
 
 /// Exchange / and . in the class name.
 static inline void exchange_slashes_and_dots(slice *dst, slice src) {
-  assert(dst->len >= src.len);
+  DCHECK(dst->len >= src.len);
   memcpy(dst->chars, src.chars, src.len);
   for (size_t i = 0; i < src.len; ++i) {
     if (dst->chars[i] == '/') {
@@ -206,14 +225,14 @@ static inline slice hslc(heap_string str) { return (slice){.chars = str.chars, .
 /// Aligns the given value up to the given alignment.
 /// alignment must be a power of 2.
 static inline size_t align_up(size_t value, size_t alignment) {
-  assert(alignment && (alignment & (alignment - 1)) == 0);
+  DCHECK(alignment && (alignment & (alignment - 1)) == 0);
   return (value + alignment - 1) & ~(alignment - 1);
 }
 
 /// Converts the given null-terminated string to a slice. Use the STR macro for literals.
 static inline slice str_to_utf8(const char *str) {
   size_t len = strlen(str);
-  assert(len <= UINT32_MAX);
+  DCHECK(len <= UINT32_MAX);
   return (slice){.chars = (char *)str, .len = (u32)len};
 }
 

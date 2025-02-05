@@ -203,7 +203,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 
   bjvm_initialize_class_t pox = { .args = {thread, desc}};
   future_t f = bjvm_initialize_class(&pox);
-  BJVM_CHECK(f.status == FUTURE_READY);
+  CHECK(f.status == FUTURE_READY);
 
   method = bjvm_method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"),
                               false, false);

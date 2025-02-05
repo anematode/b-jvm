@@ -2,6 +2,14 @@ include(CheckSymbolExists)
 include(probes)
 include(Zlib)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(DCHECK_DEFAULT ON)
+else ()
+    set(DCHECK_DEFAULT OFF)
+endif ()
+
+option(DCHECKS_ENABLED "Enable DCHECKs" ${DCHECK_DEFAULT})
+
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "*.c" "*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")
 

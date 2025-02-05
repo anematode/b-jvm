@@ -21,7 +21,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
     return value_null();
   heap_string filename = AsHeapString(args[0].handle->obj, on_oom);
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = fopen(filename.chars, "r");
   if (!file) {
     bjvm_raise_vm_exception(thread, STR("java/io/FileNotFoundException"),
@@ -37,7 +37,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, open0, "(Ljava/lang/String;I)V") {
 
 DECLARE_NATIVE("java/io", RandomAccessFile, read0, "()I") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
     bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
@@ -50,7 +50,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, read0, "()I") {
 
 DECLARE_NATIVE("java/io", RandomAccessFile, seek0, "(J)V") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
     bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
@@ -64,7 +64,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, seek0, "(J)V") {
 
 DECLARE_NATIVE("java/io", RandomAccessFile, getFilePointer, "()J") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
     bjvm_raise_vm_exception(thread, STR("java/io/IOException"),
@@ -77,7 +77,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, getFilePointer, "()J") {
 
 DECLARE_NATIVE("java/io", RandomAccessFile, close0, "()V") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (file) {
     fclose(file);
@@ -88,7 +88,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, close0, "()V") {
 
 DECLARE_NATIVE("java/io", RandomAccessFile, length, "()J") {
   bjvm_obj_header *fd = *get_fd(obj->obj);
-  assert(fd);
+  DCHECK(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
     bjvm_raise_vm_exception(thread, STR("java/io/IOException"),

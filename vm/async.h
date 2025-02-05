@@ -146,7 +146,7 @@ template <typename T> T ZeroInternalState_(T t) {
   maybe_extern_begin;                                                                                                  \
   modifiers future_t name(void *self_) {                                                                               \
     name##_t *self = (name##_t *)self_;                                                                                \
-    assert(self);                                                                                                      \
+    DCHECK(self);                                                                                                      \
     prelude(name);                                                                                                     \
     start_counter(label_counter, (0) + 1);                                                                             \
     self->_state = (self->_state == 0) ? (0) : self->_state;                                                           \

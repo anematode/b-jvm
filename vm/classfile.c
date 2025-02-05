@@ -82,7 +82,7 @@ void bjvm_free_classfile(bjvm_classdesc cf) {
 }
 
 bjvm_cp_entry *get_constant_pool_entry(bjvm_constant_pool *pool, int index) {
-  assert(index >= 0 && index < pool->entries_len);
+  DCHECK(index >= 0 && index < pool->entries_len);
   return &pool->entries[index];
 }
 
@@ -168,7 +168,7 @@ slice parse_modified_utf8(const u8 *bytes, int len, arena *arena) {
 
 bjvm_cp_entry *bjvm_check_cp_entry(bjvm_cp_entry *entry, bjvm_cp_kind expected_kinds,
                                    const char *reason) {
-  assert(reason);
+  DCHECK(reason);
   if ((entry->kind & expected_kinds) || (!expected_kinds))
     return entry;
   char buf[1000] = {0}, *write = buf, *end = buf + sizeof(buf);
@@ -196,7 +196,7 @@ const slice * bjvm_lvt_lookup(int index, int original_pc, const bjvm_attribute_l
 
 bjvm_cp_entry *checked_cp_entry(bjvm_constant_pool *pool, int index,
                                 bjvm_cp_kind expected_kinds, const char *reason) {
-  assert(reason);
+  DCHECK(reason);
   if (!(index >= 0 && index < pool->entries_len)) {
     char buf[256] = {0};
     snprintf(
@@ -1502,7 +1502,7 @@ bjvm_bytecode_insn parse_insn(cf_byteslice *reader, u32 pc,
 }
 
 int convert_pc_to_insn(int pc, int *pc_to_insn, u32 max_pc) {
-  assert(pc < (int)max_pc &&
+  DCHECK(pc < (int)max_pc &&
          pc >= 0); // checked pc should have caught this earlier
   int insn = pc_to_insn[pc];
   if (insn == -1) {

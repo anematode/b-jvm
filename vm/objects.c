@@ -105,7 +105,7 @@ object make_jstring_cstr(bjvm_thread *thread, char const* cstr) {
   bjvm_obj_header *result = nullptr;
 
   size_t len_ = strlen(cstr);
-  assert(len_ < INT32_MAX);
+  DCHECK(len_ < INT32_MAX);
   s32 len = (s32)len_;
 
   S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, len);
@@ -176,7 +176,7 @@ bjvm_obj_header *MakeJStringFromData(bjvm_thread *thread, slice data, string_cod
 
   bjvm_obj_header *result = nullptr;
 
-  assert(data.len < INT32_MAX);
+  DCHECK(data.len < INT32_MAX);
   s32 len = (s32)data.len;
 
   S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, len);

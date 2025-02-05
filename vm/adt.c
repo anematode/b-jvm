@@ -118,11 +118,11 @@ void get_compressed_bitset_word_and_offset(bjvm_compressed_bitset *bits,
                                            size_t bit_index, u64 **word,
                                            u8 *offset) {
   if (bjvm_is_bitset_compressed(*bits)) {
-    assert(bit_index < 63);
+    DCHECK(bit_index < 63);
     *word = &bits->bits_inl;
     *offset = bit_index + 1;
   } else {
-    assert(bit_index < 64 * bits->ptr.size_words);
+    DCHECK(bit_index < 64 * bits->ptr.size_words);
     *word = &bits->ptr.bits[bit_index >> 6];
     *offset = bit_index & 0x3f;
   }
@@ -329,7 +329,7 @@ void bjvm_hash_table_rehash(bjvm_string_hash_table *tbl, size_t new_capacity) {
 
 void *bjvm_hash_table_insert_impl(bjvm_string_hash_table *tbl, char *key,
                                   int len_, void *value, bool copy_key) {
-  assert(len_ >= -1);
+  DCHECK(len_ >= -1);
   size_t len = len_ == -1 ? (int)strlen(key) : len_;
 
   bool equal, on_chain;

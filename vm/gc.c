@@ -360,7 +360,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
     bjvm_obj_header *obj = ctx.objs[i];
     size_t sz = size_of_object(obj);
 
-    assert(write_ptr + sz <= end);
+    DCHECK(write_ptr + sz <= end);
 
     obj->mark_word &= ~REACHABLE_BIT;
     memcpy(write_ptr, obj, sz);

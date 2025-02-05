@@ -18,7 +18,7 @@ static bjvm_attribute *find_attribute_by_kind(bjvm_classdesc *desc, bjvm_attribu
 DECLARE_NATIVE("java/lang", Class, registerNatives, "()V") { return value_null(); }
 
 DECLARE_NATIVE("java/lang", Class, getPrimitiveClass, "(Ljava/lang/String;)Ljava/lang/Class;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   if (args[0].handle->obj == nullptr) {
     raise_null_pointer_exception(thread);
     return value_null();
@@ -79,7 +79,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;")
 #define data ((bjvm_obj_header **)ArrayData(array->obj))
 
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
-  BJVM_CHECK(!error);
+  CHECK(!error);
   data[0] = (void *)enclosing_method.class_info->classdesc->mirror;
   if (enclosing_method.nat != nullptr) {
     data[1] = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->name, true);
@@ -102,7 +102,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaringClass0, "()Ljava/lang/Class;") {
     return value_null();
   }
   int error = bjvm_resolve_class(thread, enclosing_method.class_info);
-  BJVM_CHECK(!error);
+  CHECK(!error);
   return (bjvm_stack_value){.obj = (void *)enclosing_method.class_info->classdesc->mirror};
 }
 
@@ -113,7 +113,7 @@ DECLARE_NATIVE("java/lang", Class, getComponentType, "()Ljava/lang/Class;") {
     return value_null();
   }
   void *result = bjvm_get_class_mirror(thread, desc->one_fewer_dim);
-  assert(result);
+  DCHECK(result);
   return (bjvm_stack_value){.obj = result};
 }
 
@@ -165,7 +165,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   if (c && args[1].i) {
     bjvm_initialize_class_t ctx = {.args = {thread, c}};
     future_t f = bjvm_initialize_class(&ctx);
-    BJVM_CHECK(f.status == FUTURE_READY);
+    CHECK(f.status == FUTURE_READY);
 
     if (ctx._result) {
       return value_null();
@@ -253,7 +253,7 @@ bool include_method(const bjvm_cp_method *method, bool public_only) {
 
 // Get a list of all methods on a class, optionally filtering by public_only
 DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/Method;") {
-  assert(argc == 1);
+  DCHECK(argc == 1);
   bjvm_classdesc *class = bjvm_unmirror_class(obj->obj);
   bool public_only = args[0].i;
   int methods = 0;

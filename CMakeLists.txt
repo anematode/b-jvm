@@ -29,17 +29,25 @@ endif ()
 add_library(bjvm_static STATIC)
 target_link_libraries(bjvm_static
         PUBLIC vm
-        PRIVATE natives)
+        PUBLIC natives)
 
 if (NOT EMSCRIPTEN)
-    add_library(bjvm_shared SHARED)
-    target_link_libraries(bjvm_shared PUBLIC vm PRIVATE natives)
+    add_library(bjvm SHARED)
+    target_link_libraries(bjvm PUBLIC vm PUBLIC natives)
 endif()
 
 if (EMSCRIPTEN)
+    target_link_options(bjvm_static PUBLIC -sEXPORTED_FUNCTIONS=_malloc,_free,_main
+            -sSTACK_SIZE=500000
+            -Wl,--whole-archive
+            -sWASMFS
+            -sFORCE_FILESYSTEM=1
+            -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1
+            -sEXPORTED_RUNTIME_METHODS=ccall,wasmMemory,cwrap,addFunction,removeFunction,wasmTable,FS,UTF8ToString,getValue,setValue
+            )
+
     add_executable(bjvm_main vm/bin/main.c)  # for now
     # add bjvm with -Wl,--whole-archive
     target_link_libraries(bjvm_main PRIVATE bjvm_static)
-    set(EmscriptenFlags "-s EXPORTED_FUNCTIONS=\"['_malloc','_free','_main']\" -sSTACK_SIZE=500000 -Wl,--whole-archive -sWASMFS -sFORCE_FILESYSTEM=1 -sALLOW_MEMORY_GROWTH=1 --emit-tsd bjvm_main.d.ts -s ALLOW_TABLE_GROWTH=1 -s EXPORTED_RUNTIME_METHODS='\"ccall\",\"wasmMemory\",\"cwrap\",\"addFunction\",\"removeFunction\",\"wasmTable\",\"FS\",\"UTF8ToString\",\"getValue\",\"setValue\"'")
-    add_link_options("${EmscriptenFlags} -sMODULARIZE -sEXPORT_ES6=1")
+    add_link_options(--emit-tsd bjvm_main.d.ts -sMODULARIZE -sEXPORT_ES6=1)
 endif ()

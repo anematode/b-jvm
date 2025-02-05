@@ -8,7 +8,7 @@
   bjvm_classdesc *classdesc__ = target_->descriptor; \
   (void) context__; /* stop the compiler complaining */ \
   \
-  assert(classdesc__->kind == BJVM_CD_KIND_ORDINARY); \
+  DCHECK(classdesc__->kind == BJVM_CD_KIND_ORDINARY); \
   bjvm_cp_method *method__ = bjvm_method_lookup(classdesc__, STR("run"), null_str(), true, true); \
   if (!method__) { \
     /* TODO figure out what JVM normally does here */ \
@@ -24,7 +24,7 @@ DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedExceptionAction;Ljava/security/"
                "AccessControlContext;)Ljava/lang/Object;",
                locals(), invoked_methods(invoked_method(call_interpreter))) {
-  assert(argc == 2);
+  DCHECK(argc == 2);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
 }
@@ -33,7 +33,7 @@ DECLARE_ASYNC_NATIVE(
     "java/security", AccessController, doPrivileged,
     "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
     locals(), invoked_methods(invoked_method(call_interpreter))) {
-  assert(argc == 1);
+  DCHECK(argc == 1);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
 }
@@ -47,7 +47,7 @@ DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;Ljava/security/"
                "AccessControlContext;)Ljava/lang/Object;",
                locals(), invoked_methods(invoked_method(call_interpreter))) {
-  assert(argc == 2);
+  DCHECK(argc == 2);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
 }
@@ -61,7 +61,7 @@ DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
                locals(), invoked_methods(invoked_method(call_interpreter))) {
   // Look up method "run" on obj
-  assert(argc == 1);
+  DCHECK(argc == 1);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
 }

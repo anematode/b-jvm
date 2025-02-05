@@ -17,14 +17,14 @@ void push_bjvm_native(slice class_name, slice method_name, slice signature, bjvm
 static inline void __obj_store_field(bjvm_obj_header *thing, slice field_name, bjvm_stack_value value,
                                      slice desc) {
   bjvm_cp_field *field = bjvm_field_lookup(thing->descriptor, field_name, desc);
-  assert(field);
+  DCHECK(field);
 
   bjvm_set_field(thing, field, value);
 }
 
 static inline bjvm_stack_value __obj_load_field(bjvm_obj_header *thing, slice field_name, slice desc) {
   bjvm_cp_field *field = bjvm_field_lookup(thing->descriptor, field_name, desc);
-  assert(field);
+  DCHECK(field);
 
   return bjvm_get_field(thing, field);
 }
@@ -51,7 +51,7 @@ static inline bjvm_obj_header *check_is_object(bjvm_obj_header *thing) { return 
     bjvm_obj_header *__val = check_is_object(expr);                                                                    \
     heap_string __hstr;                                                                                                \
     if (read_string_to_utf8(thread, &__hstr, __val) != 0) {                                                            \
-      assert(thread->current_exception);                                                                               \
+      DCHECK(thread->current_exception);                                                                               \
       goto on_oom;                                                                                                     \
     }                                                                                                                  \
     __hstr;                                                                                                            \
@@ -213,10 +213,10 @@ extern bjvm_native_t *bjvm_natives;
     /* inline cache here? */                                                                                           \
     bjvm_cp_method *method =                                                                                           \
         bjvm_method_lookup(self->args.receiver->descriptor, STR(method_name), STR(method_descriptor), true, true);     \
-    assert(method);                                                                                                    \
-    assert((sizeof(self->args) - sizeof(bjvm_thread *)) / sizeof(bjvm_stack_value) ==                                  \
+    DCHECK(method);                                                                                                    \
+    DCHECK((sizeof(self->args) - sizeof(bjvm_thread *)) / sizeof(bjvm_stack_value) ==                                  \
            method->descriptor->args_count + 1);                                                                        \
-    assert((sizeof(self->args) - sizeof(bjvm_thread *)) % sizeof(bjvm_stack_value) == 0);                              \
+    DCHECK((sizeof(self->args) - sizeof(bjvm_thread *)) % sizeof(bjvm_stack_value) == 0);                              \
     AWAIT_INNER_(empty, &self->invoked_async_methods.call_interpreter, call_interpreter, self->args.thread, method,                \
                  (bjvm_stack_value *)self->args.receiver);                                                             \
     bjvm_stack_value result = get_async_result(call_interpreter);                                                            \
@@ -226,9 +226,9 @@ extern bjvm_native_t *bjvm_natives;
 #define CallMethod(receiver, name, desc, result, ...)                                                                  \
   do {                                                                                                                 \
     bjvm_cp_method *method = bjvm_method_lookup(receiver->descriptor, STR(name), STR(desc), true, true);               \
-    assert(method);                                                                                                    \
+    DCHECK(method);                                                                                                    \
     bjvm_stack_value args[] = {receiver, __VA_ARGS__};                                                                 \
-    assert((sizeof(args) / sizeof(args[0])) == method->descriptor.args_count);                                         \
+    DCHECK((sizeof(args) / sizeof(args[0])) == method->descriptor.args_count);                                         \
     AWAIT(call_interpreter, thread, method, &args);                                                                          \
     if (result != nullptr) {                                                                                           \
       *result = get_async_result(call_interpreter);                                                                          \
