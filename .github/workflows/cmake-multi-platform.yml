@@ -19,11 +19,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ccache
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache
-
       - name: Install GCC 14
         if: matrix.compiler == 'gcc'
         run: |
@@ -62,12 +57,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/build
-          key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
-
-      - name: Configure ccache
-        run: |
-          ccache -M 2G
-          ccache -s
+          key: cmake-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
 
       - name: Configure CMake
         run: |
@@ -75,16 +65,12 @@ jobs:
             emcmake cmake \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
           else
             cmake \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
           fi
 
       - name: Build
