@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 TEST_CASE("Basic classpath operations", "[classpath]") {
+
   bjvm_classpath cp;
   char *error =
       bjvm_init_classpath(&cp, STR("test_files/broken_jar1/this_is_a_jar.jar"));
