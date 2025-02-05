@@ -2316,7 +2316,8 @@ EMSCRIPTEN_KEEPALIVE
 __attribute__((constructor)) static void nodejs_bootloader() {
   MAIN_THREAD_EM_ASM_INT({
     if (ENVIRONMENT_IS_NODE) {
-      FS.init();
+      if (!FS.initialized)
+        FS.init();
       const fs = require('fs');
       const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]);
 

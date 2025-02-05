@@ -5,7 +5,7 @@
 #ifndef BJVM_TESTS_COMMON_H
 #define BJVM_TESTS_COMMON_H
 
-#include "../src/bjvm.h"
+#include <bjvm.h>
 
 #include <memory>
 #include <filesystem>

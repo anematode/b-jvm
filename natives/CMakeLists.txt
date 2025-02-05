@@ -1,5 +1,5 @@
 add_library(natives OBJECT)
-target_link_libraries(natives PUBLIC bjvm_prebuild)
+target_link_libraries(natives PUBLIC vm)
 
 # all configurations need the DSL stuff to be built
 file(GLOB DSL_SOURCES CONFIGURE_DEPENDS "dsl/*.c")

@@ -1,5 +1,7 @@
 set(CMAKE_CXX_STANDARD 26)
 
+include(AddNodeShebang)
+
 find_package(OpenMP)
 
 add_executable(tests tests.cc arrays-test.cc tests-common.cc wasm-tests.cc
@@ -9,8 +11,14 @@ add_executable(tests tests.cc arrays-test.cc tests-common.cc wasm-tests.cc
         natives-test.cc
         benches.cc)
 
+if (EMSCRIPTEN)
+    AddNodeShebang(tests)
+#    target_compile_options(tests PRIVATE -sALLOW_MEMORY_GROWTH)
+    target_link_options(tests PRIVATE -sALLOW_MEMORY_GROWTH)
+endif()
+
 target_link_libraries(tests PRIVATE z)
-target_link_libraries(tests PRIVATE bjvm natives )
+target_link_libraries(tests PRIVATE bjvm_static natives )
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 set_target_properties(tests PROPERTIES LINK_FLAGS "${EmscriptenFlags}")
 

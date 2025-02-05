@@ -1,6 +1,6 @@
 // Make sure the analysis gets through all of the JDK successfully.
 
-#include "../src/analysis.h"
+#include <analysis.h>
 #include "tests-common.h"
 
 #include <catch2/catch_test_macros.hpp>

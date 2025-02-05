@@ -1,4 +1,4 @@
-#include "../src/classpath.h"
+#include <classpath.h>
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 
