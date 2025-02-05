@@ -8,7 +8,10 @@ option(ASAN "Enable ASan and UBSan" ${ASAN_DEFAULT})
 
 if (ASAN)
     set(ASAN_FLAGS
-            -fsanitize=address)
+            -fno-omit-frame-pointer
+            -fsanitize=address
+            -fsanitize-recover=address
+            -fsanitize-address-use-after-scope)
 
     add_compile_options(${ASAN_FLAGS})
     add_link_options(${ASAN_FLAGS})

@@ -21,7 +21,13 @@ add_library(vm STATIC ${bjvm_SRC})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vm PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-target_compile_options(vm PRIVATE -fno-strict-aliasing -fomit-frame-pointer)
+target_compile_options(vm PRIVATE -fno-strict-aliasing)
+
+set_source_files_properties(
+        interpreter2.c
+        PROPERTIES
+        COMPILE_FLAGS "-fno-sanitize=address"
+)
 
 target_link_libraries(vm PUBLIC stb_ds)
 target_link_libraries(vm PRIVATE m)
