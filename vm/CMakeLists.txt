@@ -17,7 +17,7 @@ file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")
 # somehow emulating emscripten locally...
 list(APPEND bjvm_SRC ${bjvm_wasm_SRC})
 
-add_library(vm STATIC ${bjvm_SRC})
+add_library(vm OBJECT ${bjvm_SRC})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vm PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -37,7 +37,7 @@ if (NOT EMSCRIPTEN)
     target_link_libraries(vm PRIVATE z)
 else ()
     target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-mtail-call")
-    target_link_options(vm PRIVATE "-sUSE_ZLIB")
+    target_link_options(vm PUBLIC "-sUSE_ZLIB")
 endif ()
 
 if (APPLE AND CMAKE_BUILD_TYPE STREQUAL "Debug")

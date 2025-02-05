@@ -15,7 +15,10 @@ if (EMSCRIPTEN)
     AddNodeShebang(tests)
 endif()
 
-target_link_libraries(tests PRIVATE z)
+if (NOT EMSCRIPTEN)
+    target_link_libraries(tests PRIVATE z)
+endif()
+
 target_link_libraries(tests PRIVATE bjvm_static)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 
