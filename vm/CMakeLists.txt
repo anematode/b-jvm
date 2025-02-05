@@ -21,6 +21,8 @@ add_library(vm STATIC ${bjvm_SRC})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vm PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
+target_compile_options(vm PRIVATE -fno-strict-aliasing)
+
 target_link_libraries(vm PUBLIC stb_ds)
 target_link_libraries(vm PRIVATE m)
 
