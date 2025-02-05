@@ -17,7 +17,7 @@ file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")
 # somehow emulating emscripten locally...
 list(APPEND bjvm_SRC ${bjvm_wasm_SRC})
 
-add_library(vm OBJECT ${bjvm_SRC})
+add_library(vm STATIC ${bjvm_SRC})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vm PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
