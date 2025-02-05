@@ -46,12 +46,17 @@ scheduler_status_t rr_scheduler_execute_immediately(execution_record *record);
 
 typedef enum {
   RR_WAKEUP_YIELDING,
-  RR_WAKEUP_SLEEP
+  RR_WAKEUP_SLEEP,
+  RR_WAKEUP_MONITORENTER  // we are trying to acquire a lock on an object held by another thread
 } rr_wakeup_kind;
 
 typedef struct {
   rr_wakeup_kind kind;
-  u64 wakeup_us;  // At this time, the thread should be rescheduled
+  union {
+    u64 wakeup_us;  // At this time, the thread should be rescheduled
+    u64 monitored_tid;
+    int monitored_object; // js handle
+  };
 } rr_wakeup_info;
 
 execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t call);

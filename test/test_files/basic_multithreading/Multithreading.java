@@ -3,7 +3,12 @@ import java.util.ArrayList;
 class MultithreadingDemo implements Runnable {
     volatile static ArrayList<Integer> list = new ArrayList<>();
 
-    public void run() {
+    String name;
+    public MultithreadingDemo(int index) {
+        name = "Thread " + index;
+    }
+
+    public void run2() {
         int id = (int)Thread.currentThread().getId();
         System.out.println("Thread " + id + " is now alive!");
 
@@ -24,13 +29,26 @@ class MultithreadingDemo implements Runnable {
         }
         System.out.println();
     }
+
+    public void run() {
+        synchronized (Multithreading.class) {
+            for (int i = 0; i < 10; i++) {
+                System.out.println(name + " :: " + i);
+                try {
+                    Thread.sleep(500);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        }
+    }
 }
 
 public class Multithreading {
     public static void main(String[] args) {
         int n = 8; // Number of threads
         for (int i = 0; i < n; i++) {
-            Thread object = new Thread(new MultithreadingDemo());
+            Thread object = new Thread(new MultithreadingDemo(i));
             object.start();
             System.out.println("Done!\n");
         }

@@ -153,7 +153,7 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
-  return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
+  return (bjvm_stack_value){.i = (int)(*get_mark_word(args[0].handle->obj) >> 1)};
 }
 
 s64 micros() {

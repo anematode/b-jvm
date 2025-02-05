@@ -402,6 +402,14 @@ void bjvm_register_native(bjvm_vm *vm, const slice class, const slice method_nam
   ent->callback = callback;
 }
 
+lock_record * inspect_lock(bjvm_obj_header *obj){
+  return (obj->mark_word & 1) ? (lock_record *)(obj->mark_word & ~1) : nullptr;
+}
+
+volatile bjvm_mark_word_t * get_mark_word(object obj){
+  return inspect_lock(obj) ? &inspect_lock(obj)->mark_word : &obj->mark_word;
+}
+
 void read_string(bjvm_thread *, bjvm_obj_header *obj, s8 **buf, size_t *len) {
   assert(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
   bjvm_obj_header *array = ((struct bjvm_native_String *)obj)->value;

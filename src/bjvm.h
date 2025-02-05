@@ -116,14 +116,31 @@ typedef struct {
 
 typedef u64 bjvm_mark_word_t;
 
+// If the last bit of the mark word is 1, then it is actually a pointer to a lock record, which contains the original
+// mark word, along with some information about the lock.
+typedef struct {
+  u64 tid;
+  u32 count;
+  bjvm_mark_word_t mark_word;
+} lock_record;
+
 // Appears at the top of every object -- corresponds to HotSpot's oopDesc
 typedef struct bjvm_obj_header {
 #ifdef BJVM_MULTITHREADED
 
 #endif
+  // Layout (LSB to MSB):
+  // - 0:  if 1, then mark_word & ~1 is a pointer to a lock_record.
+  // - 1-32: The object's hash code.
+  // - 33: 1 if the object is reachable, 0 otherwise.
+  // - rest: unused for now
   volatile bjvm_mark_word_t mark_word;
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
+
+// nullptr if the object is not locked, otherwise a pointer to a lock_record.
+lock_record *inspect_lock(bjvm_obj_header *obj);
+volatile bjvm_mark_word_t* get_mark_word(object obj);
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of

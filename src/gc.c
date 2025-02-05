@@ -208,7 +208,7 @@ static int in_heap(bjvm_gc_ctx *ctx, bjvm_obj_header *field) {
 
 static void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bitsets,
                          int *capacities, int depth) {
-  obj->mark_word |= REACHABLE_BIT;
+  *get_mark_word(obj) |= REACHABLE_BIT;
   *VECTOR_PUSH(ctx->objs, ctx->objs_count, ctx->objs_cap) = obj;
 
   // Visit all instance fields
@@ -221,7 +221,7 @@ static void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bi
                                                &capacities[depth]);
     for (int i = 0; i < len; ++i) {
       bjvm_obj_header *field = *((bjvm_obj_header **)obj + (*bitset)[i]);
-      if (field && !(field->mark_word & REACHABLE_BIT) && in_heap(ctx, field)) {
+      if (field && !(*get_mark_word(field) & REACHABLE_BIT) && in_heap(ctx, field)) {
         // Visiting instance field at offset on class
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
@@ -233,7 +233,7 @@ static void bjvm_mark_reachable(bjvm_gc_ctx *ctx, bjvm_obj_header *obj, int **bi
     int len = *ArrayLength(obj);
     for (int i = 0; i < len; ++i) {
       bjvm_obj_header *field = *((bjvm_obj_header **)ArrayData(obj) + i);
-      if (field && !(field->mark_word & REACHABLE_BIT) && in_heap(ctx, field)) {
+      if (field && !(*get_mark_word(field) & REACHABLE_BIT) && in_heap(ctx, field)) {
         bjvm_mark_reachable(ctx, field, bitsets, capacities, depth + 1);
       }
     }
@@ -336,7 +336,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
   for (int i = 0; i < ctx.roots_count; ++i) {
     bjvm_obj_header *root = *ctx.roots[i];
     // printf("Pushing roots: %p\n", root);
-    if (!(root->mark_word & REACHABLE_BIT))
+    if (!(*get_mark_word(root) & REACHABLE_BIT))
       bjvm_mark_reachable(&ctx, root, bitset_list, capacity, 0);
   }
   for (int i = 0; i < 1000; ++i) {
@@ -362,7 +362,7 @@ void bjvm_major_gc(bjvm_vm *vm) {
 
     assert(write_ptr + sz <= end);
 
-    obj->mark_word &= ~REACHABLE_BIT;
+    *get_mark_word(obj) &= ~REACHABLE_BIT;
     memcpy(write_ptr, obj, sz);
 
 

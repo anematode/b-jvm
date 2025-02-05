@@ -1557,14 +1557,64 @@ static s64 if_acmpne_impl_int(ARGS_INT) {
 
 /** Monitors */
 
+bool try_acquire_lock(bjvm_thread *thread, object obj) {
+  lock_record *existing = inspect_lock(obj);
+  if (existing) {
+    if (existing->tid == thread->tid) {
+      existing->count++;
+      return false;
+    }
+
+    // Suspend
+    continuation_frame *cont = async_stack_push(thread);
+    rr_wakeup_info *wakeup = malloc(sizeof(rr_wakeup_info));
+    wakeup->kind = RR_WAKEUP_MONITORENTER;
+    wakeup->monitored_tid = existing->tid;
+    wakeup->monitored_object = bjvm_make_js_handle(thread->vm, obj);
+    *cont = (continuation_frame){.pnt = CONT_RESUME_INSN,
+                                 .wakeup = (void*)wakeup};
+    return true;
+  }
+
+  lock_record *record = malloc(sizeof(lock_record));
+  record->tid = thread->tid;
+  record->count = 1;
+  record->mark_word = obj->mark_word;
+  obj->mark_word = (uintptr_t)record | 1;
+  // printf("Thread %llu acquired lock on object %p\n", thread->tid, obj);
+  return false;
+}
+
+bool try_release_lock(bjvm_thread *thread, object obj) {
+  lock_record *existing = inspect_lock(obj);
+  if (!existing || existing->tid != thread->tid) {
+    // TODO raise exception
+    UNREACHABLE();
+    return true;
+  }
+
+  existing->count--;
+  if (existing->count == 0) {
+    obj->mark_word = existing->mark_word;
+    free(existing);
+  }
+  return false;
+}
+
 // TODO actually implement this stuff
 static s64 monitorenter_impl_int(ARGS_INT) {
-
   DEBUG_CHECK();
   if (unlikely(!tos)) {
     SPILL(tos);
     raise_null_pointer_exception(thread);
     return 0;
+  }
+
+  bjvm_obj_header *obj = (bjvm_obj_header *)tos;
+  bool failed = try_acquire_lock(thread, obj);
+  if (failed) {
+    frame->is_async_suspended = true;
+    return 0;  // suspended, this instruction will be restarted later
   }
 
   sp--;
@@ -1579,6 +1629,10 @@ static s64 monitorexit_impl_int(ARGS_INT) {
     raise_null_pointer_exception(thread);
     return 0;
   }
+
+  bjvm_obj_header *obj = (bjvm_obj_header *)tos;
+  bool failed = try_release_lock(thread, obj);
+  BJVM_CHECK(!failed);
 
   sp--;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));

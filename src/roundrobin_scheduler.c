@@ -35,23 +35,34 @@ static bool is_sleeping(thread_info * info) {
   return info->wakeup_info && info->wakeup_info->kind == RR_WAKEUP_SLEEP;
 }
 
+static bool is_waiting_on_monitor(thread_info *info) {
+  if (info->wakeup_info && info->wakeup_info->kind == RR_WAKEUP_MONITORENTER) {
+    bjvm_thread *thread = info->thread;
+    bjvm_obj_header *obj = bjvm_deref_js_handle(thread->vm, info->wakeup_info->monitored_object);
+    lock_record *lock = inspect_lock(obj);
+    return lock;
+  }
+  return false;
+}
+
 static thread_info * get_next_thr(impl *impl) {
   assert(impl->round_robin && "No threads to run");
   thread_info *info = impl->round_robin[0], *first = info;
   do {
     memmove(impl->round_robin, impl->round_robin + 1, sizeof(thread_info *) * (arrlen(impl->round_robin) - 1));
     impl->round_robin[arrlen(impl->round_robin) - 1] = info;
-    if (!is_sleeping(info)) {
+    if (!is_sleeping(info) && !is_waiting_on_monitor(info)) {
       return info;
     }
   } while (info != first);
 
-  // all are sleeping, find the one with the minimum sleep time
+  // all are sleeping or waiting for a monitor to exit, find the one with the minimum sleep time
   int best_i = 0;
   u64 closest = UINT64_MAX;
   for (int i = 0; i < arrlen(impl->round_robin); i++) {
-    if (impl->round_robin[i]->wakeup_info->wakeup_us < closest) {
-      info = impl->round_robin[i];
+    thread_info *cand = impl->round_robin[i];
+    if (is_sleeping(cand) && cand->wakeup_info->wakeup_us < closest) {
+      info = cand;
       best_i = i;
       closest = info->wakeup_info->wakeup_us;
     }
@@ -81,6 +92,8 @@ u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler) {
         if ((s64)info->wakeup_info->wakeup_us < min) {
           min = (s64)info->wakeup_info->wakeup_us;
         }
+      } else if (is_waiting_on_monitor(info)) {
+        // exclude from consideration
       } else {
         return 0; // at least one thing is waiting, and not sleeping
       }
@@ -88,6 +101,15 @@ u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler) {
   }
   min -= (s64)get_unix_us();
   return min >= 0 ? min : 0;
+}
+
+void free_wakeup(bjvm_thread * thread, rr_wakeup_info * wakeup_info) {
+  if (!wakeup_info)
+    return;
+  if (wakeup_info->kind == RR_WAKEUP_MONITORENTER) {
+    bjvm_drop_js_handle(thread->vm, wakeup_info->monitored_object);
+  }
+  free(wakeup_info);
 }
 
 scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
@@ -143,7 +165,7 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
       arrpop(impl->round_robin);
     }
   } else {
-    free(info->wakeup_info);
+    free_wakeup(thread, info->wakeup_info);
     info->wakeup_info = (void*)fut.wakeup;
   }
 
