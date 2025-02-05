@@ -1,4 +1,4 @@
-name: CMake on a single platform
+name: CMake multi-platform
 
 on:
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ccache
 
-      - name: Install GCC 14 and ccache
+      - name: Install GCC 14
         if: matrix.compiler == 'gcc'
         run: |
           sudo apt-get update
@@ -34,6 +34,8 @@ jobs:
       - name: Set up Emscripten SDK
         if: matrix.compiler == 'emscripten'
         uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.2
 
       - name: Cache JDK
         id: cache_jdk
