@@ -716,6 +716,13 @@ TEST_CASE("benchmark startup") {
   };
 }
 
+TEST_CASE("CloneNotSupportedException") {
+  auto result = run_test_case("test_files/clone_not_supported/", true, "CloneNotSupportedTest");
+  REQUIRE(result.stdout_ == R"(CloneNotSupportedException caught
+NullPointerException caught
+)");
+}
+
 #if 0
 TEST_CASE("Filesystem") {
   auto result = run_test_case("test_files/filesystem", true, "Filesystem");

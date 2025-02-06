@@ -30,6 +30,7 @@
   X(delegating_method_handle_holder, "java/lang/invoke/DelegatingMethodHandle$Holder") \
   X(lf_holder, "java/lang/invoke/LambdaForm$Holder") \
   X(illegal_state_exception, "java/lang/IllegalStateException") \
+  X(clone_not_supported_exception, "java/lang/CloneNotSupportedException") \
   X(file_not_found_exception, "java/io/FileNotFoundException")
 
 
@@ -49,7 +50,8 @@
   X(thread, "java/lang/Thread")                                                \
   X(thread_group, "java/lang/ThreadGroup")                                     \
   X(module, "java/lang/Module")                                     \
-  X(system, "java/lang/System")
+  X(system, "java/lang/System") \
+  X(cloneable, "java/lang/Cloneable")
 
 #define CACHED_CLASSDESCS(X)                                                   \
   __CACHED_EXCEPTION_CLASSES(X)                                                \
