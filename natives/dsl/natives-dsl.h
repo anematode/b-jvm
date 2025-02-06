@@ -121,24 +121,17 @@ extern size_t bjvm_native_capacity;
 extern bjvm_native_t *bjvm_natives;
 
 #define DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier)                                                   \
-  __attribute__((used)) static bjvm_stack_value class_name_##_##method_name_##_cb##modifier(                           \
+  __attribute__((used)) bjvm_stack_value class_name_##_##method_name_##_cb##modifier(                                  \
       [[maybe_unused]] bjvm_thread *thread, [[maybe_unused]] bjvm_handle *obj, [[maybe_unused]] bjvm_value *args,      \
       [[maybe_unused]] u8 argc)
 
 #define create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, async_sz,       \
                                 variant)                                                                               \
-  maybe_extern_begin;                                                                                                  \
-  __attribute__((used, constructor)) static void class_name_##_##method_name_##_init##modifier() {                     \
-    push_bjvm_native(                                                                                                  \
-        STR(package_path "/" #class_name_), STR(#method_name_), STR(method_descriptor_),                               \
-        (bjvm_native_callback){.async_ctx_bytes = async_sz,                                                            \
-                               .variant = (variant##_native_callback) & class_name_##_##method_name_##_cb##modifier}); \
-  };                                                                                                                   \
-  maybe_extern_end
+  [[export_native(package_path, class_name_, method_name_, method_descriptor_, modifier, async_sz, variant)]]
 
 #define DECLARE_NATIVE_(package_path, class_name_, method_name_, method_descriptor_, modifier)                         \
   DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier);                                                        \
-  create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, 0, sync)              \
+  create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, 0, false)              \
       DECLARE_NATIVE_CALLBACK(class_name_, method_name_, modifier)
 
 #define DECLARE_NATIVE(package_path, class_name_, method_name_, method_descriptor_)                                    \
@@ -192,7 +185,7 @@ extern bjvm_native_t *bjvm_natives;
                               invoked_async_methods, modifier)                                                         \
   create_async_declaration(class_name_##_##method_name_##_cb##modifier, locals, invoked_async_methods);                \
   create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier,                       \
-                          sizeof(struct class_name_##_##method_name_##_cb##modifier##_s), async);                      \
+                          sizeof(struct class_name_##_##method_name_##_cb##modifier##_s), true);                      \
   DEFINE_ASYNC_(__attribute__((used)), cached_state_prelude, class_name_##_##method_name_##_cb##modifier)
 
 #define DECLARE_ASYNC_NATIVE(package_path, class_name_, method_name_, method_descriptor_, locals,                      \

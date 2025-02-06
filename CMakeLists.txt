@@ -28,10 +28,12 @@ endif ()
 
 add_library(bjvm_static STATIC)
 target_link_libraries(bjvm_static PUBLIC vm natives)
+target_link_options(bjvm_static PRIVATE -Wl,--whole-archive)
 
 if (NOT EMSCRIPTEN)
     add_library(bjvm SHARED)
     target_link_libraries(bjvm PUBLIC vm natives)
+    target_link_options(bjvm PRIVATE -Wl,--whole-archive)
 endif()
 
 if (EMSCRIPTEN)
