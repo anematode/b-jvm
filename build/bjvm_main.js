@@ -31,10 +31,29 @@ var readyPromise = new Promise((resolve, reject) => {
 // Determine the runtime environment we are in. You can customize this by
 // setting the ENVIRONMENT setting at compile time (see settings.js).
 
+<<<<<<< HEAD
 var ENVIRONMENT_IS_WEB = true;
 var ENVIRONMENT_IS_WORKER = false;
 var ENVIRONMENT_IS_NODE = false;
 var ENVIRONMENT_IS_SHELL = false;
+=======
+// Attempt to auto-detect the environment
+var ENVIRONMENT_IS_WEB = typeof window == 'object';
+var ENVIRONMENT_IS_WORKER = typeof WorkerGlobalScope != 'undefined';
+// N.b. Electron.js environment is simultaneously a NODE-environment, but
+// also a web environment.
+var ENVIRONMENT_IS_NODE = typeof process == 'object' && typeof process.versions == 'object' && typeof process.versions.node == 'string' && process.type != 'renderer';
+var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
+
+if (ENVIRONMENT_IS_NODE) {
+  // When building an ES module `require` is not normally available.
+  // We need to use `createRequire()` to construct the require()` function.
+  const { createRequire } = await import('module');
+  /** @suppress{duplicate} */
+  var require = createRequire('/');
+
+}
+>>>>>>> 3aaf9e9 (fun times)
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
@@ -65,9 +84,53 @@ function locateFile(path) {
 // Hooks that are implemented differently in different runtime environments.
 var readAsync, readBinary;
 
+<<<<<<< HEAD
 if (ENVIRONMENT_IS_SHELL) {
 
   if ((typeof process == 'object' && typeof require === 'function') || typeof window == 'object' || typeof WorkerGlobalScope != 'undefined') throw new Error('not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)');
+=======
+if (ENVIRONMENT_IS_NODE) {
+
+  // These modules will usually be used on Node.js. Load them eagerly to avoid
+  // the complexity of lazy-loading.
+  var fs = require('fs');
+  var nodePath = require('path');
+
+  // EXPORT_ES6 + ENVIRONMENT_IS_NODE always requires use of import.meta.url,
+  // since there's no way getting the current absolute path of the module when
+  // support for that is not available.
+  if (!import.meta.url.startsWith('data:')) {
+    scriptDirectory = nodePath.dirname(require('url').fileURLToPath(import.meta.url)) + '/';
+  }
+
+// include: node_shell_read.js
+readBinary = (filename) => {
+  // We need to re-wrap `file://` strings to URLs.
+  filename = isFileURI(filename) ? new URL(filename) : filename;
+  var ret = fs.readFileSync(filename);
+  return ret;
+};
+
+readAsync = async (filename, binary = true) => {
+  // See the comment in the `readBinary` function.
+  filename = isFileURI(filename) ? new URL(filename) : filename;
+  var ret = fs.readFileSync(filename, binary ? undefined : 'utf8');
+  return ret;
+};
+// end include: node_shell_read.js
+  if (!Module['thisProgram'] && process.argv.length > 1) {
+    thisProgram = process.argv[1].replace(/\\/g, '/');
+  }
+
+  arguments_ = process.argv.slice(2);
+
+  // MODULARIZE will export the module in the proper place outside, we don't need to export here
+
+  quit_ = (status, toThrow) => {
+    process.exitCode = status;
+    throw toThrow;
+  };
+>>>>>>> 3aaf9e9 (fun times)
 
 } else
 
@@ -97,12 +160,48 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
     scriptDirectory = scriptDirectory.substr(0, scriptDirectory.replace(/[?#].*/, '').lastIndexOf('/')+1);
   }
 
+<<<<<<< HEAD
   if (!(typeof window == 'object' || typeof WorkerGlobalScope != 'undefined')) throw new Error('not compiled for this environment (did you build to HTML and try to run it not on the web, or set ENVIRONMENT to something - like node - and run it someplace else - like on the web?)');
 
   {
 // include: web_or_worker_shell_read.js
 readAsync = async (url) => {
     assert(!isFileURI(url), "readAsync does not work with file:// URLs");
+=======
+  {
+// include: web_or_worker_shell_read.js
+if (ENVIRONMENT_IS_WORKER) {
+    readBinary = (url) => {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, false);
+      xhr.responseType = 'arraybuffer';
+      xhr.send(null);
+      return new Uint8Array(/** @type{!ArrayBuffer} */(xhr.response));
+    };
+  }
+
+  readAsync = async (url) => {
+    // Fetch has some additional restrictions over XHR, like it can't be used on a file:// url.
+    // See https://github.com/github/fetch/pull/92#issuecomment-140665932
+    // Cordova or Electron apps are typically loaded from a file:// url.
+    // So use XHR on webview if URL is a file URL.
+    if (isFileURI(url)) {
+      return new Promise((resolve, reject) => {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = () => {
+          if (xhr.status == 200 || (xhr.status == 0 && xhr.response)) { // file URLs can return 0
+            resolve(xhr.response);
+            return;
+          }
+          reject(xhr.status);
+        };
+        xhr.onerror = reject;
+        xhr.send(null);
+      });
+    }
+>>>>>>> 3aaf9e9 (fun times)
     var response = await fetch(url, { credentials: 'same-origin' });
     if (response.ok) {
       return response.arrayBuffer();
@@ -113,7 +212,10 @@ readAsync = async (url) => {
   }
 } else
 {
+<<<<<<< HEAD
   throw new Error('environment detection error');
+=======
+>>>>>>> 3aaf9e9 (fun times)
 }
 
 var out = Module['print'] || console.log.bind(console);
@@ -124,13 +226,17 @@ Object.assign(Module, moduleOverrides);
 // Free the object hierarchy contained in the overrides, this lets the GC
 // reclaim data used.
 moduleOverrides = null;
+<<<<<<< HEAD
 checkIncomingModuleAPI();
+=======
+>>>>>>> 3aaf9e9 (fun times)
 
 // Emit code to handle expected values on the Module object. This applies Module.x
 // to the proper local x. This has two benefits: first, we only emit it if it is
 // expected to arrive, and second, by using a local everywhere else that can be
 // minified.
 
+<<<<<<< HEAD
 if (Module['arguments']) arguments_ = Module['arguments'];legacyModuleProp('arguments', 'arguments_');
 
 if (Module['thisProgram']) thisProgram = Module['thisProgram'];legacyModuleProp('thisProgram', 'thisProgram');
@@ -166,6 +272,13 @@ assert(!ENVIRONMENT_IS_NODE, 'node environment detected but not enabled at build
 
 assert(!ENVIRONMENT_IS_SHELL, 'shell environment detected but not enabled at build time.  Add `shell` to `-sENVIRONMENT` to enable.');
 
+=======
+if (Module['arguments']) arguments_ = Module['arguments'];
+
+if (Module['thisProgram']) thisProgram = Module['thisProgram'];
+
+// perform assertions in shell.js after we set up out() and err(), as otherwise if an assertion fails it cannot print the message
+>>>>>>> 3aaf9e9 (fun times)
 // end include: shell.js
 
 // include: preamble.js
@@ -179,11 +292,15 @@ assert(!ENVIRONMENT_IS_SHELL, 'shell environment detected but not enabled at bui
 // An online HTML version (which may be of a different version of Emscripten)
 //    is up at http://kripken.github.io/emscripten-site/docs/api_reference/preamble.js.html
 
+<<<<<<< HEAD
 var wasmBinary = Module['wasmBinary'];legacyModuleProp('wasmBinary', 'wasmBinary');
 
 if (typeof WebAssembly != 'object') {
   err('no native wasm support detected');
 }
+=======
+var wasmBinary = Module['wasmBinary'];
+>>>>>>> 3aaf9e9 (fun times)
 
 // Wasm globals
 
@@ -209,6 +326,7 @@ var EXITSTATUS;
 /** @type {function(*, string=)} */
 function assert(condition, text) {
   if (!condition) {
+<<<<<<< HEAD
     abort('Assertion failed' + (text ? ': ' + text : ''));
   }
 }
@@ -216,6 +334,15 @@ function assert(condition, text) {
 // We used to include malloc/free by default in the past. Show a helpful error in
 // builds with assertions.
 
+=======
+    // This build was created without ASSERTIONS defined.  `assert()` should not
+    // ever be called in this configuration but in case there are callers in
+    // the wild leave this simple abort() implementation here for now.
+    abort(text);
+  }
+}
+
+>>>>>>> 3aaf9e9 (fun times)
 // Memory management
 
 var HEAP,
@@ -262,6 +389,7 @@ var isFileURI = (filename) => filename.startsWith('file://');
 // end include: URIUtils.js
 // include: runtime_shared.js
 // include: runtime_stack_check.js
+<<<<<<< HEAD
 // Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
 function writeStackCookie() {
   var max = _emscripten_stack_get_end();
@@ -298,10 +426,13 @@ function checkStackCookie() {
     abort('Runtime error: The application has corrupted its heap memory area (address zero)!');
   }
 }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 // end include: runtime_stack_check.js
 // include: runtime_exceptions.js
 // end include: runtime_exceptions.js
 // include: runtime_debug.js
+<<<<<<< HEAD
 // Endianness check
 (() => {
   var h16 = new Int16Array(1);
@@ -414,6 +545,8 @@ function dbg(...args) {
   // logging to show up as warnings.
   console.warn(...args);
 }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 // end include: runtime_debug.js
 // include: memoryprofiler.js
 // end include: memoryprofiler.js
@@ -434,6 +567,7 @@ function updateMemoryViews() {
 }
 
 // end include: runtime_shared.js
+<<<<<<< HEAD
 assert(!Module['STACK_SIZE'], 'STACK_SIZE can no longer be set at runtime.  Use -sSTACK_SIZE at link time')
 
 assert(typeof Int32Array != 'undefined' && typeof Float64Array !== 'undefined' && Int32Array.prototype.subarray != undefined && Int32Array.prototype.set != undefined,
@@ -443,6 +577,8 @@ assert(typeof Int32Array != 'undefined' && typeof Float64Array !== 'undefined' &
 assert(!Module['wasmMemory'], 'Use of `wasmMemory` detected.  Use -sIMPORTED_MEMORY to define wasmMemory externally');
 assert(!Module['INITIAL_MEMORY'], 'Detected runtime INITIAL_MEMORY setting.  Use -sIMPORTED_MEMORY to define wasmMemory dynamically');
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
 var __ATPRERUN__  = []; // functions called before the runtime is initialized
 var __ATINIT__    = []; // functions called during startup
 var __ATMAIN__    = []; // functions called when main() is to be run
@@ -460,23 +596,34 @@ function preRun() {
 }
 
 function initRuntime() {
+<<<<<<< HEAD
   assert(!runtimeInitialized);
   runtimeInitialized = true;
 
   checkStackCookie();
 
+=======
+  runtimeInitialized = true;
+
+>>>>>>> 3aaf9e9 (fun times)
   
   callRuntimeCallbacks(__ATINIT__);
 }
 
 function preMain() {
+<<<<<<< HEAD
   checkStackCookie();
+=======
+>>>>>>> 3aaf9e9 (fun times)
   
   callRuntimeCallbacks(__ATMAIN__);
 }
 
 function postRun() {
+<<<<<<< HEAD
   checkStackCookie();
+=======
+>>>>>>> 3aaf9e9 (fun times)
 
   if (Module['postRun']) {
     if (typeof Module['postRun'] == 'function') Module['postRun'] = [Module['postRun']];
@@ -516,6 +663,7 @@ function addOnPostRun(cb) {
 // the dependencies are met.
 var runDependencies = 0;
 var dependenciesFulfilled = null; // overridden to take different actions when all run dependencies are fulfilled
+<<<<<<< HEAD
 var runDependencyTracking = {};
 var runDependencyWatcher = null;
 
@@ -525,6 +673,11 @@ function getUniqueRunDependency(id) {
     if (!runDependencyTracking[id]) return id;
     id = orig + Math.random();
   }
+=======
+
+function getUniqueRunDependency(id) {
+  return id;
+>>>>>>> 3aaf9e9 (fun times)
 }
 
 function addRunDependency(id) {
@@ -532,6 +685,7 @@ function addRunDependency(id) {
 
   Module['monitorRunDependencies']?.(runDependencies);
 
+<<<<<<< HEAD
   if (id) {
     assert(!runDependencyTracking[id]);
     runDependencyTracking[id] = 1;
@@ -559,6 +713,8 @@ function addRunDependency(id) {
   } else {
     err('warning: run dependency added without ID');
   }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 }
 
 function removeRunDependency(id) {
@@ -566,6 +722,7 @@ function removeRunDependency(id) {
 
   Module['monitorRunDependencies']?.(runDependencies);
 
+<<<<<<< HEAD
   if (id) {
     assert(runDependencyTracking[id]);
     delete runDependencyTracking[id];
@@ -577,6 +734,9 @@ function removeRunDependency(id) {
       clearInterval(runDependencyWatcher);
       runDependencyWatcher = null;
     }
+=======
+  if (runDependencies == 0) {
+>>>>>>> 3aaf9e9 (fun times)
     if (dependenciesFulfilled) {
       var callback = dependenciesFulfilled;
       dependenciesFulfilled = null;
@@ -596,6 +756,11 @@ function abort(what) {
 
   ABORT = true;
 
+<<<<<<< HEAD
+=======
+  what += '. Build with -sASSERTIONS for more info.';
+
+>>>>>>> 3aaf9e9 (fun times)
   // Use a wasm runtime error, because a JS error might be seen as a foreign
   // exception, which means we'd run destructors on it. We need the error to
   // simply make the program stop.
@@ -619,6 +784,7 @@ function abort(what) {
   throw e;
 }
 
+<<<<<<< HEAD
 function createExportWrapper(name, nargs) {
   return (...args) => {
     assert(runtimeInitialized, `native function \`${name}\` called before runtime initialization`);
@@ -630,6 +796,8 @@ function createExportWrapper(name, nargs) {
   };
 }
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
 var wasmBinaryFile;
 function findWasmBinary() {
   if (Module['locateFile']) {
@@ -678,10 +846,13 @@ async function instantiateArrayBuffer(binaryFile, imports) {
   } catch (reason) {
     err(`failed to asynchronously prepare wasm: ${reason}`);
 
+<<<<<<< HEAD
     // Warn on some common problems.
     if (isFileURI(wasmBinaryFile)) {
       err(`warning: Loading from a file URI (${wasmBinaryFile}) is not supported in most browsers. See https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-run-a-local-webserver-for-testing-why-does-my-program-stall-in-downloading-or-preparing`);
     }
+=======
+>>>>>>> 3aaf9e9 (fun times)
     abort(reason);
   }
 }
@@ -690,6 +861,18 @@ async function instantiateAsync(binary, binaryFile, imports) {
   if (!binary &&
       typeof WebAssembly.instantiateStreaming == 'function' &&
       !isDataURI(binaryFile)
+<<<<<<< HEAD
+=======
+      // Don't use streaming for file:// delivered objects in a webview, fetch them synchronously.
+      && !isFileURI(binaryFile)
+      // Avoid instantiateStreaming() on Node.js environment for now, as while
+      // Node.js v18.1.0 implements it, it does not have a full fetch()
+      // implementation yet.
+      //
+      // Reference:
+      //   https://github.com/emscripten-core/emscripten/pull/16917
+      && !ENVIRONMENT_IS_NODE
+>>>>>>> 3aaf9e9 (fun times)
      ) {
     try {
       var response = fetch(binaryFile, { credentials: 'same-origin' });
@@ -728,12 +911,18 @@ async function createWasm() {
 
     wasmMemory = wasmExports['memory'];
     Module['wasmMemory'] = wasmMemory;
+<<<<<<< HEAD
     assert(wasmMemory, 'memory not found in wasm exports');
+=======
+>>>>>>> 3aaf9e9 (fun times)
     updateMemoryViews();
 
     wasmTable = wasmExports['__indirect_function_table'];
     Module['wasmTable'] = wasmTable;
+<<<<<<< HEAD
     assert(wasmTable, 'table not found in wasm exports');
+=======
+>>>>>>> 3aaf9e9 (fun times)
 
     addOnInit(wasmExports['__wasm_call_ctors']);
 
@@ -744,6 +933,7 @@ async function createWasm() {
   addRunDependency('wasm-instantiate');
 
   // Prefer streaming instantiation if available.
+<<<<<<< HEAD
   // Async compilation can be confusing when an error on the page overwrites Module
   // (for example, if the order of elements is wrong, and the one defining Module is
   // later), so we save Module and check it later.
@@ -753,6 +943,11 @@ async function createWasm() {
     // receiveInstance() will swap in the exports (to Module.asm) so they can be called
     assert(Module === trueModule, 'the Module object should not be replaced during async compilation - perhaps the order of HTML elements is wrong?');
     trueModule = null;
+=======
+  function receiveInstantiationResult(result) {
+    // 'result' is a ResultObject object which has both the module and instance.
+    // receiveInstance() will swap in the exports (to Module.asm) so they can be called
+>>>>>>> 3aaf9e9 (fun times)
     // TODO: Due to Closure regression https://github.com/google/closure-compiler/issues/3193, the above line no longer optimizes out down to the following line.
     // When the regression is fixed, can restore the above PTHREADS-enabled path.
     return receiveInstance(result['instance']);
@@ -792,11 +987,19 @@ async function createWasm() {
 // === Body ===
 
 var ASM_CONSTS = {
+<<<<<<< HEAD
   5079880: () => { if (ENVIRONMENT_IS_NODE) { if (!FS.initialized) FS.init(); const fs = require('f' + String.fromCharCode(115)); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } },  
  5080251: ($0) => { const fs = require('f' + String.fromCharCode(115)); return fs.existsSync(UTF8ToString($0)); },  
  5080347: ($0, $1) => { const fs = require('f' + String.fromCharCode(115)); const buffer = fs.readFileSync(UTF8ToString($0)); const length = buffer.length; const result = _malloc(length); Module.HEAPU32[$1 >> 2] = length; Module.HEAPU8.set(buffer, result); return result; },  
  5080599: () => { return ENVIRONMENT_IS_NODE; },  
  5080631: () => { return ENVIRONMENT_IS_NODE; }
+=======
+  79080: () => { if (ENVIRONMENT_IS_NODE) { FS.init(); const fs = require('fs'); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } },  
+ 79404: ($0) => { const fs = require('fs'); return fs.existsSync(UTF8ToString($0)); },  
+ 79474: ($0, $1) => { const fs = require('fs'); const buffer = fs.readFileSync(UTF8ToString($0)); const length = buffer.length; const result = _malloc(length); Module.HEAPU32[$1 >> 2] = length; Module.HEAPU8.set(buffer, result); return result; },  
+ 79700: () => { return ENVIRONMENT_IS_NODE; },  
+ 79732: () => { return ENVIRONMENT_IS_NODE; }
+>>>>>>> 3aaf9e9 (fun times)
 };
 
 // end include: preamble.js
@@ -839,6 +1042,7 @@ var ASM_CONSTS = {
 
   var noExitRuntime = Module['noExitRuntime'] || true;
 
+<<<<<<< HEAD
   var ptrToString = (ptr) => {
       assert(typeof ptr === 'number');
       // With CAN_ADDRESS_2GB or MEMORY64, pointers are already unsigned.
@@ -846,6 +1050,8 @@ var ASM_CONSTS = {
       return '0x' + ptr.toString(16).padStart(8, '0');
     };
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
   
     /**
      * @param {number} ptr
@@ -871,6 +1077,7 @@ var ASM_CONSTS = {
 
   var stackSave = () => _emscripten_stack_get_current();
 
+<<<<<<< HEAD
   var warnOnce = (text) => {
       warnOnce.shown ||= {};
       if (!warnOnce.shown[text]) {
@@ -879,6 +1086,8 @@ var ASM_CONSTS = {
       }
     };
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
   var UTF8Decoder = typeof TextDecoder != 'undefined' ? new TextDecoder() : undefined;
   
     /**
@@ -919,7 +1128,10 @@ var ASM_CONSTS = {
         if ((u0 & 0xF0) == 0xE0) {
           u0 = ((u0 & 15) << 12) | (u1 << 6) | u2;
         } else {
+<<<<<<< HEAD
           if ((u0 & 0xF8) != 0xF0) warnOnce('Invalid UTF-8 leading byte ' + ptrToString(u0) + ' encountered when deserializing a UTF-8 string in wasm memory to a JS string!');
+=======
+>>>>>>> 3aaf9e9 (fun times)
           u0 = ((u0 & 7) << 18) | (u1 << 12) | (u2 << 6) | (heapOrArray[idx++] & 63);
         }
   
@@ -949,7 +1161,10 @@ var ASM_CONSTS = {
      * @return {string}
      */
   var UTF8ToString = (ptr, maxBytesToRead) => {
+<<<<<<< HEAD
       assert(typeof ptr == 'number', `UTF8ToString expects a number (got ${typeof ptr})`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return ptr ? UTF8ArrayToString(HEAPU8, ptr, maxBytesToRead) : '';
     };
   var ___assert_fail = (condition, filename, line, func) =>
@@ -966,13 +1181,17 @@ var ASM_CONSTS = {
         /** @suppress {checkTypes} */
         wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
       }
+<<<<<<< HEAD
       /** @suppress {checkTypes} */
       assert(wasmTable.get(funcPtr) == func, 'JavaScript-side Wasm function table mirror is out of date!');
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return func;
     };
   var ___call_sighandler = (fp, sig) => getWasmTableEntry(fp)(sig);
 
   /** @type {function(...*):?} */
+<<<<<<< HEAD
   function ___interpreter_intrinsic_notco_call_outlined(
   ) {
   abort('missing function: __interpreter_intrinsic_notco_call_outlined');
@@ -981,11 +1200,45 @@ var ASM_CONSTS = {
 
   var __abort_js = () =>
       abort('native code called abort()');
+=======
+  function ___interpreter_intrinsic_next_double(
+  ) {
+  abort('missing function: __interpreter_intrinsic_next_double');
+  }
+  ___interpreter_intrinsic_next_double.stub = true;
+
+  /** @type {function(...*):?} */
+  function ___interpreter_intrinsic_next_float(
+  ) {
+  abort('missing function: __interpreter_intrinsic_next_float');
+  }
+  ___interpreter_intrinsic_next_float.stub = true;
+
+  /** @type {function(...*):?} */
+  function ___interpreter_intrinsic_next_int(
+  ) {
+  abort('missing function: __interpreter_intrinsic_next_int');
+  }
+  ___interpreter_intrinsic_next_int.stub = true;
+
+  /** @type {function(...*):?} */
+  function ___interpreter_intrinsic_next_void(
+  ) {
+  abort('missing function: __interpreter_intrinsic_next_void');
+  }
+  ___interpreter_intrinsic_next_void.stub = true;
+
+  var __abort_js = () =>
+      abort('');
+>>>>>>> 3aaf9e9 (fun times)
 
   var getExecutableName = () => thisProgram || './this.program';
   
   var stringToUTF8Array = (str, heap, outIdx, maxBytesToWrite) => {
+<<<<<<< HEAD
       assert(typeof str === 'string', `stringToUTF8Array expects a string (got ${typeof str})`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       // Parameter maxBytesToWrite is not optional. Negative values, 0, null,
       // undefined and false each don't write out any bytes.
       if (!(maxBytesToWrite > 0))
@@ -1020,7 +1273,10 @@ var ASM_CONSTS = {
           heap[outIdx++] = 0x80 | (u & 63);
         } else {
           if (outIdx + 3 >= endIdx) break;
+<<<<<<< HEAD
           if (u > 0x10FFFF) warnOnce('Invalid Unicode code point ' + ptrToString(u) + ' encountered when serializing a JS string to a UTF-8 string in wasm memory! (Valid unicode code points should be in range 0-0x10FFFF).');
+=======
+>>>>>>> 3aaf9e9 (fun times)
           heap[outIdx++] = 0xF0 | (u >> 18);
           heap[outIdx++] = 0x80 | ((u >> 12) & 63);
           heap[outIdx++] = 0x80 | ((u >> 6) & 63);
@@ -1032,7 +1288,10 @@ var ASM_CONSTS = {
       return outIdx - startIdx;
     };
   var stringToUTF8 = (str, outPtr, maxBytesToWrite) => {
+<<<<<<< HEAD
       assert(typeof maxBytesToWrite == 'number', 'stringToUTF8(str, outPtr, maxBytesToWrite) is missing the third parameter that specifies the length of the output buffer!');
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return stringToUTF8Array(str, HEAPU8, outPtr, maxBytesToWrite);
     };
   var __emscripten_get_progname = (str, len) => stringToUTF8(getExecutableName(), str, len);
@@ -1059,12 +1318,15 @@ var ASM_CONSTS = {
       if (e instanceof ExitStatus || e == 'unwind') {
         return EXITSTATUS;
       }
+<<<<<<< HEAD
       checkStackCookie();
       if (e instanceof WebAssembly.RuntimeError) {
         if (_emscripten_stack_get_current() <= 0) {
           err('Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 5000000)');
         }
       }
+=======
+>>>>>>> 3aaf9e9 (fun times)
       quit_(1, e);
     };
   
@@ -1078,13 +1340,17 @@ var ASM_CONSTS = {
       }
       quit_(code, new ExitStatus(code));
     };
+<<<<<<< HEAD
   
   
+=======
+>>>>>>> 3aaf9e9 (fun times)
   /** @suppress {duplicate } */
   /** @param {boolean|number=} implicit */
   var exitJS = (status, implicit) => {
       EXITSTATUS = status;
   
+<<<<<<< HEAD
       checkUnflushedContent();
   
       // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
@@ -1094,6 +1360,8 @@ var ASM_CONSTS = {
         err(msg);
       }
   
+=======
+>>>>>>> 3aaf9e9 (fun times)
       _proc_exit(status);
     };
   var _exit = exitJS;
@@ -1110,7 +1378,10 @@ var ASM_CONSTS = {
     };
   var callUserCallback = (func) => {
       if (ABORT) {
+<<<<<<< HEAD
         err('user callback triggered after runtime exited or application aborted.  Ignoring.');
+=======
+>>>>>>> 3aaf9e9 (fun times)
         return;
       }
       try {
@@ -1135,7 +1406,10 @@ var ASM_CONSTS = {
       if (!timeout_ms) return 0;
   
       var id = setTimeout(() => {
+<<<<<<< HEAD
         assert(which in timers);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         delete timers[which];
         callUserCallback(() => __emscripten_timeout(which, _emscripten_get_now()));
       }, timeout_ms);
@@ -1143,6 +1417,7 @@ var ASM_CONSTS = {
       return 0;
     };
 
+<<<<<<< HEAD
   
   var lengthBytesUTF8 = (str) => {
       var len = 0;
@@ -1164,6 +1439,8 @@ var ASM_CONSTS = {
       }
       return len;
     };
+=======
+>>>>>>> 3aaf9e9 (fun times)
   var __tzset_js = (timezone, daylight, std_name, dst_name) => {
       // TODO: Use (malleable) environment variables instead of system settings.
       var currentYear = new Date().getFullYear();
@@ -1203,10 +1480,13 @@ var ASM_CONSTS = {
   
       var winterName = extractZone(winterOffset);
       var summerName = extractZone(summerOffset);
+<<<<<<< HEAD
       assert(winterName);
       assert(summerName);
       assert(lengthBytesUTF8(winterName) <= 16, `timezone name truncated to fit in TZNAME_MAX (${winterName})`);
       assert(lengthBytesUTF8(summerName) <= 16, `timezone name truncated to fit in TZNAME_MAX (${summerName})`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       if (summerOffset < winterOffset) {
         // Northern hemisphere
         stringToUTF8(winterName, std_name, 17);
@@ -1253,6 +1533,29 @@ var ASM_CONSTS = {
       stringToUTF8(s, parentPathBuffer, len);
     };
 
+<<<<<<< HEAD
+=======
+  var lengthBytesUTF8 = (str) => {
+      var len = 0;
+      for (var i = 0; i < str.length; ++i) {
+        // Gotcha: charCodeAt returns a 16-bit word that is a UTF-16 encoded code
+        // unit, not a Unicode code point of the character! So decode
+        // UTF16->UTF32->UTF8.
+        // See http://unicode.org/faq/utf_bom.html#utf16-3
+        var c = str.charCodeAt(i); // possibly a lead surrogate
+        if (c <= 0x7F) {
+          len++;
+        } else if (c <= 0x7FF) {
+          len += 2;
+        } else if (c >= 0xD800 && c <= 0xDFFF) {
+          len += 4; ++i;
+        } else {
+          len += 3;
+        }
+      }
+      return len;
+    };
+>>>>>>> 3aaf9e9 (fun times)
   
   var __wasmfs_get_preloaded_path_name = (index, fileNameBuffer) => {
       var s = wasmFSPreloadedFiles[index].pathName;
@@ -1261,17 +1564,26 @@ var ASM_CONSTS = {
     };
 
   var __wasmfs_jsimpl_alloc_file = (backend, file) => {
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return wasmFS$backends[backend].allocFile(file);
     };
 
   var __wasmfs_jsimpl_free_file = (backend, file) => {
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return wasmFS$backends[backend].freeFile(file);
     };
 
   var __wasmfs_jsimpl_get_size = (backend, file) => {
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return wasmFS$backends[backend].getSize(file);
     };
 
@@ -1283,7 +1595,10 @@ var ASM_CONSTS = {
     offset = bigintToI53Checked(offset);
   
     
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       if (!wasmFS$backends[backend].read) {
         return -28;
       }
@@ -1295,7 +1610,10 @@ var ASM_CONSTS = {
     size = bigintToI53Checked(size);
   
     
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return wasmFS$backends[backend].setSize(file, size);
     ;
   }
@@ -1304,7 +1622,10 @@ var ASM_CONSTS = {
     offset = bigintToI53Checked(offset);
   
     
+<<<<<<< HEAD
       assert(wasmFS$backends[backend]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       if (!wasmFS$backends[backend].write) {
         return -28;
       }
@@ -1326,6 +1647,38 @@ var ASM_CONSTS = {
   var FS_stdin_getChar = () => {
       if (!FS_stdin_getChar_buffer.length) {
         var result = null;
+<<<<<<< HEAD
+=======
+        if (ENVIRONMENT_IS_NODE) {
+          // we will read data by chunks of BUFSIZE
+          var BUFSIZE = 256;
+          var buf = Buffer.alloc(BUFSIZE);
+          var bytesRead = 0;
+  
+          // For some reason we must suppress a closure warning here, even though
+          // fd definitely exists on process.stdin, and is even the proper way to
+          // get the fd of stdin,
+          // https://github.com/nodejs/help/issues/2136#issuecomment-523649904
+          // This started to happen after moving this logic out of library_tty.js,
+          // so it is related to the surrounding code in some unclear manner.
+          /** @suppress {missingProperties} */
+          var fd = process.stdin.fd;
+  
+          try {
+            bytesRead = fs.readSync(fd, buf, 0, BUFSIZE);
+          } catch(e) {
+            // Cross-platform differences: on Windows, reading EOF throws an
+            // exception, but on other OSes, reading EOF returns 0. Uniformize
+            // behavior by treating the EOF exception to return 0.
+            if (e.toString().includes('EOF')) bytesRead = 0;
+            else throw e;
+          }
+  
+          if (bytesRead > 0) {
+            result = buf.slice(0, bytesRead).toString('utf-8');
+          }
+        } else
+>>>>>>> 3aaf9e9 (fun times)
         if (typeof window != 'undefined' &&
           typeof window.prompt == 'function') {
           // Browser.
@@ -1353,20 +1706,26 @@ var ASM_CONSTS = {
 
   var readEmAsmArgsArray = [];
   var readEmAsmArgs = (sigPtr, buf) => {
+<<<<<<< HEAD
       // Nobody should have mutated _readEmAsmArgsArray underneath us to be something else than an array.
       assert(Array.isArray(readEmAsmArgsArray));
       // The input buffer is allocated on the stack, so it must be stack-aligned.
       assert(buf % 16 == 0);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       readEmAsmArgsArray.length = 0;
       var ch;
       // Most arguments are i32s, so shift the buffer pointer so it is a plain
       // index into HEAP32.
       while (ch = HEAPU8[sigPtr++]) {
+<<<<<<< HEAD
         var chr = String.fromCharCode(ch);
         var validChars = ['d', 'f', 'i', 'p'];
         // In WASM_BIGINT mode we support passing i64 values as bigint.
         validChars.push('j');
         assert(validChars.includes(chr), `Invalid character ${ch}("${chr}") in readEmAsmArgs! Use only [${validChars}], and do not specify "v" for void return argument.`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         // Floats are always passed as doubles, so all types except for 'i'
         // are 8 bytes and require alignment.
         var wide = (ch != 105);
@@ -1386,7 +1745,10 @@ var ASM_CONSTS = {
     };
   var runEmAsmFunction = (code, sigPtr, argbuf) => {
       var args = readEmAsmArgs(sigPtr, argbuf);
+<<<<<<< HEAD
       assert(ASM_CONSTS.hasOwnProperty(code), `No EM_ASM constant found at address ${code}.  The loaded WebAssembly file is likely out of sync with the generated JavaScript.`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return ASM_CONSTS[code](...args);
     };
   var _emscripten_asm_const_int = (code, sigPtr, argbuf) => {
@@ -1395,7 +1757,10 @@ var ASM_CONSTS = {
 
   var runMainThreadEmAsm = (emAsmAddr, sigPtr, argbuf, sync) => {
       var args = readEmAsmArgs(sigPtr, argbuf);
+<<<<<<< HEAD
       assert(ASM_CONSTS.hasOwnProperty(emAsmAddr), `No EM_ASM constant found at address ${emAsmAddr}.  The loaded WebAssembly file is likely out of sync with the generated JavaScript.`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return ASM_CONSTS[emAsmAddr](...args);
     };
   var _emscripten_asm_const_int_sync_on_main_thread = (emAsmAddr, sigPtr, argbuf) => runMainThreadEmAsm(emAsmAddr, sigPtr, argbuf, 1);
@@ -1419,7 +1784,10 @@ var ASM_CONSTS = {
       2147483648;
   
   var alignMemory = (size, alignment) => {
+<<<<<<< HEAD
       assert(alignment, "alignment argument is required");
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return Math.ceil(size / alignment) * alignment;
     };
   
@@ -1432,7 +1800,10 @@ var ASM_CONSTS = {
         updateMemoryViews();
         return 1 /*success*/;
       } catch(e) {
+<<<<<<< HEAD
         err(`growMemory: Attempted to grow heap from ${b.byteLength} bytes to ${size} bytes, but got error: ${e}`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       }
       // implicit 0 return to save code size (caller will cast "undefined" into 0
       // anyhow)
@@ -1443,7 +1814,10 @@ var ASM_CONSTS = {
       requestedSize >>>= 0;
       // With multithreaded builds, races can happen (another thread might increase the size
       // in between), so return a failure, and let the caller retry.
+<<<<<<< HEAD
       assert(requestedSize > oldSize);
+=======
+>>>>>>> 3aaf9e9 (fun times)
   
       // Memory resize rules:
       // 1.  Always increase heap size to at least the requested size, rounded up
@@ -1466,7 +1840,10 @@ var ASM_CONSTS = {
       // (the wasm binary specifies it, so if we tried, we'd fail anyhow).
       var maxHeapSize = getHeapMax();
       if (requestedSize > maxHeapSize) {
+<<<<<<< HEAD
         err(`Cannot enlarge memory, requested ${requestedSize} bytes, but the limit is ${maxHeapSize} bytes!`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         return false;
       }
   
@@ -1486,7 +1863,10 @@ var ASM_CONSTS = {
           return true;
         }
       }
+<<<<<<< HEAD
       err(`Failed to grow the heap from ${oldSize} bytes to ${newSize} bytes, not enough memory!`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return false;
     };
 
@@ -1526,7 +1906,10 @@ var ASM_CONSTS = {
   
   var stringToAscii = (str, buffer) => {
       for (var i = 0; i < str.length; ++i) {
+<<<<<<< HEAD
         assert(str.charCodeAt(i) === (str.charCodeAt(i) & 0xff));
+=======
+>>>>>>> 3aaf9e9 (fun times)
         HEAP8[buffer++] = str.charCodeAt(i);
       }
       // Null-terminate the string
@@ -1553,8 +1936,17 @@ var ASM_CONSTS = {
     };
 
 
+<<<<<<< HEAD
 
   var initRandomFill = () => {
+=======
+  var initRandomFill = () => {
+      // This block is not needed on v19+ since crypto.getRandomValues is builtin
+      if (ENVIRONMENT_IS_NODE) {
+        var nodeCrypto = require('crypto');
+        return (view) => nodeCrypto.randomFillSync(view);
+      }
+>>>>>>> 3aaf9e9 (fun times)
   
       return (view) => crypto.getRandomValues(view);
     };
@@ -1689,7 +2081,10 @@ var ASM_CONSTS = {
         data = buf.slice(0, actualNumBytes);
       }
       var dataBuffer = _malloc(data.length);
+<<<<<<< HEAD
       assert(dataBuffer);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       for (var i = 0; i < data.length; i++) {
         HEAP8[(dataBuffer)+(i)] = data[i];
       }
@@ -1716,7 +2111,10 @@ var ASM_CONSTS = {
   
   var asyncLoad = async (url) => {
       var arrayBuffer = await readAsync(url);
+<<<<<<< HEAD
       assert(arrayBuffer, `Loading data file "${url}" failed (no arrayBuffer).`);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return new Uint8Array(arrayBuffer);
     };
   
@@ -2141,11 +2539,14 @@ var ASM_CONSTS = {
         return entries;
       }),
   mount:(type, opts, mountpoint) => {
+<<<<<<< HEAD
         if (typeof type == 'string') {
           // The filesystem was not included, and instead we have an error
           // message stored in the variable.
           throw type;
         }
+=======
+>>>>>>> 3aaf9e9 (fun times)
         var backendPointer = type.createBackend(opts);
         return FS.handleError(withStackSave(() => __wasmfs_mount(stringToUTF8OnStack(mountpoint), backendPointer)));
       },
@@ -2266,12 +2667,18 @@ var ASM_CONSTS = {
 
   var getCFunc = (ident) => {
       var func = Module['_' + ident]; // closure exported function
+<<<<<<< HEAD
       assert(func, 'Cannot call unknown function ' + ident + ', make sure it is exported');
+=======
+>>>>>>> 3aaf9e9 (fun times)
       return func;
     };
   
   var writeArrayToMemory = (array, buffer) => {
+<<<<<<< HEAD
       assert(array.length >= 0, 'writeArrayToMemory array must have a length (should be an array or typed array)')
+=======
+>>>>>>> 3aaf9e9 (fun times)
       HEAP8.set(array, buffer);
     };
   
@@ -2314,7 +2721,10 @@ var ASM_CONSTS = {
       var func = getCFunc(ident);
       var cArgs = [];
       var stack = 0;
+<<<<<<< HEAD
       assert(returnType !== 'array', 'Return type should not be "array".');
+=======
+>>>>>>> 3aaf9e9 (fun times)
       if (args) {
         for (var i = 0; i < args.length; i++) {
           var converter = toC[argTypes[i]];
@@ -2344,11 +2754,24 @@ var ASM_CONSTS = {
      * @param {Object=} opts
      */
   var cwrap = (ident, returnType, argTypes, opts) => {
+<<<<<<< HEAD
+=======
+      // When the function takes numbers and returns a number, we can just return
+      // the original function
+      var numericArgs = !argTypes || argTypes.every((type) => type === 'number' || type === 'boolean');
+      var numericRet = returnType !== 'string';
+      if (numericRet && numericArgs && !opts) {
+        return getCFunc(ident);
+      }
+>>>>>>> 3aaf9e9 (fun times)
       return (...args) => ccall(ident, returnType, argTypes, args, opts);
     };
 
   var uleb128Encode = (n, target) => {
+<<<<<<< HEAD
       assert(n < 16384);
+=======
+>>>>>>> 3aaf9e9 (fun times)
       if (n < 128) {
         target.push(n);
       } else {
@@ -2370,7 +2793,10 @@ var ASM_CONSTS = {
         results: sig[0] == 'v' ? [] : [typeNames[sig[0]]]
       };
       for (var i = 1; i < sig.length; ++i) {
+<<<<<<< HEAD
         assert(sig[i] in typeNames, 'invalid signature char: ' + sig[i]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         type.parameters.push(typeNames[sig[i]]);
       }
       return type;
@@ -2392,7 +2818,10 @@ var ASM_CONSTS = {
       target.push(0x60 /* form: func */);
       uleb128Encode(sigParam.length, target);
       for (var i = 0; i < sigParam.length; ++i) {
+<<<<<<< HEAD
         assert(sigParam[i] in typeCodes, 'invalid signature char: ' + sigParam[i]);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         target.push(typeCodes[sigParam[i]]);
       }
   
@@ -2508,7 +2937,10 @@ var ASM_CONSTS = {
   
   /** @param {string=} sig */
   var addFunction = (func, sig) => {
+<<<<<<< HEAD
       assert(typeof func != 'undefined');
+=======
+>>>>>>> 3aaf9e9 (fun times)
       // Check if the function is already in the table, to ensure each function
       // gets a unique index.
       var rtn = getFunctionAddress(func);
@@ -2528,7 +2960,10 @@ var ASM_CONSTS = {
         if (!(err instanceof TypeError)) {
           throw err;
         }
+<<<<<<< HEAD
         assert(typeof sig != 'undefined', 'Missing signature argument to addFunction: ' + func);
+=======
+>>>>>>> 3aaf9e9 (fun times)
         var wrapped = convertJsFunctionToWasm(func, sig);
         setWasmTableEntry(ret, wrapped);
       }
@@ -2560,16 +2995,29 @@ var ASM_CONSTS = {
 
   FS.init();
   ;
+<<<<<<< HEAD
 function checkIncomingModuleAPI() {
   ignoredModuleProp('fetchSettings');
 }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 var wasmImports = {
   /** @export */
   __assert_fail: ___assert_fail,
   /** @export */
   __call_sighandler: ___call_sighandler,
   /** @export */
+<<<<<<< HEAD
   __interpreter_intrinsic_notco_call_outlined: ___interpreter_intrinsic_notco_call_outlined,
+=======
+  __interpreter_intrinsic_next_double: ___interpreter_intrinsic_next_double,
+  /** @export */
+  __interpreter_intrinsic_next_float: ___interpreter_intrinsic_next_float,
+  /** @export */
+  __interpreter_intrinsic_next_int: ___interpreter_intrinsic_next_int,
+  /** @export */
+  __interpreter_intrinsic_next_void: ___interpreter_intrinsic_next_void,
+>>>>>>> 3aaf9e9 (fun times)
   /** @export */
   _abort_js: __abort_js,
   /** @export */
@@ -2633,8 +3081,11 @@ var wasmImports = {
   /** @export */
   environ_sizes_get: _environ_sizes_get,
   /** @export */
+<<<<<<< HEAD
   exit: _exit,
   /** @export */
+=======
+>>>>>>> 3aaf9e9 (fun times)
   invoke_ii,
   /** @export */
   invoke_iii,
@@ -2643,17 +3094,26 @@ var wasmImports = {
   /** @export */
   invoke_iiiii,
   /** @export */
+<<<<<<< HEAD
   invoke_v,
   /** @export */
+=======
+>>>>>>> 3aaf9e9 (fun times)
   invoke_vi,
   /** @export */
   invoke_viii,
   /** @export */
+<<<<<<< HEAD
+=======
+  invoke_viiii,
+  /** @export */
+>>>>>>> 3aaf9e9 (fun times)
   proc_exit: _proc_exit,
   /** @export */
   random_get: _random_get
 };
 var wasmExports = await createWasm();
+<<<<<<< HEAD
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors', 0);
 var _ffi_create_vm = Module['_ffi_create_vm'] = createExportWrapper('ffi_create_vm', 4);
 var _ffi_create_thread = Module['_ffi_create_thread'] = createExportWrapper('ffi_create_thread', 1);
@@ -3172,6 +3632,94 @@ var _NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0 = Module['_NATI
 var _NATIVE_INFO_UnixFileDispatcherImpl_map0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_map0_0'] = 5078444;
 var _NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0'] = 5078476;
 var _NATIVE_INFO_FileDispatcherImpl_init0_0 = Module['_NATIVE_INFO_FileDispatcherImpl_init0_0'] = 5078508;
+=======
+var ___wasm_call_ctors = wasmExports['__wasm_call_ctors']
+var _bjvm_ffi_create_vm = Module['_bjvm_ffi_create_vm'] = wasmExports['bjvm_ffi_create_vm']
+var _bjvm_ffi_create_thread = Module['_bjvm_ffi_create_thread'] = wasmExports['bjvm_ffi_create_thread']
+var _bjvm_ffi_get_class = Module['_bjvm_ffi_get_class'] = wasmExports['bjvm_ffi_get_class']
+var _bjvm_ffi_get_current_exception = Module['_bjvm_ffi_get_current_exception'] = wasmExports['bjvm_ffi_get_current_exception']
+var _bjvm_ffi_clear_current_exception = Module['_bjvm_ffi_clear_current_exception'] = wasmExports['bjvm_ffi_clear_current_exception']
+var _bjvm_ffi_get_classdesc = Module['_bjvm_ffi_get_classdesc'] = wasmExports['bjvm_ffi_get_classdesc']
+var _bjvm_ffi_create_rr_scheduler = Module['_bjvm_ffi_create_rr_scheduler'] = wasmExports['bjvm_ffi_create_rr_scheduler']
+var _malloc = Module['_malloc'] = wasmExports['malloc']
+var _bjvm_ffi_rr_scheduler_wait_for_us = Module['_bjvm_ffi_rr_scheduler_wait_for_us'] = wasmExports['bjvm_ffi_rr_scheduler_wait_for_us']
+var _bjvm_ffi_rr_scheduler_step = Module['_bjvm_ffi_rr_scheduler_step'] = wasmExports['bjvm_ffi_rr_scheduler_step']
+var _bjvm_ffi_rr_record_is_ready = Module['_bjvm_ffi_rr_record_is_ready'] = wasmExports['bjvm_ffi_rr_record_is_ready']
+var _bjvm_ffi_rr_schedule = Module['_bjvm_ffi_rr_schedule'] = wasmExports['bjvm_ffi_rr_schedule']
+var _bjvm_ffi_get_execution_record_result_pointer = Module['_bjvm_ffi_get_execution_record_result_pointer'] = wasmExports['bjvm_ffi_get_execution_record_result_pointer']
+var _bjvm_deref_js_handle = Module['_bjvm_deref_js_handle'] = wasmExports['bjvm_deref_js_handle']
+var _bjvm_ffi_execute_immediately = Module['_bjvm_ffi_execute_immediately'] = wasmExports['bjvm_ffi_execute_immediately']
+var _bjvm_ffi_free_execution_record = Module['_bjvm_ffi_free_execution_record'] = wasmExports['bjvm_ffi_free_execution_record']
+var _bjvm_ffi_async_run = Module['_bjvm_ffi_async_run'] = wasmExports['bjvm_ffi_async_run']
+var _bjvm_ffi_allocate_object = Module['_bjvm_ffi_allocate_object'] = wasmExports['bjvm_ffi_allocate_object']
+var _bjvm_ffi_run_step = Module['_bjvm_ffi_run_step'] = wasmExports['bjvm_ffi_run_step']
+var _bjvm_ffi_free_async_run_ctx = Module['_bjvm_ffi_free_async_run_ctx'] = wasmExports['bjvm_ffi_free_async_run_ctx']
+var _free = Module['_free'] = wasmExports['free']
+var _bjvm_ffi_get_class_json = Module['_bjvm_ffi_get_class_json'] = wasmExports['bjvm_ffi_get_class_json']
+var _main = Module['_main'] = wasmExports['main']
+var _bjvm_make_js_handle = Module['_bjvm_make_js_handle'] = wasmExports['bjvm_make_js_handle']
+var _bjvm_drop_js_handle = Module['_bjvm_drop_js_handle'] = wasmExports['bjvm_drop_js_handle']
+var _set_max_calls = Module['_set_max_calls'] = wasmExports['set_max_calls']
+var ___interpreter_intrinsic_void_table_base = Module['___interpreter_intrinsic_void_table_base'] = wasmExports['__interpreter_intrinsic_void_table_base']
+var ___interpreter_intrinsic_int_table_base = Module['___interpreter_intrinsic_int_table_base'] = wasmExports['__interpreter_intrinsic_int_table_base']
+var ___interpreter_intrinsic_float_table_base = Module['___interpreter_intrinsic_float_table_base'] = wasmExports['__interpreter_intrinsic_float_table_base']
+var ___interpreter_intrinsic_double_table_base = Module['___interpreter_intrinsic_double_table_base'] = wasmExports['__interpreter_intrinsic_double_table_base']
+var ___interpreter_intrinsic_max_insn = Module['___interpreter_intrinsic_max_insn'] = wasmExports['__interpreter_intrinsic_max_insn']
+var _bjvm_wasm_push_export = Module['_bjvm_wasm_push_export'] = wasmExports['bjvm_wasm_push_export']
+var _emscripten_builtin_memalign = wasmExports['emscripten_builtin_memalign']
+var _emscripten_stack_get_current = wasmExports['emscripten_stack_get_current']
+var _htons = wasmExports['htons']
+var _ntohs = wasmExports['ntohs']
+var _emscripten_proxy_execute_queue = wasmExports['emscripten_proxy_execute_queue']
+var _emscripten_proxy_finish = wasmExports['emscripten_proxy_finish']
+var __emscripten_timeout = wasmExports['_emscripten_timeout']
+var _setThrew = wasmExports['setThrew']
+var __emscripten_stack_restore = wasmExports['_emscripten_stack_restore']
+var __emscripten_stack_alloc = wasmExports['_emscripten_stack_alloc']
+var __wasmfs_fetch_get_file_path = wasmExports['_wasmfs_fetch_get_file_path']
+var __wasmfs_read_file = wasmExports['_wasmfs_read_file']
+var __wasmfs_write_file = wasmExports['_wasmfs_write_file']
+var __wasmfs_mkdir = wasmExports['_wasmfs_mkdir']
+var __wasmfs_rmdir = wasmExports['_wasmfs_rmdir']
+var __wasmfs_open = wasmExports['_wasmfs_open']
+var __wasmfs_allocate = wasmExports['_wasmfs_allocate']
+var __wasmfs_mknod = wasmExports['_wasmfs_mknod']
+var __wasmfs_unlink = wasmExports['_wasmfs_unlink']
+var __wasmfs_chdir = wasmExports['_wasmfs_chdir']
+var __wasmfs_symlink = wasmExports['_wasmfs_symlink']
+var __wasmfs_readlink = wasmExports['_wasmfs_readlink']
+var __wasmfs_write = wasmExports['_wasmfs_write']
+var __wasmfs_pwrite = wasmExports['_wasmfs_pwrite']
+var __wasmfs_chmod = wasmExports['_wasmfs_chmod']
+var __wasmfs_fchmod = wasmExports['_wasmfs_fchmod']
+var __wasmfs_lchmod = wasmExports['_wasmfs_lchmod']
+var __wasmfs_llseek = wasmExports['_wasmfs_llseek']
+var __wasmfs_rename = wasmExports['_wasmfs_rename']
+var __wasmfs_read = wasmExports['_wasmfs_read']
+var __wasmfs_pread = wasmExports['_wasmfs_pread']
+var __wasmfs_truncate = wasmExports['_wasmfs_truncate']
+var __wasmfs_ftruncate = wasmExports['_wasmfs_ftruncate']
+var __wasmfs_close = wasmExports['_wasmfs_close']
+var __wasmfs_mmap = wasmExports['_wasmfs_mmap']
+var __wasmfs_msync = wasmExports['_wasmfs_msync']
+var __wasmfs_munmap = wasmExports['_wasmfs_munmap']
+var __wasmfs_utime = wasmExports['_wasmfs_utime']
+var __wasmfs_stat = wasmExports['_wasmfs_stat']
+var __wasmfs_lstat = wasmExports['_wasmfs_lstat']
+var __wasmfs_mount = wasmExports['_wasmfs_mount']
+var __wasmfs_unmount = wasmExports['_wasmfs_unmount']
+var __wasmfs_identify = wasmExports['_wasmfs_identify']
+var __wasmfs_readdir_start = wasmExports['_wasmfs_readdir_start']
+var __wasmfs_readdir_get = wasmExports['_wasmfs_readdir_get']
+var __wasmfs_readdir_finish = wasmExports['_wasmfs_readdir_finish']
+var __wasmfs_get_cwd = wasmExports['_wasmfs_get_cwd']
+var _wasmfs_create_jsimpl_backend = wasmExports['wasmfs_create_jsimpl_backend']
+var _wasmfs_create_memory_backend = wasmExports['wasmfs_create_memory_backend']
+var __wasmfs_node_record_dirent = wasmExports['_wasmfs_node_record_dirent']
+var __wasmfs_opfs_record_entry = wasmExports['_wasmfs_opfs_record_entry']
+var _wasmfs_create_file = wasmExports['wasmfs_create_file']
+
+>>>>>>> 3aaf9e9 (fun times)
 function invoke_vi(index,a1) {
   var sp = stackSave();
   try {
@@ -3194,10 +3742,17 @@ function invoke_ii(index,a1) {
   }
 }
 
+<<<<<<< HEAD
 function invoke_iiii(index,a1,a2,a3) {
   var sp = stackSave();
   try {
     return getWasmTableEntry(index)(a1,a2,a3);
+=======
+function invoke_viiii(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    getWasmTableEntry(index)(a1,a2,a3,a4);
+>>>>>>> 3aaf9e9 (fun times)
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -3216,10 +3771,17 @@ function invoke_iii(index,a1,a2) {
   }
 }
 
+<<<<<<< HEAD
 function invoke_v(index) {
   var sp = stackSave();
   try {
     getWasmTableEntry(index)();
+=======
+function invoke_iiiii(index,a1,a2,a3,a4) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2,a3,a4);
+>>>>>>> 3aaf9e9 (fun times)
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -3227,10 +3789,17 @@ function invoke_v(index) {
   }
 }
 
+<<<<<<< HEAD
 function invoke_iiiii(index,a1,a2,a3,a4) {
   var sp = stackSave();
   try {
     return getWasmTableEntry(index)(a1,a2,a3,a4);
+=======
+function invoke_iiii(index,a1,a2,a3) {
+  var sp = stackSave();
+  try {
+    return getWasmTableEntry(index)(a1,a2,a3);
+>>>>>>> 3aaf9e9 (fun times)
   } catch(e) {
     stackRestore(sp);
     if (e !== e+0) throw e;
@@ -3269,6 +3838,7 @@ Module['FS_unlink'] = FS_unlink;
 Module['FS_createPath'] = FS_createPath;
 Module['FS'] = FS;
 Module['FS_createDataFile'] = FS_createDataFile;
+<<<<<<< HEAD
 var missingLibrarySymbols = [
   'writeI53ToI64',
   'writeI53ToI64Clamped',
@@ -3568,6 +4138,11 @@ var calledRun;
 function callMain() {
   assert(runDependencies == 0, 'cannot call main when async dependencies remain! (listen on Module["onRuntimeInitialized"])');
   assert(__ATPRERUN__.length == 0, 'cannot call main when preRun functions remain to be called');
+=======
+
+
+function callMain() {
+>>>>>>> 3aaf9e9 (fun times)
 
   var entryFunction = _main;
 
@@ -3586,6 +4161,7 @@ function callMain() {
   }
 }
 
+<<<<<<< HEAD
 function stackCheckInit() {
   // This is normally called automatically during __wasm_call_ctors but need to
   // get these values before even running any of the ctors so we call it redundantly
@@ -3595,6 +4171,8 @@ function stackCheckInit() {
   writeStackCookie();
 }
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
 function run() {
 
   if (runDependencies > 0) {
@@ -3602,8 +4180,11 @@ function run() {
     return;
   }
 
+<<<<<<< HEAD
   stackCheckInit();
 
+=======
+>>>>>>> 3aaf9e9 (fun times)
   preRun();
 
   // a preRun added a dependency, run will be called later
@@ -3615,8 +4196,11 @@ function run() {
   function doRun() {
     // run may have just been called through dependencies being fulfilled just in this very frame,
     // or while the async setStatus time below was happening
+<<<<<<< HEAD
     assert(!calledRun);
     calledRun = true;
+=======
+>>>>>>> 3aaf9e9 (fun times)
     Module['calledRun'] = true;
 
     if (ABORT) return;
@@ -3628,7 +4212,11 @@ function run() {
     readyPromiseResolve(Module);
     Module['onRuntimeInitialized']?.();
 
+<<<<<<< HEAD
     var noInitialRun = Module['noInitialRun'];legacyModuleProp('noInitialRun', 'noInitialRun');
+=======
+    var noInitialRun = Module['noInitialRun'];
+>>>>>>> 3aaf9e9 (fun times)
     if (!noInitialRun) callMain();
 
     postRun();
@@ -3644,6 +4232,7 @@ function run() {
   {
     doRun();
   }
+<<<<<<< HEAD
   checkStackCookie();
 }
 
@@ -3676,6 +4265,8 @@ function checkUnflushedContent() {
     warnOnce('stdio streams had content in them that was not flushed. you should set EXIT_RUNTIME to 1 (see the Emscripten FAQ), or make sure to emit a newline when you printf etc.');
     warnOnce('(this may also be due to not including full filesystem support - try building with -sFORCE_FILESYSTEM)');
   }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 }
 
 if (Module['preInit']) {
@@ -3698,6 +4289,7 @@ run();
 
 moduleRtn = readyPromise;
 
+<<<<<<< HEAD
 // Assertion for attempting to access module properties on the incoming
 // moduleArg.  In the past we used this object as the prototype of the module
 // and assigned properties to it, but now we return a distinct object.  This
@@ -3713,6 +4305,8 @@ for (const prop of Object.keys(Module)) {
     });
   }
 }
+=======
+>>>>>>> 3aaf9e9 (fun times)
 // end include: postamble_modularize.js
 
 
@@ -3721,6 +4315,7 @@ for (const prop of Object.keys(Module)) {
 }
 );
 })();
+<<<<<<< HEAD
 (() => {
   // Create a small, never-async wrapper around Module which
   // checks for callers incorrectly using it with `new`.
@@ -3730,4 +4325,6 @@ for (const prop of Object.keys(Module)) {
     return real_Module(arg);
   }
 })();
+=======
+>>>>>>> 3aaf9e9 (fun times)
 export default Module;

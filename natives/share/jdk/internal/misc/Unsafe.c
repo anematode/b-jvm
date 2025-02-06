@@ -309,3 +309,10 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, copyMemory0, "(Ljava/lang/Object;JLj
   }
   return value_null();
 }
+
+// setMemory0(Object o, long offset, long bytes, byte value);
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, setMemory0, "(Ljava/lang/Object;JJB)V") {
+  assert(argc == 4);
+  memset((void*)((uintptr_t)args[0].handle->obj + args[1].l), args[3].i, args[2].l);
+  return value_null();
+}

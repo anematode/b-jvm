@@ -170,7 +170,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   } else {
     // Invoke findClass on the classloader
     cp_method *find_class = method_lookup(classloader->descriptor, STR("loadClass"),
-      STR("(Ljava/lang/String;)Ljava/lang/Class;"), false, false);
+      STR("(Ljava/lang/String;)Ljava/lang/Class;"), true, false);
     CHECK(find_class);
     stack_value args[2] = {{.obj = classloader}, {.obj = name_obj}};
     stack_value result = call_interpreter_synchronous(thread, find_class, args);

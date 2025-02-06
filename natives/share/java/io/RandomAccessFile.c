@@ -92,24 +92,20 @@ DECLARE_NATIVE("java/io", RandomAccessFile, length0, "()J") {
 }
 
 
+
 DECLARE_NATIVE("java/io", RandomAccessFile, readBytes0, "([BII)I") {
-  obj_header *fd = *get_fd(obj->obj);
-  DCHECK(fd);
+  object *fd = *get_fd(obj->obj);
+  assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    raise_vm_exception(thread, STR("java/io/IOException"), STR("File not open"));
+    raise_vm_exception(thread, STR("java/io/IOException"),
+                         STR("File not open"));
     return value_null();
   }
-  obj_header *array = args[0].handle->obj;
-  int offset = args[1].i;
-  int length = args[2].i;
-  if (offset < 0 || length < 0 || (s64)offset + length > *ArrayLength(array)) {
-    raise_vm_exception(thread, STR("java/lang/IndexOutOfBoundsException"), STR("Invalid array bounds"));
-    return value_null();
-  }
-  u8 *data = ArrayData(array);
-  fseek(file, offset, SEEK_SET);
-  int read = fread(data + offset, 1, length, file);
-  printf("Offset, length: %d %d %d\n", offset, length, read);
+  object *buf = args[0].handle->obj;
+  s32 off = args[1].i;
+  s32 len = args[2].i;
+  s32 read = fread((char*)ArrayData(buf) + off, 1, len, file);
   return (stack_value){.i = read};
 }
+

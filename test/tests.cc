@@ -730,3 +730,8 @@ TEST_CASE("New instance") {
 Test
 )");
 }
+
+TEST_CASE("URLClassLoader") {
+  auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
+  REQUIRE(result.stdout_ == "Hello, world!\n");
+}
