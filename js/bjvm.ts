@@ -562,6 +562,15 @@ class Thread {
     }
 }
 
+function forwardChars(stdout: (byte: number) => void): Function {
+    // (char *buf, int len, void *param) -> void
+    return function (buf: number, len: number, _param: number) {
+        for (let i = 0; i < len; i++) {
+            stdout(module.HEAPU8[buf + i]);
+        }
+    }
+}
+
 class VM {
     ptr: number;
     handleRegistry: FinalizationRegistry<BaseHandle> = new FinalizationRegistry((handle) => {
@@ -585,7 +594,9 @@ class VM {
         options.stderr ??= buffered();
 
         this.timeout = -1;
-        this.ptr = module._bjvm_ffi_create_vm(classpath, module.addFunction(options.stdout, 'vii'), module.addFunction(options.stderr, 'vii'));
+        this.ptr = module._bjvm_ffi_create_vm(classpath,
+            module.addFunction(forwardChars(options.stdout), 'viii'),
+            module.addFunction(forwardChars(options.stderr), 'viii'));
         module._free(classpath);
 
         this.scheduler = module._bjvm_ffi_create_rr_scheduler(this.ptr);
@@ -688,11 +699,12 @@ class VM {
 }
 
 const runtimeFilesList = `./jdk23/lib/modules
-./jdk23.jar
-./test_files/basic_multithreading/Multithreading.class
-./test_files/basic_multithreading/MultithreadingDemo.class
-./test_files/n_body_problem/NBodyProblem$Body.class
-./test_files/n_body_problem/NBodyProblem.class`.split('\n');
+./jdk23/conf/security/java.security
+./jdk23.jar`.split('\n');
+
+export function appendRuntimeFiles(files: string[]) {
+    runtimeFilesList.push(...files);
+}
 
 const dbName = 'bjvm';
 

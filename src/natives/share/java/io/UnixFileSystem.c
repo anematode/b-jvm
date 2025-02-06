@@ -16,7 +16,22 @@ DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") {
 }
 
 DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
-               "(Ljava/io/File;)I", locals(), invoked_methods()) {
+"(Ljava/io/File;)I", locals(), invoked_methods()) {
+  bjvm_obj_header *file_obj = args[0].handle->obj;
+  bjvm_obj_header *path = LoadFieldObject(file_obj, "java/lang/String", "path");
+
+  heap_string path_str = AsHeapString(path, on_oom);
+
+  struct stat st;
+  int result = stat(path_str.chars, &st) != 0 ? 0 : BA_EXISTS | (S_ISDIR(st.st_mode) ? BA_DIRECTORY : BA_REGULAR);
+  free_heap_str(path_str);
+
+  ASYNC_RETURN((bjvm_stack_value) {.i = result});
+
+  on_oom:
+  ASYNC_RETURN(value_null());
+
+#if 0
   unixlike_fs const *fs = unix_get_active_fs();
   if (!fs) {
     ThrowLangException(UnsupportedOperationException);
@@ -41,6 +56,7 @@ DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
 
   exception:
   ASYNC_RETURN(value_null());
+#endif
 
   ASYNC_END(value_null());
 }

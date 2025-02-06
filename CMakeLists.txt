@@ -101,6 +101,13 @@ if (EMSCRIPTEN)
     # add bjvm with -Wl,--whole-archive
     target_link_libraries(bjvm_main PRIVATE bjvm)
     set_target_properties(bjvm_main PROPERTIES LINK_FLAGS "${EmscriptenFlags} -sMODULARIZE -sEXPORT_ES6=1")
+
+    add_custom_command(TARGET bjvm_main POST_BUILD
+            COMMAND ${CMAKE_SOURCE_DIR}/../binaryen/cmake-build-release/bin/wasm-opt
+        ${CMAKE_SOURCE_DIR}/build/bjvm_main.wasm -all --interpreter -o ${CMAKE_SOURCE_DIR}/build/bjvm_main.wasm
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Replacing interpreter intrinsics"
+    )
 endif ()
 
 add_executable(gen_natives codegen/gen_natives.c)

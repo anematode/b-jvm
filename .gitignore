@@ -1,5 +1,8 @@
-build
+build/*
 cmake-build-*
 test/jre8
 website
 test/jdk23-exploded
+!build/bjvm_main.js
+!build/bjvm_main.d.ts
+!build/bjvm_main.wasm

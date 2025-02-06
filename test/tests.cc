@@ -768,3 +768,8 @@ slept for at least 1000 ms? false
   REQUIRE(result.ms_slept <= 1000000); // 1 second
   REQUIRE(1000000 - result.ms_slept <= 100000); // give or take 0.1 seconds
 }
+
+TEST_CASE("URLClassLoader, basic") {
+  auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
+  REQUIRE(result.stdout_ == "Hello, world!\n");
+}

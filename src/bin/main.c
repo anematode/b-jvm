@@ -12,12 +12,13 @@
 #include <roundrobin_scheduler.h>
 
 EMSCRIPTEN_KEEPALIVE
-bjvm_vm *bjvm_ffi_create_vm(const char* classpath, bjvm_write_byte stdout_, bjvm_write_byte stderr_) {
+bjvm_vm *bjvm_ffi_create_vm(const char* classpath, bjvm_write_bytes stdout_, bjvm_write_bytes stderr_) {
   bjvm_vm_options options = bjvm_default_vm_options();
   options.classpath = (slice){ .chars=(char*)classpath, .len=(int)strlen(classpath)};
+
   options.write_stdout = stdout_;
   options.write_stderr = stderr_;
-  options.write_byte_param = nullptr;
+  options.stdio_override_param = nullptr;
 
   bjvm_vm *vm = bjvm_create_vm(options);
   return vm;

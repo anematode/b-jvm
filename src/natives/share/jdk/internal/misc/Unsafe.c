@@ -11,6 +11,13 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, registerNatives, "()V") {
   return value_null();
 }
 
+// setMemory0(Object o, long offset, long bytes, byte value);
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, setMemory0, "(Ljava/lang/Object;JJB)V") {
+  assert(argc == 4);
+  memset((void*)((uintptr_t)args[0].handle->obj + args[1].l), args[3].i, args[2].l);
+  return value_null();
+}
+
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, arrayBaseOffset0, "(Ljava/lang/Class;)I") {
   return (bjvm_stack_value){.i = kArrayDataOffset};
 }
@@ -201,6 +208,12 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {
   assert(argc == 2);
   *(s64 *)args[0].l = args[1].l;
+  return value_null();
+}
+
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(Ljava/lang/Object;JJ)V") {
+  assert(argc == 3);
+  *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].l;
   return value_null();
 }
 
