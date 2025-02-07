@@ -36,7 +36,6 @@ if (NOT EMSCRIPTEN)
 endif()
 
 if (EMSCRIPTEN)
-    target_compile_options(bjvm_static PUBLIC -O3)
     target_link_options(bjvm_static PUBLIC -sEXPORTED_FUNCTIONS=_malloc,_free,_main
             -sSTACK_SIZE=500000
             -sWASMFS
