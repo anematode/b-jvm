@@ -1,3 +1,5 @@
+set(CMAKE_C_STANDARD 23)
+
 include(CheckSymbolExists)
 include(probes)
 include(Zlib)

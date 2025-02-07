@@ -44,7 +44,7 @@ extern "C" {
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
       fprintf(stderr, "%s: %s%d: CHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                       \
-      fprintf(stderr, "" __VA_ARGS__);                                                                                 \
+      fprintf(stderr, " " __VA_ARGS__);                                                                                 \
       fprintf(stderr, "\n");                                                                                           \
       abort();                                                                                                         \
     }                                                                                                                  \
@@ -58,7 +58,7 @@ extern "C" {
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
       fprintf(stderr, "%s: %s%d: DCHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                      \
-      fprintf(stderr, "" __VA_ARGS__);                                                                                 \
+      fprintf(stderr, " " __VA_ARGS__);                                                                                 \
       fprintf(stderr, "\n");                                                                                           \
       abort();                                                                                                         \
     }                                                                                                                  \
