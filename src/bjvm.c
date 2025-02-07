@@ -147,15 +147,39 @@ void bjvm_drop_js_handle(bjvm_vm *vm, int index) {
   vm->js_handles[index] = nullptr;
 }
 
-bjvm_handle *bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj) {
+[[maybe_unused]] static int handles_count(bjvm_thread * thread) {
+  int count = 0;
+  for (int i = 0; i < thread->handles_capacity; ++i) {
+    if (thread->handles[i].obj) {
+      count++;
+    }
+  }
+  return count;
+}
+
+bjvm_handle *bjvm_make_handle_impl(bjvm_thread *thread, bjvm_obj_header *obj, int line_no) {
   if (!obj)
     return &thread->null_handle;
   for (int i = 0; i < thread->handles_capacity; ++i) {
     if (!thread->handles[i].obj) {
       thread->handles[i].obj = obj;
+#ifndef NDEBUG
+      thread->handles[i].line = line_no;
+#endif
       return thread->handles + i;
     }
   }
+
+#ifndef NDEBUG
+  // Print where the handles were allocated
+  fprintf(stderr, "Handle exhaustion: Lines ");
+  for (int i = 0; i < thread->handles_capacity; ++i) {
+    if (thread->handles[i].obj) {
+      fprintf(stderr, "%d ", thread->handles[i].line);
+    }
+  }
+  fprintf(stderr, "\n");
+#endif
   UNREACHABLE(); // When we need more handles, rewrite to use a LL impl
 }
 
@@ -355,6 +379,7 @@ static void free_primitive_classdesc(bjvm_classdesc *classdesc) {
   if (classdesc->array_type)
     classdesc->array_type->dtor(classdesc->array_type);
   free_heap_str(classdesc->name);
+  arena_uninit(&classdesc->arena);
   free(classdesc);
 }
 
@@ -645,6 +670,7 @@ void free_unsafe_allocations(bjvm_vm *vm) {
     mmap_allocation A = vm->mmap_allocations[i];
     munmap(A.ptr, A.len);
   }
+  arrfree(vm->mmap_allocations);
   arrfree(vm->unsafe_allocations);
 }
 
@@ -762,10 +788,9 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->vm = vm;
   thr->frame_buffer = calloc(1, thr->frame_buffer_capacity = options.stack_space);
   thr->js_jit_enabled = options.js_jit_enabled;
-  const int HANDLES_CAPACITY = 100;
+  const int HANDLES_CAPACITY = 200;
   thr->handles = calloc(1, sizeof(bjvm_handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
-  thr->lang_exception_frame = -1;
 
   thr->async_stack = calloc(1, 0x20);
 
@@ -781,9 +806,6 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   // Pre-allocate OOM and stack overflow errors
   thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
   thr->stack_overflow_error = new_object(thr, vm->cached_classdescs->stack_overflow_error);
-
-  bootstrap_lookup_class(thr, STR("java/lang/reflect/Field"));
-  bootstrap_lookup_class(thr, STR("java/lang/reflect/Constructor"));
 
   bjvm_handle *java_thread = bjvm_make_handle(thr, new_object(thr, vm->cached_classdescs->thread));
 #define java_thr ((struct bjvm_native_Thread *)java_thread->obj)
@@ -1602,22 +1624,18 @@ bjvm_cp_method *bjvm_method_lookup(bjvm_classdesc *descriptor, const slice name,
   return nullptr;
 }
 
-bjvm_async_run_ctx *create_run_ctx(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args) {
+// Returns true on failure to initialize the context
+static bool initialize_async_ctx(bjvm_async_run_ctx *ctx, bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args) {
   assert(method && "Method is null");
-  bjvm_async_run_ctx *ctx = calloc(1, sizeof(bjvm_async_run_ctx));
-  if (!ctx) {
-    bjvm_out_of_memory(thread);
-    return nullptr;
-  }
+  memset(ctx, 0, sizeof(*ctx));
 
   u8 argc = bjvm_argc(method);
-
   bjvm_stack_value *stack_top = (bjvm_stack_value *)(thread->frame_buffer + thread->frame_buffer_used);
   size_t args_size = sizeof(bjvm_stack_value) * argc;
 
   if (args_size + thread->frame_buffer_used > thread->frame_buffer_capacity) {
     bjvm_raise_exception_object(thread, thread->stack_overflow_error);
-    return ctx; // todo, not very good error handling, use proper async
+    return true;
   }
 
   memcpy(stack_top, args, args_size);
@@ -1625,34 +1643,18 @@ bjvm_async_run_ctx *create_run_ctx(bjvm_thread *thread, bjvm_cp_method *method, 
 
   ctx->thread = thread;
   ctx->frame = bjvm_push_frame(thread, method, stack_top, argc);
-  ctx->status = BJVM_ASYNC_RUN_RESULT_EXC;
-  if (!ctx->frame) // failed to allocate a frame
-    return ctx;
-  ctx->status = BJVM_ASYNC_RUN_RESULT_INT;
-  return ctx;
-}
-
-void bjvm_free_async_run_ctx(bjvm_async_run_ctx *ctx) {
-  free(ctx);
+  return !ctx->frame;  // true on failure to allocate
 }
 
 DEFINE_ASYNC(call_interpreter) {
-#define method args->method
-#define thread args->thread
-
-  self->ctx = create_run_ctx(thread, method, args->args);
-  if (!self->ctx)
+  if (initialize_async_ctx(&self->ctx, args->thread, args->method, args->args))
     ASYNC_RETURN((bjvm_stack_value){.l = 0});
 
-  self->ctx->interpreter_state.args = (struct bjvm_interpret_args){ thread, self->ctx->frame};
-  AWAIT_FUTURE_EXPR(bjvm_interpret(&self->ctx->interpreter_state));
+  self->ctx.interpreter_state.args = (struct bjvm_interpret_args){ args->thread, self->ctx.frame};
+  AWAIT_FUTURE_EXPR(bjvm_interpret(&self->ctx.interpreter_state));
 
-  bjvm_stack_value result = self->ctx->interpreter_state._result;
-  bjvm_free_async_run_ctx(self->ctx);
-
+  bjvm_stack_value result = self->ctx.interpreter_state._result;
   ASYNC_END(result);
-#undef method
-#undef thread
 }
 
 int bjvm_resolve_class(bjvm_thread *thread, bjvm_cp_class_info *info) {
@@ -1851,27 +1853,39 @@ struct bjvm_native_Class *bjvm_get_class_mirror(bjvm_thread *thread, bjvm_classd
 #undef class_mirror
 }
 
-bool bjvm_instanceof_interface(const bjvm_classdesc *o, const bjvm_classdesc *classdesc) {
-  if (o == classdesc)
+bool bjvm_instanceof_interface(const bjvm_classdesc *o, const bjvm_classdesc *target) {
+  if (o == target)
     return true;
-  for (int i = 0; i < o->interfaces_count; ++i) {
-    if (bjvm_instanceof_interface(o->interfaces[i]->classdesc, classdesc)) {
+  for (int i = 0; i < arrlen(o->itables.interfaces); ++i)
+    if (o->itables.interfaces[i] == target)
       return true;
-    }
-  }
   return false;
 }
 
+bool bjvm_instanceof_super(const bjvm_classdesc *o, const bjvm_classdesc *target) {
+  assert(target->hierarchy_len > 0 && "Invalid hierarchy length");
+  assert(target->state >= BJVM_CD_STATE_LINKED && "Target class not linked");
+  assert(o->state >= BJVM_CD_STATE_LINKED && "Source class not linked");
+
+  return target->hierarchy_len <= o->hierarchy_len  // target is at or higher than o in its chain
+    && o->hierarchy[target->hierarchy_len - 1] == target; // it is a superclass!
+}
+
+// Returns true if o is an instance of target
 bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
+  assert(o->kind != BJVM_CD_KIND_PRIMITIVE && "bjvm_instanceof not intended for primitives");
+  assert(target->kind != BJVM_CD_KIND_PRIMITIVE && "bjvm_instanceof not intended for primitives");
+
   // TODO compare class loaders too
-  if (o == nullptr || o == target)
+  if (o == target)
     return true;
 
-  if (target->kind != BJVM_CD_KIND_ORDINARY) {
+  if (unlikely(target->kind != BJVM_CD_KIND_ORDINARY)) { // target is an array
     if (o->kind == BJVM_CD_KIND_ORDINARY)
       return false;
     if (o->kind == BJVM_CD_KIND_ORDINARY_ARRAY) {
-      return target->dimensions == o->dimensions && o->primitive_component == target->primitive_component &&
+      return target->dimensions == o->dimensions &&
+        o->primitive_component == target->primitive_component &&
              (!o->base_component || !target->base_component ||
               bjvm_instanceof(o->base_component, target->base_component));
     }
@@ -1881,12 +1895,9 @@ bool bjvm_instanceof(const bjvm_classdesc *o, const bjvm_classdesc *target) {
 
   // o is normal object
   const bjvm_classdesc *desc = o;
-  while (desc) {
-    if (bjvm_instanceof_interface(desc, target))
-      return true;
-    desc = desc->super_class ? desc->super_class->classdesc : nullptr;
-  }
-  return false;
+  return target->access_flags & BJVM_ACCESS_INTERFACE ?
+    bjvm_instanceof_interface(desc, target) :
+    bjvm_instanceof_super(desc, target);
 }
 
 bool method_types_compatible(struct bjvm_native_MethodType *provider_mt, struct bjvm_native_MethodType *targ) {
@@ -1990,7 +2001,6 @@ DEFINE_ASYNC(bjvm_invokevirtual_signature_polymorphic) {
     // if the VM is deleted
     self->interpreter_ctx = calloc(1, sizeof(bjvm_interpret_t));
     AWAIT_INNER(self->interpreter_ctx, bjvm_interpret, thread, self->frame);
-
     if (self->method->descriptor->return_type.base_kind != BJVM_TYPE_KIND_VOID) {
       // Store the result in the frame
       *args->sp_ = self->interpreter_ctx->_result;
@@ -2176,8 +2186,12 @@ DEFINE_ASYNC(indy_resolve) {
       bjvm_method_lookup(self->bootstrap_handle->obj->descriptor, STR("invokeWithArguments"),
                          STR("([Ljava/lang/Object;)Ljava/lang/Object;"), true, false);
 
+  object bh = self->bootstrap_handle->obj, invoke_array = self->invoke_array->obj;
+  bjvm_drop_handle(thread, self->bootstrap_handle);
+  bjvm_drop_handle(thread, self->invoke_array);
+
   AWAIT(call_interpreter, thread, invokeWithArguments,
-                       (bjvm_stack_value[]){{.obj = self->bootstrap_handle->obj}, {.obj = self->invoke_array->obj}});
+                       (bjvm_stack_value[]){{.obj = bh}, {.obj = invoke_array}});
   bjvm_stack_value res = get_async_result(call_interpreter);
 
   int result;
@@ -2189,7 +2203,6 @@ DEFINE_ASYNC(indy_resolve) {
     result = 0;
   }
 
-  bjvm_drop_handle(thread, self->bootstrap_handle);
 
   ASYNC_END(result);
 #undef m
@@ -2246,13 +2259,13 @@ DEFINE_ASYNC(bjvm_interpret) {
     bjvm_stack_value the_result = bjvm_interpret_2(&f, thread, raw_frame);
     if (f.status == FUTURE_READY) {
       ASYNC_RETURN(the_result);
-    } else {
-      ASYNC_YIELD(f.wakeup);
     }
+    ASYNC_YIELD(f.wakeup);
   }
 
-  UNREACHABLE();
   ASYNC_END_VOID();
+#undef thread
+#undef raw_frame
 }
 // #pragma GCC diagnostic pop
 
@@ -2278,8 +2291,6 @@ int bjvm_get_line_number(const bjvm_attribute_code *code, u16 pc) {
     }
   }
   return -1;
-#undef thread
-#undef raw_frame
 }
 
 bjvm_obj_header *get_main_thread_group(bjvm_thread *thread) {

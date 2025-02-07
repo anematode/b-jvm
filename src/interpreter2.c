@@ -2457,7 +2457,7 @@ static s64 checkcast_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   bjvm_cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
-  int error = bjvm_resolve_class(thread, info);
+  int error = bjvm_resolve_class(thread, info) || bjvm_link_class(thread, info->classdesc);
   if (error)
     return 0;
 
@@ -2487,7 +2487,7 @@ static s64 instanceof_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   bjvm_cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
-  int error = bjvm_resolve_class(thread, info);
+  int error = bjvm_resolve_class(thread, info) || bjvm_link_class(thread, info->classdesc);
   if (error)
     return 0;
 
@@ -2525,7 +2525,7 @@ static bjvm_exception_table_entry *find_exception_handler(bjvm_thread *thread, b
 
     if (ent->start_insn <= pc && pc < ent->end_insn) {
       if (ent->catch_type) {
-        int error = bjvm_resolve_class(thread, ent->catch_type);
+        int error = bjvm_resolve_class(thread, ent->catch_type) || bjvm_link_class(thread, ent->catch_type->classdesc);
         if (error)
           continue; // can happen if the current classloader != verifier classloader?
       }

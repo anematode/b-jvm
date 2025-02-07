@@ -3,22 +3,12 @@
 #include <linkage.h>
 #include <natives-dsl.h>
 
-bool frame_mentions_object(bjvm_stack_frame *raw_frame,
-                           const bjvm_obj_header *obj) {
-  if (bjvm_is_frame_native(raw_frame))
+// Returns true if the frame is currently constructing the given object.
+static bool is_frame_constructing(bjvm_stack_frame *frame, object obj) {
+  if (!frame->method->is_ctor || bjvm_is_frame_native(frame) || frame->num_locals < 1) {
     return false;
-  bjvm_plain_frame *frame = bjvm_get_plain_frame(raw_frame);
-  for (int i = 0; i < stack_depth(raw_frame); ++i) {
-    if (frame->stack[i].obj == obj) {
-      bjvm_compressed_bitset refs =
-          (raw_frame->method->code_analysis)
-              ->insn_index_to_references[frame->program_counter];
-      if (bjvm_test_compressed_bitset(refs, i)) {
-        return true;
-      }
-    }
   }
-  return false;
+  return frame_locals(frame)[0].obj == obj;
 }
 
 // Implementation-dependent field where we can store the stack trace
@@ -35,18 +25,13 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
       bootstrap_lookup_class(thread, STR("java/lang/StackTraceElement"));
   bjvm_link_class(thread, StackTraceElement);
 
-  int i = thread->lang_exception_frame;
-  if (i == -1) {
-    // Not a lang exception, skip frames involved in constructing the object
-    // TODO cleaner way of doing this?
-    i = (int)thread->frames_count - 2;
-    for (; i >= 0; --i) {
-      bjvm_stack_frame *frame = thread->frames[i];
-      // The first frame in which the exception object is not mentioned
-      if (!frame_mentions_object(frame, obj->obj))
-        break;
+  // Find the first frame which is not an initializer of the current exception
+  int i = (int)thread->frames_count - 3 /* skip fillInStackTrace(void) and fillInStackTrace(I) */;
+  for (; i >= 0; --i) {
+    bjvm_stack_frame *frame = thread->frames[i];
+    if (!is_frame_constructing(frame, obj->obj)) {
+      break;
     }
-    ++i;
   }
 
   // Create stack trace of the appropriate height

@@ -21,6 +21,7 @@ static void free_array_classdesc(bjvm_classdesc *classdesc) {
   free(classdesc->interfaces[0]); // Cloneable and Serializable together
   free(classdesc->interfaces);
   bjvm_free_function_tables(classdesc);
+  arena_uninit(&classdesc->arena);
   free(classdesc);
 }
 
@@ -60,6 +61,7 @@ primitive_array_classdesc(bjvm_thread *thread, bjvm_classdesc *component_type) {
   result->primitive_component = component_type->primitive_component;
   result->name = make_heap_str(2);
   bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
+  setup_super_hierarchy(result);
   bjvm_set_up_function_tables(result);
   return result;
 }

@@ -62,6 +62,9 @@ typedef union {
 // objects.
 typedef struct {
   bjvm_obj_header *obj;
+#ifndef NDEBUG
+  int line;
+#endif
 } bjvm_handle;
 
 // Value set as viewed by native functions (rather than by the VM itself,
@@ -158,23 +161,16 @@ DECLARE_ASYNC(
     ),
 );
 
-typedef enum {
-  BJVM_ASYNC_RUN_RESULT_OK,
-  BJVM_ASYNC_RUN_RESULT_EXC,
-  BJVM_ASYNC_RUN_RESULT_INT,
-} bjvm_async_run_result;
-
 typedef struct {
   bjvm_thread *thread;
   bjvm_stack_frame *frame;
   bjvm_stack_value *result;
   bjvm_interpret_t interpreter_state;
-  bjvm_async_run_result status;
 } bjvm_async_run_ctx;
 
 // runs interpreter (async)
 DECLARE_ASYNC(bjvm_stack_value, call_interpreter,
-  locals(bjvm_async_run_ctx *ctx),
+  locals(bjvm_async_run_ctx ctx),
   arguments(
     bjvm_thread *thread;
     bjvm_cp_method *method;
@@ -504,11 +500,6 @@ typedef struct bjvm_thread {
 
   // Currently propagating exception
   bjvm_obj_header *current_exception;
-  // Frame in which we are raising a language Throwable (as opposed to a
-  // "manually" generated Throwable). Used so that the stack trace in such
-  // cases doesn't include the <init> frame. -1 if not applicable.
-  // See Throwable:fillInStackTrace for more information.
-  int lang_exception_frame;
 
   bool js_jit_enabled;
 
@@ -539,7 +530,8 @@ typedef struct bjvm_thread {
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
 
-bjvm_handle *bjvm_make_handle(bjvm_thread *thread, bjvm_obj_header *obj);
+bjvm_handle *bjvm_make_handle_impl(bjvm_thread *thread, bjvm_obj_header *obj, int line_no);
+#define bjvm_make_handle(thread, obj) bjvm_make_handle_impl(thread, obj, __LINE__)
 
 void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
 

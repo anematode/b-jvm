@@ -49,6 +49,27 @@ static size_t allocate_field(size_t *current, bjvm_type_kind kind) {
   return result;
 }
 
+// Construct superclass hierarchy, used for fast instanceof checks
+void setup_super_hierarchy(bjvm_classdesc * classdesc) {
+  if (classdesc->super_class) {
+    bjvm_classdesc *super = classdesc->super_class->classdesc;
+    assert(super && "Superclass is resolved");
+    assert(super->hierarchy_len > 0 && "Invalid hierarchy length");
+
+    classdesc->hierarchy_len = super->hierarchy_len + 1;
+    classdesc->hierarchy = arena_alloc(&classdesc->arena, super->hierarchy_len + 1, sizeof(bjvm_classdesc *));
+    memcpy(classdesc->hierarchy, super->hierarchy, super->hierarchy_len * sizeof(bjvm_classdesc *));
+  } else {
+    // java/lang/Object has a superclass hierarchy of length 1, containing only itself
+    classdesc->hierarchy_len = 1;
+    classdesc->hierarchy = arena_alloc(&classdesc->arena, 1, sizeof(bjvm_classdesc *));
+  }
+
+  // Place ourselves into the hierarchy
+  classdesc->hierarchy[classdesc->hierarchy_len - 1] = classdesc;
+}
+
+
 static int link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   if (classdesc->state >= BJVM_CD_STATE_LINKED)
     return 0;
@@ -68,6 +89,7 @@ static int link_array_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
       a->state = st;
     }
   }
+  setup_super_hierarchy(classdesc);
   bjvm_set_up_function_tables(classdesc);
   return status;
 }
@@ -79,12 +101,18 @@ int bjvm_link_class(bjvm_thread *thread, bjvm_classdesc *classdesc) {
   }
   // Link superclasses
   if (classdesc->super_class) {
-    int status = bjvm_link_class(thread, classdesc->super_class->classdesc);
+    bjvm_classdesc *super = classdesc->super_class->classdesc;
+    int status = bjvm_link_class(thread, super);
     if (status) {
       classdesc->state = BJVM_CD_STATE_LINKAGE_ERROR;
       return status;
     }
+  } else {
+    assert(utf8_equals(hslc(classdesc->name), "java/lang/Object"));
   }
+
+  setup_super_hierarchy(classdesc);
+
   // Link superinterfaces
   for (int i = 0; i < classdesc->interfaces_count; ++i) {
     int status = bjvm_link_class(thread, classdesc->interfaces[i]->classdesc);

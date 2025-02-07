@@ -162,6 +162,9 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   }
   bjvm_classdesc *c = bootstrap_lookup_class(thread, hslc(name_str));
 
+  int error = bjvm_link_class(thread, c);
+  BJVM_CHECK(!error);
+
   if (c && args[1].i) {
     bjvm_initialize_class_t ctx = {.args = {thread, c}};
     future_t f = bjvm_initialize_class(&ctx);
@@ -301,20 +304,31 @@ DECLARE_NATIVE("java/lang", Class, isInterface, "()Z") {
 
 DECLARE_NATIVE("java/lang", Class, isAssignableFrom, "(Ljava/lang/Class;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj->obj);
+  BJVM_CHECK(!bjvm_link_class(thread, this_desc));
+
   if (!args[0].handle->obj) {
     raise_null_pointer_exception(thread);
     return value_null();
   }
+
   bjvm_classdesc *other_desc = bjvm_unmirror_class(args[0].handle->obj);
-  return (bjvm_stack_value){.i = bjvm_instanceof(other_desc, this_desc)};
+  BJVM_CHECK(!bjvm_link_class(thread, other_desc));
+
+  bool instanceof = other_desc == this_desc;
+  if (!instanceof && (other_desc->kind != BJVM_CD_KIND_PRIMITIVE && this_desc->kind != BJVM_CD_KIND_PRIMITIVE)) {
+    instanceof = bjvm_instanceof(other_desc, this_desc);
+  }
+  return (bjvm_stack_value){.i = instanceof};
 }
 
 // Returns false when passed object is null
 DECLARE_NATIVE("java/lang", Class, isInstance, "(Ljava/lang/Object;)Z") {
   bjvm_classdesc *this_desc = bjvm_unmirror_class(obj->obj);
   int result = 0;
-  if (args[0].handle)
-    result = bjvm_instanceof(args[0].handle->obj->descriptor, this_desc);
+  object arg = args[0].handle->obj;
+  if (arg && this_desc->kind != BJVM_CD_KIND_PRIMITIVE) {
+    result = bjvm_instanceof(arg->descriptor, this_desc);
+  }
   return (bjvm_stack_value){.i = result};
 }
 

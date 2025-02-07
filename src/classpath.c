@@ -215,8 +215,10 @@ static char *load_filesystem_jar(const char *filename, bjvm_mapped_jar *jar) {
   char *specific_error;
   bool error_needs_free = false;
   char *map_err = map_jar(filename, jar);
-  if (map_err)
+  if (map_err) {
+    free_jar(jar);
     return map_err;
+  }
   // Search 22 bytes from the end for the ZIP end of central directory record
   // signature
   const char sig[4] = "PK\005\006";
