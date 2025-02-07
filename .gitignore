@@ -1,4 +1,5 @@
 build
+build-debug
 cmake-build-*
 test/jre8
 website
