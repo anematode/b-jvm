@@ -20,7 +20,7 @@
       }
     },
     {
-      "name": "Debug-wasm",
+      "name": "Debug",
       "inherits": "default",
       "binaryDir": "build-debug",
       "cacheVariables": {
@@ -28,12 +28,24 @@
       }
     },
     {
-      "name": "Release-wasm",
+      "name": "Release",
       "inherits": "default",
       "binaryDir": "build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Debug",
+      "configurePreset": "default",
+      "configuration": "Debug"
+    },
+    {
+      "name": "Release",
+      "configurePreset": "default",
+      "configuration": "Release"
     }
   ]
 }
