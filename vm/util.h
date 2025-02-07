@@ -7,10 +7,10 @@ extern "C" {
 
 #include <assert.h>
 #include <stdarg.h>
-#include <types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <types.h>
 #include <wchar.h>
 
 // These are unlikely (ha!) to actually improve codegen, but are actually kind
@@ -43,7 +43,7 @@ extern "C" {
 #define CHECK(condition, ...)                                                                                          \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
-      fprintf(stderr, "%s: %s%d : CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
+      fprintf(stderr, "%s: %s%d: CHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                       \
       fprintf(stderr, "" __VA_ARGS__);                                                                                 \
       fprintf(stderr, "\n");                                                                                           \
       abort();                                                                                                         \
@@ -54,10 +54,10 @@ extern "C" {
 /// Checks the condition is true;  if not, optionally prints a message and aborts.
 /// This check is removed in release builds.
 #if DCHECKS_ENABLED
-#define DCHECK(condition, ...)                                                                                          \
+#define DCHECK(condition, ...)                                                                                         \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
-      fprintf(stderr, "%s: %s%d: CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
+      fprintf(stderr, "%s: %s%d: DCHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                      \
       fprintf(stderr, "" __VA_ARGS__);                                                                                 \
       fprintf(stderr, "\n");                                                                                           \
       abort();                                                                                                         \
