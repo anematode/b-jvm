@@ -384,9 +384,12 @@ extern bjvm_native_t *bjvm_natives[];
 void bjvm_register_native(bjvm_vm *vm, slice class, const slice method_name, const slice method_descriptor,
                           bjvm_native_callback callback) {
   if (class.chars[0] == '/') class = subslice(class, 1);
+
+  heap_string heap_class = make_heap_str_from(class);
   for (size_t i = 0; i < class.len; i++) { // hacky way to avoid emscripten from complaining about symbol names
-    if (class.chars[i] == '_') class.chars[i] = '$';
+    if (heap_class.chars[i] == '_') heap_class.chars[i] = '$';
   }
+  class = hslc(heap_class);
 
   bjvm_classdesc *cd = bjvm_hash_table_lookup(&vm->classes, class.chars, class.len);
   CHECK (cd == nullptr, "%.*s: Natives must be registered before class is loaded", fmt_slice(class));
@@ -401,6 +404,8 @@ void bjvm_register_native(bjvm_vm *vm, slice class, const slice method_name, con
   ent->name = method_name;
   ent->descriptor = method_descriptor;
   ent->callback = callback;
+
+  free_heap_str(heap_class);
 }
 
 void read_string(bjvm_thread *, bjvm_obj_header *obj, s8 **buf, size_t *len) {
