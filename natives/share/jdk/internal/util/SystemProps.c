@@ -56,7 +56,7 @@ static bjvm_handle *make_string_array(bjvm_thread *thread, int length) {
 }
 
 // TODO read the properties from the VM instead of hardcoding them
-DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
+DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, platformProperties,
                "()[Ljava/lang/String;") {
   bjvm_handle *props = make_string_array(thread, FIXED_LENGTH);
 
@@ -118,7 +118,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, platformProperties,
   return result;
 }
 
-DECLARE_NATIVE("jdk/internal/util", SystemProps$Raw, vmProperties,
+DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, vmProperties,
                "()[Ljava/lang/String;") {
   bjvm_handle *props = make_string_array(thread, 2);
 

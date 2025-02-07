@@ -27,19 +27,16 @@ if (BUILD_TESTING)
 endif ()
 
 add_library(bjvm_static STATIC)
-target_link_libraries(bjvm_static PUBLIC vm natives)
-target_link_options(bjvm_static PRIVATE -Wl,--whole-archive)
+target_link_libraries(bjvm_static PUBLIC vm PRIVATE natives)
 
 if (NOT EMSCRIPTEN)
     add_library(bjvm SHARED)
-    target_link_libraries(bjvm PUBLIC vm natives)
-    target_link_options(bjvm PRIVATE -Wl,--whole-archive)
+    target_link_libraries(bjvm PUBLIC vm PRIVATE natives)
 endif()
 
 if (EMSCRIPTEN)
     target_link_options(bjvm_static PUBLIC -sEXPORTED_FUNCTIONS=_malloc,_free,_main
             -sSTACK_SIZE=500000
-            -Wl,--whole-archive
             -sWASMFS
             -sFORCE_FILESYSTEM=1
             -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1

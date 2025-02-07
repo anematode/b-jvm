@@ -29,10 +29,10 @@ DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
 }
 
-DECLARE_ASYNC_NATIVE(
+DECLARE_ASYNC_NATIVE_OVERLOADED(
     "java/security", AccessController, doPrivileged,
     "(Ljava/security/PrivilegedExceptionAction;)Ljava/lang/Object;",
-    locals(), invoked_methods(invoked_method(call_interpreter))) {
+    locals(), invoked_methods(invoked_method(call_interpreter)), 1) {
   DCHECK(argc == 1);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
@@ -43,10 +43,10 @@ DECLARE_NATIVE("java/security", AccessController, getStackAccessControlContext,
   return value_null();
 }
 
-DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
+DECLARE_ASYNC_NATIVE_OVERLOADED("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;Ljava/security/"
                "AccessControlContext;)Ljava/lang/Object;",
-               locals(), invoked_methods(invoked_method(call_interpreter))) {
+               locals(), invoked_methods(invoked_method(call_interpreter)), 2) {
   DCHECK(argc == 2);
 
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, args[1].handle->obj);
@@ -57,9 +57,9 @@ DECLARE_NATIVE("java/security", AccessController, ensureMaterializedForStackWalk
   return value_null();
 }
 
-DECLARE_ASYNC_NATIVE("java/security", AccessController, doPrivileged,
+DECLARE_ASYNC_NATIVE_OVERLOADED("java/security", AccessController, doPrivileged,
                "(Ljava/security/PrivilegedAction;)Ljava/lang/Object;",
-               locals(), invoked_methods(invoked_method(call_interpreter))) {
+               locals(), invoked_methods(invoked_method(call_interpreter)), 3) {
   // Look up method "run" on obj
   DCHECK(argc == 1);
 

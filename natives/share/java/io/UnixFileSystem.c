@@ -11,10 +11,6 @@ DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") {
   return value_null();
 }
 
-DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") {
-  return value_null();
-}
-
 DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
                "(Ljava/io/File;)I", locals(), invoked_methods()) {
   unixlike_fs const *fs = unix_get_active_fs();

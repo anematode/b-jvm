@@ -66,6 +66,10 @@ TEST_CASE("Async natives") {
 
   bjvm_vm *vm = bjvm_create_vm(vm_options);
 
+  bjvm_native_t *native_ptr = &NATIVE_INFO_AsyncNative_myYield_0;
+  bjvm_register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
+                         native_ptr->callback);
+
   auto thread = bjvm_create_thread(vm, bjvm_default_thread_options());
 
   bjvm_classdesc *desc = bootstrap_lookup_class(thread, STR("AsyncNative"));

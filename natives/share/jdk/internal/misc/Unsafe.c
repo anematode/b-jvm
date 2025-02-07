@@ -247,7 +247,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, getLong, "(Ljava/lang/Object;J)J") {
     .l = *(s64 *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, getByte, "(J)B") {
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, getByte, "(J)B", 1) {
   DCHECK(argc == 1);
   return (bjvm_stack_value){.i = *(s8 *)args[0].l};
 }

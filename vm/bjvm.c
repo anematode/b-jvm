@@ -378,17 +378,19 @@ void free_native_entries(void *entries_) {
   free(entries_);
 }
 
-size_t bjvm_native_count = 0;
-size_t bjvm_native_capacity = 0;
-bjvm_native_t *bjvm_natives = nullptr;
+extern size_t bjvm_natives_count;
+extern bjvm_native_t *bjvm_natives[];
 
-size_t bjvm_get_natives_list(bjvm_native_t const *natives[]) {
-  *natives = bjvm_natives;
-  return bjvm_native_count;
-}
-
-void bjvm_register_native(bjvm_vm *vm, const slice class, const slice method_name, const slice method_descriptor,
+void bjvm_register_native(bjvm_vm *vm, slice class, const slice method_name, const slice method_descriptor,
                           bjvm_native_callback callback) {
+  if (class.chars[0] == '/') class = subslice(class, 1);
+  for (size_t i = 0; i < class.len; i++) { // hacky way to avoid emscripten from complaining about symbol names
+    if (class.chars[i] == '_') class.chars[i] = '$';
+  }
+
+  bjvm_classdesc *cd = bjvm_hash_table_lookup(&vm->classes, class.chars, class.len);
+  CHECK (cd == nullptr, "%.*s: Natives must be registered before class is loaded", fmt_slice(class));
+
   native_entries *existing = bjvm_hash_table_lookup(&vm->natives, class.chars, class.len);
   if (!existing) {
     existing = calloc(1, sizeof(native_entries));
@@ -643,11 +645,10 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
 
   vm->next_tid = 0;
 
-  bjvm_native_t const *natives;
-  size_t natives_reg_count = bjvm_get_natives_list(&natives);
-  for (size_t i = 0; i < natives_reg_count; ++i) {
-    bjvm_register_native(vm, natives[i].class_path, natives[i].method_name, natives[i].method_descriptor,
-                         natives[i].callback);
+  for (size_t i = 0; i < bjvm_natives_count; ++i) {
+    bjvm_native_t const *native_ptr = bjvm_natives[i];
+    bjvm_register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
+                         native_ptr->callback);
   }
 
   bjvm_register_native_padding(vm);

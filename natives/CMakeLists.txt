@@ -1,61 +1,39 @@
 add_library(natives OBJECT)
 target_link_libraries(natives PRIVATE vm)
 
-# all configurations need the DSL stuff to be built
-file(GLOB DSL_SOURCES CONFIGURE_DEPENDS "dsl/*.c")
-file(GLOB DSL_HEADERS CONFIGURE_DEPENDS "dsl/*.h")
-
-target_sources(natives PRIVATE ${DSL_SOURCES} ${DSL_HEADERS})
-target_include_directories(natives PUBLIC "dsl")
-
-# adds a directory that contains natives organized like a typical Java package hierarchy, but with c files instead of
-# .java files.
-function (add_classes_root directory_name)
-    file(GLOB_RECURSE classes_sources CONFIGURE_DEPENDS "${directory_name}/*.c")
-    target_sources(natives PRIVATE ${classes_sources})
-    get_filename_component(abs_dir ${directory_name} ABSOLUTE)
-
-    foreach(file IN LISTS classes_sources)
-        get_filename_component(abs_src ${file} ABSOLUTE)
-        file(RELATIVE_PATH rel_path "${directory_name}" "${abs_src}")
-
-        get_filename_component(dir_part "${rel_path}" DIRECTORY)
-        get_filename_component(file_part "${rel_path}" NAME)
-
-        set(out_dir "${CMAKE_BINARY_DIR}/preprocessed/${dir_part}")
-        file(MAKE_DIRECTORY "${out_dir}")
-        get_filename_component(file_name_no_ext "${file_part}" NAME_WE)
-        set(out_file "${out_dir}/${file_name_no_ext}.i")
-
-        add_custom_command(
-                OUTPUT "${out_file}"
-                COMMAND "${CMAKE_C_COMPILER}"
-                -E
-                $<JOIN:$<TARGET_PROPERTY:${natives},INTERFACE_COMPILE_OPTIONS>, >
-                "${abs_src}"
-                -o "${out_file}"
-                DEPENDS "${abs_src}"
-                COMMENT "Preprocessing ${src} => ${out_file}"
-                VERBATIM
-        )
-
-        add_custom_target("preprocess_${file_name_no_ext}"
-                DEPENDS "${out_file}"
-        )
-        add_dependencies(preprocess_all_files "preprocess_${file_name_no_ext}")
-    endforeach ()
+function(add_classes_root DIRECTORY_NAME)
+    file(GLOB_RECURSE CLASS_SOURCES CONFIGURE_DEPENDS "${DIRECTORY_NAME}/*.c")
+    target_sources(natives PRIVATE ${CLASS_SOURCES})
+    set(NATIVES_FILES ${NATIVES_FILES} ${CLASS_SOURCES} PARENT_SCOPE)
 endfunction()
 
-add_classes_root("${CMAKE_CURRENT_SOURCE_DIR}/share")
+add_classes_root("share")
 
 if (EMSCRIPTEN)
-    add_classes_root("${CMAKE_CURRENT_SOURCE_DIR}/emscripten")
+    add_classes_root("emscripten")
 endif ()
 
 if (UNIX)
-    add_classes_root("${CMAKE_CURRENT_SOURCE_DIR}/unix")
+    add_classes_root("unix")
 endif()
 
 if (APPLE)
-    add_classes_root("${CMAKE_CURRENT_SOURCE_DIR}/darwin")
+    add_classes_root("darwin")
 endif()
+
+list(JOIN NATIVES_FILES " " NATIVES_FILES_STR)
+set(out_file "${CMAKE_BINARY_DIR}/natives_registration.c")
+add_custom_command(
+        OUTPUT  ${out_file}
+        COMMAND ${CMAKE_SOURCE_DIR}/codegen/scan_native_declarations.py ${NATIVES_FILES_STR} > ${out_file}
+        DEPENDS ${NATIVES_FILES} ${CMAKE_SOURCE_DIR}/codegen/scan_native_declarations.py
+        COMMENT "Postprocessing natives files => ${out_file}"
+        VERBATIM
+)
+
+add_custom_target(natives_registration_generate
+        DEPENDS "${out_file}"
+)
+
+add_dependencies(natives natives_registration_generate)
+target_sources(natives PRIVATE ${out_file})
