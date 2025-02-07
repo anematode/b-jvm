@@ -9,6 +9,7 @@
 #include <config.h>
 
 #ifdef __cplusplus
+extern "C++" {
 #include <cstdint>
 #include <type_traits>
 
@@ -25,6 +26,7 @@ constexpr T bswap_generic(T x) {
   } else {
     static_assert(!std::is_same_v<T, T>, "Unsupported type for bswap_generic");
   }
+}
 }
 #else
 #define bswap_generic(x) _Generic((x), u8: (x), u16: bswap16((x)), u32: bswap32((x)), u64: bswap64((x)))
