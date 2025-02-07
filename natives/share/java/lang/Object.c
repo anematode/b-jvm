@@ -8,6 +8,16 @@ DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") {
   return value_null();
 }
 
+// Check whether the class is cloneable.
+static bool cloneable(bjvm_vm *vm, bjvm_classdesc *cd) {
+  for (int i = 0; i < arrlen(cd->itables.interfaces); i++) {
+    if (cd->itables.interfaces[i] == vm->cached_classdescs->cloneable) {
+      return true;
+    }
+  }
+  return false;
+}
+
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   switch (obj->obj->descriptor->kind) {
   case BJVM_CD_KIND_ORDINARY_ARRAY: {
@@ -20,9 +30,17 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
     return (bjvm_stack_value){.obj = new_array};
   }
   case BJVM_CD_KIND_ORDINARY: {
+    // Check if the object is Cloneable
+    if (!cloneable(thread->vm, obj->obj->descriptor)) {
+      ThrowLangException("CloneNotSupportedException");
+      return value_null();
+    }
+
     bjvm_obj_header *new_obj = new_object(thread, obj->obj->descriptor);
-    memcpy(new_obj + 1, obj->obj + 1,
-           obj->obj->descriptor->instance_bytes - sizeof(bjvm_obj_header));
+    if (new_obj) {
+      memcpy(new_obj + 1, obj->obj + 1,
+             obj->obj->descriptor->instance_bytes - sizeof(bjvm_obj_header));
+    }
     return (bjvm_stack_value){.obj = new_obj};
   }
   case BJVM_CD_KIND_PRIMITIVE_ARRAY: {
