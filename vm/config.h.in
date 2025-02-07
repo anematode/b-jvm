@@ -1,8 +1,32 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#cmakedefine HAVE_GETENV
-#cmakedefine DTRACE_ENABLED
-#cmakedefine DCHECKS_ENABLED
+#cmakedefine01 HAVE_GETENV
+#cmakedefine01 DTRACE_ENABLED
+#cmakedefine01 DCHECKS_ENABLED
+#cmakedefine01 HAVE_BYTESWAP_H
+#cmakedefine01 HAVE_OSBYTEORDER_H
+
+#if !defined(__BYTE_ORDER__)
+#error "__BYTE_ORDER__ is not defined"
+#endif
+#define PLATFORM_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+
+#if HAVE_BYTESWAP_H
+#include <byteswap.h>
+
+#define bswap16 __bswap_16
+#define bswap32 __bswap_32
+#define bswap64 __bswap_64
+
+#elif HAVE_OSBYTEORDER_H
+#include <libkern/OSByteOrder.h>
+
+#define bswap16 OSSwapInt16
+#define bswap32 OSSwapInt32
+#define bswap64 OSSwapInt64
+#else
+#error i dont know how to bswap
+#endif
 
 #endif

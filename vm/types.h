@@ -15,6 +15,9 @@ typedef int32_t s32;
 typedef uint64_t u64;
 typedef int64_t s64;
 
+typedef float f32;
+typedef double f64;
+
 #define U8_MAX UINT8_MAX
 #define S8_MAX S8_MAX
 #define U16_MAX UINT16_MAX

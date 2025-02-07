@@ -570,7 +570,7 @@ void bjvm_vm_init_primitive_classes(bjvm_thread *thread) {
 }
 
 static slice get_default_boot_cp() {
-#if defined(HAVE_GETENV)
+#if HAVE_GETENV
   char *boot_cp = getenv("BOOT_CLASSPATH");
   if (boot_cp != nullptr && strlen(boot_cp) > 0) {
     FILE *file = fopen(boot_cp, "r");

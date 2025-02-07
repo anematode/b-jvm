@@ -1,6 +1,7 @@
 include(CheckSymbolExists)
 include(probes)
 include(Zlib)
+include(CheckIncludeFile)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(DCHECK_DEFAULT ON)
@@ -48,6 +49,8 @@ endif ()
 
 check_symbol_exists(getenv stdlib.h HAVE_GETENV)
 check_symbol_exists(fopen stdio.h HAVE_FOPEN)
+check_include_file(byteswap.h HAVE_BYTESWAP_H)
+check_include_file(libkern/OSByteOrder.h HAVE_OSBYTEORDER_H)
 
 configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 

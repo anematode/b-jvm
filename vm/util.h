@@ -13,15 +13,6 @@ extern "C" {
 #include <string.h>
 #include <wchar.h>
 
-#if defined(__APPLE__)
-#include <libkern/OSByteOrder.h>
-#define __bswap_16(x) OSSwapInt16(x) // NOLINT(*-reserved-identifier)
-#define __bswap_32(x) OSSwapInt32(x) // NOLINT(*-reserved-identifier)
-#define __bswap_64(x) OSSwapInt64(x) // NOLINT(*-reserved-identifier)
-#else
-#include <byteswap.h>
-#endif
-
 // These are unlikely (ha!) to actually improve codegen, but are actually kind
 // of nice to indicate what we "think" is going to happen. Long term we might
 // use these macro sites to instrument certain operations and see what "unhappy"
@@ -62,7 +53,7 @@ extern "C" {
 
 /// Checks the condition is true;  if not, optionally prints a message and aborts.
 /// This check is removed in release builds.
-#ifdef DCHECKS_ENABLED
+#if DCHECKS_ENABLED
 #define DCHECK(condition, ...)                                                                                          \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
