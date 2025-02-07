@@ -19,11 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GCC 14 and ccache
+      - name: Install GCC 14, ninja and ccache
         if: matrix.compiler == 'gcc'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-14 g++-14 ccache
+          sudo apt-get install -y gcc-14 g++-14 ccache ninja
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
 
       - name: Set up Emscripten SDK
@@ -69,12 +69,12 @@ jobs:
       - name: Configure CMake
         run: |
           if [ "${{ matrix.compiler }}" = "emscripten" ]; then
-            emcmake cmake \
+            emcmake cmake -GNinja \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           else
-            cmake \
+            cmake -GNinja \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
               -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
