@@ -13,26 +13,11 @@
       "binaryDir": "build",
       "toolchainFile": "/Users/cowpox/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
       "cacheVariables": {
-        "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/node"
+        "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/node",
+        "EMSCRIPTEN_GENERATE_BITCODE_STATIC_LIBRARIES": "OFF"
       },
       "environment": {
         "EM_LLVM_ROOT": "/Users/cowpox/Documents/Projects/llvm-project/build/bin"
-      }
-    },
-    {
-      "name": "Debug",
-      "inherits": "default",
-      "binaryDir": "build-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "Release",
-      "inherits": "default",
-      "binaryDir": "build",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ],
