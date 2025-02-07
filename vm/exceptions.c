@@ -23,8 +23,6 @@ int bjvm_raise_vm_exception(bjvm_thread *thread, const slice exception_name, sli
   DCHECK(!thread->current_exception);
   DCHECK(classdesc->state == BJVM_CD_STATE_INITIALIZED && "VM-generated exceptions should be initialised at VM boot");
 
-  thread->lang_exception_frame = (int)thread->frames_count - 1;
-
   // Create the exception object
   bjvm_handle *handle = bjvm_make_handle(thread, new_object(thread, classdesc));
 
@@ -36,8 +34,6 @@ int bjvm_raise_vm_exception(bjvm_thread *thread, const slice exception_name, sli
     bjvm_cp_method *method = bjvm_method_lookup(classdesc, STR("<init>"), STR("()V"), true, false);
     call_interpreter_synchronous(thread, method, (bjvm_stack_value[]){{.obj = handle->obj}}); // no return val, it's a constructor
   }
-
-  thread->lang_exception_frame = -1;
 
 #ifndef EMSCRIPTEN
   // fprintf(stderr, "Exception: %.*s: %.*s\n", fmt_slice(exception_name), fmt_slice(exception_string));

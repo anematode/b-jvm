@@ -71,7 +71,7 @@ bjvm_obj_header *make_jstring_modified_utf8(bjvm_thread *thread, slice string) {
   u16 *chars = nullptr;
   int len;
   if (convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true) == -1)
-    return nullptr;
+    goto error;
 
   if (do_latin1(chars, len)) {
     S->value = CreatePrimitiveArray1D(thread, BJVM_TYPE_KIND_BYTE, len);
@@ -93,6 +93,7 @@ bjvm_obj_header *make_jstring_modified_utf8(bjvm_thread *thread, slice string) {
 
 oom:
   free(chars);
+error:
   bjvm_drop_handle(thread, str);
   return result;
 }

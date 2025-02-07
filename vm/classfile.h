@@ -841,6 +841,9 @@ typedef struct bjvm_classdesc {
   bjvm_vtable vtable;
   bjvm_itables itables;
 
+  bjvm_classdesc **hierarchy;  // 0 = java/lang/Object, etc. Used for fast instanceof checks
+  int hierarchy_len;
+
   arena arena; // most things are allocated in here
 } bjvm_classdesc;
 
