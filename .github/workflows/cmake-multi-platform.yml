@@ -19,11 +19,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GCC 14
+      - name: Install GCC 14 and ccache
         if: matrix.compiler == 'gcc'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-14 g++-14
+          sudo apt-get install -y gcc-14 g++-14 ccache
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 60 --slave /usr/bin/g++ g++ /usr/bin/g++-14
 
       - name: Set up Emscripten SDK
@@ -52,13 +52,19 @@ jobs:
           tar -xzf ${{ github.workspace }}/jdk-23_linux-x64_bin.tar.gz -C ${{ github.workspace }}/test
           mv ${{ github.workspace }}/test/jdk-23.* ${{ github.workspace }}/test/jdk23
 
-      - name: Cache cmake build dir
-        id: cache_cmake_build
-        uses: actions/cache@v4
+      - name: Cache ccache
+        id: cache_ccache
+        uses: actions/cache@v4.2.0
         with:
-          path: ${{ github.workspace }}/build
-          key: cmake-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
-          restore-keys: cmake-${{ runner.os }}-${{ matrix.compiler }}-
+          path: ~/.cache/ccache
+          key: ccache-${{ runner.os }}-${{ matrix.compiler }}-${{ hashFiles('**/*.c','**/*.cpp','**/*.h','**/*.hpp','**/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-${{ runner.os }}-${{ matrix.compiler }}-
+
+      - name: Configure ccache
+        run: |
+          ccache -M 2G
+          ccache -s
 
       - name: Configure CMake
         run: |
@@ -71,7 +77,7 @@ jobs:
             cmake \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           fi
 
       - name: Build
