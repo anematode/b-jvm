@@ -43,7 +43,7 @@ extern "C" {
 #define CHECK(condition, ...)                                                                                          \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
-      fprintf(stderr, "%s: %s%d: CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
+      fprintf(stderr, "%s: %s%d : CHECK(" #condition ") failed: ", __func__, __FILE__, __LINE__);                       \
       fprintf(stderr, "" __VA_ARGS__);                                                                                 \
       fprintf(stderr, "\n");                                                                                           \
       abort();                                                                                                         \

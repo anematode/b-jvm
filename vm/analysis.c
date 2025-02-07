@@ -1635,7 +1635,7 @@ static void idom_dfs(bjvm_basic_block *block, int *visited, u32 *clock) {
 // The classic Lengauer-Tarjan algorithm for dominator tree computation
 void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
   // bjvm_dump_cfg_to_graphviz(stderr, analy);
-  DCHECK(analy->blocks && "Basic blocks must have been already scanned");
+  DCHECK(analy->blocks, "Basic blocks must have been already scanned");
   if (analy->dominator_tree_computed)
     return;
   analy->dominator_tree_computed = true;
@@ -1692,7 +1692,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
     bjvm_dominated_list_t *sdlist = &analy->blocks[i].idominates;
     for (int list_i = 0; list_i < sdlist->count; ++list_i) {
       int w = sdlist->list[list_i], walk = w, min = INT_MAX;
-      DCHECK(semidom[w] == i && "Algorithm invariant");
+      DCHECK(semidom[w] == i, "Algorithm invariant");
       // Walk from w to i and record the minimizer of the semidominator value
       while (walk != i) {
         if (block_to_pre[walk] < min) {
@@ -1729,7 +1729,7 @@ void bjvm_compute_dominator_tree(bjvm_code_analysis *analy) {
 
 bool bjvm_query_dominance(const bjvm_basic_block *dominator,
                           const bjvm_basic_block *dominated) {
-  DCHECK(dominator->idom_pre != 0 && "dominator tree not computed");
+  DCHECK(dominator->idom_pre != 0, "dominator tree not computed");
   return dominator->idom_pre <= dominated->idom_pre &&
          dominator->idom_post >= dominated->idom_post;
 }

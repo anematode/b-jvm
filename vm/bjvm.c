@@ -87,8 +87,8 @@ DEFINE_ASYNC(init_cached_classdescs) {
 #define MAX_CF_NAME_LENGTH 1000
 
 u16 stack_depth(const bjvm_stack_frame *frame) {
-  DCHECK(!bjvm_is_frame_native(frame) && "Can't get stack depth of native frame");
-  DCHECK(frame->method && "Can't get stack depth of fake frame");
+  DCHECK(!bjvm_is_frame_native(frame), "Can't get stack depth of native frame");
+  DCHECK(frame->method, "Can't get stack depth of fake frame");
   int pc = frame->plain.program_counter;
   if (pc == 0)
     return 0;
@@ -241,7 +241,7 @@ bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *me
   bjvm_value *locals = (bjvm_value *)(args + argc); // reserve new memory on stack
   bjvm_stack_frame *frame = (bjvm_stack_frame *)(locals + argc);
 
-  DCHECK((uintptr_t)frame % 8 == 0 && "Frame is aligned");
+  DCHECK((uintptr_t)frame % 8 == 0, "Frame is aligned");
 
   *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) = frame;
 
@@ -313,8 +313,8 @@ bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *met
 // Interrupt behavior:
 //   - No interrupts will occur as a result of executing this function.
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, u8 argc) {
-  DCHECK(method != nullptr && "Method is null");
-  DCHECK(argc == bjvm_argc(method) && "Wrong argc");
+  DCHECK(method != nullptr, "Method is null");
+  DCHECK(argc == bjvm_argc(method), "Wrong argc");
   if (method->access_flags & BJVM_ACCESS_NATIVE) {
     return bjvm_push_native_frame(thread, method, method->descriptor, args, argc);
   }
@@ -339,7 +339,7 @@ const char *infer_type(bjvm_code_analysis *analysis, int insn, int index) {
 }
 
 void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
-  DCHECK(!bjvm_is_frame_native(frame) && "Can't dump native frame");
+  DCHECK(!bjvm_is_frame_native(frame), "Can't dump native frame");
 
   char buf[5000] = {0}, *write = buf, *end = buf + sizeof(buf);
   int sd = stack_depth(frame);
@@ -441,7 +441,7 @@ void read_string(bjvm_thread *, bjvm_obj_header *obj, s8 **buf, size_t *len) {
 }
 
 int read_string_to_utf8(bjvm_thread *thread, heap_string *result, bjvm_obj_header *obj) {
-  DCHECK(obj && "String is null");
+  DCHECK(obj, "String is null");
 
   s8 *buf;
   size_t len;
@@ -788,7 +788,7 @@ bjvm_stack_value bjvm_get_field(bjvm_obj_header *obj, bjvm_cp_field *field) {
 //   - UNALIGNED_ACCESS: Whether unaligned memory access is allowed
 static void init_unsafe_constants(bjvm_thread *thread) {
   bjvm_classdesc *UC = bootstrap_lookup_class(thread, STR("jdk/internal/misc/UnsafeConstants"));
-  DCHECK(UC && "UnsafeConstants class not found!");
+  DCHECK(UC, "UnsafeConstants class not found!");
 
   bjvm_initialize_class_t ctx = {.args = {thread, UC}};
   future_t init = bjvm_initialize_class(&ctx);
@@ -798,7 +798,7 @@ static void init_unsafe_constants(bjvm_thread *thread) {
                 *page_size = bjvm_field_lookup(UC, STR("PAGE_SIZE"), STR("I")),
                 *unaligned_access = bjvm_field_lookup(UC, STR("UNALIGNED_ACCESS"), STR("Z"));
 
-  DCHECK(address_size && page_size && unaligned_access && "UnsafeConstants fields not found!");
+  DCHECK(address_size && page_size && unaligned_access, "UnsafeConstants fields not found!");
   bjvm_set_static_field(address_size, (bjvm_stack_value){.i = sizeof(void *)});
   bjvm_set_static_field(page_size, (bjvm_stack_value){.i = 4096});
   bjvm_set_static_field(unaligned_access, (bjvm_stack_value){.i = 1});
@@ -1040,7 +1040,7 @@ static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info 
 }
 
 DEFINE_ASYNC(resolve_mh_mt) {
-  DCHECK(mh_handle_supported(args->info->handle_kind) && "Unsupported method handle kind");
+  DCHECK(mh_handle_supported(args->info->handle_kind), "Unsupported method handle kind");
 
   bjvm_cp_class_info *required_type = args->info->handle_kind == BJVM_MH_KIND_GET_FIELD
                                           ? args->info->reference->field.class_info
@@ -2243,7 +2243,7 @@ DEFINE_ASYNC(bjvm_run_native) {
 #define frame args->frame
 #define thread args->thread
 
-  DCHECK(frame && "frame is null");
+  DCHECK(frame, "frame is null");
 
   bjvm_native_callback *handle = frame->method->native_handle;
   bool is_static = frame->method->access_flags & BJVM_ACCESS_STATIC;
@@ -2273,7 +2273,7 @@ DEFINE_ASYNC(bjvm_run_native) {
 DEFINE_ASYNC(bjvm_interpret) {
 #define thread args->thread
 #define raw_frame args->raw_frame
-  DCHECK(*(thread->frames + thread->frames_count - 1) == raw_frame && "Frame is not last frame on stack");
+  DCHECK(*(thread->frames + thread->frames_count - 1) == raw_frame, "Frame is not last frame on stack");
 
   for (;;) {
     future_t f;
@@ -2291,7 +2291,7 @@ DEFINE_ASYNC(bjvm_interpret) {
 // #pragma GCC diagnostic pop
 
 int bjvm_get_line_number(const bjvm_attribute_code *code, u16 pc) {
-  DCHECK(code && "code is null");
+  DCHECK(code, "code is null");
   bjvm_attribute_line_number_table *table = code->line_number_table;
   if (!table || pc >= code->insn_count)
     return -1;

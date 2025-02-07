@@ -532,7 +532,7 @@ FORWARD_TO_NULLARY(putstatic)
 
 force_inline static s64 getstatic_L_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT(*(bjvm_obj_header **)insn->ic)
 }
@@ -541,7 +541,7 @@ FORWARD_TO_NULLARY(getstatic_L)
 force_inline static s64 getstatic_F_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_FLOAT(*(float *)insn->ic)
 }
@@ -550,7 +550,7 @@ FORWARD_TO_NULLARY(getstatic_F)
 force_inline static s64 getstatic_D_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_DOUBLE(*(double *)insn->ic)
 }
@@ -559,7 +559,7 @@ FORWARD_TO_NULLARY(getstatic_D)
 force_inline static s64 getstatic_J_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT(*(s64 *)insn->ic)
 }
@@ -568,7 +568,7 @@ FORWARD_TO_NULLARY(getstatic_J)
 force_inline static s64 getstatic_I_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT(*(int *)insn->ic)
 }
@@ -577,7 +577,7 @@ FORWARD_TO_NULLARY(getstatic_I)
 force_inline static s64 getstatic_S_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s16 *)insn->ic)
 }
@@ -586,7 +586,7 @@ FORWARD_TO_NULLARY(getstatic_S)
 force_inline static s64 getstatic_C_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT((s64)*(u16 *)insn->ic)
 }
@@ -595,7 +595,7 @@ FORWARD_TO_NULLARY(getstatic_C)
 force_inline static s64 getstatic_B_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s8 *)insn->ic)
 }
@@ -604,7 +604,7 @@ FORWARD_TO_NULLARY(getstatic_B)
 force_inline static s64 getstatic_Z_impl_void(ARGS_VOID) {
 
   DEBUG_CHECK();
-  DCHECK(insn->ic && "Static field location not found");
+  DCHECK(insn->ic, "Static field location not found");
   sp++;
   NEXT_INT((s64)*(s8 *)insn->ic)
 }

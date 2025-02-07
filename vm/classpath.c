@@ -406,7 +406,7 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
     }
     // Concatenate with the desired filename (and optionally a / in between)
     heap_string search = concat_path(entry->name, filename);
-    DCHECK(search.chars[search.len] == '\0' && "Must be null terminated");
+    DCHECK(search.chars[search.len] == '\0', "Must be null terminated");
 
     struct loaded_bytes lb;
 #ifdef EMSCRIPTEN

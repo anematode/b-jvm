@@ -21,7 +21,7 @@ void bjvm_raise_exception_object(bjvm_thread *thread, bjvm_obj_header *obj) {
 int bjvm_raise_vm_exception(bjvm_thread *thread, const slice exception_name, slice msg_utf8) {
   bjvm_classdesc *classdesc = bootstrap_lookup_class(thread, exception_name);
   DCHECK(!thread->current_exception);
-  DCHECK(classdesc->state == BJVM_CD_STATE_INITIALIZED && "VM-generated exceptions should be initialised at VM boot");
+  DCHECK(classdesc->state == BJVM_CD_STATE_INITIALIZED, "VM-generated exceptions should be initialised at VM boot");
 
   // Create the exception object
   bjvm_handle *handle = bjvm_make_handle(thread, new_object(thread, classdesc));

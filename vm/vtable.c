@@ -88,8 +88,8 @@ static void merge_itable(bjvm_itable *dst, const bjvm_itable *src,
   DCHECK(arrlen(dst->methods) == arrlen(src->methods));
   for (int i = 0; i < arrlen(src->methods); ++i) {
     bjvm_itable_method_t d = dst->methods[i], s = src->methods[i], result;
-    DCHECK(s != 0 && "i-table method must not be null");
-    DCHECK(d != 0 && "i-table method must not be null");
+    DCHECK(s != 0, "i-table method must not be null");
+    DCHECK(d != 0, "i-table method must not be null");
 
     [[maybe_unused]]
     bool d_abs = get_unambiguous_method(d)->access_flags & BJVM_ACCESS_ABSTRACT,
@@ -126,7 +126,7 @@ static bool itable_include(const bjvm_cp_method *method) {
 
 static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
   bjvm_itables *itables = &classdesc->itables;
-  DCHECK(!itables->interfaces && "i-tables already set up");
+  DCHECK(!itables->interfaces, "i-tables already set up");
 
   // Scan superinterface itables for conflicting methods, i.e., methods which
   // have the same name and descriptor.
@@ -143,7 +143,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
       iface = classdesc->interfaces[iface_i]->classdesc;
     else
       iface = super;
-    DCHECK(iface && "Superclass or -interface not resolved");
+    DCHECK(iface, "Superclass or -interface not resolved");
     for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       bjvm_itable *super_itable = iface->itables.entries + itable_i;
@@ -182,7 +182,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
     iface = iface_i < classdesc->interfaces_count
                 ? classdesc->interfaces[iface_i]->classdesc
                 : super;
-    DCHECK(iface && "Superclass or -interface not resolved");
+    DCHECK(iface, "Superclass or -interface not resolved");
     for (int itable_i = 0; itable_i < arrlen(iface->itables.interfaces);
          ++itable_i) {
       // Look if we already implement this interface, and if so, merge with
@@ -215,7 +215,7 @@ static void setup_itables(bjvm_classdesc *super, bjvm_classdesc *classdesc) {
 // TODO consider optimizing final methods out of the tables?
 void bjvm_set_up_function_tables(bjvm_classdesc *classdesc) {
   bjvm_vtable *vtable = &classdesc->vtable;
-  DCHECK(!vtable->methods && "v-table already set up");
+  DCHECK(!vtable->methods, "v-table already set up");
 
   // If the class has a superclass, copy its vtable, replacing methods which
   // are overridden.

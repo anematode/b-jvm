@@ -285,7 +285,7 @@ u32 walk_to_find_label(expression_ser_ctx *ctx,
     ++i;
     ctx = ctx->prev_block_ctx;
   }
-  DCHECK(ctx && "trying to branch to a non-enclosing block");
+  DCHECK(ctx, "trying to branch to a non-enclosing block");
   return i;
 }
 
