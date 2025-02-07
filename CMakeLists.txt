@@ -16,6 +16,7 @@ include(LtoSupport)
 FetchContent_MakeAvailable(Catch2)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 add_subdirectory(vendor)
 add_subdirectory(vm)
