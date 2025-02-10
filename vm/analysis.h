@@ -13,8 +13,6 @@ extern "C" {
 
 typedef struct {
   int *list;
-  int count;
-  int cap;
 } bjvm_dominated_list_t;
 
 typedef struct bjvm_bytecode_insn bjvm_bytecode_insn;
@@ -32,13 +30,9 @@ typedef struct bjvm_basic_block {
   // lookupswitch and tableswitch, the default branch is last.
   int *next;
   u8 *is_backedge;
-  int next_count;
-  int next_cap;
 
   // May contain duplicates in the presence of a switch or cursed if*
   int *prev;
-  int prev_count;
-  int prev_cap;
 
   // Pre- and postorder in a DFS on the original CFG
   u32 dfs_pre, dfs_post;

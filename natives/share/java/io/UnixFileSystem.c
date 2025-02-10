@@ -43,16 +43,17 @@ DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
 
 static heap_string canonicalize_path(slice path) {
   slice *components = nullptr;
-  u32 count = 0, cap = 0;
 
   u32 i = 0;
   for (u32 j = 0; j <= path.len; ++j) {
     if (path.chars[j] == '/' || j == path.len) {
       slice slc = (slice){path.chars + i, j - i};
       if (utf8_equals(slc, "..")) {
-        count = count > 0 ? count - 1 : 0;
+        if (arrlen(components)) {
+          arrpop(components);
+        }
       } else if (!utf8_equals(slc, ".") && i < j) {
-        *VECTOR_PUSH(components, count, cap) = slc;
+        arrput(components, slc);
       }
       i = j + 1;
     }
@@ -60,14 +61,14 @@ static heap_string canonicalize_path(slice path) {
 
   i = 0;
   heap_string result = make_heap_str(path.len);
-  for (u32 component_i = 0; component_i < count; ++component_i) {
+  for (u32 component_i = 0; component_i < arrlen(components); ++component_i) {
     result.chars[i++] = '/';
     for (u32 j = 0; j < components[component_i].len; ++j) {
       result.chars[i++] = components[component_i].chars[j];
     }
   }
   result.len = i;
-  free(components);
+  arrfree(components);
   return result;
 }
 

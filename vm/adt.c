@@ -21,13 +21,12 @@ void bjvm_free_compressed_bitset(bjvm_compressed_bitset bits) {
     free(bits.ptr.bits);
 }
 
-static void push_set_bits(u64 bits, int offset, int **existing_buf,
-                          int *length, int *capacity) {
+static void push_set_bits(u64 bits, int offset, int **existing_buf) {
   while (bits) {
     int shift = __builtin_ctzll(bits);
     bits >>= shift;
     offset += shift;
-    *VECTOR_PUSH((*existing_buf), (*length), (*capacity)) = offset;
+    arrput(*existing_buf, offset);
     bits >>= 1;
     offset += 1;
   }
@@ -40,18 +39,15 @@ static void push_set_bits(u64 bits, int offset, int **existing_buf,
  *
  * Used to follow references during garbage collection.
  */
-int *bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
-                                      int *existing_buf, int *length,
-                                      int *capacity) {
-  *length = 0;
+void bjvm_list_compressed_bitset_bits(bjvm_compressed_bitset bits,
+                                      int **stbds_vector) {
+  arrsetlen(*stbds_vector, 0);
   if (bjvm_is_bitset_compressed(bits)) {
-    push_set_bits(bits.bits_inl >> 1, 0, &existing_buf, length, capacity);
+    push_set_bits(bits.bits_inl >> 1, 0, stbds_vector);
   } else {
     for (u32 i = 0; i < bits.ptr.size_words; ++i)
-      push_set_bits(bits.ptr.bits[i], (int)i << 6, &existing_buf, length,
-                    capacity);
+      push_set_bits(bits.ptr.bits[i], (int)i << 6, stbds_vector);
   }
-  return existing_buf;
 }
 
 void arena_init(arena *a) { a->begin = nullptr; }

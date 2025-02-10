@@ -26,7 +26,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   bjvm_link_class(thread, StackTraceElement);
 
   // Find the first frame which is not an initializer of the current exception
-  int i = (int)thread->frames_count - 3 /* skip fillInStackTrace(void) and fillInStackTrace(I) */;
+  int i = (int)arrlen(thread->frames) - 3 /* skip fillInStackTrace(void) and fillInStackTrace(I) */;
   for (; i >= 0; --i) {
     bjvm_stack_frame *frame = thread->frames[i];
     if (!is_frame_constructing(frame, obj->obj)) {
@@ -43,11 +43,6 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace,
   ((struct bjvm_native_Throwable *)obj->obj)->depth = i + 1;
 
   for (int j = 0; i >= 0; --i, ++j) {
-    // Check that all frames have an non-null method
-    for (int i = 0; i < thread->frames_count; ++i) {
-      DCHECK(bjvm_get_frame_method(thread->frames[i]));
-    }
-
     bjvm_stack_frame *frame = thread->frames[i];
     // Create the stack trace element
     bjvm_handle *e =

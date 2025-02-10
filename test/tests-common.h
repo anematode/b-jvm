@@ -46,7 +46,14 @@ struct TestCaseResult {
   std::string stderr_;
 };
 
+struct ScheduledTestCaseResult : TestCaseResult {
+  int yield_count;
+  int sleep_count;
+  u64 ms_slept;
+};
+
 TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main", std::string input = "");
+ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main", std::string input = "");
 }
 
 #endif // BJVM_TESTS_COMMON_H

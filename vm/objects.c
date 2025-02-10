@@ -208,6 +208,15 @@ bjvm_obj_header *InternJString(bjvm_thread *thread, object s) {
 
 u64 hash_code_rng = 0;
 
+s32 get_object_hash_code(object o) {
+  u32 *hc = &get_mark_word(&o->header_word)->data[1];
+  if (*hc == 0) {
+    // Hash not yet computed -- make it always nonzero
+    while (!((*hc = ObjNextHashCode())));
+  }
+  return (s32) *hc;
+}
+
 u64 ObjNextHashCode() {
   hash_code_rng = hash_code_rng * 0x5DEECE66D + 0xB;
   return hash_code_rng >> 32;

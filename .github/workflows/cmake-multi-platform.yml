@@ -74,15 +74,21 @@ jobs:
       - name: Configure CMake
         run: |
           if [ "${{ matrix.compiler }}" = "emscripten" ]; then
+            BUILD_TYPE=Release
+          else
+            BUILD_TYPE=${{ env.BUILD_TYPE }}
+          fi
+
+          if [ "${{ matrix.compiler }}" = "emscripten" ]; then
             emcmake cmake -GNinja \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           else
             cmake -GNinja \
               -S ${{ github.workspace }} \
               -B ${{ github.workspace }}/build \
-              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
           fi
 
       - name: Build

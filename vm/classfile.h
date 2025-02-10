@@ -509,7 +509,6 @@ typedef enum {
 typedef struct bjvm_method_descriptor {
   bjvm_field_descriptor *args;
   int args_count;
-  int args_cap;
   bjvm_field_descriptor return_type;
 } bjvm_method_descriptor;
 
@@ -845,6 +844,9 @@ typedef struct bjvm_classdesc {
   int hierarchy_len;
 
   arena arena; // most things are allocated in here
+
+  // The tid of the thread which is initializing this class
+  s32 initializing_thread;
 } bjvm_classdesc;
 
 heap_string insn_to_string(const bjvm_bytecode_insn *insn, int insn_index);

@@ -69,7 +69,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldOffset0,
   return (bjvm_stack_value){.l = reflect_field->byte_offset};
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldBase,
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, staticFieldBase0,
                "(Ljava/lang/reflect/Field;)Ljava/lang/Object;") {
   DCHECK(argc == 1);
   // Return pointer to static_fields
@@ -288,8 +288,6 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
 
   INIT_STACK_STRING(cf_name, 1000);
   cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(name_str));
-
-  printf("Defining class %.*s\n", fmt_slice(name_str));
 
   bjvm_classdesc *result =
       bjvm_define_bootstrap_class(thread, hslc(name_str), bytes, length);

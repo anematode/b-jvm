@@ -21,24 +21,23 @@ enum {
 static void *module_malloc(bjvm_wasm_module *module, size_t size) {
   if (size > MODULE_ALLOCATION_SIZE_BYTES) {
     // Too big for an arena allocation, just make a new mf
-    if (module->arenas_count) {
-      char *last_arena = module->arenas[module->arenas_count - 1];
-      *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) =
-          last_arena;
-      return module->arenas[module->arenas_count - 2] = malloc(size);
+    if (module->arenas) {
+      char *last_arena = arrlast(module->arenas);
+      arrput(module->arenas, last_arena);
+      return module->arenas[arrlen(module->arenas) - 2] = malloc(size);
     }
-    return *VECTOR_PUSH(module->arenas, module->arenas_count,
-                        module->arenas_count) = malloc(size);
+    void *res = malloc(size);
+    arrput(module->arenas, res);
+    return res;
   }
   void *result;
   if (module->last_arena_used + size < MODULE_ALLOCATION_SIZE_BYTES) {
-    char *last_arena = module->arenas[module->arenas_count - 1];
+    char *last_arena = arrlast(module->arenas);
     result = last_arena + module->last_arena_used;
     module->last_arena_used += size;
   } else {
     result = malloc(MODULE_ALLOCATION_SIZE_BYTES);
-    *VECTOR_PUSH(module->arenas, module->arenas_count, module->arenas_cap) =
-        result;
+    arrput(module->arenas, result);
     module->last_arena_used = size;
   }
   // align to 8 bytes
@@ -74,22 +73,12 @@ static bjvm_wasm_expression *module_expr(bjvm_wasm_module *module,
 // Write the byte to the serialization context
 void write_byte(bjvm_bytevector *ctx, int byte) {
   DCHECK(byte >= 0 && byte <= 255);
-  *VECTOR_PUSH(ctx->bytes, ctx->bytes_len, ctx->bytes_cap) = byte;
+  arrput(ctx->bytes, byte);
 }
 
 // Write the bytes to the serialization context
 void write_slice(bjvm_bytevector *ctx, const u8 *bytes, size_t len) {
-  size_t new_length = ctx->bytes_len + len;
-  if (new_length > ctx->bytes_cap) {
-    size_t new_cap = ctx->bytes_cap * 2;
-    if (new_cap < new_length)
-      new_cap = new_length;
-    ctx->bytes = realloc(ctx->bytes, new_cap);
-    DCHECK(ctx->bytes);
-    ctx->bytes_cap = new_cap;
-  }
-  memcpy(ctx->bytes + ctx->bytes_len, bytes, len);
-  ctx->bytes_len = new_length;
+  memcpy(arraddnptr(ctx->bytes, len), bytes, len);
 }
 
 void write_u32(bjvm_bytevector *ctx, u32 value) {
@@ -173,15 +162,14 @@ u32 bjvm_register_function_type(bjvm_wasm_module *module,
   bjvm_wasm_ser_function_type search = {params, results};
   // Search function types for an existing one. Since we intern types we can
   // compare by value
-  for (int i = 0; i < module->fn_types_count; ++i) {
+  for (int i = 0; i < arrlen(module->fn_types); ++i) {
     if (memcmp(module->fn_types + i, &search,
                sizeof(bjvm_wasm_ser_function_type)) == 0)
       return i;
   }
 
-  *VECTOR_PUSH(module->fn_types, module->fn_types_count, module->fn_types_cap) =
-      search;
-  return module->fn_types_count - 1;
+  arrput(module->fn_types, search);
+  return arrlen(module->fn_types) - 1;
 }
 
 void write_tuple_type(bjvm_bytevector *result, bjvm_wasm_type params) {
@@ -205,32 +193,32 @@ void write_tuple_type(bjvm_bytevector *result, bjvm_wasm_type params) {
 void serialize_typesection(bjvm_bytevector *result, bjvm_wasm_module *module) {
   write_byte(result, SECTION_ID_TYPE);
   bjvm_bytevector sect = {nullptr};
-  bjvm_wasm_writeuint(&sect, module->fn_types_count);
-  for (int i = 0; i < module->fn_types_count; ++i) {
+  bjvm_wasm_writeuint(&sect, arrlen(module->fn_types));
+  for (int i = 0; i < arrlen(module->fn_types); ++i) {
     bjvm_wasm_ser_function_type *fn_type = module->fn_types + i;
     write_byte(&sect, 0x60); // function type
     write_tuple_type(&sect, fn_type->params);
     write_tuple_type(&sect, fn_type->results);
   }
-  bjvm_wasm_writeuint(result, sect.bytes_len);
-  write_slice(result, sect.bytes, sect.bytes_len);
-  free(sect.bytes);
+  bjvm_wasm_writeuint(result, arrlen(sect.bytes));
+  write_slice(result, sect.bytes, arrlen(sect.bytes));
+  arrfree(sect.bytes);
 }
 
 void serialize_functionsection(bjvm_bytevector *result,
                                bjvm_wasm_module *module) {
   write_byte(result, SECTION_ID_FUNCTION);
   bjvm_bytevector sect = {nullptr};
-  bjvm_wasm_writeuint(&sect, module->function_count);
-  for (int i = 0; i < module->function_count; ++i) {
+  bjvm_wasm_writeuint(&sect, arrlen(module->functions));
+  for (int i = 0; i < arrlen(module->functions); ++i) {
     bjvm_wasm_function *fn = module->functions[i];
     u32 typeidx = bjvm_register_function_type(module, fn->params, fn->results);
     bjvm_wasm_writeuint(&sect, typeidx);
     fn->my_index = module->fn_index++;
   }
-  bjvm_wasm_writeuint(result, sect.bytes_len);
-  write_slice(result, sect.bytes, sect.bytes_len);
-  free(sect.bytes);
+  bjvm_wasm_writeuint(result, arrlen(sect.bytes));
+  write_slice(result, sect.bytes, arrlen(sect.bytes));
+  arrfree(sect.bytes);
 }
 
 void serialize_importsection(bjvm_bytevector *result,
@@ -239,7 +227,7 @@ void serialize_importsection(bjvm_bytevector *result,
   write_byte(result, SECTION_ID_IMPORT);
 
   bjvm_bytevector sect = {nullptr};
-  bjvm_wasm_writeuint(&sect, module->import_count + PREDEFINED_IMPORT_COUNT);
+  bjvm_wasm_writeuint(&sect, arrlen(module->imports) + PREDEFINED_IMPORT_COUNT);
   // Predefined imports
   write_string(&sect, "env2");
   write_string(&sect, "memory");
@@ -254,7 +242,7 @@ void serialize_importsection(bjvm_bytevector *result,
   write_byte(&sect, 0x00); // only minimum limit present
   bjvm_wasm_writeuint(&sect, 1); // initial
 
-  for (int i = 0; i < module->import_count; ++i) {
+  for (int i = 0; i < arrlen(module->imports); ++i) {
     bjvm_wasm_import *import = module->imports + i;
     write_string(&sect, import->module);
     write_string(&sect, import->name);
@@ -262,10 +250,10 @@ void serialize_importsection(bjvm_bytevector *result,
     bjvm_wasm_writeuint(&sect, import->func.type);
     import->func.associated->my_index = i;
   }
-  module->fn_index = module->import_count;
-  bjvm_wasm_writeuint(result, sect.bytes_len);
-  write_slice(result, sect.bytes, sect.bytes_len);
-  free(sect.bytes);
+  module->fn_index = arrlen(module->imports);
+  bjvm_wasm_writeuint(result, arrlen(sect.bytes));
+  write_slice(result, sect.bytes, arrlen(sect.bytes));
+  arrfree(sect.bytes);
 }
 
 typedef struct expression_ser_ctx {
@@ -474,8 +462,8 @@ void write_compressed_locals(bjvm_bytevector *body,
     ++count;
   }
   bjvm_wasm_writeuint(body, count);
-  write_slice(body, types.bytes, types.bytes_len);
-  free(types.bytes);
+  write_slice(body, types.bytes, arrlen(types.bytes));
+  arrfree(types.bytes);
 }
 
 void serialize_function_locals_and_code(bjvm_bytevector *body,
@@ -498,29 +486,29 @@ void serialize_codesection(bjvm_bytevector *code_section,
                            bjvm_wasm_module *module) {
   write_byte(code_section, 0x0A);
   bjvm_bytevector body = {nullptr};
-  bjvm_wasm_writeuint(&body, module->function_count);
-  for (int i = 0; i < module->function_count; ++i) {
+  bjvm_wasm_writeuint(&body, arrlen(module->functions));
+  for (int i = 0; i < arrlen(module->functions); ++i) {
     bjvm_bytevector boi = {nullptr};
     serialize_function_locals_and_code(&boi, module, module->functions[i]);
-    bjvm_wasm_writeuint(&body, boi.bytes_len);
-    write_slice(&body, boi.bytes, boi.bytes_len);
-    free(boi.bytes);
+    bjvm_wasm_writeuint(&body, arrlen(boi.bytes));
+    write_slice(&body, boi.bytes, arrlen(boi.bytes));
+    arrfree(boi.bytes);
   }
-  bjvm_wasm_writeuint(code_section, body.bytes_len);
-  write_slice(code_section, body.bytes, body.bytes_len);
-  free(body.bytes);
+  bjvm_wasm_writeuint(code_section, arrlen(body.bytes));
+  write_slice(code_section, body.bytes, arrlen(body.bytes));
+  arrfree(body.bytes);
 }
 
 void serialize_exportsection(bjvm_bytevector *rest, bjvm_wasm_module *module) {
   write_byte(rest, 0x07);
   bjvm_bytevector sect = {nullptr};
   int export_count = 0;
-  for (int i = 0; i < module->function_count; ++i) {
+  for (int i = 0; i < arrlen(module->functions); ++i) {
     if (module->functions[i]->exported)
       ++export_count;
   }
   bjvm_wasm_writeuint(&sect, export_count);
-  for (int i = 0; i < module->function_count; ++i) {
+  for (int i = 0; i < arrlen(module->functions); ++i) {
     bjvm_wasm_function *fn = module->functions[i];
     if (fn->exported) {
       write_string(&sect, fn->name);
@@ -528,9 +516,9 @@ void serialize_exportsection(bjvm_bytevector *rest, bjvm_wasm_module *module) {
       bjvm_wasm_writeuint(&sect, fn->my_index);
     }
   }
-  bjvm_wasm_writeuint(rest, sect.bytes_len);
-  write_slice(rest, sect.bytes, sect.bytes_len);
-  free(sect.bytes);
+  bjvm_wasm_writeuint(rest, arrlen(sect.bytes));
+  write_slice(rest, sect.bytes, arrlen(sect.bytes));
+  arrfree(sect.bytes);
 }
 
 bjvm_bytevector bjvm_wasm_module_serialize(bjvm_wasm_module *module) {
@@ -554,22 +542,22 @@ bjvm_bytevector bjvm_wasm_module_serialize(bjvm_wasm_module *module) {
   serialize_codesection(&rest, module);
   // serialize_datasection(&rest, module);
   serialize_typesection(&result, module);
-  write_slice(&result, rest.bytes, rest.bytes_len);
+  write_slice(&result, rest.bytes, arrlen(rest.bytes));
 
-  free(rest.bytes);
+  arrfree(rest.bytes);
 
   return result;
 }
 
 void bjvm_wasm_module_free(bjvm_wasm_module *module) {
-  for (int i = 0; i < module->arenas_count; ++i) {
+  for (int i = 0; i < arrlen(module->arenas); ++i) {
     free(module->arenas[i]);
   }
-  free(module->arenas);
-  free(module->imports);
-  free(module->interned_result_types);
-  free(module->functions);
-  free(module->fn_types);
+  arrfree(module->arenas);
+  arrfree(module->imports);
+  arrfree(module->interned_result_types);
+  arrfree(module->functions);
+  arrfree(module->fn_types);
   free(module);
 }
 
@@ -577,7 +565,7 @@ bjvm_wasm_type bjvm_wasm_make_tuple(bjvm_wasm_module *module,
                                     bjvm_wasm_value_type *components,
                                     int length) {
   // Search for an existing tuple type
-  for (int i = 0; i < module->result_types_count; ++i) {
+  for (int i = 0; i < arrlen(module->interned_result_types); ++i) {
     bjvm_wasm_tuple_type *tuple = module->interned_result_types[i];
     if (tuple->types_len != length)
       continue;
@@ -590,8 +578,7 @@ bjvm_wasm_type bjvm_wasm_make_tuple(bjvm_wasm_module *module,
                                 length * sizeof(bjvm_wasm_value_type));
   tuple->types_len = length;
   memcpy(tuple->types, components, length * sizeof(bjvm_wasm_value_type));
-  *VECTOR_PUSH(module->interned_result_types, module->result_types_count,
-               module->result_types_cap) = tuple;
+  arrput(module->interned_result_types, tuple);
   return (bjvm_wasm_type){.val = (uintptr_t)tuple};
 }
 
@@ -627,8 +614,7 @@ bjvm_wasm_add_function(bjvm_wasm_module *module, bjvm_wasm_type params,
   fn->locals = locals;
   fn->body = body;
   fn->name = bjvm_wasm_copy_string(module, name);
-  *VECTOR_PUSH(module->functions, module->function_count,
-               module->function_cap) = fn;
+  arrput(module->functions, fn);
   return fn;
 }
 
@@ -673,8 +659,7 @@ bjvm_wasm_import_runtime_function_impl(bjvm_wasm_module *module,
   fn->locals = bjvm_wasm_void();
   const char *name_cpy = bjvm_wasm_copy_string(module, c_name);
   fn->name = name_cpy;
-  bjvm_wasm_import *import =
-      VECTOR_PUSH(module->imports, module->import_count, module->import_cap);
+  bjvm_wasm_import *import = arraddnptr(module->imports, 1);
   import->module = "env";
   import->name = name_cpy;
   import->func = (bjvm_wasm_func_import){
@@ -897,8 +882,7 @@ bjvm_wasm_expression *bjvm_wasm_return(bjvm_wasm_module *module,
 EMSCRIPTEN_KEEPALIVE
 void bjvm_wasm_push_export(bjvm_wasm_instantiation_result *result,
                            const char *name, void *exported_func) {
-  bjvm_wasm_instantiation_export *exp =
-      *VECTOR_PUSH(result->exports, result->export_count, result->export_cap);
+  bjvm_wasm_instantiation_export *exp = arraddnptr(result->exports, 1);
   exp->name = make_heap_str_from(
       (slice){.chars = (char *)name, .len = strlen(name)});
   exp->export_ = exported_func;
@@ -907,12 +891,12 @@ void bjvm_wasm_push_export(bjvm_wasm_instantiation_result *result,
 void bjvm_free_wasm_instantiation_result(
     bjvm_wasm_instantiation_result *result) {
   // Delete function pointers from the table
-  for (int i = 0; i < result->export_count; ++i) {
-    free_heap_str(result->exports[i]->name);
+  for (int i = 0; i < arrlen(result->exports); ++i) {
+    free_heap_str(result->exports[i].name);
 #ifdef EMSCRIPTEN
     EM_ASM_(
         { removeFunction(wasmTable.get($0)); },
-        (intptr_t)result->exports[i]->export_);
+        (intptr_t)result->exports[i].export_);
 #endif
   }
   free(result);
@@ -951,7 +935,7 @@ bjvm_wasm_instantiate_module(bjvm_wasm_module *module, const char *debug_name) {
         }
       },
       (intptr_t)serialized.bytes,
-      (intptr_t)(serialized.bytes + serialized.bytes_len),
+      (intptr_t)(serialized.bytes + arrlen(serialized.bytes)),
       (intptr_t)debug_name);
   if (ptr) {
     result->status = BJVM_WASM_INSTANTIATION_SUCCESS;

@@ -1,6 +1,7 @@
 set(CMAKE_CXX_STANDARD 26)
 
 include(AddNodeShebang)
+include(PostprocessWasm)
 
 find_package(OpenMP)
 
@@ -10,6 +11,7 @@ add_executable(tests tests.cc arrays-test.cc tests-common.cc wasm-tests.cc
         classpath-tests.cc
         natives-test.cc
         benches.cc)
+run_emscripten_postprocess(tests)
 
 if (EMSCRIPTEN)
     AddNodeShebang(tests)
@@ -17,9 +19,11 @@ endif()
 
 if (NOT EMSCRIPTEN)
     target_link_libraries(tests PRIVATE z)
+    target_link_libraries(tests PRIVATE bjvm_static)
+else()
+    target_link_libraries(tests PRIVATE "-Wl,--whole-archive" bjvm_static)
 endif()
 
-target_link_libraries(tests PRIVATE bjvm_static)
 target_link_libraries(tests PRIVATE Catch2::Catch2WithMain)
 
 if(OpenMP_CXX_FOUND)

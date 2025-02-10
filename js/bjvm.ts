@@ -38,10 +38,13 @@ function buffered() {
     }
 }
 
-type JavaType = 'L' | 'I' | 'F' | 'D' | 'J' | 'S' | 'B' | 'C' | 'Z';
+type JavaType = {
+    kind: 'L' | 'I' | 'F' | 'D' | 'J' | 'S' | 'B' | 'C' | 'Z' | 'V';
+    className: string;
+};
 
 function readJavaType(vm: VM, addr: number, type: JavaType): any {
-    switch (type) {
+    switch (type.kind) {
         case "L":
             return vm.createHandle(module.getValue(addr, "i32"));
         case "I":
@@ -65,15 +68,25 @@ function readJavaType(vm: VM, addr: number, type: JavaType): any {
     }
 }
 
+function explainObject(value: any) {
+    if (value === null) {
+        return "null";
+    }
+    if (typeof value === "object") {
+        return value.constructor.name;
+    }
+    return typeof value;
+}
+
 function setJavaType(vm: VM, addr: number, type: JavaType, value: any) {
-    switch (type) {
+    switch (type.kind) {
         case "L":
             if (value === null) {
                 module.setValue(addr, 0, "i32");
                 return;
             }
             if (!(value instanceof BaseHandle)) {
-                throw new TypeError("Expected BaseHandle");
+                throw new TypeError("Expected BaseHandle, not " + explainObject(value));
             }
             let obj = module._bjvm_deref_js_handle(vm.ptr, value.handleIndex);
             module.setValue(addr, obj, "i32");
@@ -115,29 +128,55 @@ type FieldInfo = {
 };
 
 type ParsedMethodDescriptor = {
-    returnType: JavaType | 'V';
+    returnType: JavaType;
     parameterTypes: JavaType[];
 };
 
-function parseMethodDescriptor(desc: string): ParsedMethodDescriptor {
+function makePrimitiveArrayName(descElement: string, dims: number) {
+    return "[".repeat(dims) + descElement;
+}
+
+function makeArrayName(s: string, dims: number) {
+    return "[".repeat(dims) + "L" + s;
+}
+
+function parseParameterType(desc: string, i: number, parameterTypes: JavaType[]) {
+    let dims = 0;
+    while (desc[i] === '[') {
+        ++i;
+        ++dims;
+    }
+    if (desc[i] == 'L') {
+        let j = i + 1;
+        while (desc[i] !== ';') {
+            i++;
+        }
+        parameterTypes.push({ kind: 'L', className: makeArrayName(desc.substring(j, i), dims) } as JavaType);
+    } else {
+        parameterTypes.push(dims ?
+            { kind: 'L', className: makePrimitiveArrayName(desc[i], dims) } :
+            { kind: desc[i], className: "" } as JavaType);
+    }
+    i++;
+    return i;
+}
+
+function parseMethodDescriptor(method: MethodInfo): ParsedMethodDescriptor {
+    if (method.parsedDescriptor)
+        return method.parsedDescriptor
+    const desc = method.descriptor;
     let i = 1;
     let parameterTypes: JavaType[] = [];
     while (desc[i] !== ')') {
-        let dims = 0;
-        while (desc[i] === '[') {
-            ++i;
-            ++dims;
-        }
-        parameterTypes.push(dims ? 'L' : desc[i] as JavaType);
-        if (desc[i] == 'L') {
-            while (desc[i] !== ';') {
-                i++;
-            }
-        }
-        i++;
+        i = parseParameterType(desc, i, parameterTypes);
     }
-    const returnType = desc[i + 1] as JavaType;
-    return { returnType, parameterTypes };
+    const returnType: JavaType[] = [];
+    if (desc[i + 1] === 'V') {
+        returnType.push({ kind: 'V', className: "" });
+    } else {
+        parseParameterType(desc, i + 1, returnType);
+    }
+    return method.parsedDescriptor = { returnType: returnType[0]!, parameterTypes };
 }
 
 type MethodInfo = {
@@ -146,6 +185,8 @@ type MethodInfo = {
     methodPointer: number;
     accessFlags: number;
     parameterNames: string[];
+    index: number;
+    parsedDescriptor?: ParsedMethodDescriptor;
 };
 
 type ClassInfo = {
@@ -159,52 +200,138 @@ class BaseHandle {
     vm: VM;
     handleIndex: number;
 
-    constructor(vm: VM, handleIndex: number) {
-        this.vm = vm;
-        this.handleIndex = handleIndex;
-    }
-
     drop() {
+        if (this.handleIndex === -1) {  // already dropped
+            return;
+        }
         this.vm.handleRegistry.unregister(this);
         module._bjvm_drop_js_handle(this.vm.ptr, this.handleIndex);
+        this.handleIndex = -1;
     }
 }
 
+function binaryNameToJSName(name: string) {
+    return name.replaceAll('/', "_");
+}
 
-function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): any {
+function stringifyParameter(type: JavaType) {
+    switch (type.kind) {
+        case 'L':
+            return type.className.replaceAll('/', "_");
+        default:
+            return type.kind;
+    }
+}
+
+class OverloadResolver {
+    grouped: Map<string /* method name */, Map<number /* argc */, MethodInfo[]> >;
+
+    constructor() {
+        this.grouped = new Map();
+    }
+
+    addMethod(method: MethodInfo) {
+        if (!this.grouped.has(method.name)) {
+            this.grouped.set(method.name, new Map());
+        }
+        let group = this.grouped.get(method.name);
+        if (!group.has(method.parameterNames.length)) {
+            group.set(method.parameterNames.length, []);
+        }
+        group.get(method.parameterNames.length).push(method);
+    }
+
+    flattenCollisions() {
+        // For each method/argc combination with more than one possible method, generate a new method name
+        // with the parameter types appended to it
+        for (let [name, group] of this.grouped.entries()) {
+            for (let [argc, methods] of group.entries()) {
+                if (methods.length < 2) {
+                    continue;
+                }
+
+                for (let i = 0; i < methods.length; ++i) {
+                    let method = methods[i];
+                    let desc = parseMethodDescriptor(method);
+                    let newName = `${name}_$${desc.parameterTypes.map(stringifyParameter).join('$')}`;
+
+                    this.grouped.set(newName, new Map([[argc, [method]]]));
+                }
+
+                group.delete(argc);
+            }
+        }
+    }
+
+    createImpls(classInfo: ClassInfo, static_: boolean): string {
+        let impls: string[] = [];
+        this.flattenCollisions();
+
+        function escape(name: string) {
+            return JSON.stringify(name);
+        }
+
+        // For each NAME, generate an implementation which checks the # of args, then calls the appropriate method
+        for (let [name, group] of this.grouped.entries()) {
+            const isCtor = name.startsWith("<init>");
+            const staticLike = static_ || isCtor;
+            const maybeStatic = staticLike ? 'static' : '';
+            const maybeThis = staticLike ? '' : 'this,';
+            const runner = isCtor ? "_runConstructor" : "_runMethod";
+            let impl = `${maybeStatic} ${escape(name)} () {
+                let i = 0;
+                switch (arguments.length) {
+                    ${[...group.entries()].map(([argc, method]) => {
+                        const m = method[0];
+                        return `case ${argc}: { i = ${m.index}; break; }`;
+                    }).join('\n')}
+                    default:
+                    throw new RangeError("Invalid number of arguments (expected one of ${[...group.keys()].join(', ')}, got " + arguments.length + ")");
+                }
+                const thread = vm.createThread();
+                return thread.${runner}(methods[i], ${maybeThis} ...arguments);
+            }`;
+            impls.push(impl);
+        }
+
+        return impls.join('\n');
+    }
+
+    createTSDefs() {
+
+    }
+}
+
+interface HandleConstructor {
+    new (): typeof BaseHandle;
+}
+
+function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): HandleConstructor {
     const classInfoStr = module._bjvm_ffi_get_class_json(bjvm_classdesc_ptr);
     const info = module.UTF8ToString(classInfoStr);
     const classInfo: ClassInfo = JSON.parse(info);
     module._free(classInfoStr);
 
+    const instanceResolver = new OverloadResolver();
+    const staticResolver = new OverloadResolver();
+
     // Static methods
-    const staticMethods: string[] = [];
-    const instanceMethods: string[] = [];
     for (let i = 0 ; i < classInfo.methods.length; ++i) {
         let method = classInfo.methods[i];
-        const argNames = method.parameterNames.join(", ");
         if (!(method.accessFlags & 0x0001)) {
             continue;
         }
         if (method.accessFlags & 0x0008) {
-            staticMethods.push(`static async ${method.name} (${argNames}) {
-                const thread = vm.createThread();
-                const result = await thread._runMethod(methods[${i}], ${argNames});
-                return result;
-            }`);
+            staticResolver.addMethod(method);
         } else {
-            instanceMethods.push(`async ${method.name} (${argNames}) {
-                const thread = vm.createThread();
-                const result = await thread._runMethod(methods[${i}], this, ${argNames});
-                return result;
-            }`);
+            instanceResolver.addMethod(method);
         }
     }
 
-    const cow = classInfo.binaryName.replaceAll('/', "_");
+    const cow = binaryNameToJSName(classInfo.binaryName);
     const body = `class ${cow} extends BaseHandle {
-    ${staticMethods.join(' ')}
-    ${instanceMethods.join(' ')}
+    ${instanceResolver.createImpls(classInfo, false)}
+    ${staticResolver.createImpls(classInfo, true)}
     }; return ${cow}`;
 
     const Class = new Function("name", "BaseHandle", "vm", "methods", body)(classInfo.binaryName, BaseHandle, vm, classInfo.methods);
@@ -212,6 +339,121 @@ function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): any {
 
     return Class;
 }
+
+const _BRANDS = Symbol("BRANDS");
+
+declare class TSJavaType {
+    [_BRANDS]: {
+        "TSJavaType": [];
+    }
+}
+
+// Superclass
+export declare class AbstractList<E extends TSJavaType> {
+    get(index: number): Promise<E>;
+
+    [_BRANDS]: {
+        "TSJavaType": [];
+        "AbstractList": [];
+        "List": [E];
+    }
+}
+
+// "Superinterface"
+export declare class List<E extends TSJavaType> {
+    [_BRANDS]: {
+        "TSJavaType": [];
+        "List": [E];
+    }
+}
+
+const _PRIMITIVE = Symbol("PRIMITIVE");
+
+type JavaPrimitive<N extends string, T> = T & {[_PRIMITIVE]: N}
+type JavaInt = JavaPrimitive<"int", number>;
+type JavaFloat = JavaPrimitive<"float", number>;
+
+function makeInt(n: number): JavaInt {
+    if (n < 2 ** 31 && n >= -(2 ** 31) && Number.isInteger(n)) {
+        return (n | 0) as JavaInt;
+    }
+    throw new Error("NO!");
+}
+
+function makeFloat(n: number): JavaFloat {
+    return Math.fround(n) as JavaFloat;
+}
+
+export declare class ArrayList<E extends TSJavaType> extends AbstractList<E> {
+    private static vm: number;
+    constructor(capacity: number);  // VERY GOOD. DO NOT YIELD TO ASYNC IN THE CONSTRUCTOR
+
+    add(item: E): Promise<boolean>;
+    add(index: JavaInt | Integer, item: E);
+
+    pox(float: JavaFloat);
+    pox(integer: JavaInt | Integer);
+
+    [_BRANDS]: {
+        "TSJavaType": [];
+        "ArrayList": [];
+        "AbstractList": [];
+        "List": [E];
+    }
+}
+
+export declare class Integer {
+    static "valueOf_$I": (value: number) => Promise<Integer>;
+
+    static cow(list: List<Integer>);
+
+    [_BRANDS]: {
+        "TSJavaType": [];
+        "Integer": [];
+    }
+}
+
+export declare class Multithreading {
+    static main(args: any): ForceablePromise<void>;
+
+    [_BRANDS]: {
+        "TSJavaType": [];
+        "Multithreading": [];
+    }
+}
+
+// A promise type for which we can also attempt to call the function synchronously.
+type ForceablePromise<T> = Promise<T> & {
+    // - The promise resolves normally if __forceSync is not called.
+    // - If __forceSync is called after the promise has resolved, it throws a JS error.
+    // - If __forceSync is called before the promise has resolved, the promise will be discarded and never resolve.
+    // - If __forceSync fails, it will return { success: false, illegalStateException: e } where e is an error containing
+    //   a backtrace to the function which forced a yielding to occur. thread->current_exception is NOT set. The promise
+    //   will resolve normally.
+    // - If __forceSync succeeds, it will return { success: true }. The current exception must still be checked in case
+    //   an error was thrown.
+    //
+    // This function is intended for internal use only, by the forceSync and attemptSync APIs.
+    __forceSync(raiseIllegalState: boolean): { success: true, value: T } | { success: false, illegalStateException: BaseHandle | null};
+};
+
+export function sync<T>(toExecute: ForceablePromise<T>): T {
+    const result = toExecute.__forceSync(true);
+    if (result.success) {
+        return result.value;
+    } else if (result.success === false /* convince TS */) {
+        throw result.illegalStateException;
+    }
+}
+
+
+type LoadedClassMap = {
+    "java/util/ArrayList": typeof ArrayList;
+    "java/lang/Integer": typeof Integer;
+    "NBodyProblem": typeof Multithreading;
+};
+export type LoadableClassName = keyof LoadedClassMap;
+type LoadedClass<T extends LoadableClassName> = LoadedClassMap[T];
 
 class Thread {
     vm: VM;
@@ -222,31 +464,77 @@ class Thread {
         this.ptr = ptr;
     }
 
-    private async _runMethod(method: MethodInfo, ...args: any[]): Promise<any> {
+    private async _runConstructor(method: MethodInfo, ...args: any[]): Promise<any> {
+        const this_ = module._bjvm_ffi_allocate_object(this.ptr, method.methodPointer);
+        if (!this_) {
+            this.throwThreadException();
+        }
+        const handle = this.vm.createHandle(this_);
+        await this._runMethod(method, handle, ...args);
+        return handle;
+    }
+
+    private _runMethod(method: MethodInfo, ...args: any[]): ForceablePromise<any> {
         let argsPtr = module._malloc(args.length * 8);
-        let resultPtr = module._malloc(8);
+        let executionRecord = 0;
+
+        let freed = false;
+        function freeData() {
+            if (freed) {
+                return;
+            }
+            freed = true;
+            if (executionRecord)
+                module._bjvm_ffi_free_execution_record(executionRecord);
+            module._free(argsPtr);
+        }
+
         try {
-            const parsed = parseMethodDescriptor(method.descriptor);
+            const parsed = parseMethodDescriptor(method);
             let isInstanceMethod = !(method.accessFlags & 0x0008);
             let j = 0;
             if (isInstanceMethod) {
-                setJavaType(this.vm, argsPtr, 'L', args[0]);
+                setJavaType(this.vm, argsPtr, { kind: 'L', className: "" }, args[0]);
                 j++;
             }
-            for (let i = 0; i < args.length - +isInstanceMethod; i++, j++) {
+            const nonInstanceArgc = args.length - +isInstanceMethod;
+            for (let i = 0; i < nonInstanceArgc; i++, j++) {
                 setJavaType(this.vm, argsPtr + j * 8, parsed.parameterTypes[i], args[j]);
             }
-            let ctx = module._bjvm_ffi_async_run(this.ptr, method.methodPointer, argsPtr);
-            while (!module._bjvm_ffi_run_step(ctx, resultPtr)) {
-                await new Promise(resolve => setTimeout(resolve, 0));
+            const scheduled = this.vm.scheduleMethod(this, method, argsPtr);
+            const readResult = () => {
+                if (parsed.returnType.kind !== 'V') {
+                    const resultPtr = module._bjvm_ffi_get_execution_record_result_pointer(executionRecord);
+                    return readJavaType(this.vm, resultPtr, parsed.returnType);
+                }
             }
-            this.throwThreadException();
-            if (parsed.returnType !== 'V') {
-                return readJavaType(this.vm, resultPtr, parsed.returnType);
-            }
-        } finally {
-            module._free(argsPtr);
-            module._free(resultPtr);
+
+            const promise = (async () => {
+                if (!await scheduled.waitForResolution) {
+                    return;  // cancelled
+                }
+                this.throwThreadException();
+                freeData();
+                return readResult();
+            })() as ForceablePromise<any>;
+
+            promise.__forceSync = (raiseIllegalState: boolean) => {
+                const status = module._bjvm_ffi_execute_immediately(scheduled.record);
+                if (status == 0 /* DONE */) {
+                    const ret: ReturnType<typeof promise.__forceSync> = { success: true, value: readResult() };
+                    freeData();
+                    return ret;
+                } else {
+                    const ptr = module._bjvm_ffi_get_current_exception(this.ptr);
+                    const handle = this.vm.createHandle(ptr);
+                    return { success: false, illegalStateException: handle };
+                }
+            };
+
+            return promise;
+        } catch (e: any) {
+            freeData();
+            throw e;
         }
     }
 
@@ -260,7 +548,7 @@ class Thread {
         throw handle;
     }
 
-    async loadClass(name: string): Promise<any> {
+    async loadClass<N extends LoadableClassName>(name: N): Promise<LoadedClass<N>> {
         let namePtr = module._malloc(name.length + 1);
         new TextEncoder().encodeInto(name, new Uint8Array(module.HEAPU8.buffer, namePtr, name.length));
         module.HEAPU8[namePtr + name.length] = 0;
@@ -268,7 +556,7 @@ class Thread {
         if (!ptr) {
             this.throwThreadException();
         }
-        const clazz = createClassImpl(this.vm, ptr);
+        const clazz = this.vm.getClassForDescriptor(ptr);
         module._free(namePtr);
         return clazz;
     }
@@ -282,6 +570,12 @@ class VM {
     namedClasses: Map<number /* bjvm_classdesc* */, any> = new Map();
     cachedThread: Thread;
 
+    scheduler: number;
+    timeout: number; // if not -1, then a scheduler step is scheduled
+
+    waitingForYield: number;
+    pending: Function[] = [];  // hook here to be called every time the timeout fires
+
     private constructor(options: VMOptions) {
         let classpath = module._malloc(options.classpath.length + 1);
         new TextEncoder().encodeInto(options.classpath, new Uint8Array(module.HEAPU8.buffer, classpath, options.classpath.length));
@@ -290,8 +584,68 @@ class VM {
         options.stdout ??= buffered();
         options.stderr ??= buffered();
 
+        this.timeout = -1;
         this.ptr = module._bjvm_ffi_create_vm(classpath, module.addFunction(options.stdout, 'vii'), module.addFunction(options.stderr, 'vii'));
         module._free(classpath);
+
+        this.scheduler = module._bjvm_ffi_create_rr_scheduler(this.ptr);
+    }
+
+    scheduleTimeout(waitUs: number = 0) {
+        if (this.waitingForYield > waitUs && this.timeout !== -1) {
+            clearTimeout(this.timeout);
+            this.timeout = -1;
+        }
+        if (this.timeout === -1) {
+            this.timeout = setTimeout(() => {
+                this.timeout = -1;
+                const status = module._bjvm_ffi_rr_scheduler_step(this.scheduler);
+                if (status !== 0) {
+                    const waitUs = module._bjvm_ffi_rr_scheduler_wait_for_us(this.scheduler);
+                    this.scheduleTimeout(this.waitingForYield = waitUs);
+                }
+                for (let i = 0; i < this.pending.length; i++) {
+                    this.pending[i]();
+                }
+                this.pending.length = 0;
+            }, waitUs / 1000);
+        }
+    }
+
+    // Low-level method scheduling apparatus
+   scheduleMethod(thread: Thread, method: MethodInfo, argsPtr: number):
+        { record: number, waitForResolution: Promise<boolean>, cancelResolution: () => void } {
+        let record = module._bjvm_ffi_rr_schedule(thread.ptr, method.methodPointer, argsPtr);
+        let cancelled = false;
+        let resolve_: Function;
+
+        const waitForResolution = (async () => {
+            while (!module._bjvm_ffi_rr_record_is_ready(record)) {
+                if (cancelled) {
+                    return false;
+                }
+
+                this.scheduleTimeout();
+                await new Promise((resolve) => {
+                    resolve_ = resolve;
+                    this.pending.push(resolve);
+                });
+            }
+
+            return true;
+        })();
+
+        const cancelResolution = () => {
+            cancelled = true;
+            for (let i = 0; i < this.pending.length; i++) {
+                if (this.pending[i] === resolve_) {
+                    this.pending.splice(i, 1);
+                    break;
+                }
+            }
+        };
+
+        return { record, waitForResolution, cancelResolution };
     }
 
     static async create(options: VMOptions) {
@@ -309,13 +663,17 @@ class VM {
         return made;
     }
 
-    createHandle(ptr: number) {
+    createHandle(ptr: number): BaseHandle | null {
         if (ptr === 0) return null;
 
         let handleIndex = module._bjvm_make_js_handle(this.ptr, ptr);
         let classdesc = module._bjvm_ffi_get_classdesc(ptr);
+
         const clazz = this.getClassForDescriptor(classdesc);
-        return new clazz(this, handleIndex);
+        const handle = Object.create(clazz.prototype);  // do this to avoid calling the constructor
+        handle.vm = this;
+        handle.handleIndex = handleIndex;
+        return handle;
     }
 
     createThread(): Thread {
@@ -331,6 +689,8 @@ class VM {
 
 const runtimeFilesList = `./jdk23/lib/modules
 ./jdk23.jar
+./test_files/basic_multithreading/Multithreading.class
+./test_files/basic_multithreading/MultithreadingDemo.class
 ./test_files/n_body_problem/NBodyProblem$Body.class
 ./test_files/n_body_problem/NBodyProblem.class`.split('\n');
 
@@ -358,15 +718,19 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 function addFile(db: IDBDatabase, name: string, data: Uint8Array): Promise<void> {
+    // Delete the existing file
     return new Promise((resolve, reject) => {
-        const transaction = db.transaction(dbName, "readwrite");
-        const store = transaction.objectStore(dbName);
+        const req = db.transaction(dbName, "readwrite").objectStore(dbName).delete(name);
+        req.onsuccess = req.onerror = () => {
+            const transaction = db.transaction(dbName, "readwrite");
+            const store = transaction.objectStore(dbName);
 
-        const file = { name, data }; // Object with name and Uint8Array
-        const request = store.add(file);
+            const file = { name, data }; // Object with name and Uint8Array
+            const request = store.add(file);
 
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => reject((event.target as IDBRequest).error);
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => reject((event.target as IDBRequest).error);
+        }
     });
 }
 
@@ -391,13 +755,14 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
 
     // Spawn fetch requests
     const requests = runtimeFilesList.map(async (file) => {
+
         // Check whether the file is already in the database
-        const cached = await getFile(db, file);
+        /*const cached = await getFile(db, file);
         if (cached) {
             totalLoaded += cached.data.length;
             progress?.(totalLoaded, TOTAL_BYTES);
             return {file, data: cached.data};
-        }
+        }*/
 
         const response = await fetch(`${baseUrl}/${file}`, {
             method: 'GET',
@@ -446,7 +811,6 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
 
     pending.forEach(p => p.resolve());
     pending.length = 0
-    // Now cache them in IndexedDB TODO
 }
 
-export { VM, VMOptions, installRuntimeFiles };
+export { VM, VMOptions, installRuntimeFiles, type HandleConstructor, BaseHandle, Thread };

@@ -14,6 +14,7 @@
       "toolchainFile": "/Users/cowpox/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
       "cacheVariables": {
         "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/node",
+        "CMAKE_BUILD_TYPE": "Release",
         "EMSCRIPTEN_GENERATE_BITCODE_STATIC_LIBRARIES": "OFF"
       },
       "environment": {
@@ -22,11 +23,6 @@
     }
   ],
   "buildPresets": [
-    {
-      "name": "Debug",
-      "configurePreset": "default",
-      "configuration": "Debug"
-    },
     {
       "name": "Release",
       "configurePreset": "default",

@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
     "lib": [
-      "es2019",
+      "es2021",
       "dom",
       "es2021.weakref"
-    ]
+    ],
+    "target": "es2021",
   }
 }

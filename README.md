@@ -3,6 +3,7 @@ A JVM for the web. Bring back the applet!
 
 Message me on Discord if you are interested in collaborating: forevermilk#0001
 
+
 ## Style guide
 
 Always use `s64` instead of `long` because Emscripten has `sizeof(long) == 4`. `int` can be assumed to be 32 bits.
@@ -49,3 +50,15 @@ See GitHub issues
 ```
 clang-format -i test/*.cc src/**/*.c src/**/*.h
 ```
+
+## Documentation
+
+### Overloaded Java functions
+
+When overloaded functions are compiled into JS, overloads with the same number of arguments will be disambiguated with a generated suffix. For example, if there is a function `f(double, double)` and `f(double, Object)`, then there will be generated functions `f_$D$D` and `f_$D$Ljava_lang_Object`. To be precise, all arguments are prefixed with a `$`, and class/interface names are prefixed with `$L`, while the package separator is replaced with an underscore. This can still generate some collisions; in this case, the function called is unspecified.
+
+Disambiguated constructors are called "<init>_$...". Yes, the syntax is gross.
+
+A function named `drop` is called `drop$` to avoid a collision with the `drop` function, which takes a handle and drops it from use (instead of automatic management).
+
+Variadic functions are not yet supported; the variadic argument is 

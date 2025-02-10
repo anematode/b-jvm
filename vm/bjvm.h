@@ -117,16 +117,41 @@ typedef struct {
   bjvm_native_callback callback;
 } bjvm_native_t;
 
-typedef u64 bjvm_mark_word_t;
+//      struct { flags, hash? }
+typedef struct { u32 data[2]; } bjvm_mark_word_t;
+
+typedef struct {
+  s32 tid;
+  volatile u32 hold_count; // only changed by owner thread; therefore volatile is safe here
+  bjvm_mark_word_t mark_word;
+} monitor_data;
+
+static_assert(offsetof(monitor_data, mark_word) % 8 == 0);
+
+typedef union {
+  // least significant flag bit set if it's a mark_word, using the fact that expanded_data will be aligned
+  bjvm_mark_word_t mark_word;
+  monitor_data *expanded_data;
+} bjvm_header_word;
 
 // Appears at the top of every object -- corresponds to HotSpot's oopDesc
 typedef struct bjvm_obj_header {
-#ifdef BJVM_MULTITHREADED
-
-#endif
-  volatile bjvm_mark_word_t mark_word;
+  bjvm_header_word header_word; // accessed atomically, except during a full GC pause
   bjvm_classdesc *descriptor;
 } bjvm_obj_header;
+
+typedef enum : u32 {
+  IS_MARK_WORD = 1 << 0,
+  IS_REACHABLE = 1 << 1,
+} bjvm_mark_word_flags;
+
+bool has_expanded_data(bjvm_header_word *data);
+bjvm_mark_word_t *get_mark_word(bjvm_header_word *data);
+// nullptr if the object has never been locked, otherwise a pointer to a lock_record.
+monitor_data *inspect_monitor(bjvm_header_word *data);
+// only call this if inspect_monitor returns nullptr
+// doesn't store this allocated data onto the object, because that should later be done atomically by someone else
+monitor_data *allocate_monitor(bjvm_thread *thread); // doesn't initialize any monitor data
 
 void read_string(bjvm_thread *thread, bjvm_obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of
@@ -190,7 +215,7 @@ DECLARE_ASYNC(bjvm_stack_value, bjvm_run_native,
 
 DECLARE_ASYNC(
     int, bjvm_initialize_class,
-    locals(bjvm_initialize_class_t *recursive_call_space; u16 i),
+    locals(bjvm_initialize_class_t *recursive_call_space; void *wakeup_info; u16 i),
     arguments(bjvm_thread *thread; bjvm_classdesc *classdesc),
     invoked_methods(
         invoked_method(call_interpreter)
@@ -332,10 +357,11 @@ typedef struct bjvm_vm {
   // Primitive classes (int.class, etc.)
   bjvm_classdesc *primitive_classes[9];
 
-  // Active threads (unused for now)
   bjvm_thread **active_threads;
-  int active_thread_count;
-  int active_thread_cap;
+
+  // The first thread created, which will always be kept around so there as at least one thread
+  // available (even if it isn't running anything)
+  bjvm_thread *primordial_thread;
 
   u8 *heap;
   // Next object should be allocated here. Should always be 8-byte aligned
@@ -354,7 +380,7 @@ typedef struct bjvm_vm {
   /// Struct containing cached classdescs
   struct bjvm_cached_classdescs *cached_classdescs;
 
-  int next_thread_id;
+  s64 next_thread_id;  // MUST BE 64 BITS
 
   // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
   // the finalizers aren't run
@@ -364,7 +390,10 @@ typedef struct bjvm_vm {
   mmap_allocation *mmap_allocations;
 
   // Latest TID
-  u32 next_tid;
+  s32 next_tid;
+
+  bool vm_initialized;
+  void *scheduler;  // rr_scheduler or null
 } bjvm_vm;
 
 // Java Module
@@ -495,8 +524,6 @@ typedef struct bjvm_thread {
 
   // Pointers into the frame_buffer
   bjvm_stack_frame **frames;
-  int frames_count;
-  u32 frames_cap;
 
   // Currently propagating exception
   bjvm_obj_header *current_exception;
@@ -524,8 +551,17 @@ typedef struct bjvm_thread {
   async_stack_t *async_stack;
 
   int allocations_so_far;
+  // This value is used to periodically check whether we should yield back to the scheduler ...
+  u32 fuel;
+  // ... if the current time is past this value
+  u64 yield_at_time;
+  // Current number of active synchronous calls
+  u32 synchronous_depth;
 
-  u64 tid;
+  s32 tid;
+
+  // Allocation for the refuel_check wakeup info
+  void *refuel_wakeup_info;
 
   // Thread-local allocation buffer (objects are first created here)
 } bjvm_thread;
@@ -539,10 +575,13 @@ void bjvm_drop_handle(bjvm_thread *thread, bjvm_handle *handle);
  * Create an uninitialized frame with space sufficient for the given method.
  * Raises a StackOverflowError if the frames are exhausted.
  */
+__attribute__((noinline))
 bjvm_stack_frame *bjvm_push_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args, u8 argc);
 
+__attribute__((noinline))
 bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *method, bjvm_stack_value *args,
                                         u8 argc);
+__attribute__((noinline))
 bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *method,
                                          const bjvm_method_descriptor *descriptor, bjvm_stack_value *args,
                                          u8 argc);

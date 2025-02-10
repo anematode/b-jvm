@@ -40,15 +40,15 @@ TEST_CASE("Top-level await") {
 
   fut = a_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 1);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 1);
 
   fut = a_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 2);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 2);
 
   fut = a_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 3);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 3);
 
   fut = a_test_method(&tm);
   REQUIRE(fut.status == FUTURE_READY);
@@ -71,15 +71,15 @@ TEST_CASE("For loop") {
 
   fut = b_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 1);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 1);
 
   fut = b_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 2);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 2);
 
   fut = b_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 3);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 3);
 
   fut = b_test_method(&tm);
   REQUIRE(fut.status == FUTURE_READY);
@@ -107,15 +107,15 @@ TEST_CASE("Recursion") {
 
   fut = c_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 1);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 1);
 
   fut = c_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 2);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 2);
 
   fut = c_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 3);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 3);
 
   fut = c_test_method(&tm);
   REQUIRE(fut.status == FUTURE_READY);
@@ -141,7 +141,7 @@ TEST_CASE("Fat return type") {
 
   fut = d_test_method(&tm);
   REQUIRE(fut.status == FUTURE_NOT_READY);
-  REQUIRE(fut.wakeup->index == 6);
+  REQUIRE(((async_wakeup_info *) fut.wakeup)->index == 6);
 
   fut = d_test_method(&tm);
   REQUIRE(fut.status == FUTURE_READY);

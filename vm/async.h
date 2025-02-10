@@ -25,12 +25,9 @@ extern "C" {
 
 typedef enum { FUTURE_NOT_READY, FUTURE_READY } future_status;
 
-struct async_wakeup_info;
-typedef struct async_wakeup_info async_wakeup_info;
-
 typedef struct future {
   future_status status;
-  async_wakeup_info *wakeup;
+  void *wakeup;
 } future_t;
 
 #define future_not_ready(wakeup)                                                                                       \

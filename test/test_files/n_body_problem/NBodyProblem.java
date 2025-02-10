@@ -4,6 +4,7 @@ public final class NBodyProblem {
 
         Body(double x, double y, double z,
              double vx, double vy, double vz, double mass) {
+
             this.x = x;
             this.y = y;
             this.z = z;
@@ -89,7 +90,9 @@ public final class NBodyProblem {
     public static void main(String[] args) {
         // int n = Integer.parseInt(args[0]);
         // int n = 50_000_000; // num simulation steps in the original program
-        int n = 50_000;
+        int n = 1_000_000;
+
+        long time = System.currentTimeMillis();
 
         var bodies = new Body[] {
             // sun
@@ -151,5 +154,7 @@ public final class NBodyProblem {
         System.out.println("Final energy: " + energyAfter);
         System.out.println("Energy change minimal: " + roughlyEquals(energyBefore, energyAfter, 1e-3));
         System.out.println("Sun final position: " + bodies[0].x + " " + bodies[0].y + " " + bodies[0].z);
+
+        System.out.println("Simulation took: " + (System.currentTimeMillis() - time) + "ms");
     }
 }

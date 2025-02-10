@@ -1,9 +1,5 @@
 #define AGGRESSIVE_DEBUG 0
 
-// Skip the memset(...) call to clear each frame's locals/stack. This messes
-// up the debug dumps, but makes setting up frames faster.
-#define SKIP_CLEARING_FRAME 1
-
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
@@ -29,6 +25,7 @@
 #include "cached_classdescs.h"
 #include <errno.h>
 #include <linkage.h>
+#include <monitors.h>
 #include <sys/mman.h>
 
 /// Looks up a class and initializes it if it needs to be initialized.
@@ -82,6 +79,23 @@ DEFINE_ASYNC(init_cached_classdescs) {
     }
   }
   ASYNC_END(0);
+}
+
+inline bool has_expanded_data(bjvm_header_word *data) {
+  return !((uintptr_t)data->expanded_data & IS_MARK_WORD);
+}
+
+inline bjvm_mark_word_t *get_mark_word(bjvm_header_word *data) {
+  return has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
+}
+
+inline monitor_data *inspect_monitor(bjvm_header_word *data) {
+  return has_expanded_data(data) ? data->expanded_data : nullptr;
+}
+
+inline monitor_data *allocate_monitor(bjvm_thread *thread) {
+  monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
+  return data;
 }
 
 #define MAX_CF_NAME_LENGTH 1000
@@ -242,8 +256,7 @@ bjvm_stack_frame *bjvm_push_native_frame(bjvm_thread *thread, bjvm_cp_method *me
   bjvm_stack_frame *frame = (bjvm_stack_frame *)(locals + argc);
 
   DCHECK((uintptr_t)frame % 8 == 0, "Frame is aligned");
-
-  *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) = frame;
+  arrput(thread->frames, frame);
 
   thread->frame_buffer_used = (char *)frame + sizeof(*frame) - thread->frame_buffer;
 
@@ -281,7 +294,7 @@ bjvm_stack_frame *bjvm_push_plain_frame(bjvm_thread *thread, bjvm_cp_method *met
   bjvm_stack_frame *frame = (bjvm_stack_frame *)(args + code->max_locals);
 
   thread->frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->frame_buffer;
-  *VECTOR_PUSH(thread->frames, thread->frames_count, thread->frames_cap) = frame;
+  arrput(thread->frames, frame);
   frame->is_native = 0;
   frame->num_locals = code->max_locals;
   frame->plain.program_counter = 0;
@@ -361,15 +374,14 @@ void dump_frame(FILE *stream, const bjvm_stack_frame *frame) {
 }
 
 void bjvm_pop_frame(bjvm_thread *thr, [[maybe_unused]] const bjvm_stack_frame *reference) {
-  DCHECK(thr->frames_count > 0);
-  bjvm_stack_frame *frame = thr->frames[thr->frames_count - 1];
+  DCHECK(arrlen(thr->frames) > 0);
+  bjvm_stack_frame *frame = arrpop(thr->frames);
   DCHECK(reference == nullptr || reference == frame);
   if (bjvm_is_frame_native(frame)) {
     drop_handles_array(thr, frame->method, frame->native.method_shape, bjvm_get_native_args(frame));
   }
-  thr->frames_count--;
   thr->frame_buffer_used =
-      thr->frames_count == 0 ? 0 : (char *)(frame->plain.stack + frame->plain.max_stack) - thr->frame_buffer;
+      arrlen(thr->frames) == 0 ? 0 : (char *)(frame->plain.stack + frame->plain.max_stack) - thr->frame_buffer;
 }
 
 // Symmetry with make_primitive_classdesc
@@ -391,15 +403,13 @@ typedef struct {
 
 typedef struct {
   native_entry *entries;
-  int entries_count;
-  int entries_cap;
 } native_entries;
 
 void free_native_entries(void *entries_) {
   if (!entries_)
     return;
 
-  free(((native_entries *)entries_)->entries);
+  arrfree(((native_entries *)entries_)->entries);
   free(entries_);
 }
 
@@ -425,11 +435,8 @@ void bjvm_register_native(bjvm_vm *vm, slice class, const slice method_name, con
     (void)bjvm_hash_table_insert(&vm->natives, class.chars, class.len, existing);
   }
 
-  native_entry *ent = VECTOR_PUSH(existing->entries, existing->entries_count, existing->entries_cap);
-  ent->name = method_name;
-  ent->descriptor = method_descriptor;
-  ent->callback = callback;
-
+  native_entry ent = (native_entry) { method_name, method_descriptor, callback };
+  arrput(existing->entries, ent);
   free_heap_str(heap_class);
 }
 
@@ -665,7 +672,6 @@ bjvm_vm *bjvm_create_vm(const bjvm_vm_options options) {
   vm->heap_capacity = options.heap_size;
   vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
   vm->active_threads = nullptr;
-  vm->active_thread_count = vm->active_thread_cap = 0;
 
   vm->read_stdin = options.read_stdin;
   vm->poll_available_stdin = options.poll_available_stdin;
@@ -715,9 +721,14 @@ void bjvm_free_vm(bjvm_vm *vm) {
   bjvm_free_classpath(&vm->classpath);
 
   free(vm->cached_classdescs);
-  free(vm->active_threads);
+  // Free all threads, iterate backwards because they remove themselves
+  for (int i = arrlen(vm->active_threads) - 1; i >= 0; --i) {
+    bjvm_free_thread(vm->active_threads[i]);
+  }
+  arrfree(vm->active_threads);
   free(vm->heap);
   free_unsafe_allocations(vm);
+
 
   free(vm);
 }
@@ -737,9 +748,13 @@ bjvm_stack_value call_interpreter_synchronous(bjvm_thread *thread, bjvm_cp_metho
     args = (bjvm_stack_value[]){};
   }
 
+  thread->synchronous_depth++;
+
   call_interpreter_t ctx = (call_interpreter_t){.args = {thread, method, args}};
   future_t fut = call_interpreter(&ctx);
   CHECK(fut.status == FUTURE_READY, "method tried to suspend");
+
+  thread->synchronous_depth--;
 
   return ctx._result;
 }
@@ -806,7 +821,7 @@ static void init_unsafe_constants(bjvm_thread *thread) {
 
 bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   bjvm_thread *thr = calloc(1, sizeof(bjvm_thread));
-  *VECTOR_PUSH(vm->active_threads, vm->active_thread_count, vm->active_thread_cap) = thr;
+  arrput(vm->active_threads, thr);
 
   thr->vm = vm;
   thr->frame_buffer = calloc(1, thr->frame_buffer_capacity = options.stack_space);
@@ -816,15 +831,20 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
   thr->handles_capacity = HANDLES_CAPACITY;
 
   thr->async_stack = calloc(1, 0x20);
-
   thr->tid = vm->next_tid++;
 
-  bjvm_vm_init_primitive_classes(thr);
-  init_unsafe_constants(thr);
+  bool initializing = !vm->vm_initialized;
 
-  init_cached_classdescs_t init = {.args = {thr}};
-  future_t result = init_cached_classdescs(&init);
-  CHECK(result.status == FUTURE_READY);
+  if (initializing) {
+    vm->vm_initialized = true;
+
+    bjvm_vm_init_primitive_classes(thr);
+    init_unsafe_constants(thr);
+
+    init_cached_classdescs_t init = {.args = {thr}};
+    future_t result = init_cached_classdescs(&init);
+    CHECK(result.status == FUTURE_READY);
+  }
 
   // Pre-allocate OOM and stack overflow errors
   thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
@@ -834,7 +854,7 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 #define java_thr ((struct bjvm_native_Thread *)java_thread->obj)
   thr->thread_obj = java_thr;
 
-  java_thr->vm_thread = thr;
+  java_thr->eetop = (intptr_t)thr;
   java_thr->name = MakeJStringFromCString(thr, "main", true);
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
@@ -852,62 +872,70 @@ bjvm_thread *bjvm_create_thread(bjvm_vm *vm, bjvm_thread_options options) {
 
 #undef java_thr
   bjvm_drop_handle(thr, java_thread);
-  slice const phases[3] = {STR("initPhase1"), STR("initPhase2"), STR("initPhase3")};
-  slice const signatures[3] = {STR("()V"), STR("(ZZ)I"), STR("()V")};
 
-  bjvm_cp_method *method;
-  bjvm_stack_value ret;
-  for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases);
-       ++i) { // todo: these init phases should only be called once per VM
-    method = bjvm_method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
-    DCHECK(method);
-    bjvm_stack_value args[2] = {{.i = 1}, {.i = 1}};
-    call_interpreter_synchronous(thr, method, args); // void methods, no result
+  if (initializing) {
+    slice const phases[3] = {STR("initPhase1"), STR("initPhase2"), STR("initPhase3")};
+    slice const signatures[3] = {STR("()V"), STR("(ZZ)I"), STR("()V")};
 
-    if (thr->current_exception) {
-      // Failed to initialize
-      method = bjvm_method_lookup(thr->current_exception->descriptor, STR("getMessage"), STR("()Ljava/lang/String;"),
-                                  true, true);
-      DCHECK(method);
+    bjvm_cp_method *method;
+    bjvm_stack_value ret;
+    for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); ++i) { // todo: these init phases should only be called once per VM
+      method = bjvm_method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
+      assert(method);
+      bjvm_stack_value args[2] = {{.i = 1}, {.i = 1}};
+      call_interpreter_synchronous(thr, method, args); // void methods, no result
 
-      bjvm_stack_value args[] = {{.obj = thr->current_exception}};
-      bjvm_stack_value obj = call_interpreter_synchronous(thr, method, args);
-      heap_string message;
-      if (obj.obj) {
-        CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
+      if (thr->current_exception) {
+        // Failed to initialize
+        method = bjvm_method_lookup(thr->current_exception->descriptor, STR("getMessage"), STR("()Ljava/lang/String;"), true, true);
+        assert(method);
+
+        bjvm_stack_value args[] = {{.obj = thr->current_exception}};
+        bjvm_stack_value obj = call_interpreter_synchronous(thr, method, args);
+        heap_string message;
+        if (obj.obj) {
+          CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
+        }
+        fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n",
+          fmt_slice(thr->current_exception->descriptor->name), fmt_slice(phases[i]),
+          obj.obj ? message.chars : "no message");
+        abort();
       }
-      fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n", fmt_slice(thr->current_exception->descriptor->name),
-              fmt_slice(phases[i]), obj.obj ? message.chars : "no message");
-      abort();
+
+      method = bjvm_method_lookup(vm->cached_classdescs->system, STR("getProperty"),
+                                  STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
+      assert(method);
+      bjvm_stack_value args2[1] = {{.obj = (void *)MakeJStringFromCString(thr, "java.home", true)}};
+      ret = call_interpreter_synchronous(thr, method, args2); // returns a String
+
+      heap_string java_home;
+      CHECK(read_string_to_utf8(thr, &java_home, ret.obj) == 0);
+      free_heap_str(java_home);
     }
-
-    method = bjvm_method_lookup(vm->cached_classdescs->system, STR("getProperty"),
-                                STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
-    DCHECK(method);
-    bjvm_stack_value args2[1] = {{.obj = (void *)MakeJStringFromCString(thr, "java.home", true)}};
-    ret = call_interpreter_synchronous(thr, method, args2); // returns a String
-
-    heap_string java_home;
-    CHECK(read_string_to_utf8(thr, &java_home, ret.obj) == 0);
-    free_heap_str(java_home);
   }
 
   thr->current_exception = nullptr;
-
-  // Call setJavaLangAccess() since we crash before getting there
-  method = bjvm_method_lookup(vm->cached_classdescs->system, STR("setJavaLangAccess"), STR("()V"), false, false);
-  call_interpreter_synchronous(thr, method, nullptr); // void methods, no result
-
   return thr;
+}
+
+static void remove_thread_from_vm_list(bjvm_thread *thread) {
+  for (int i = 0; i < arrlen(thread->vm->active_threads); ++i) {
+    if (thread == thread->vm->active_threads[i]) {
+      arrdelswap(thread->vm->active_threads, i);
+      break;
+    }
+  }
 }
 
 void bjvm_free_thread(bjvm_thread *thread) {
   // TODO remove from the VM
 
   free(thread->async_stack);
-  free(thread->frames);
+  arrfree(thread->frames);
   free(thread->frame_buffer);
   free(thread->handles);
+  free(thread->refuel_wakeup_info);
+  remove_thread_from_vm_list(thread);
   free(thread);
 }
 
@@ -976,20 +1004,17 @@ typedef struct {
   bjvm_classdesc *rtype;
   bjvm_classdesc **ptypes;
   u32 ptypes_count;
-  u32 ptypes_capacity;
 } mh_type_info_t;
 
 static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info *info, mh_type_info_t *result) {
   bjvm_classdesc *rtype = nullptr;
   bjvm_classdesc **ptypes = nullptr;
-  int ptypes_count = 0;
-  int ptypes_capacity = 0;
 
   switch (info->handle_kind) {
   case BJVM_MH_KIND_GET_FIELD: {
     // MT should be of the form (C)T, where C is the class the field is found on
     bjvm_cp_field_info *field = &info->reference->field;
-    *VECTOR_PUSH(ptypes, ptypes_count, ptypes_capacity) = field->class_info->classdesc;
+    arrput(ptypes, field->class_info->classdesc);
     rtype = load_class_of_field(thread, field->parsed_descriptor);
     break;
   }
@@ -1006,12 +1031,12 @@ static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info 
     bjvm_cp_method_info *method = &info->reference->methodref;
 
     if (info->handle_kind != BJVM_MH_KIND_INVOKE_STATIC) {
-      *VECTOR_PUSH(ptypes, ptypes_count, ptypes_capacity) = method->class_info->classdesc;
+      arrput(ptypes, method->class_info->classdesc);
     }
 
     for (int i = 0; i < method->descriptor->args_count; ++i) {
       bjvm_field_descriptor *arg = method->descriptor->args + i;
-      *VECTOR_PUSH(ptypes, ptypes_count, ptypes_capacity) = load_class_of_field(thread, arg);
+      arrput(ptypes, load_class_of_field(thread, arg));
     }
 
     rtype = load_class_of_field(thread, &method->descriptor->return_type);
@@ -1023,7 +1048,7 @@ static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info 
 
     for (int i = 0; i < method->descriptor->args_count; ++i) {
       bjvm_field_descriptor *arg = method->descriptor->args + i;
-      *VECTOR_PUSH(ptypes, ptypes_count, ptypes_capacity) = load_class_of_field(thread, arg);
+      arrput(ptypes, load_class_of_field(thread, arg));
     }
 
     rtype = method->class_info->classdesc;
@@ -1035,7 +1060,7 @@ static int compute_mh_type_info(bjvm_thread *thread, bjvm_cp_method_handle_info 
   }
 
   *result = (mh_type_info_t){
-      .rtype = rtype, .ptypes = ptypes, .ptypes_count = ptypes_count, .ptypes_capacity = ptypes_capacity};
+      .rtype = rtype, .ptypes = ptypes, .ptypes_count = arrlen(ptypes)};
   return 0;
 }
 
@@ -1065,7 +1090,7 @@ DEFINE_ASYNC(resolve_mh_mt) {
     *((bjvm_obj_header **)ArrayData(self->ptypes_array->obj) + i) =
         (void *)bjvm_get_class_mirror(args->thread, info.ptypes[i]);
   }
-  free(info.ptypes);
+  arrfree(info.ptypes);
 
   AWAIT(call_interpreter, args->thread, make,
         (bjvm_stack_value[]){{.obj = (void *)bjvm_get_class_mirror(args->thread, info.rtype)},
@@ -1288,7 +1313,7 @@ bjvm_classdesc *bjvm_define_bootstrap_class(bjvm_thread *thread, slice chars, co
   // Look up in the native methods list and add native handles as appropriate
   native_entries *entries = bjvm_hash_table_lookup(&vm->natives, chars.chars, chars.len);
   if (entries) {
-    for (int i = 0; i < entries->entries_count; i++) {
+    for (int i = 0; i < arrlen(entries->entries); i++) {
       native_entry *entry = entries->entries + i;
 
       for (int j = 0; j < class->methods_count; ++j) {
@@ -1352,7 +1377,7 @@ bjvm_classdesc *bootstrap_lookup_class_impl(bjvm_thread *thread, const slice nam
   if (!class) {
     // Maybe it's an anonymous class, read the thread stack looking for a
     // class with a matching name
-    for (int i = thread->frames_count - 1; i >= 0; --i) {
+    for (int i = (int)arrlen(thread->frames) - 1; i >= 0; --i) {
       bjvm_classdesc *d = bjvm_get_frame_method(thread->frames[i])->my_class;
       if (utf8_equals_utf8(hslc(d->name), chars)) {
         class = d;
@@ -1540,14 +1565,12 @@ DEFINE_ASYNC(bjvm_initialize_class) {
                                                // awaits
 
   DCHECK(classdesc);
-  if (classdesc->state >= BJVM_CD_STATE_INITIALIZING) {
-    // Class is already initialized, or currently being initialized.
-    // TODO In a multithreaded model, we would need to wait for the other
-    // thread to finish initializing the class.
+  if (likely(classdesc->state == BJVM_CD_STATE_INITIALIZED)) {
+    // Class is already initialized
     ASYNC_RETURN(0);
   }
 
-  if (classdesc->state != BJVM_CD_STATE_LINKED) {
+  if (classdesc->state < BJVM_CD_STATE_LINKED) {
     error = bjvm_link_class(thread, classdesc);
     if (error) {
       DCHECK(thread->current_exception);
@@ -1555,7 +1578,30 @@ DEFINE_ASYNC(bjvm_initialize_class) {
     }
   }
 
+  if (classdesc->state == BJVM_CD_STATE_INITIALIZING) {
+    if (classdesc->initializing_thread == thread->tid) {
+      // The class is currently being initialized by this thread, so we can just return
+      ASYNC_RETURN(0);
+    }
+
+    // The class is being initialized by a different thread, and we need to wait for it to finish.
+    // This effectively busy waits, but this is an edge case so it doesn't matter for now.
+    while (classdesc->state == BJVM_CD_STATE_INITIALIZING) {
+      self->wakeup_info = malloc(sizeof(rr_wakeup_info));
+      ((rr_wakeup_info*)self->wakeup_info)->kind = RR_WAKEUP_YIELDING;
+      ASYNC_YIELD(&self->wakeup_info);
+      classdesc = args->classdesc; // reload!
+      free(self->wakeup_info);
+    }
+
+    ASYNC_RETURN(0);  // the class is done
+  }
+
+  // TODO handle linkage error
+
   classdesc->state = BJVM_CD_STATE_INITIALIZING;
+  classdesc->initializing_thread = thread->tid;  // mark this thread as initializing the class
+
   self->recursive_call_space = calloc(1, sizeof(bjvm_initialize_class_t));
   if (!self->recursive_call_space) {
     bjvm_out_of_memory(thread);
@@ -1598,6 +1644,11 @@ DEFINE_ASYNC(bjvm_initialize_class) {
 done:
   free(self->recursive_call_space);
   args->classdesc->state = error ? BJVM_CD_STATE_LINKAGE_ERROR : BJVM_CD_STATE_INITIALIZED;
+  // Mark all array classes with the same state
+  bjvm_classdesc *arr = args->classdesc;
+  while ((arr = arr->array_type)) {
+    arr->state = args->classdesc->state;
+  }
   ASYNC_END(error);
 
 #undef thread
@@ -1978,6 +2029,8 @@ DEFINE_ASYNC(bjvm_invokevirtual_signature_polymorphic) {
   struct bjvm_native_MethodHandle *mh = (void *)target;
   struct bjvm_native_MethodType *targ = (void *)mh->type;
 
+  assert(targ && "Method type must be non-null");
+
   bool mts_are_same = method_types_compatible(provider_mt, targ);
   bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
   // only raw calls to MethodHandle.invoke involve "asType" conversions
@@ -2273,7 +2326,7 @@ DEFINE_ASYNC(bjvm_run_native) {
 DEFINE_ASYNC(bjvm_interpret) {
 #define thread args->thread
 #define raw_frame args->raw_frame
-  DCHECK(*(thread->frames + thread->frames_count - 1) == raw_frame, "Frame is not last frame on stack");
+  DCHECK(arrlast(thread->frames) == raw_frame, "Frame is not last frame on stack");
 
   for (;;) {
     future_t f;

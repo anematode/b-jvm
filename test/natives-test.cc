@@ -86,13 +86,13 @@ TEST_CASE("Async natives") {
   for (int i = 0; i < 2; i++) {
     fut = call_interpreter(&ctx);
     REQUIRE(fut.status == FUTURE_NOT_READY);
-    REQUIRE(fut.wakeup->index == i);
+    REQUIRE(((async_wakeup_info *)fut.wakeup)->index == i);
   }
 
   for (int i = 0; i < 4; i++) {
     fut = call_interpreter(&ctx);
     REQUIRE(fut.status == FUTURE_NOT_READY);
-    REQUIRE(fut.wakeup->index == i);
+    REQUIRE(((async_wakeup_info *)fut.wakeup)->index == i);
   }
 
   fut = call_interpreter(&ctx);

@@ -147,7 +147,9 @@ DECLARE_NATIVE("java/lang", Class, initClassName, "()Ljava/lang/String;") {
     name.chars[i] = name.chars[i] == '/' ? '.' : name.chars[i];
   }
   name.len = classdesc->name.len;
-  return (bjvm_stack_value){.obj = MakeJStringFromModifiedUTF8(thread, name, true)};
+  void *str = MakeJStringFromModifiedUTF8(thread, name, true);
+  StoreFieldObject(obj->obj, "java/lang/String", "name", str);
+  return (bjvm_stack_value){.obj = str};
 }
 
 DECLARE_NATIVE("java/lang", Class, forName0,

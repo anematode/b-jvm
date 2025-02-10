@@ -12,10 +12,13 @@ include(Catch2)
 include(CTest)
 include(AsanSupport)
 include(LtoSupport)
+include(PostprocessWasm)
 
 FetchContent_MakeAvailable(Catch2)
 
+if(NOT EMSCRIPTEN)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 add_subdirectory(vendor)
@@ -28,6 +31,7 @@ if (BUILD_TESTING)
 endif ()
 
 add_library(bjvm_static STATIC)
+# This keeps names fixed for the post-processor
 target_link_libraries(bjvm_static PUBLIC vm PRIVATE natives)
 
 if (NOT EMSCRIPTEN)
@@ -37,15 +41,18 @@ endif()
 
 if (EMSCRIPTEN)
     target_link_options(bjvm_static PUBLIC -sEXPORTED_FUNCTIONS=_malloc,_free,_main
-            -sSTACK_SIZE=500000
+            -sSTACK_SIZE=5000000
             -sWASMFS
+            -sWASM_BIGINT
             -sFORCE_FILESYSTEM=1
             -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1
+            -sWARN_ON_UNDEFINED_SYMBOLS=0
             -sEXPORTED_RUNTIME_METHODS=ccall,wasmMemory,cwrap,addFunction,removeFunction,wasmTable,FS,UTF8ToString,getValue,setValue
             )
 
     add_executable(bjvm_main vm/bin/main.c)  # for now
-    # add bjvm with -Wl,--whole-archive
+    run_emscripten_postprocess(bjvm_main)
+
     target_link_libraries(bjvm_main PRIVATE bjvm_static)
     add_link_options(--emit-tsd bjvm_main.d.ts -sMODULARIZE -sEXPORT_ES6=1)
 endif ()

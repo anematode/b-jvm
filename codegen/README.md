@@ -1,0 +1,1 @@
+The source code for `wasm-opt.js` and `wasm-opt.wasm` can be built from `anematode/binaryen`.

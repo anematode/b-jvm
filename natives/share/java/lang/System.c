@@ -161,13 +161,13 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 }
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
-  DCHECK(argc == 1);
-  return (bjvm_stack_value){.i = (int)args[0].handle->obj->mark_word};
+  assert(argc == 1);
+  return (bjvm_stack_value) {.i = get_object_hash_code(args[0].handle->obj) };
 }
 
 s64 micros() {
 #ifdef EMSCRIPTEN
-  return (s64)(emscripten_get_now() * 1000000);
+  return (s64)(emscripten_get_now() * 1000);
 #elifdef USE_SYS_TIME
   struct timeval tv;
   gettimeofday(&tv, NULL);

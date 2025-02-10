@@ -53,7 +53,7 @@ extern "C" {
 
 /// Checks the condition is true;  if not, optionally prints a message and aborts.
 /// This check is removed in release builds.
-#if DCHECKS_ENABLED
+#if 1
 #define DCHECK(condition, ...)                                                                                         \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \
@@ -66,24 +66,6 @@ extern "C" {
 #else
 #define DCHECK(condition, ...) (void)(condition);
 #endif
-
-static inline void *__vector_push(size_t element_size, void **vector, int *vector_count, int *vector_cap) {
-  if (__builtin_expect((*vector_count) >= (*vector_cap), 0)) {
-    int new_cap = *vector_cap * 2 + 1;
-    void *_next = realloc(*vector, new_cap * element_size);
-    *vector_cap = new_cap;
-    *vector = _next;
-  }
-
-  int element_position = *vector_count;
-  *vector_count += 1;
-
-  void *destination = (char *)*vector + (element_position * element_size);
-  return destination;
-}
-
-#define VECTOR_PUSH(vector, vector_count, vector_cap)                                                                  \
-  ((typeof(vector))__vector_push(sizeof(*(vector)), (void **)&(vector), (int *)&(vector_count), (int *)&(vector_cap)))
 
 typedef struct {
   char *chars;

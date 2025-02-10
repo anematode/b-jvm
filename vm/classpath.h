@@ -40,9 +40,6 @@ typedef struct {
 // Classes will be sought for in JARs and folders in the order they're added.
 typedef struct {
   bjvm_classpath_entry *entries;
-  int entries_len;
-  int entries_cap;
-
   heap_string as_colon_separated;
 } bjvm_classpath;
 

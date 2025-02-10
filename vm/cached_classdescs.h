@@ -29,9 +29,12 @@
   X(direct_method_handle_holder, "java/lang/invoke/DirectMethodHandle$Holder") \
   X(delegating_method_handle_holder, "java/lang/invoke/DelegatingMethodHandle$Holder") \
   X(lf_holder, "java/lang/invoke/LambdaForm$Holder") \
-  X(illegal_state_exception, "java/lang/IllegalStateException") \
+  X(file_not_found_exception, "java/io/FileNotFoundException") \
+  X(io_exception, "java/io/IOException") \
+  X(interrupted_exception, "java/lang/InterruptedException") \
   X(clone_not_supported_exception, "java/lang/CloneNotSupportedException") \
-  X(file_not_found_exception, "java/io/FileNotFoundException")
+  X(illegal_monitor_state_exception, "java/lang/IllegalMonitorStateException") \
+  X(illegal_state_exception, "java/lang/IllegalStateException")
 
 
 #define __CACHED_REFLECTION_CLASSES(X)                                         \

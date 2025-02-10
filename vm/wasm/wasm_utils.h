@@ -410,21 +410,13 @@ typedef struct {
 typedef struct {
   /** Used during construction of the module */
   bjvm_wasm_tuple_type **interned_result_types;
-  int result_types_count;
-  int result_types_cap;
 
   bjvm_wasm_import *imports;
-  int import_count;
-  int import_cap;
 
   bjvm_wasm_function **functions;
-  int function_count;
-  int function_cap;
 
   /** Used during serialisation only */
   bjvm_wasm_ser_function_type *fn_types; // bjvm_wasm_function_type*
-  int fn_types_count;
-  int fn_types_cap;
 
   u32 fn_index;
 
@@ -433,17 +425,12 @@ typedef struct {
   // Vector of immovable arena regions, all collectively freed when the module
   // is destroyed
   char **arenas;
-  int arenas_count;
-  int arenas_cap;
   size_t last_arena_used;
 } bjvm_wasm_module;
 
 // Used when writing out the WASM to a series of bytes.
 typedef struct {
-  // Bytes of the currenf
   u8 *bytes;
-  size_t bytes_len;
-  size_t bytes_cap;
 } bjvm_bytevector;
 
 // LEB128 encodings
@@ -573,9 +560,7 @@ typedef struct {
   bjvm_wasm_instantiation_status status;
   int js_promise;
 
-  bjvm_wasm_instantiation_export **exports; // unused for now
-  int export_count;
-  int export_cap;
+  bjvm_wasm_instantiation_export *exports; // unused for now
 
   void *run;
 } bjvm_wasm_instantiation_result;

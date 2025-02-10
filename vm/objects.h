@@ -43,12 +43,15 @@ static inline object AllocateObject(bjvm_thread *thread,
   DCHECK(descriptor);
   DCHECK(descriptor->state >=
          BJVM_CD_STATE_LINKED); // important to know the size
-  object obj = (object)bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
+  object obj = (object) bump_allocate(thread, sizeof(bjvm_obj_header) + data_size);
   if (obj) {
-    obj->mark_word = ObjNextHashCode();
+    obj->header_word.expanded_data = (monitor_data*)(uintptr_t)IS_MARK_WORD;
     obj->descriptor = descriptor;
   }
   return obj;
 }
+
+// Get the hash code of the object, computing it if it is not already computed.
+s32 get_object_hash_code(object o);
 
 #endif

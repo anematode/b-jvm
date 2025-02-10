@@ -22,6 +22,8 @@
 #include "catch2/matchers/catch_matchers_vector.hpp"
 #include "tests-common.h"
 #include <numeric>
+#include <roundrobin_scheduler.h>
+#include <unistd.h>
 
 using namespace Bjvm::Tests;
 using Catch::Matchers::Equals;
@@ -44,78 +46,6 @@ TEST_CASE("Test STR() macro") {
   REQUIRE(utf.len == 3);
 }
 
-TEST_CASE("Test classfile parsing") {
-  bool fuzz = false;
-
-  // list all java files in the jre8 directory
-  auto files = ListDirectory("jdk23", true);
-  double total_millis = 0;
-
-  int count = 0;
-  int FILE_COUNT = fuzz ? 5 : INT_MAX;
-  for (size_t i = 0; i < files.size(); ++i) {
-    auto file = files[i];
-    if (!EndsWith(file, ".class")) {
-      continue;
-    }
-    if (count++ > FILE_COUNT) {
-      continue;
-    }
-
-    auto read = ReadFile(file).value();
-    double start = get_time();
-
-    // std::cout << "Reading " << file << "\n";
-    bjvm_classdesc cf = {};
-    parse_result_t error =
-        bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
-    if (error != PARSE_SUCCESS) {
-      std::cerr << "Error parsing classfile: " << error << '\n';
-      // abort();
-    } else {
-      bjvm_free_classfile(cf);
-    }
-
-    if (fuzz) {
-      std::cerr << "Fuzzing classfile: " << file << '\n';
-
-#pragma omp parallel for
-      for (size_t i = 0; i < read.size(); ++i) {
-        bjvm_classdesc cf;
-        auto copy = read;
-        for (int j = 0; j < 256; ++j) {
-          copy[i] += 1;
-          parse_result_t error =
-              bjvm_parse_classfile(copy.data(), copy.size(), &cf, nullptr);
-          if (error != PARSE_SUCCESS) {
-
-          } else {
-            bjvm_free_classfile(cf);
-          }
-        }
-      }
-    }
-
-    total_millis += get_time() - start;
-  }
-
-  std::cout << "Total time: " << total_millis << "ms\n";
-
-  BENCHMARK_ADVANCED("Parse classfile")(Catch::Benchmark::Chronometer meter) {
-    auto read =
-        ReadFile("./jre8/sun/security/tools/keytool/Main.class").value();
-    bjvm_classdesc cf;
-
-    meter.measure([&] {
-      parse_result_t error =
-          bjvm_parse_classfile(read.data(), read.size(), &cf, nullptr);
-      if (error != PARSE_SUCCESS)
-        abort();
-      bjvm_free_classfile(cf);
-    });
-  };
-}
-
 TEST_CASE("Compressed bitset") {
   for (int size = 1; size < 256; ++size) {
     std::vector<u8> reference(size);
@@ -126,14 +56,13 @@ TEST_CASE("Compressed bitset") {
       int index = rand() % size;
       switch (rand() % 4) {
       case 0: {
-        int *set_bits = nullptr, length = 0, capacity = 0;
-        set_bits = bjvm_list_compressed_bitset_bits(bitset, set_bits, &length,
-                                                    &capacity);
-        for (int i = 0; i < length; ++i) {
+        int *set_bits = nullptr;
+        bjvm_list_compressed_bitset_bits(bitset, &set_bits);
+        for (int i = 0; i < arrlen(set_bits); ++i) {
           if (!reference[set_bits[i]])
             REQUIRE(false);
         }
-        free(set_bits);
+        arrfree(set_bits);
         break;
       }
       case 1: {
@@ -612,36 +541,80 @@ As a char: A
 #ifndef EMSCRIPTEN  // these tests are sloooowwww
 
 TEST_CASE("Sudoku solver") {
-  int num_puzzles = 33761;
-  std::cout << "Starting sudoku solver" << std::endl;
-  std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
-  auto now = std::chrono::system_clock::now();
+  BENCHMARK("Sudoku solver benchmark") {
+    int num_puzzles = 33761;
+    std::cout << "Starting sudoku solver" << std::endl;
+    std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
+    auto now = std::chrono::system_clock::now();
 
-  auto result = run_test_case("test_files/sudoku/", true, "Main");
-  // last puzzle
-  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+    auto result = run_test_case("test_files/sudoku/", true, "Main");
+    // last puzzle
+    REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
 
-  auto end = std::chrono::system_clock::now();
-  long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
-  std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+    auto end = std::chrono::system_clock::now();
+    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
+    std::cout << "Done in " << elapsed << " ms!" << std::endl;
+    std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  };
+}
+
+TEST_CASE("Scheduled sudoku solver") {
+  BENCHMARK("Sudoku solver benchmark") {
+    int num_puzzles = 33761;
+    std::cout << "Starting sudoku solver with a scheduler" << std::endl;
+    std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
+    auto now = std::chrono::system_clock::now();
+
+    auto result = run_scheduled_test_case("test_files/sudoku/", true, "Main");
+    // last puzzle
+    REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+    REQUIRE(result.sleep_count == 0); // chop chop
+
+    auto end = std::chrono::system_clock::now();
+    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
+    std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
+    std::cout << "Done in " << elapsed << " ms!" << std::endl;
+    std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  };
+}
+
+TEST_CASE("Scheduled worker sudoku solver") {
+  BENCHMARK("Sudoku solver benchmark") {
+    int num_puzzles = 33761;
+    std::cout << "Starting sudoku solver with a worker thread" << std::endl;
+    std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
+    auto now = std::chrono::system_clock::now();
+
+    auto result = run_scheduled_test_case("test_files/sudoku/", false, "WorkerThreadSudoku");
+    // last puzzle
+    REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+    REQUIRE(result.sleep_count == 0); // chop chop
+
+    auto end = std::chrono::system_clock::now();
+    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
+    std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
+    std::cout << "Done in " << elapsed << " ms!" << std::endl;
+    std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  };
 }
 
 TEST_CASE("Autodiff") {
-  int num_derivatives = 10000 * 10 + 3;
-  std::cout << "Testing Autodiff" << std::endl;
-  std::cout << "Hang on tight, automatically differentiating " << num_derivatives << " simple expressions..." << std::endl;
-  auto now = std::chrono::system_clock::now();
+  BENCHMARK("Sudoku solver benchmark") {
+    int num_derivatives = 10000 * 10 + 3;
+    std::cout << "Testing Autodiff" << std::endl;
+    std::cout << "Hang on tight, automatically differentiating " << num_derivatives << " simple expressions..." << std::endl;
+    auto now = std::chrono::system_clock::now();
 
-  auto result = run_test_case("test_files/autodiff/", true, "Main");
-  // last test
-  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+sin((x*y))))) = -3209354.522523045 == -3209354.522523045")
-          != std::string::npos);
+    auto result = run_test_case("test_files/autodiff/", true, "Main");
+    // last test
+    REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+sin((x*y))))) = -3209354.522523045 == -3209354.522523045")
+            != std::string::npos);
 
-  auto end = std::chrono::system_clock::now();
-  long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
-  std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_derivatives << " ms per evaluation!" << std::endl;
+    auto end = std::chrono::system_clock::now();
+    long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
+    std::cout << "Done in " << elapsed << " ms!" << std::endl;
+    std::cout << "That's " << (double) elapsed / num_derivatives << " ms per evaluation!" << std::endl;
+  };
 }
 
 #endif
@@ -729,3 +702,66 @@ TEST_CASE("Filesystem") {
   REQUIRE_THAT(result.stdout_, Equals("UnixFileSystem"));
 }
 #endif
+
+TEST_CASE("Multithreading") {
+  auto result = run_scheduled_test_case("test_files/basic_multithreading/", false, "Multithreading");
+  (void) result; // use this var fr
+}
+
+TEST_CASE("Monitor reentrancy") {
+  auto result = run_scheduled_test_case("test_files/reentrant_monitor/", true, "Main");
+  REQUIRE(result.stdout_ == R"(ReentrantFactorialCalculator: {}
+5! = 120
+ReentrantFactorialCalculator: {1=1, 2=2, 3=6, 4=24, 5=120}
+3! = 6
+ReentrantFactorialCalculator: {1=1, 2=2, 3=6, 4=24, 5=120}
+100! = 2432902008176640000
+ReentrantFactorialCalculator: {1=1, 2=2, 3=6, 4=24, 5=120, 6=720, 7=5040, 8=40320, 9=362880, 10=3628800, 11=39916800, 12=479001600, 13=6227020800, 14=87178291200, 15=1307674368000, 16=20922789888000, 17=355687428096000, 18=6402373705728000, 19=121645100408832000, 20=2432902008176640000}
+caching correctly: true
+)");
+}
+
+TEST_CASE("Single thread interruption") {
+  auto result = run_scheduled_test_case("test_files/single_thread_interrupt/", true);
+
+  REQUIRE(result.stdout_ == R"(initially interrupted: false
+interrupted: true
+interrupted: true
+interrupted: false
+slept for at least 1000 ms? true
+interrupting
+interrupted while sleeping
+interrupted: false
+slept for at least 1000 ms? false
+)");
+
+  REQUIRE(result.sleep_count == 1);
+  REQUIRE(result.ms_slept <= 1000000); // 1 second
+  REQUIRE(1000000 - result.ms_slept <= 100000); // give or take 0.1 seconds
+}
+
+TEST_CASE("IllegalMonitorStateException") {
+  auto result = run_test_case("test_files/illegal_monitor/", true, "IllegalMonitors");
+  REQUIRE_THAT(result.stdout_, Equals(R"(Caught exception1
+null
+Caught exception2
+null
+Caught exception3
+null
+Caught exception4
+null
+Caught exception5
+null
+Caught exception6
+Cannot enter synchronized block because "<local0>" is null
+Caught exception7
+Cannot exit synchronized block because "<local0>" is null
+)"));
+}
+
+TEST_CASE("Concurrent initialisation") {
+  auto result = run_scheduled_test_case("test_files/concurrent_initialisation/", true, "ConcurrentInitialization");
+  REQUIRE(result.stdout_ == R"(Initializing...
+Finished initializing!
+)");
+}

@@ -82,7 +82,7 @@ static char *map_jar(const char *filename, bjvm_mapped_jar *jar) {
   close(fd);
   return nullptr;
 #elif EMSCRIPTEN
-  int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
+  int is_node = EM_ASM_INT({ return typeof window === 'undefined'; });
   if (is_node) {
     struct loaded_bytes load = node_read_file(filename);
     if (!load.bytes)
@@ -269,19 +269,18 @@ static char *add_classpath_entry(bjvm_classpath *cp, slice entry) {
       return error;
     }
 
-    *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
-        (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
+    bjvm_classpath_entry ent = (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = jar};
+    arrput(cp->entries, ent);
 
     return nullptr;
   }
-  *VECTOR_PUSH(cp->entries, cp->entries_len, cp->entries_cap) =
-      (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};
+  bjvm_classpath_entry ent = (bjvm_classpath_entry){.name = make_heap_str_from(entry), .jar = nullptr};
+  arrput(cp->entries, ent);
   return nullptr;
 }
 
 char *bjvm_init_classpath(bjvm_classpath *cp, slice path) {
   cp->entries = nullptr;
-  cp->entries_cap = cp->entries_len = 0;
   cp->as_colon_separated = make_heap_str_from(path);
   int start = 0;
   for (u32 i = 0; i <= path.len; i++) {
@@ -301,13 +300,13 @@ char *bjvm_init_classpath(bjvm_classpath *cp, slice path) {
 }
 
 void bjvm_free_classpath(bjvm_classpath *cp) {
-  for (int i = 0; i < cp->entries_len; i++) {
+  for (int i = 0; i < arrlen(cp->entries); i++) {
     free_heap_str(cp->entries[i].name);
     if (cp->entries[i].jar) {
       free_jar(cp->entries[i].jar);
     }
   }
-  free(cp->entries);
+  arrfree(cp->entries);
   free_heap_str(cp->as_colon_separated);
   memset(cp, 0, sizeof(*cp));
 }
@@ -395,7 +394,7 @@ int bjvm_lookup_classpath(bjvm_classpath *cp, const slice filename,
   if (bad_filename(filename)) {
     return -1;
   }
-  for (int i = 0; i < cp->entries_len; i++) {
+  for (int i = 0; i < arrlen(cp->entries); i++) {
     bjvm_classpath_entry *entry = &cp->entries[i];
     if (entry->jar) {
       enum jar_lookup_result result =

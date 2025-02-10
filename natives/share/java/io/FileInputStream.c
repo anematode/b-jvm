@@ -1,6 +1,10 @@
 #include <errno.h>
 #include <natives-dsl.h>
+#ifdef EMSCRIPTEN
+#include <fcntl.h>
+#else
 #include <sys/fcntl.h>
+#endif
 #include <sys/ioctl.h>
 #include <unistd.h>
 
