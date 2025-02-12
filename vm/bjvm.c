@@ -1,5 +1,3 @@
-#define AGGRESSIVE_DEBUG 0
-
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
@@ -1447,18 +1445,12 @@ void out_of_memory(vm_thread *thread) {
   vm->heap_capacity = original_capacity;
 }
 
-#define GC_EVERY_ALLOCATION 0
-
 void *bump_allocate(vm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
   vm *vm = thread->vm;
-#if AGGRESSIVE_DEBUG
-  printf("Allocating %zu bytes, %zu used, %zu capacity\n", bytes, vm->heap_used, vm->heap_capacity);
-#endif
-  if (vm->heap_used + bytes > vm->heap_capacity || (GC_EVERY_ALLOCATION && thread->allocations_so_far++ > 69770)) {
+  if (vm->heap_used + bytes > vm->heap_capacity) {
     major_gc(thread->vm);
-    // printf("GC!\n");
     if (vm->heap_used + bytes > vm->heap_capacity) {
       out_of_memory(thread);
       return nullptr;

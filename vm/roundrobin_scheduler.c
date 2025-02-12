@@ -48,13 +48,6 @@ static bool is_sleeping(thread_info *info, s64 time) {
   return info->wakeup_info && info->wakeup_info->kind == RR_WAKEUP_SLEEP && (s64)info->wakeup_info->wakeup_us > time;
 }
 
-u64 get_unix_us(void) {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  u64 time = tv.tv_sec * 1000000 + tv.tv_usec;
-  return time;
-}
-
 static thread_info *get_next_thr(impl *impl) {
   assert(impl->round_robin && "No threads to run");
   thread_info *info = impl->round_robin[0], *first = info;

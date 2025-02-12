@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <types.h>
+#include <sys/time.h>
 
 bool utf8_equals(const slice entry, const char *str) {
   size_t str_len = strlen(str);
@@ -17,4 +18,11 @@ bool utf8_ends_with(slice str, slice ending) {
     return false;
 
   return memcmp(str.chars + str.len - ending.len, ending.chars, ending.len) == 0;
+}
+
+u64 get_unix_us(void) {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  u64 time = tv.tv_sec * 1000000 + tv.tv_usec;
+  return time;
 }
