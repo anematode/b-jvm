@@ -22,18 +22,18 @@ factory.then((instantiated) => {
 
 interface VMOptions {
     classpath: string;
-    stdout?: (byte: number) => void;
-    stderr?: (byte: number) => void;
+    stdout?: (buf: number, len: number) => void;
+    stderr?: (buf: number, len: number) => void;
 }
 
 function buffered() {
     let buffer = "";
-    return (byte: number) => {
-        if (byte === 10) {
-            console.log(buffer);
-            buffer = "";
-        } else {
-            buffer += String.fromCharCode(byte);
+    return (buf: number, len: number) => {
+        buffer += new TextDecoder().decode(new Uint8Array(module.HEAPU8.buffer, buf, len));
+        let idx: number;
+        while ((idx = buffer.indexOf('\n')) != -1) {
+            console.log(buffer.slice(0, idx));
+            buffer = buffer.slice(idx + 1);
         }
     }
 }
@@ -88,7 +88,7 @@ function setJavaType(vm: VM, addr: number, type: JavaType, value: any) {
             if (!(value instanceof BaseHandle)) {
                 throw new TypeError("Expected BaseHandle, not " + explainObject(value));
             }
-            let obj = module._bjvm_deref_js_handle(vm.ptr, value.handleIndex);
+            let obj = module._deref_js_handle(vm.ptr, value.handleIndex);
             module.setValue(addr, obj, "i32");
             return;
         case "I":
@@ -205,7 +205,7 @@ class BaseHandle {
             return;
         }
         this.vm.handleRegistry.unregister(this);
-        module._bjvm_drop_js_handle(this.vm.ptr, this.handleIndex);
+        module._drop_js_handle(this.vm.ptr, this.handleIndex);
         this.handleIndex = -1;
     }
 }
@@ -307,7 +307,7 @@ interface HandleConstructor {
 }
 
 function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): HandleConstructor {
-    const classInfoStr = module._bjvm_ffi_get_class_json(bjvm_classdesc_ptr);
+    const classInfoStr = module._ffi_get_class_json(bjvm_classdesc_ptr);
     const info = module.UTF8ToString(classInfoStr);
     const classInfo: ClassInfo = JSON.parse(info);
     module._free(classInfoStr);
@@ -465,7 +465,7 @@ class Thread {
     }
 
     private async _runConstructor(method: MethodInfo, ...args: any[]): Promise<any> {
-        const this_ = module._bjvm_ffi_allocate_object(this.ptr, method.methodPointer);
+        const this_ = module._ffi_allocate_object(this.ptr, method.methodPointer);
         if (!this_) {
             this.throwThreadException();
         }
@@ -485,7 +485,7 @@ class Thread {
             }
             freed = true;
             if (executionRecord)
-                module._bjvm_ffi_free_execution_record(executionRecord);
+                module._ffi_free_execution_record(executionRecord);
             module._free(argsPtr);
         }
 
@@ -504,7 +504,7 @@ class Thread {
             const scheduled = this.vm.scheduleMethod(this, method, argsPtr);
             const readResult = () => {
                 if (parsed.returnType.kind !== 'V') {
-                    const resultPtr = module._bjvm_ffi_get_execution_record_result_pointer(executionRecord);
+                    const resultPtr = module._ffi_get_execution_record_result_pointer(executionRecord);
                     return readJavaType(this.vm, resultPtr, parsed.returnType);
                 }
             }
@@ -519,13 +519,13 @@ class Thread {
             })() as ForceablePromise<any>;
 
             promise.__forceSync = (raiseIllegalState: boolean) => {
-                const status = module._bjvm_ffi_execute_immediately(scheduled.record);
+                const status = module._ffi_execute_immediately(scheduled.record);
                 if (status == 0 /* DONE */) {
                     const ret: ReturnType<typeof promise.__forceSync> = { success: true, value: readResult() };
                     freeData();
                     return ret;
                 } else {
-                    const ptr = module._bjvm_ffi_get_current_exception(this.ptr);
+                    const ptr = module._ffi_get_current_exception(this.ptr);
                     const handle = this.vm.createHandle(ptr);
                     return { success: false, illegalStateException: handle };
                 }
@@ -539,12 +539,12 @@ class Thread {
     }
 
     throwThreadException() {
-        let ptr = module._bjvm_ffi_get_current_exception(this.ptr);
+        let ptr = module._ffi_get_current_exception(this.ptr);
         if (!ptr) {
             return;
         }
         const handle = this.vm.createHandle(ptr);
-        module._bjvm_ffi_clear_current_exception(this.ptr);
+        module._ffi_clear_current_exception(this.ptr);
         throw handle;
     }
 
@@ -552,7 +552,7 @@ class Thread {
         let namePtr = module._malloc(name.length + 1);
         new TextEncoder().encodeInto(name, new Uint8Array(module.HEAPU8.buffer, namePtr, name.length));
         module.HEAPU8[namePtr + name.length] = 0;
-        let ptr = module._bjvm_ffi_get_class(this.ptr, namePtr);
+        let ptr = module._ffi_get_class(this.ptr, namePtr);
         if (!ptr) {
             this.throwThreadException();
         }
@@ -565,7 +565,7 @@ class Thread {
 class VM {
     ptr: number;
     handleRegistry: FinalizationRegistry<BaseHandle> = new FinalizationRegistry((handle) => {
-        module._bjvm_drop_js_handle(this.ptr, handle.handleIndex);
+        module._drop_js_handle(this.ptr, handle.handleIndex);
     });
     namedClasses: Map<number /* bjvm_classdesc* */, any> = new Map();
     cachedThread: Thread;
@@ -585,10 +585,10 @@ class VM {
         options.stderr ??= buffered();
 
         this.timeout = -1;
-        this.ptr = module._bjvm_ffi_create_vm(classpath, module.addFunction(options.stdout, 'vii'), module.addFunction(options.stderr, 'vii'));
+        this.ptr = module._ffi_create_vm(classpath, module.addFunction(options.stdout, 'viii'), module.addFunction(options.stderr, 'viii'));
         module._free(classpath);
 
-        this.scheduler = module._bjvm_ffi_create_rr_scheduler(this.ptr);
+        this.scheduler = module._ffi_create_rr_scheduler(this.ptr);
     }
 
     scheduleTimeout(waitUs: number = 0) {
@@ -599,9 +599,9 @@ class VM {
         if (this.timeout === -1) {
             this.timeout = setTimeout(() => {
                 this.timeout = -1;
-                const status = module._bjvm_ffi_rr_scheduler_step(this.scheduler);
+                const status = module._ffi_rr_scheduler_step(this.scheduler);
                 if (status !== 0) {
-                    const waitUs = module._bjvm_ffi_rr_scheduler_wait_for_us(this.scheduler);
+                    const waitUs = module._ffi_rr_scheduler_wait_for_us(this.scheduler);
                     this.scheduleTimeout(this.waitingForYield = waitUs);
                 }
                 for (let i = 0; i < this.pending.length; i++) {
@@ -615,12 +615,12 @@ class VM {
     // Low-level method scheduling apparatus
    scheduleMethod(thread: Thread, method: MethodInfo, argsPtr: number):
         { record: number, waitForResolution: Promise<boolean>, cancelResolution: () => void } {
-        let record = module._bjvm_ffi_rr_schedule(thread.ptr, method.methodPointer, argsPtr);
+        let record = module._ffi_rr_schedule(thread.ptr, method.methodPointer, argsPtr);
         let cancelled = false;
         let resolve_: Function;
 
         const waitForResolution = (async () => {
-            while (!module._bjvm_ffi_rr_record_is_ready(record)) {
+            while (!module._ffi_rr_record_is_ready(record)) {
                 if (cancelled) {
                     return false;
                 }
@@ -666,8 +666,8 @@ class VM {
     createHandle(ptr: number): BaseHandle | null {
         if (ptr === 0) return null;
 
-        let handleIndex = module._bjvm_make_js_handle(this.ptr, ptr);
-        let classdesc = module._bjvm_ffi_get_classdesc(ptr);
+        let handleIndex = module._make_js_handle(this.ptr, ptr);
+        let classdesc = module._ffi_get_classdesc(ptr);
 
         const clazz = this.getClassForDescriptor(classdesc);
         const handle = Object.create(clazz.prototype);  // do this to avoid calling the constructor
@@ -679,7 +679,7 @@ class VM {
     createThread(): Thread {
         if (this.cachedThread) return this.cachedThread;
 
-        let thread = module._bjvm_ffi_create_thread(this.ptr);
+        let thread = module._ffi_create_thread(this.ptr);
         return this.cachedThread = new Thread(this, thread);
     }
 
@@ -693,6 +693,10 @@ const runtimeFilesList = `./jdk23/lib/modules
 ./test_files/basic_multithreading/MultithreadingDemo.class
 ./test_files/n_body_problem/NBodyProblem$Body.class
 ./test_files/n_body_problem/NBodyProblem.class`.split('\n');
+
+export function appendRuntimeFiles(files: string[]) {
+    runtimeFilesList.push(...files);
+}
 
 const dbName = 'bjvm';
 
@@ -786,7 +790,7 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
             progress?.(totalLoaded, TOTAL_BYTES);
         }
         // Insert into the DB
-        await addFile(db, file, data);
+        // await addFile(db, file, data);
         return {file, data};
     });
 
@@ -796,14 +800,26 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
     // Wait for the WASM module to be done
     await factory;
 
+    let existingFolders: Set<string> = new Set();
+    let existingFiles: Set<string> = new Set();
+
     // Add to file system
     results.forEach(({file, data}) => {
         // make directories up to last /
-        for (let i = 0; i < file.length; i++) {
+        while (file[0] == '.') file = file.substring(1);
+        if (existingFiles.has(file)) {
+            return;
+        }
+        existingFiles.add(file);
+        if (!file)
+            throw new Error("Invalid file name: " + file)
+        for (let i = 1; i < file.length; i++) {
             if (file[i] === '/') {
                 const dir = file.substring(0, i);
-                if (!module.FS.analyzePath(dir).exists)
+                if (!existingFolders.has(dir)) {
                     module.FS.mkdir(dir, 0o777);
+                    existingFolders.add(dir)
+                }
             }
         }
         module.FS.writeFile(file, data);

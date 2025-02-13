@@ -396,6 +396,7 @@ typedef struct vm {
 
   bool vm_initialized;
   void *scheduler; // rr_scheduler or null
+  void *debugger;  // standard_debugger or null
 } vm;
 
 // Java Module
@@ -566,6 +567,12 @@ typedef struct vm_thread {
   void *refuel_wakeup_info;
 
   // Thread-local allocation buffer (objects are first created here)
+
+  // Whether this thread is currently being debugged, AND the debugger should be consulted after the execution of
+  // every bytecode instruction.
+  bool is_single_stepping;
+  // Whether this thread is currently paused in the debugger
+  bool paused_in_debugger;
 } vm_thread;
 
 handle *make_handle_impl(vm_thread *thread, obj_header *obj, int line_no);

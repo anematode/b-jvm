@@ -36,6 +36,7 @@
 #include "classfile.h"
 #include "util.h"
 
+#include <debugger.h>
 #include <math.h>
 #include <tgmath.h>
 
@@ -67,7 +68,7 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 1
+#define DO_TAILS 0
 #endif
 
 #define MUSTTAIL // to allow compilation without -mtail-call
@@ -476,6 +477,7 @@ typedef enum {
   CONT_RUN_NATIVE,
   CONT_MONITOR_ENTER,
   CONT_RESUME_INSN,
+  CONT_DEBUGGER_PAUSE
 } continuation_point;
 
 typedef struct {
@@ -2662,6 +2664,17 @@ static s64 dsqrt_impl_double(ARGS_DOUBLE) {
   return bytecode_tables[index & 0x3][index >> 2](thread, frame, insns, pc_, sp_, arg_1, arg_2, arg_3);
 }
 
+[[maybe_unused]] static standard_debugger* get_active_debugger(vm *vm) {
+  return vm->debugger;
+}
+
+__attribute__((noinline))
+void debugger_pause(vm_thread *thread, stack_frame *frame) {
+  continuation_frame *cont = async_stack_push(thread);
+  *cont = (continuation_frame) {.pnt = CONT_DEBUGGER_PAUSE};
+  frame->is_async_suspended = true;
+}
+
 #if DO_TAILS
 static s64 entry_impl_void(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
 #else
@@ -2683,6 +2696,18 @@ __attribute__((noinline)) static s64 entry_notco(vm_thread *thread, stack_frame 
     // printf("pc: %d, sp: %d, tos_int: %lld, tos_double: %f, tos_float: %f\n", pc_, (int)(sp_ - frame->plain.stack),
     // int_tos, double_tos, float_tos);
     bytecode_insn *insns = code + pc_;
+
+    /*
+    if (unlikely(thread->is_single_stepping)) {
+      standard_debugger *dbg = get_active_debugger(thread->vm);
+      DCHECK(dbg && "Debugger not active");
+      frame->plain.program_counter = pc_;
+      bool should_pause = dbg->callback(dbg, thread, frame);
+      if (should_pause) {
+        debugger_pause(thread, frame);
+        return 0;
+      }
+    }*/
 
     enum {
       tos_int = TOS_INT,
@@ -2804,6 +2829,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
     }
     break;
 
+  case CONT_DEBUGGER_PAUSE:
   case CONT_RESUME_INSN: {
     fut.status = FUTURE_READY;
     needs_polymorphic_jump = true;

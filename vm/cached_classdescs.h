@@ -32,6 +32,7 @@
   X(file_not_found_exception, "java/io/FileNotFoundException")                                                         \
   X(io_exception, "java/io/IOException")                                                                               \
   X(interrupted_exception, "java/lang/InterruptedException")                                                           \
+  X(class_format_error, "java/lang/ClassFormatError")                                                                  \
   X(clone_not_supported_exception, "java/lang/CloneNotSupportedException")                                             \
   X(illegal_monitor_state_exception, "java/lang/IllegalMonitorStateException")                                         \
   X(illegal_state_exception, "java/lang/IllegalStateException")

@@ -1250,6 +1250,7 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
   classdesc *class = calloc(1, sizeof(classdesc));
 
   heap_string format_error;
+
   parse_result_t error = parse_classfile(classfile_bytes, classfile_len, class, &format_error);
   if (error != PARSE_SUCCESS) {
     raise_vm_exception(thread, STR("java/lang/ClassFormatError"), hslc(format_error));
