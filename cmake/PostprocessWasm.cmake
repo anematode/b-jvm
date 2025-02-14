@@ -1,6 +1,6 @@
 function(run_emscripten_postprocess TARGET)
     if (EMSCRIPTEN)
-        target_compile_options(${TARGET} PUBLIC "-fno-inline")
+        #target_compile_options(${TARGET} PUBLIC "-fno-inline")
         target_link_options(${TARGET} PUBLIC "--profiling-funcs" "-O0")  # keep names
 
         set(POST_PROCESS_SCRIPT ${CMAKE_SOURCE_DIR}/codegen/wasm-opt.js)

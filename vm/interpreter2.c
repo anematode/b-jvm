@@ -353,6 +353,27 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                             \
   }
 
+/** Return codes for exceptions, to improve codegen */
+
+enum {
+  EXC_RETURN_CODE_NPE = MAX_INSN_KIND * 4 + TOS_VOID,
+};
+
+#if 0
+#define NPE_ON_NULL(expr) \
+  if (unlikely(!expr)) { \
+    SPILL_VOID \
+    raise_null_pointer_exception(thread); \
+    return 0; \
+  }
+#else
+// spill will be handled by the npe handler
+#define NPE_ON_NULL(expr) \
+  if (unlikely(!expr)) { \
+    return EXC_RETURN_CODE_NPE; \
+  }
+#endif
+
 /** Helper functions */
 
 static s32 java_idiv_(s32 const a, s32 const b) {
@@ -939,99 +960,63 @@ FORWARD_TO_NULLARY(putfield)
 
 static s64 getfield_B_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   s8 *field = (s8 *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((s64)*field)
 }
 
 static s64 getfield_C_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   u16 *field = (u16 *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((s64)*field)
 }
 
 static s64 getfield_S_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   s16 *field = (s16 *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((s64)*field)
 }
 
 static s64 getfield_I_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   int *field = (int *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((s64)*field)
 }
 
 static s64 getfield_J_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   s64 *field = (s64 *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT(*field)
 }
 
 static s64 getfield_F_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   float *field = (float *)((char *)tos + (size_t)insn->ic2);
   NEXT_FLOAT(*field)
 }
 
 static s64 getfield_D_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   double *field = (double *)((char *)tos + (size_t)insn->ic2);
   NEXT_DOUBLE(*field)
 }
 
 static s64 getfield_L_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   obj_header **field = (obj_header **)((char *)tos + (size_t)insn->ic2);
   NEXT_INT(*field)
 }
 
 static s64 getfield_Z_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
   s8 *field = (s8 *)((char *)tos + (size_t)insn->ic2);
   NEXT_INT((s64)*field)
 }
@@ -1039,11 +1024,7 @@ static s64 getfield_Z_impl_int(ARGS_INT) {
 static s64 putfield_B_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   s8 *field = (s8 *)((char *)obj + (size_t)insn->ic2);
   *field = (s8)tos;
   sp -= 2;
@@ -1053,11 +1034,7 @@ static s64 putfield_B_impl_int(ARGS_INT) {
 static s64 putfield_C_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   u16 *field = (u16 *)((char *)obj + (size_t)insn->ic2);
   *field = (u16)tos;
   sp -= 2;
@@ -1067,11 +1044,7 @@ static s64 putfield_C_impl_int(ARGS_INT) {
 static s64 putfield_S_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   s16 *field = (s16 *)((char *)obj + (size_t)insn->ic2);
   *field = (s16)tos;
   sp -= 2;
@@ -1081,11 +1054,7 @@ static s64 putfield_S_impl_int(ARGS_INT) {
 static s64 putfield_I_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   int *field = (int *)((char *)obj + (size_t)insn->ic2);
   *field = (int)tos;
   sp -= 2;
@@ -1095,11 +1064,7 @@ static s64 putfield_I_impl_int(ARGS_INT) {
 static s64 putfield_J_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   s64 *field = (s64 *)((char *)obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
@@ -1109,11 +1074,7 @@ static s64 putfield_J_impl_int(ARGS_INT) {
 static s64 putfield_L_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   obj_header **field = (obj_header **)((char *)obj + (size_t)insn->ic2);
   *field = (obj_header *)tos;
   sp -= 2;
@@ -1123,11 +1084,7 @@ static s64 putfield_L_impl_int(ARGS_INT) {
 static s64 putfield_Z_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   s8 *field = (s8 *)((char *)obj + (size_t)insn->ic2);
   *field = (s8)tos;
   sp -= 2;
@@ -1137,11 +1094,7 @@ static s64 putfield_Z_impl_int(ARGS_INT) {
 static s64 putfield_F_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   float *field = (float *)((char *)obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
@@ -1151,11 +1104,7 @@ static s64 putfield_F_impl_float(ARGS_FLOAT) {
 static s64 putfield_D_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   obj_header *obj = (sp - 2)->obj;
-  if (unlikely(!obj)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(obj);
   double *field = (double *)((char *)obj + (size_t)insn->ic2);
   *field = tos;
   sp -= 2;
@@ -1325,11 +1274,7 @@ static s64 lrem_impl_int(ARGS_INT) {
 static s64 arraylength_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *array = (obj_header *)tos;
-  if (unlikely(!array)) {
-    SPILL(tos);
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(array);
   NEXT_INT(*ArrayLength(array))
 }
 
@@ -1338,14 +1283,10 @@ static s64 arraylength_impl_int(ARGS_INT) {
     DEBUG_CHECK();                                                                                                     \
     obj_header *array = (obj_header *)(sp - 2)->obj;                                                                   \
     int index = (int)tos;                                                                                              \
-    if (unlikely(!array)) {                                                                                            \
-      SPILL(tos);                                                                                                      \
-      raise_null_pointer_exception(thread);                                                                            \
-      return 0;                                                                                                        \
-    }                                                                                                                  \
+    NPE_ON_NULL(array);                                                                                                \
     int length = *ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
-      SPILL(tos);                                                                                                      \
+      SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
       return 0;                                                                                                        \
     }                                                                                                                  \
@@ -1368,14 +1309,10 @@ ARRAY_LOAD(caload, CharArrayLoad, s64, NEXT_INT)
     DEBUG_CHECK();                                                                                                     \
     obj_header *array = (obj_header *)(sp - 3)->obj;                                                                   \
     int index = (int)(sp - 2)->i;                                                                                      \
-    if (unlikely(!array)) {                                                                                            \
-      SPILL(tos);                                                                                                      \
-      raise_null_pointer_exception(thread);                                                                            \
-      return 0;                                                                                                        \
-    }                                                                                                                  \
+    NPE_ON_NULL(array);                                                                                                            \
     int length = *ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
-      SPILL(tos);                                                                                                      \
+      SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
       return 0;                                                                                                        \
     }                                                                                                                  \
@@ -1399,11 +1336,7 @@ static s64 aastore_impl_int(ARGS_INT) {
   obj_header *array = (obj_header *)(sp - 3)->obj;
   obj_header *value = (obj_header *)tos;
   int index = (int)(sp - 2)->i;
-  if (unlikely(!array)) {
-    SPILL(tos);
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(array);
   int length = *ArrayLength(array);
   if (unlikely(index < 0 || index >= length)) {
     SPILL(tos);
@@ -1618,11 +1551,7 @@ void push_async_monitor_enter(vm_thread *thread, stack_frame *frame, monitor_acq
 
 static s64 monitorenter_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL(tos);
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
 
   do {
     monitor_acquire_t ctx = {.args = {thread, (obj_header *)tos}};
@@ -1642,11 +1571,7 @@ static s64 monitorenter_impl_int(ARGS_INT) {
 
 static s64 monitorexit_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  if (unlikely(!tos)) {
-    SPILL_VOID
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(tos);
 
   obj_header *obj = (obj_header *)tos;
   int result = monitor_release(thread, obj);
@@ -1984,10 +1909,7 @@ force_inline static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
-  if (target == nullptr) {
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(target);
   cp_method *target_method = insn->ic;
   stack_frame *invoked_frame = push_frame(thread, target_method, sp - insn->args, insn->args);
   if (!invoked_frame)
@@ -2063,10 +1985,7 @@ force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
-  if (target == nullptr) {
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(target);
   if (unlikely(target->descriptor != insn->ic2)) {
     if (insn->kind == insn_invokevtable_monomorphic)
       make_invokevtable_polymorphic_(insn);
@@ -2097,10 +2016,7 @@ force_inline static s64 invokesigpoly_impl_void(ARGS_VOID) {
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
-  if (target == nullptr) {
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(target);
 
   invokevirtual_signature_polymorphic_t ctx = {
       .args = {
@@ -2128,10 +2044,7 @@ static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
-  if (target == nullptr) {
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(target);
   cp_method *target_method = itable_lookup(target->descriptor, insn->ic, (size_t)insn->ic2);
   if (unlikely(!target_method)) {
     raise_abstract_method_error(thread, insn->cp->methodref.resolved);
@@ -2161,10 +2074,7 @@ static s64 invokevtable_polymorphic_impl_void(ARGS_VOID) {
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
-  if (target == nullptr) {
-    raise_null_pointer_exception(thread);
-    return 0;
-  }
+  NPE_ON_NULL(target);
   cp_method *target_method = vtable_lookup(target->descriptor, (size_t)insn->ic2);
   DCHECK(target_method);
   stack_frame *invoked_frame = push_frame(thread, target_method, sp - insn->args, insn->args);
@@ -2693,10 +2603,6 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
   float float_tos = (sp_ - 1)->f;
 
   while (true) {
-    // printf("pc: %d, sp: %d, tos_int: %lld, tos_double: %f, tos_float: %f\n", pc_, (int)(sp_ - frame->plain.stack),
-    // int_tos, double_tos, float_tos);
-    bytecode_insn *insns = code + pc_;
-
     if (check_stepping && unlikely(thread->is_single_stepping)) {
       standard_debugger *dbg = get_active_debugger(thread->vm);
       DCHECK(dbg && "Debugger not active");
@@ -2719,7 +2625,9 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 
 #define INL(insn__, tos__)                                                                                             \
   case 4 * insn_##insn__ + tos_##tos__:                                                                                \
-    handler_i = insn__##_impl_##tos__(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);            \
+    handler_i = insn__##_impl_##tos__(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);       \
+    if (handler_i == EXC_RETURN_CODE_NPE) /* hope that jump threading will optimize this out */ \
+      goto npe; \
     break;
 
 #include "interpreter2-notco.inc"
@@ -2728,23 +2636,26 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
     case 4 * insn_return + TOS_DOUBLE:
     case 4 * insn_return + TOS_FLOAT:
     case 4 * insn_return + TOS_VOID:
-      return return_impl_void(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return return_impl_void(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
 
     case 4 * insn_areturn + TOS_INT:
-      return areturn_impl_int(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return areturn_impl_int(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
     case 4 * insn_dreturn + TOS_DOUBLE:
-      return dreturn_impl_double(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return dreturn_impl_double(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
     case 4 * insn_freturn + TOS_FLOAT:
-      return freturn_impl_float(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return freturn_impl_float(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
     case 4 * insn_ireturn + TOS_INT:
-      return ireturn_impl_int(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return ireturn_impl_int(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
     case 4 * insn_lreturn + TOS_INT:
-      return lreturn_impl_int(thread, frame, insns, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
+      return lreturn_impl_int(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);
 
     case 0: // special value in case of exception or suspend (theoretically also nop_impl_void, but javac doesn't use
             // that)
       DCHECK(thread->current_exception || frame->is_async_suspended);
       return 0;
+    case EXC_RETURN_CODE_NPE: {
+      goto npe;
+    }
     default: {
       // outlined case
       spill.temp_pc = pc_;
@@ -2771,6 +2682,13 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
       break;
     }
     }
+  }
+
+  if (0) {
+    npe:
+    frame->plain.program_counter = pc_;
+    raise_null_pointer_exception(thread);
+    return 0;
   }
 }
 
