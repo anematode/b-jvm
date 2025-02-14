@@ -68,7 +68,7 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 0
+#define DO_TAILS 1
 #endif
 
 #define MUSTTAIL // to allow compilation without -mtail-call
@@ -2678,8 +2678,8 @@ void debugger_pause(vm_thread *thread, stack_frame *frame) {
 #if DO_TAILS
 static s64 entry_impl_void(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
 #else
-__attribute__((noinline)) static s64 entry_notco(vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_,
-                                                 stack_value *sp_, unsigned handler_i) {
+force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_,
+                                                 stack_value *sp_, unsigned handler_i, bool check_stepping) {
   struct {
     stack_value *temp_sp_;
     int64_t temp_int_tos;
@@ -2697,8 +2697,7 @@ __attribute__((noinline)) static s64 entry_notco(vm_thread *thread, stack_frame 
     // int_tos, double_tos, float_tos);
     bytecode_insn *insns = code + pc_;
 
-    /*
-    if (unlikely(thread->is_single_stepping)) {
+    if (check_stepping && unlikely(thread->is_single_stepping)) {
       standard_debugger *dbg = get_active_debugger(thread->vm);
       DCHECK(dbg && "Debugger not active");
       frame->plain.program_counter = pc_;
@@ -2707,7 +2706,7 @@ __attribute__((noinline)) static s64 entry_notco(vm_thread *thread, stack_frame 
         debugger_pause(thread, frame);
         return 0;
       }
-    }*/
+    }
 
     enum {
       tos_int = TOS_INT,
@@ -2773,6 +2772,16 @@ __attribute__((noinline)) static s64 entry_notco(vm_thread *thread, stack_frame 
     }
     }
   }
+}
+
+[[maybe_unused]] __attribute__((noinline)) static s64 entry_notco_no_stepping(
+  vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_, stack_value *sp_, unsigned handler_i) {
+  return entry_notco_impl(thread, frame, code, pc_, sp_, handler_i, false);
+}
+
+[[maybe_unused]] __attribute__((noinline)) static s64 entry_notco_with_stepping(
+  vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_, stack_value *sp_, unsigned handler_i) {
+  return entry_notco_impl(thread, frame, code, pc_, sp_, handler_i, true);
 }
 #endif
 
@@ -2937,7 +2946,11 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
 #else
     if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
       // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
-      result.l = entry_notco(thread, frame_, insns, pc_, sp_, handler_i);
+      if (thread->is_single_stepping) {
+        result.l = entry_notco_with_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+      } else {
+        result.l = entry_notco_no_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+      }
     }
 #endif
 
