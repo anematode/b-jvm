@@ -258,8 +258,8 @@ typedef enum : u8 {
   insn_putstatic_Z,
   insn_putstatic_L,
 
-  /** intrinsics */
-  insn_dsqrt
+  /** intrinsics understood by the interpreter */
+  insn_sqrt
 } insn_code_kind;
 
 typedef enum : u8 {

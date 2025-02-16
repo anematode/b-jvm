@@ -66,9 +66,7 @@ bool check_casts(vm_thread *thread, cp_method *method, stack_value *args) {
 
     classdesc *class;
     if (arg) {
-      INIT_STACK_STRING(str, 1000);
-      str = unparse_field_descriptor(str, arg);
-      class = load_class_of_field_descriptor(thread, str);
+      class = load_class_of_field_descriptor(thread, arg->unparsed);
     } else {
       class = method->my_class;
     }

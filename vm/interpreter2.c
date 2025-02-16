@@ -271,7 +271,7 @@ double *arg_3;
 // The current instruction
 #define insn (&insns[0])
 
-#define MAX_INSN_KIND (insn_dsqrt + 1)
+#define MAX_INSN_KIND (insn_sqrt + 1)
 
 typedef s64 (*bytecode_handler_t)(ARGS_VOID);
 
@@ -1675,8 +1675,8 @@ static s64 multianewarray_impl_int(ARGS_INT) {
 static int intrinsify(bytecode_insn *inst) {
   cp_method *method = inst->ic;
   if (utf8_equals(hslc(method->my_class->name), "java/lang/Math")) {
-    if (utf8_equals(method->name, "sqrt") && utf8_equals(method->unparsed_descriptor, "(D)D")) {
-      inst->kind = insn_dsqrt;
+    if (utf8_equals(method->name, "sqrt")) {
+      inst->kind = insn_sqrt;
       return 1;
     }
   }
@@ -1712,14 +1712,11 @@ __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokestatic)
 
-#ifdef EMSCRIPTEN
-__attribute__((noinline))
-#endif
 static u8
 attempt_invoke(vm_thread *thread, stack_frame *invoked_frame, stack_frame *outer_frame, u8 argc, bool returns,
                stack_value *result) {
   future_t fut;
-  stack_value result_ = interpret_2(&fut, thread, invoked_frame);
+  *result = interpret_2(&fut, thread, invoked_frame);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
     DCHECK(invoked_frame->is_async_suspended);
     continuation_frame *cont = async_stack_push(thread);
@@ -1729,7 +1726,6 @@ attempt_invoke(vm_thread *thread, stack_frame *invoked_frame, stack_frame *outer
     outer_frame->is_async_suspended = true;
     return 1;
   }
-  *result = result_;
 
   return 0;
 }
@@ -2551,9 +2547,14 @@ static s64 instanceof_resolved_impl_int(ARGS_INT) {
   NEXT_INT(result)
 }
 
-static s64 dsqrt_impl_double(ARGS_DOUBLE) {
+static s64 sqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   NEXT_DOUBLE(sqrt(tos))
+}
+
+static s64 sqrt_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_FLOAT(sqrt(tos))
 }
 
 [[maybe_unused]] static s64 notco_fallback(ARGS_VOID, int index) {
@@ -3044,7 +3045,7 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_double,
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
-    [insn_dsqrt] = dsqrt_impl_double};
+    [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_nop] = nop_impl_int,
@@ -3276,4 +3277,5 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_D] = getstatic_D_impl_float,
     [insn_getstatic_Z] = getstatic_Z_impl_float,
     [insn_getstatic_L] = getstatic_L_impl_float,
-    [insn_putstatic_F] = putstatic_F_impl_float};
+    [insn_putstatic_F] = putstatic_F_impl_float,
+    [insn_sqrt] = sqrt_impl_float};

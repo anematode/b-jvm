@@ -1,3 +1,7 @@
+!build/bjvm_main.d.ts
+!build/bjvm_main.js
+!build/bjvm_main.wasm
+
 build
 cmake-build-*
 test/jre8

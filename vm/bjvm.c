@@ -731,8 +731,8 @@ thread_options default_thread_options() {
   return options;
 }
 
-/// Invokes a Java method.  Sets thread->current_exception if an exception is
-/// thrown and causes UB if
+/// Invokes a Java method.  Sets thread->current_exception if an exception is thrown and aborts if the method tries
+/// to suspend.
 stack_value call_interpreter_synchronous(vm_thread *thread, cp_method *method, stack_value *args) {
   if (args == nullptr) {
     args = (stack_value[]){};
