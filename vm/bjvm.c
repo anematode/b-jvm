@@ -168,14 +168,16 @@ void drop_js_handle(vm *vm, int index) {
   return count;
 }
 
-handle *make_handle_impl(vm_thread *thread, obj_header *obj, int line_no) {
+handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file_name, int line_no) {
   if (!obj)
     return &thread->null_handle;
   for (int i = 0; i < thread->handles_capacity; ++i) {
-    if (!thread->handles[i].obj) {
-      thread->handles[i].obj = obj;
+    handle *h = &thread->handles[i];
+    if (!h->obj) {
+      h->obj = obj;
 #ifndef NDEBUG
-      thread->handles[i].line = line_no;
+      h->line = line_no;
+      h->filename = file_name;
 #endif
       return thread->handles + i;
     }

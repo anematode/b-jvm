@@ -2,8 +2,8 @@
 // Created by Cowpox on 12/10/24.
 //
 
-#ifndef H
-#define H
+#ifndef BJVM_H
+#define BJVM_H
 
 #include <async.h>
 #include <types.h>
@@ -64,6 +64,7 @@ typedef struct {
   obj_header *obj;
 #ifndef NDEBUG
   int line;
+  const char *filename;
 #endif
 } handle;
 
@@ -575,8 +576,9 @@ typedef struct vm_thread {
   bool paused_in_debugger;
 } vm_thread;
 
-handle *make_handle_impl(vm_thread *thread, obj_header *obj, int line_no);
-#define make_handle(thread, obj) make_handle_impl(thread, obj, __LINE__)
+handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char* file, int line_no);
+// Create a handle to the given object. Should always be paired with drop_handle.
+#define make_handle(thread, obj) make_handle_impl(thread, obj, __FILE__, __LINE__)
 
 void drop_handle(vm_thread *thread, handle *handle);
 bool is_builtin_class(slice chars);
@@ -701,4 +703,4 @@ void *bump_allocate(vm_thread *thread, size_t bytes);
 }
 #endif
 
-#endif // H
+#endif // BJVM_H
