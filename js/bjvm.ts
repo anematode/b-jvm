@@ -15,10 +15,8 @@ async function loaded() {
     });
 }
 
-const factory = MainModuleFactory();
-factory.then((instantiated) => {
-    module = instantiated;
-});
+let wasmFile: string | null = null;
+let factory: Promise<MainModule>;
 
 interface VMOptions {
     classpath: string;
@@ -751,6 +749,20 @@ function getFile(db: IDBDatabase, name: string): Promise<{ name: string; data: U
 }
 
 const TOTAL_BYTES = 0;
+
+export function setWasmLocation(location: string) {
+    wasmFile = location;
+    factory = MainModuleFactory({
+        locateFile: (path: string) => {
+            if (path.endsWith(".wasm")) {
+                return wasmFile;
+            }
+            return path;
+        }
+    }).then((m) => {
+        module = m;
+    });
+}
 
 async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, total: number) => void) {
     let totalLoaded = 0;

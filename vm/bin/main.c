@@ -2,6 +2,7 @@
 // Created by Cowpox on 12/10/24.
 //
 
+#include "arrays.h"
 #include "exceptions.h"
 #include "reflection.h"
 
@@ -139,6 +140,39 @@ EMSCRIPTEN_KEEPALIVE
 object ffi_allocate_object(vm_thread *thr, cp_method *method) {
   classdesc *clazz = method->my_class;
   return AllocateObject(thr, clazz, clazz->instance_bytes);
+}
+
+EMSCRIPTEN_KEEPALIVE
+object ffi_create_string(vm_thread *thread, const char *str, size_t len) {
+  return MakeJStringFromModifiedUTF8(thread, (slice) { .chars = (char*)str, .len = len }, false);
+}
+
+EMSCRIPTEN_KEEPALIVE
+uint8_t *ffi_get_string_data(object str) {
+  assert(str);
+  assert(utf8_equals(str->descriptor->name, "java/lang/String"));
+  object array = ((struct native_String *)str)->value;
+  return ArrayData(array);
+}
+
+EMSCRIPTEN_KEEPALIVE
+size_t ffi_get_string_len(object str) {
+  assert(str);
+  assert(utf8_equals(str->descriptor->name, "java/lang/String"));
+  object array = ((struct native_String *)str)->value;
+  return *ArrayLength(array);
+}
+
+EMSCRIPTEN_KEEPALIVE
+u8 ffi_get_string_coder(object str) {
+  assert(str);
+  assert(utf8_equals(str->descriptor->name, "java/lang/String"));
+  return ((struct native_String *)str)->coder;
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool ffi_instanceof(object obj, classdesc *target) {
+  return !obj || instanceof(obj->descriptor, target);
 }
 
 EMSCRIPTEN_KEEPALIVE
