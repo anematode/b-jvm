@@ -16,7 +16,7 @@ async function loaded() {
 }
 
 let wasmFile: string | null = null;
-let factory: Promise<MainModule>;
+let factory: Promise<void>;
 
 interface VMOptions {
     classpath: string;
@@ -589,6 +589,8 @@ class VM {
         this.scheduler = module._ffi_create_rr_scheduler(this.ptr);
     }
 
+    static module: MainModule;
+
     scheduleTimeout(waitUs: number = 0) {
         if (this.waitingForYield > waitUs && this.timeout !== -1) {
             clearTimeout(this.timeout);
@@ -761,6 +763,7 @@ export function setWasmLocation(location: string) {
         }
     }).then((m) => {
         module = m;
+        VM.module = m;
     });
 }
 
