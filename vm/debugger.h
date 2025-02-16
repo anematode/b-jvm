@@ -24,13 +24,16 @@ typedef bool (*bkpt_callback)(standard_debugger *debugger, vm_thread *thread, st
 typedef struct standard_debugger {
   vm *vm;
   debugger_bkpt *bkpts;
-  bkpt_callback callback;
+  bkpt_callback should_pause;
 } standard_debugger;
+
+// Get a list of potential breakpoints corresponding to the given file name and line number.
+debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line) ;
 
 int create_and_attach_debugger(vm *vm, standard_debugger **debugger);
 int debugger_add_breakpoint(standard_debugger *debugger, cp_method *method, int pc);
 int debugger_remove_breakpoint(standard_debugger *debugger, cp_method *method, int pc);
-// If the given thread is currently paused under the debugger, resume it.
+// If the given thread is currently paused under the debugger, resume it. nop if the thread is not paused.
 void debugger_resume(standard_debugger *debugger, vm_thread *thread);
 void free_debugger(standard_debugger *debugger);
 

@@ -4,7 +4,6 @@
 #include <bjvm.h>
 #include <util.h>
 
-slice unparse_field_descriptor(slice str, const field_descriptor *desc);
 void reflect_initialize_field(vm_thread *thread, classdesc *classdesc, cp_field *field);
 void reflect_initialize_constructor(vm_thread *thread, classdesc *classdesc, cp_method *method);
 void reflect_initialize_method(vm_thread *thread, classdesc *classdesc, cp_method *method);

@@ -930,9 +930,7 @@ void free_thread(vm_thread *thread) {
 int resolve_class(vm_thread *thread, cp_class_info *info);
 
 classdesc *load_class_of_field(vm_thread *thread, const field_descriptor *field) {
-  INIT_STACK_STRING(name, 1000);
-  name = unparse_field_descriptor(name, field);
-  classdesc *result = load_class_of_field_descriptor(thread, name);
+  classdesc *result = load_class_of_field_descriptor(thread, field->unparsed);
   return result;
 }
 
@@ -945,18 +943,14 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
   handle *ptypes = make_handle(thread, CreateObjectArray1D(thread, Class, method->args_count));
 
   for (int i = 0; i < method->args_count; ++i) {
-    INIT_STACK_STRING(name, 1000);
-    name = unparse_field_descriptor(name, method->args + i);
-    classdesc *arg_desc = load_class_of_field_descriptor(thread, name);
+    classdesc *arg_desc = load_class_of_field_descriptor(thread, method->args[i].unparsed);
 
     if (!arg_desc)
       return nullptr;
     *((struct native_Class **)ArrayData(ptypes->obj) + i) = get_class_mirror(thread, arg_desc);
   }
 
-  INIT_STACK_STRING(return_name, 1000);
-  return_name = unparse_field_descriptor(return_name, &method->return_type);
-  classdesc *ret_desc = load_class_of_field_descriptor(thread, return_name);
+  classdesc *ret_desc = load_class_of_field_descriptor(thread, method->return_type.unparsed);
   if (!ret_desc)
     return nullptr;
   struct native_Class *rtype = get_class_mirror(thread, ret_desc);

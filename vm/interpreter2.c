@@ -353,26 +353,12 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                             \
   }
 
-/** Return codes for exceptions, to improve codegen */
-
-enum {
-  EXC_RETURN_CODE_NPE = MAX_INSN_KIND * 4 + TOS_VOID,
-};
-
-#if 0
 #define NPE_ON_NULL(expr) \
   if (unlikely(!expr)) { \
     SPILL_VOID \
     raise_null_pointer_exception(thread); \
     return 0; \
   }
-#else
-// spill will be handled by the npe handler
-#define NPE_ON_NULL(expr) \
-  if (unlikely(!expr)) { \
-    return EXC_RETURN_CODE_NPE; \
-  }
-#endif
 
 /** Helper functions */
 
@@ -1709,7 +1695,7 @@ DEFINE_ASYNC(resolve_invokestatic) {
   self->args.insn_->args = info->descriptor->args_count;
 
   ASYNC_END(0);
-};
+}
 
 __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
@@ -2607,7 +2593,7 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
       standard_debugger *dbg = get_active_debugger(thread->vm);
       DCHECK(dbg && "Debugger not active");
       frame->plain.program_counter = pc_;
-      bool should_pause = dbg->callback(dbg, thread, frame);
+      bool should_pause = dbg->should_pause(dbg, thread, frame);
       if (should_pause) {
         debugger_pause(thread, frame);
         return 0;
@@ -2626,8 +2612,6 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 #define INL(insn__, tos__)                                                                                             \
   case 4 * insn_##insn__ + tos_##tos__:                                                                                \
     handler_i = insn__##_impl_##tos__(thread, frame, code + pc_, &pc_, &sp_, &int_tos, &float_tos, &double_tos);       \
-    if (handler_i == EXC_RETURN_CODE_NPE) /* hope that jump threading will optimize this out */ \
-      goto npe; \
     break;
 
 #include "interpreter2-notco.inc"
@@ -2653,9 +2637,6 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
             // that)
       DCHECK(thread->current_exception || frame->is_async_suspended);
       return 0;
-    case EXC_RETURN_CODE_NPE: {
-      goto npe;
-    }
     default: {
       // outlined case
       spill.temp_pc = pc_;
@@ -2682,13 +2663,6 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
       break;
     }
     }
-  }
-
-  if (0) {
-    npe:
-    frame->plain.program_counter = pc_;
-    raise_null_pointer_exception(thread);
-    return 0;
   }
 }
 

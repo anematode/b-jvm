@@ -189,9 +189,12 @@ hash_table_iterator hash_table_get_iterator(string_hash_table *tbl) {
 
 bool hash_table_iterator_has_next(hash_table_iterator iter, char **key, size_t *key_len, void **value) {
   if (iter.current != iter.end) {
-    *key = iter.current->key;
-    *key_len = iter.current->key_len;
-    *value = iter.current->data;
+    if (key)
+      *key = iter.current->key;
+    if (key_len)
+      *key_len = iter.current->key_len;
+    if (value)
+      *value = iter.current->data;
     return true;
   }
   return false;

@@ -1640,6 +1640,7 @@ cp_field read_field(cf_byteslice *reader, classfile_parse_ctx *ctx) {
  * if there was an error.
  */
 char *parse_field_descriptor(const char **chars, size_t len, field_descriptor *result, arena *arena) {
+  const char *field_start = *chars;
   const char *end = *chars + len;
   int dimensions = 0;
   while (*chars < end) {
@@ -1658,6 +1659,7 @@ char *parse_field_descriptor(const char **chars, size_t len, field_descriptor *r
     case 'Z':
     case 'V':
       result->base_kind = (type_kind)c;
+      result->unparsed = arena_make_str(arena, field_start, *chars - field_start);
       if (c == 'V' && dimensions > 0)
         return strdup("void cannot have dimensions");
       return nullptr;
@@ -1665,18 +1667,21 @@ char *parse_field_descriptor(const char **chars, size_t len, field_descriptor *r
       ++dimensions;
       break;
     case 'L': {
-      const char *start = *chars;
+      const char *class_start = *chars;
       while (*chars < end && **chars != ';')
         ++*chars;
       if (*chars == end)
         return strdup("missing ';' in reference type");
-      int class_name_len = *chars - start;
+      int class_name_len = *chars - class_start;
       if (class_name_len == 0) {
         return strdup("missing reference type name");
       }
       ++*chars;
       result->base_kind = TYPE_KIND_REFERENCE;
-      result->class_name = arena_make_str(arena, start, class_name_len);
+      result->unparsed = arena_make_str(arena, field_start, *chars - field_start);
+      DCHECK(class_start > field_start);
+      DCHECK(*chars > field_start + 1);
+      result->class_name = subslice_to(result->unparsed, class_start - field_start, *chars - field_start - 1);
       return nullptr;
     }
     default: {

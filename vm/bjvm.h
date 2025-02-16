@@ -579,6 +579,7 @@ handle *make_handle_impl(vm_thread *thread, obj_header *obj, int line_no);
 #define make_handle(thread, obj) make_handle_impl(thread, obj, __LINE__)
 
 void drop_handle(vm_thread *thread, handle *handle);
+bool is_builtin_class(slice chars);
 
 /**
  * Create an uninitialized frame with space sufficient for the given method.
@@ -646,8 +647,8 @@ cp_method **unmirror_ctor(obj_header *mirror);
 void set_field(obj_header *obj, cp_field *field, stack_value stack_value);
 int resolve_field(vm_thread *thread, cp_field_info *info);
 stack_value get_field(obj_header *obj, cp_field *field);
-cp_field *field_lookup(classdesc *classdesc, slice const name, slice const descriptor);
-cp_field *field_lookup(classdesc *classdesc, const slice name, const slice descriptor);
+// Look up a (possibly inherited) field on the class.
+cp_field *field_lookup(classdesc *classdesc, slice name, slice descriptor);
 int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_data *multianewarray, u16 *sd);
 void dump_frame(FILE *stream, const stack_frame *frame);
 

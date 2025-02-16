@@ -7,23 +7,6 @@
 #include <cached_classdescs.h>
 #include <reflection.h>
 
-slice unparse_field_descriptor(slice str, const field_descriptor *desc) {
-  slice write = str;
-  // Print '[' repeatedly
-  int dims = desc->dimensions;
-  while (dims--) {
-    write.chars[0] = '[';
-    write = subslice(write, 1);
-  }
-  if (desc->base_kind == TYPE_KIND_REFERENCE) {
-    write = subslice(write, bprintf(write, "L%.*s;", fmt_slice(desc->class_name)).len);
-  } else {
-    write = subslice(write, bprintf(write, "%c", desc->base_kind).len);
-  }
-  str.len = write.chars - str.chars;
-  return str;
-}
-
 void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field) {
   classdesc *reflect_Field = thread->vm->cached_classdescs->field;
   handle *field_mirror = make_handle(thread, new_object(thread, reflect_Field));
@@ -68,8 +51,7 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   C->parameterTypes = CreateObjectArray1D(thread, thread->vm->cached_classdescs->klass, method->descriptor->args_count);
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
-    INIT_STACK_STRING(desc, 1000);
-    desc = unparse_field_descriptor(desc, &method->descriptor->args[i]);
+    slice desc = method->descriptor->args[i].unparsed;
     struct native_Class *type = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
     ((struct native_Class **)ArrayData(C->parameterTypes))[i] = type;
   }
@@ -120,14 +102,13 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
 
   M->parameterTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
                                           method->descriptor->args_count);
-  INIT_STACK_STRING(str, 1000);
   for (int i = 0; i < method->descriptor->args_count; ++i) {
-    slice desc = unparse_field_descriptor(str, &method->descriptor->args[i]);
+    slice desc = method->descriptor->args[i].unparsed;
     ((void **)ArrayData(M->parameterTypes))[i] =
         (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
   }
 
-  slice ret_desc = unparse_field_descriptor(str, &method->descriptor->return_type);
+  slice ret_desc = method->descriptor->return_type.unparsed;
   M->returnType = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, ret_desc));
   M->exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
   // TODO parse these ^^

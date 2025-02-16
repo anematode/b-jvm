@@ -322,6 +322,7 @@ struct field_descriptor {
   // Can be nonzero for any kind
   int dimensions;
   slice class_name; // For reference and array types only
+  slice unparsed;
 };
 
 typedef struct cp_field cp_field;
