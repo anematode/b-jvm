@@ -500,6 +500,7 @@ class Thread {
                 setJavaType(this.vm, argsPtr + j * 8, parsed.parameterTypes[i], args[j]);
             }
             const scheduled = this.vm.scheduleMethod(this, method, argsPtr);
+            executionRecord = scheduled.record;
             const readResult = () => {
                 if (parsed.returnType.kind !== 'V') {
                     const resultPtr = module._ffi_get_execution_record_result_pointer(executionRecord);

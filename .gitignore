@@ -7,3 +7,4 @@ cmake-build-*
 test/jre8
 website
 test/jdk23-exploded
+test/tmp
