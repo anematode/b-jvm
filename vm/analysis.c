@@ -226,7 +226,7 @@ const char *insn_code_name(insn_code_kind code) {
     CASE(putstatic_L)
     CASE(putstatic_Z)
     CASE(invokesigpoly)
-    CASE(dsqrt)
+    CASE(sqrt)
   }
   printf("Unknown code: %d\n", code);
   UNREACHABLE();
