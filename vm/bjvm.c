@@ -2342,14 +2342,14 @@ obj_header *get_main_thread_group(vm_thread *thread) {
   return vm->main_thread_group;
 }
 
-#ifdef EMSCRIPTEN
+#if defined(EMSCRIPTEN)
 EMSCRIPTEN_KEEPALIVE
 __attribute__((constructor)) static void nodejs_bootloader() {
   MAIN_THREAD_EM_ASM_INT({
     if (ENVIRONMENT_IS_NODE) {
       if (!FS.initialized)
         FS.init();
-      const fs = require('fs');
+      const fs = require('f' + String.fromCharCode(115));
       const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]);
 
       // Read each of these from disk and put them in the filesystem

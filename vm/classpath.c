@@ -40,14 +40,14 @@ struct loaded_bytes node_read_file(const char *filename) {
   struct loaded_bytes result = {0};
   bool exists = EM_ASM_INT(
       {
-        const fs = require('fs');
+        const fs = require('f' + String.fromCharCode(115));
         return fs.existsSync(UTF8ToString($0));
       },
       filename);
   if (exists) {
     result.bytes = EM_ASM_PTR(
         {
-          const fs = require('fs');
+          const fs = require('f' + String.fromCharCode(115));
           const buffer = fs.readFileSync(UTF8ToString($0));
           const length = buffer.length;
 
@@ -81,8 +81,8 @@ static char *map_jar(const char *filename, mapped_jar *jar) {
   jar->is_mmap = true;
   close(fd);
   return nullptr;
-#elif EMSCRIPTEN
-  int is_node = EM_ASM_INT({ return typeof window == 'undefined'; });
+#elif defined(EMSCRIPTEN)
+  int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
   if (is_node) {
     struct loaded_bytes load = node_read_file(filename);
     if (!load.bytes)

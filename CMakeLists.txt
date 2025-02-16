@@ -52,5 +52,5 @@ if (EMSCRIPTEN)
     run_emscripten_postprocess(bjvm_main)
 
     target_link_libraries(bjvm_main PRIVATE bjvm_static)
-    target_link_options(bjvm_main PUBLIC -s ENVIRONMENT=web -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
+    target_link_options(bjvm_main PUBLIC -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
 endif ()
