@@ -156,6 +156,11 @@ interface WasmModule {
   _ffi_free_execution_record(_0: number): void;
   _ffi_async_run(_0: number, _1: number, _2: number): number;
   _ffi_allocate_object(_0: number, _1: number): number;
+  _ffi_create_string(_0: number, _1: number, _2: number): number;
+  _ffi_get_string_data(_0: number): number;
+  _ffi_get_string_len(_0: number): number;
+  _ffi_get_string_coder(_0: number): number;
+  _ffi_instanceof(_0: number, _1: number): number;
   _ffi_run_step(_0: number, _1: number): number;
   _ffi_free_async_run_ctx(_0: number): void;
   _free(_0: number): void;
