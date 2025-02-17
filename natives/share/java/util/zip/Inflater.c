@@ -61,12 +61,12 @@ DECLARE_NATIVE("java/util/zip", Inflater, reset, "(J)V") {
   inflateReset(stream);
   return value_null();
 }
+
 DECLARE_NATIVE("java/util/zip", Inflater, end, "(J)V") {
   z_stream *stream = (z_stream *)args[0].l;
   inflateEnd(stream);
   return value_null();
 }
-
 
 DECLARE_NATIVE("java/util/zip", CRC32, updateBytes0, "(I[BII)I") {
   // int crc, byte[] b, int off, int len
