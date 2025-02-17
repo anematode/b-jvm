@@ -725,3 +725,10 @@ new
 TEST_CASE("Random UUID") {
   auto result = run_test_case("test_files/random_uuid/", false, "Main");
 }
+
+TEST_CASE("New instance") {
+  auto result = run_test_case("test_files/new_instance/", true, "Main");
+  REQUIRE(result.stdout_ == R"(Test 3.14
+Test
+)");
+}

@@ -129,7 +129,7 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
     return SCHEDULER_RESULT_DONE;
 
   vm_thread *thread = info->thread;
-  const int MICROSECONDS_TO_RUN = 30000;
+  const int MICROSECONDS_TO_RUN = 1 << 30;
 
   thread->fuel = 50000;
 
