@@ -1715,11 +1715,16 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
                            info->vm_object); // already failed
     return -1;
   }
-  // Oh boy
-  stack_frame *frame = arrlen(thread->frames) ? thread->frames[arrlen(thread->frames) - 1] : nullptr;
+
+  // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
+  // with reflection n' shit)
   object loader = nullptr;
-  if (frame) {
-    loader = frame->method->my_class->classloader;
+  for (int i = arrlen(thread->frames) - 1; i >= 0; --i) {
+    void *candidate = thread->frames[i]->method->my_class->classloader;
+    if (candidate) {
+      loader = candidate;
+      break;
+    }
   }
 
   if (loader) {
