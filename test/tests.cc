@@ -598,11 +598,9 @@ TEST_CASE("ITextPDF") {
 }
 #endif
 
-#if 0
 TEST_CASE("Class loading") {
   auto result = run_test_case("test_files/basic_classloader/", false, "URLClassLoaderExample");
 }
-#endif
 
 TEST_CASE("java.lang.reflect.Method") {
   auto result = run_test_case("test_files/reflection_method/", true, "ReflectionMethod");

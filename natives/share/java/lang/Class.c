@@ -158,11 +158,27 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   // Read args[0] as a string
   obj_header *name_obj = args[0].handle->obj;
 
+  obj_header *classloader = args[2].handle->obj;
+
   heap_string name_str = AsHeapString(name_obj, oom);
   for (size_t i = 0; i < name_str.len; ++i) {
     name_str.chars[i] = name_str.chars[i] == '.' ? '/' : name_str.chars[i];
   }
-  classdesc *c = bootstrap_lookup_class(thread, hslc(name_str));
+  classdesc *c;
+  if (!classloader) {
+    c = bootstrap_lookup_class(thread, hslc(name_str));
+  } else {
+    // Invoke findClass on the classloader
+    cp_method *find_class = method_lookup(classloader->descriptor, STR("loadClass"),
+      STR("(Ljava/lang/String;)Ljava/lang/Class;"), false, false);
+    CHECK(find_class);
+    stack_value args[2] = {{.obj = classloader}, {.obj = name_obj}};
+    stack_value result = call_interpreter_synchronous(thread, find_class, args);
+    if (!result.obj) {
+      return value_null();
+    }
+    c = unmirror_class(result.obj);
+  }
 
   int error = link_class(thread, c);
   CHECK(!error);

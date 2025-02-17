@@ -26,6 +26,13 @@ public class URLClassLoaderExample {
             Method method = loadedClass.getMethod("someMethod"); // replace with actual method name
             method.invoke(instance);
 
+            Class<?> loadedClass2 = Class.forName(className, true, classLoader);
+            System.out.println("Loaded class: " + loadedClass2.getName());
+
+            Object instance2 = loadedClass2.getDeclaredConstructor().newInstance();
+            Method method2 = loadedClass2.getMethod("someMethod"); // replace with actual method name
+            method2.invoke(instance2);
+
             // Close the class loader (Java 7+)
             classLoader.close();
         } catch (Exception e) {
