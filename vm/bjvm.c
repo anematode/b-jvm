@@ -1722,6 +1722,7 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   for (int i = arrlen(thread->frames) - 1; i >= 0; --i) {
     void *candidate = thread->frames[i]->method->my_class->classloader;
     if (candidate) {
+      printf("Using class loader for class %.*s\n", fmt_slice(info->name));
       loader = candidate;
       break;
     }
