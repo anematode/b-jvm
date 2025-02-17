@@ -705,7 +705,7 @@ class VM {
             if (coder === Coder.STRING_CODER_LATIN1) {
                 return new TextDecoder('latin1').decode(new Uint8Array(module.HEAPU8.buffer, chars, length));
             } else {
-                return new TextDecoder('utf16').decode(new Uint8Array(module.HEAPU8.buffer, chars, length));
+                return new TextDecoder('utf-16').decode(new Uint8Array(module.HEAPU8.buffer, chars, length));
             }
         }
 
