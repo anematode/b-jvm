@@ -31,7 +31,7 @@ function buffered() {
         buffer += new TextDecoder().decode(new Uint8Array(module.HEAPU8.buffer, buf, len));
         let idx: number;
         while ((idx = buffer.indexOf('\n')) != -1) {
-            console.log(buffer.slice(0, idx));
+            console.log(buffer.slice(0, idx + 1));
             buffer = buffer.slice(idx + 1);
         }
     }

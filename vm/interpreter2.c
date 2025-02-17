@@ -1679,6 +1679,14 @@ static int intrinsify(bytecode_insn *inst) {
       inst->kind = insn_sqrt;
       return 1;
     }
+    if (utf8_equals(method->name, "cos")) {
+      inst->kind = insn_cos;
+      return 1;
+    }
+    if (utf8_equals(method->name, "sin")) {
+      inst->kind = insn_sin;
+      return 1;
+    }
   }
   return 0;
 }
@@ -2548,6 +2556,26 @@ static s64 instanceof_resolved_impl_int(ARGS_INT) {
   NEXT_INT(result)
 }
 
+static s64 cos_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(cos(tos))
+}
+
+static s64 sin_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(sin(tos))
+}
+
+static s64 cos_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_FLOAT(cosf(tos))
+}
+
+static s64 sin_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_FLOAT(sinf(tos))
+}
+
 static s64 sqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   NEXT_DOUBLE(sqrt(tos))
@@ -3046,6 +3074,8 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_double,
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
+    [insn_cos] = cos_impl_double,
+    [insn_sin] = sin_impl_double,
     [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3279,4 +3309,6 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_float,
     [insn_getstatic_L] = getstatic_L_impl_float,
     [insn_putstatic_F] = putstatic_F_impl_float,
+    [insn_sin] = sin_impl_float,
+    [insn_cos] = cos_impl_float,
     [insn_sqrt] = sqrt_impl_float};

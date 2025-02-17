@@ -259,6 +259,8 @@ typedef enum : u8 {
   insn_putstatic_L,
 
   /** intrinsics understood by the interpreter */
+  insn_sin,
+  insn_cos,
   insn_sqrt
 } insn_code_kind;
 

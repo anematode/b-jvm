@@ -1049,9 +1049,9 @@ static int compute_mh_type_info(vm_thread *thread, cp_method_handle_info *info, 
 }
 
 DEFINE_ASYNC(resolve_mh_mt) {
-  DCHECK(mh_handle_supported(args->info->handle_kind), "Unsupported method handle kind");
+  CHECK(mh_handle_supported(args->info->handle_kind), "Unsupported method handle kind");
 
-  cp_class_info *required_type = args->info->handle_kind == MH_KIND_GET_FIELD
+  cp_class_info *required_type = args->info->handle_kind == MH_KIND_GET_FIELD || args->info->handle_kind == MH_KIND_PUT_FIELD
                                      ? args->info->reference->field.class_info
                                      : args->info->reference->methodref.class_info;
 
@@ -1722,7 +1722,6 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   for (int i = arrlen(thread->frames) - 1; i >= 0; --i) {
     void *candidate = thread->frames[i]->method->my_class->classloader;
     if (candidate) {
-      printf("Using class loader for class %.*s\n", fmt_slice(info->name));
       loader = candidate;
       break;
     }
@@ -1736,6 +1735,9 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
     }
     int dims = i;
     // Then strip the L and ; if it's an array type
+    if (dims && info->name.chars[dims] != 'L') {
+      goto welp;
+    }
     slice subslice = subslice_to(info->name, dims + (dims != 0), info->name.len - (dims != 0));
 
     cp_method *loadClass = method_lookup(loader->descriptor,
@@ -2269,21 +2271,33 @@ int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_
   return 0;
 }
 
-static stack_value box_cp_integral(cp_kind kind, cp_entry *ent) {
+static stack_value box_cp_integral(vm_thread *thread, cp_kind kind, cp_entry *ent) {
   switch (kind) {
-  case CP_KIND_INTEGER:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.i = (jint)ent->integral.value};
-  case CP_KIND_FLOAT:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.f = (jfloat)ent->floating.value};
-  case CP_KIND_LONG:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.l = ent->integral.value};
-  case CP_KIND_DOUBLE:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.d = ent->floating.value};
-
+  case CP_KIND_INTEGER: {
+    stack_value args[1] = { {.i = (jint)ent->integral.value} };
+    // Call Integer.valueOf
+    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->integer,
+      STR("valueOf"), STR("(I)Ljava/lang/Integer;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_FLOAT: {
+    stack_value args[1] = { {.f = (jfloat)ent->floating.value} };
+    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->float_,
+      STR("valueOf"), STR("(F)Ljava/lang/Float;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_LONG: {
+    stack_value args[1] = { {.l = (jlong)ent->integral.value} };
+    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->long_,
+      STR("valueOf"), STR("(J)Ljava/lang/Long;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_DOUBLE: {
+    stack_value args[1] = { {.d = (jdouble)ent->floating.value} };
+    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->double_,
+      STR("valueOf"), STR("(D)Ljava/lang/Double;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
   default:
     UNREACHABLE();
   }
@@ -2294,7 +2308,7 @@ DEFINE_ASYNC(resolve_indy_static_argument) {
 #define ent args->ent
 
   if (cp_kind_is_primitive(ent->kind)) {
-    ASYNC_RETURN(box_cp_integral(ent->kind, ent));
+    ASYNC_RETURN(box_cp_integral(thread, ent->kind, ent));
   }
 
   if (ent->kind == CP_KIND_CLASS) {

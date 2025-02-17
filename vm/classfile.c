@@ -346,7 +346,8 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
   case CONSTANT_MethodHandle: {
     u8 handle_kind = reader_next_u8(reader, "method handle kind");
     u16 reference_index = reader_next_u16(reader, "reference index");
-    cp_entry *entry = skip_linking ? nullptr : checked_cp_entry(ctx->cp, reference_index, 0, "method handle reference");
+    cp_entry *entry = skip_linking ? nullptr : checked_cp_entry(ctx->cp, reference_index,
+      CP_KIND_FIELD_REF | CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF, "method handle reference");
     // TODO validate both
     return (cp_entry){.kind = CP_KIND_METHOD_HANDLE, .method_handle = {.handle_kind = handle_kind, .reference = entry}};
   }
@@ -456,10 +457,6 @@ constant_pool *parse_constant_pool(cf_byteslice *reader, classfile_parse_ctx *ct
         // TODO fix ^^ this is janky af
       }
       ent->my_index = cp_i;
-
-      if (ent->kind == CP_KIND_PACKAGE) {
-        printf("PACKAGE: %.*s\n", fmt_slice(ent->class_info.name));
-      }
 
       if (ent->kind == CP_KIND_LONG || ent->kind == CP_KIND_DOUBLE) {
         get_constant_pool_entry(pool, cp_i + 1)->kind = CP_KIND_INVALID;
