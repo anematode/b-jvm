@@ -171,4 +171,8 @@ public final class NBodyProblem {
     public static String randomUUID() {
         return UUID.randomUUID().toString();
     }
+
+    public static String[] exampleArray() {
+        return new String[] { "Hello", "World", "Lol", null };
+    }
 }

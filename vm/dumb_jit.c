@@ -11,8 +11,44 @@
 typedef wasm_expression* expression;
 
 typedef struct {
+  wasm_module *module;
+  wasm_value_type *params;
+  wasm_value_type *locals;
+  wasm_type returns;
+  int next_local;
+} function_builder;
+
+static wasm_type tuple_from_array(wasm_module *module, wasm_value_type *array) {
+  return wasm_make_tuple(module, array, arrlen(array));
+}
+
+void init_function_builder(wasm_module *module, function_builder *builder, const wasm_value_type *params, wasm_type returns) {
+  builder->module = module;
+  builder->params = nullptr;
+  for (int i = 0; i < arrlen(params); ++i) {
+    arrput(builder->params, params[i]);
+  }
+  builder->locals = nullptr;
+  builder->next_local = arrlen(builder->params);
+}
+
+wasm_function *finalize_function_builder(function_builder *builder, const char *name, expression body) {
+  wasm_type params = tuple_from_array(builder->module, builder->params);
+  wasm_type results = builder->returns;
+  wasm_type locals = tuple_from_array(builder->module, builder->locals);
+
+  wasm_function *fn = wasm_add_function(builder->module, params, results, locals, body, name);
+
+  arrfree(builder->params);
+  arrfree(builder->locals);
+
+  return fn;
+}
+
+typedef struct {
   int start, end;
 } loop_range_t;
+
 typedef struct {
   // these future blocks requested a wasm block to begin here, so that
   // forward edges can be implemented with a br or br_if
@@ -56,6 +92,7 @@ void free_topo_ctx(method_jit_ctx ctx) {
   }
   free(ctx.creations);
 }
+
 void find_block_insertion_points(code_analysis *analy, method_jit_ctx *ctx) {
   // For each bb, if there is a bb preceding it (in the topological sort)
   // which branches to that bb, which is NOT its immediate predecessor in the
@@ -74,6 +111,7 @@ void find_block_insertion_points(code_analysis *analy, method_jit_ctx *ctx) {
     }
   }
 }
+
 void topo_walk_idom(code_analysis *analy, method_jit_ctx *ctx) {
   int current = ctx->current_block_i;
   int start = ctx->topo_i;
@@ -110,6 +148,7 @@ void topo_walk_idom(code_analysis *analy, method_jit_ctx *ctx) {
     arrput(creations->requested, ctx->topo_i << 1);
   free(sorted);
 }
+
 method_jit_ctx make_topo_sort_ctx(code_analysis *analy) {
   method_jit_ctx ctx;
   ctx.topo_to_block = calloc(analy->block_count, sizeof(int));

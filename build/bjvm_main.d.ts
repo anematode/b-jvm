@@ -155,6 +155,9 @@ interface WasmModule {
   _ffi_get_execution_record_js_handle(_0: number): number;
   _ffi_execute_immediately(_0: number): number;
   _ffi_free_execution_record(_0: number): void;
+  _ffi_classify_array(_0: number): number;
+  _ffi_get_element_ptr(_0: number, _1: number, _2: number): number;
+  _ffi_get_array_length(_0: number): number;
   _ffi_async_run(_0: number, _1: number, _2: number): number;
   _ffi_allocate_object(_0: number, _1: number): number;
   _ffi_create_string(_0: number, _1: number, _2: number): number;

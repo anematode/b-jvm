@@ -128,6 +128,71 @@ void ffi_free_execution_record(execution_record *record) {
   free_execution_record(record);
 }
 
+enum ArrayClassification : s32 {
+  NOT_AN_ARRAY = -1,
+  BYTE_ARRAY = 0,
+  SHORT_ARRAY = 1,
+  INT_ARRAY = 2,
+  LONG_ARRAY = 3,
+  FLOAT_ARRAY = 4,
+  DOUBLE_ARRAY = 5,
+  CHAR_ARRAY = 6,
+  BOOLEAN_ARRAY = 7,
+  OBJECT_ARRAY = 8
+};
+
+EMSCRIPTEN_KEEPALIVE
+enum ArrayClassification ffi_classify_array(object obj) {
+  switch (obj->descriptor->kind) {
+  case CD_KIND_ORDINARY:
+    return NOT_AN_ARRAY;
+  case CD_KIND_ORDINARY_ARRAY:
+    return OBJECT_ARRAY;
+  case CD_KIND_PRIMITIVE_ARRAY: {
+    switch (obj->descriptor->primitive_component) {
+    case TYPE_KIND_BOOLEAN:
+      return BOOLEAN_ARRAY;
+    case TYPE_KIND_CHAR:
+      return CHAR_ARRAY;
+    case TYPE_KIND_FLOAT:
+      return FLOAT_ARRAY;
+    case TYPE_KIND_DOUBLE:
+      return DOUBLE_ARRAY;
+    case TYPE_KIND_BYTE:
+      return BYTE_ARRAY;
+    case TYPE_KIND_SHORT:
+      return SHORT_ARRAY;
+    case TYPE_KIND_INT:
+      return INT_ARRAY;
+    case TYPE_KIND_LONG:
+      return LONG_ARRAY;
+    case TYPE_KIND_VOID:
+    case TYPE_KIND_REFERENCE:
+      UNREACHABLE();
+    }
+  }
+  case CD_KIND_PRIMITIVE:
+  default:
+    UNREACHABLE();
+  }
+}
+
+EMSCRIPTEN_KEEPALIVE
+uintptr_t ffi_get_element_ptr(vm_thread *thread, object obj, int index) {
+  int length = *ArrayLength(obj);
+  if (index < 0 || index >= length) {
+    raise_array_index_oob_exception(thread, index, length);
+    return 0;
+  }
+  if (obj->descriptor->kind == CD_KIND_ORDINARY_ARRAY) {
+    return (uintptr_t)((object*)ArrayData(obj) + index);
+  }
+  return (uintptr_t)ArrayData(obj) + index * sizeof_type_kind(obj->descriptor->primitive_component);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int ffi_get_array_length(object obj) { return *ArrayLength(obj); }
+
 void ffi_free_rr_scheduler(rr_scheduler *scheduler) { rr_scheduler_uninit(scheduler); }
 
 EMSCRIPTEN_KEEPALIVE

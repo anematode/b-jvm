@@ -2672,6 +2672,9 @@ var _deref_js_handle = Module['_deref_js_handle'] = createExportWrapper('deref_j
 var _ffi_get_execution_record_js_handle = Module['_ffi_get_execution_record_js_handle'] = createExportWrapper('ffi_get_execution_record_js_handle', 1);
 var _ffi_execute_immediately = Module['_ffi_execute_immediately'] = createExportWrapper('ffi_execute_immediately', 1);
 var _ffi_free_execution_record = Module['_ffi_free_execution_record'] = createExportWrapper('ffi_free_execution_record', 1);
+var _ffi_classify_array = Module['_ffi_classify_array'] = createExportWrapper('ffi_classify_array', 1);
+var _ffi_get_element_ptr = Module['_ffi_get_element_ptr'] = createExportWrapper('ffi_get_element_ptr', 3);
+var _ffi_get_array_length = Module['_ffi_get_array_length'] = createExportWrapper('ffi_get_array_length', 1);
 var _ffi_async_run = Module['_ffi_async_run'] = createExportWrapper('ffi_async_run', 3);
 var _ffi_allocate_object = Module['_ffi_allocate_object'] = createExportWrapper('ffi_allocate_object', 2);
 var _ffi_create_string = Module['_ffi_create_string'] = createExportWrapper('ffi_create_string', 3);
