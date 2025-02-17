@@ -215,7 +215,12 @@ class BaseHandle {
 }
 
 function binaryNameToJSName(name: string) {
-    return name.replaceAll('/', "_");
+    name = name.replaceAll('/', "_");
+    // Remove potentially dangerous characters (only allow a-zA-Z0-9)
+    if (!name.match(/^[a-zA-Z0-9_]$/)) {
+        name = "";
+    }
+    return name;
 }
 
 function stringifyParameter(type: JavaType) {
@@ -300,10 +305,6 @@ class OverloadResolver {
 
         return impls.join('\n');
     }
-
-    createTSDefs() {
-
-    }
 }
 
 interface HandleConstructor {
@@ -332,11 +333,14 @@ function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): HandleConstructor 
         }
     }
 
+    let arrayMethods = "";
+
     const cow = binaryNameToJSName(classInfo.binaryName);
-    const body = `class ${cow} extends BaseHandle {
+    const body = `return class ${cow} extends BaseHandle {
     ${instanceResolver.createImpls(classInfo, false)}
     ${staticResolver.createImpls(classInfo, true)}
-    }; return ${cow}`;
+    ${arrayMethods}
+    };`;
 
     const Class = new Function("name", "BaseHandle", "vm", "methods", body)(classInfo.binaryName, BaseHandle, vm, classInfo.methods);
     Object.defineProperty(Class, 'name', { value: classInfo.binaryName });
