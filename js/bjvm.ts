@@ -734,17 +734,9 @@ class VM {
 }
 
 const runtimeFilesList = `./jdk23/lib/modules
-<<<<<<< HEAD
 ./jdk23/lib/security/default.policy
 ./jdk23/conf/security/java.security
 ./jdk23/conf/security/java.policy
-./jdk23.jar
-./test_files/basic_multithreading/Multithreading.class
-./test_files/basic_multithreading/MultithreadingDemo.class
-./test_files/n_body_problem/NBodyProblem$Body.class
-./test_files/n_body_problem/NBodyProblem.class`.split('\n');
-=======
-./jdk23/conf/security/java.security
 ./jdk23.jar`.split('\n');
 
 export function appendRuntimeFiles(files: string[]) {
