@@ -613,13 +613,7 @@ class VM {
         options.stderr ??= buffered();
 
         this.timeout = -1;
-<<<<<<< HEAD
         this.ptr = module._ffi_create_vm(classpath, options.heapSize ?? 1 << 26, module.addFunction(options.stdout, 'viii'), module.addFunction(options.stderr, 'viii'));
-=======
-        this.ptr = module._bjvm_ffi_create_vm(classpath,
-            module.addFunction(forwardChars(options.stdout), 'viii'),
-            module.addFunction(forwardChars(options.stderr), 'viii'));
->>>>>>> 3aaf9e9 (fun times)
         module._free(classpath);
 
         this.scheduler = module._ffi_create_rr_scheduler(this.ptr);
@@ -738,11 +732,6 @@ const runtimeFilesList = `./jdk23/lib/modules
 ./jdk23/conf/security/java.security
 ./jdk23/conf/security/java.policy
 ./jdk23.jar`.split('\n');
-
-export function appendRuntimeFiles(files: string[]) {
-    runtimeFilesList.push(...files);
-}
->>>>>>> 3aaf9e9 (fun times)
 
 export function appendRuntimeFiles(files: string[]) {
     runtimeFilesList.push(...files);
