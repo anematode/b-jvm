@@ -2754,8 +2754,8 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   case CONT_INVOKESIGPOLY:
     fut = invokevirtual_signature_polymorphic(&cont.ctx.sigpoly);
-    sp -= cont.ctx.interp_call.argc; // todo: wrong union member
-    has_result = cont.ctx.interp_call.returns;
+    sp -= cont.ctx.sigpoly.argc; // todo: wrong union member
+    has_result = false;
     advance_pc = true;
     break;
 
