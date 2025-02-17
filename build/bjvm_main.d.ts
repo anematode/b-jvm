@@ -13,11 +13,7 @@ declare namespace RuntimeExports {
      * @param {Array=} argTypes
      * @param {Object=} opts
      */
-<<<<<<< HEAD
     function cwrap(ident: any, returnType?: string | undefined, argTypes?: any[] | undefined, opts?: any | undefined): (...args: any[]) => any;
-=======
-    function cwrap(ident: any, returnType?: string | undefined, argTypes?: any[] | undefined, opts?: any | undefined): any;
->>>>>>> 3aaf9e9 (fun times)
     /** @param {string=} sig */
     function addFunction(func: any, sig?: string | undefined): any;
     function removeFunction(index: any): void;
@@ -142,7 +138,6 @@ declare namespace RuntimeExports {
     let removeRunDependency: any;
 }
 interface WasmModule {
-<<<<<<< HEAD
   _ffi_create_vm(_0: number, _1: number, _2: number, _3: number): number;
   _ffi_create_thread(_0: number): number;
   _ffi_get_class(_0: number, _1: number): number;
@@ -175,40 +170,12 @@ interface WasmModule {
   _main(_0: number, _1: number): number;
   _make_js_handle(_0: number, _1: number): number;
   _drop_js_handle(_0: number, _1: number): void;
-=======
-  _bjvm_ffi_create_vm(_0: number, _1: number, _2: number): number;
-  _bjvm_ffi_create_thread(_0: number): number;
-  _bjvm_ffi_get_class(_0: number, _1: number): number;
-  _bjvm_ffi_get_current_exception(_0: number): number;
-  _bjvm_ffi_clear_current_exception(_0: number): void;
-  _bjvm_ffi_get_classdesc(_0: number): number;
-  _bjvm_ffi_create_rr_scheduler(_0: number): number;
-  _malloc(_0: number): number;
-  _bjvm_ffi_rr_scheduler_wait_for_us(_0: number): number;
-  _bjvm_ffi_rr_scheduler_step(_0: number): number;
-  _bjvm_ffi_rr_record_is_ready(_0: number): number;
-  _bjvm_ffi_rr_schedule(_0: number, _1: number, _2: number): number;
-  _bjvm_ffi_get_execution_record_result_pointer(_0: number): number;
-  _bjvm_deref_js_handle(_0: number, _1: number): number;
-  _bjvm_ffi_execute_immediately(_0: number): number;
-  _bjvm_ffi_free_execution_record(_0: number): void;
-  _bjvm_ffi_async_run(_0: number, _1: number, _2: number): number;
-  _bjvm_ffi_allocate_object(_0: number, _1: number): number;
-  _bjvm_ffi_run_step(_0: number, _1: number): number;
-  _bjvm_ffi_free_async_run_ctx(_0: number): void;
-  _free(_0: number): void;
-  _bjvm_ffi_get_class_json(_0: number): number;
-  _main(_0: number, _1: number): number;
-  _bjvm_make_js_handle(_0: number, _1: number): number;
-  _bjvm_drop_js_handle(_0: number, _1: number): void;
->>>>>>> 3aaf9e9 (fun times)
   _set_max_calls(_0: number): number;
   ___interpreter_intrinsic_void_table_base(): number;
   ___interpreter_intrinsic_int_table_base(): number;
   ___interpreter_intrinsic_float_table_base(): number;
   ___interpreter_intrinsic_double_table_base(): number;
   ___interpreter_intrinsic_max_insn(): number;
-<<<<<<< HEAD
   _nop_impl_void(_0: number, _1: number, _2: number, _3: number, _4: number, _5: number, _6: number, _7: number): BigInt;
   _wasm_push_export(_0: number, _1: number, _2: number): void;
   _FileDescriptor_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -231,7 +198,8 @@ interface WasmModule {
   _RandomAccessFile_seek0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _RandomAccessFile_getFilePointer_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _RandomAccessFile_close0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _RandomAccessFile_length_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _RandomAccessFile_length0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _RandomAccessFile_readBytes0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_checkAccess0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_canonicalize0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -337,6 +305,12 @@ interface WasmModule {
   _AccessController_ensureMaterializedForStackWalk_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _TimeZone_getSystemTimeZoneID_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _AtomicLong_VMSupportsCS8_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Inflater_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Inflater_init_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Inflater_inflateBytesBytes_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Inflater_reset_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Inflater_end_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _CRC32_updateBytes0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _ZipFile_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NativeImageBuffer_getNativeMap_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _BootLoader_setBootLoaderUnnamedModule0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -390,7 +364,10 @@ interface WasmModule {
   _Unsafe_storeFence_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_fullFence_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_copyMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_setMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _VM_initialize_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Perf_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Perf_createLong_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _ConstantPool_getUTF8At0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _ConstantPool_getIntAt0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Reflection_getCallerClass_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -414,9 +391,6 @@ interface WasmModule {
   _UnixFileDispatcherImpl_map0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileDispatcherImpl_unmap0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _FileDispatcherImpl_init0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-=======
-  _bjvm_wasm_push_export(_0: number, _1: number, _2: number): void;
->>>>>>> 3aaf9e9 (fun times)
 }
 
 export type MainModule = WasmModule & typeof RuntimeExports;
