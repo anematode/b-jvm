@@ -719,6 +719,7 @@ class VM {
 }
 
 const runtimeFilesList = `./jdk23/lib/modules
+./jdk23/lib/security/default.policy
 ./jdk23.jar
 ./test_files/basic_multithreading/Multithreading.class
 ./test_files/basic_multithreading/MultithreadingDemo.class
