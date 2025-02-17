@@ -1729,12 +1729,21 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   }
 
   if (loader) {
+    // First strip off [ so that we only call loadClass on the component type
+    int i = 0;
+    while (info->name.chars[i] == '[') {
+      ++i;
+    }
+    int dims = i;
+    // Then strip the L and ; if it's an array type
+    slice subslice = subslice_to(info->name, dims + (dims != 0), info->name.len - (dims != 0));
+
     cp_method *loadClass = method_lookup(loader->descriptor,
       STR("loadClass"), STR("(Ljava/lang/String;)Ljava/lang/Class;"),
                                          true, false);
     INIT_STACK_STRING(s, 1000);
-    exchange_slashes_and_dots(&s, info->name);
-    s.len = info->name.len;
+    exchange_slashes_and_dots(&s, subslice);
+    s.len = subslice.len;
 
     object name = MakeJStringFromModifiedUTF8(thread, s, false);
     stack_value result = call_interpreter_synchronous(thread, loadClass, (stack_value[]){{.obj = loader}, {.obj = name}});
@@ -1745,6 +1754,10 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
     }
 
     info->classdesc = (classdesc *)unmirror_class(result.obj);
+    // Now repeatedly instantiate array classes
+    for (int i = 0; i < dims; ++i) {
+      info->classdesc = make_array_classdesc(thread, info->classdesc);
+    }
   } else {
     welp:
     info->classdesc = bootstrap_lookup_class(thread, info->name);

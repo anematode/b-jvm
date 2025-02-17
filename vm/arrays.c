@@ -104,6 +104,7 @@ classdesc *make_array_classdesc(vm_thread *thread, classdesc *classdesc) {
       classdesc->array_type = ordinary_array_classdesc(thread, classdesc);
     }
     classdesc->array_type->dtor = free_array_classdesc;
+    classdesc->array_type->classloader = classdesc->classloader;
   }
   return classdesc->array_type;
 }
