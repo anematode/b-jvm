@@ -58,8 +58,8 @@ stack_value define_class(vm_thread *thread, handle *loader, handle *parent_class
   }
 
   // Now append some random stuff to the name
-  // TODO when we do classloaders, obey that
   classdesc *result = define_bootstrap_class(thread, cf_name, data_bytes, length);
+  result->classloader = loader->obj;
 
   free_heap_str(name_str);
   if (initialize) {

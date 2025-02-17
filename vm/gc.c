@@ -29,6 +29,8 @@ static int in_heap(gc_ctx *ctx, obj_header *field) {
 
 static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
   // Push the mirrors of this base class and all of its array types
+  PUSH_ROOT(&desc->classloader);
+
   classdesc *array = desc;
   while (array) {
     PUSH_ROOT(&array->mirror);

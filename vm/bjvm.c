@@ -540,7 +540,7 @@ classdesc *make_primitive_classdesc(type_kind kind, const slice name) {
   desc->array_type = nullptr;
   desc->primitive_component = kind;
   desc->dtor = free_primitive_classdesc;
-  desc->classloader = &bootstrap_classloader;
+  desc->classloader = nullptr;
 
   return desc;
 }
@@ -612,7 +612,7 @@ void existing_classes_are_javabase(vm *vm, module *module) {
   size_t key_len;
   classdesc *classdesc;
   while (hash_table_iterator_has_next(it, &key, &key_len, (void **)&classdesc)) {
-    if (classdesc->classloader == &bootstrap_classloader) {
+    if (classdesc->classloader == nullptr) {
       classdesc->module = module;
       if (classdesc->mirror) {
         classdesc->mirror->module = module->reflection_object;
@@ -1311,7 +1311,7 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
 
   class->kind = CD_KIND_ORDINARY;
   class->dtor = free_ordinary_classdesc;
-  class->classloader = &bootstrap_classloader;
+  class->classloader = nullptr;
 
   if (is_builtin_class(chars)) {
     class->module = get_module(vm, STR("java.base"));
@@ -1715,7 +1715,29 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
                            info->vm_object); // already failed
     return -1;
   }
-  info->classdesc = bootstrap_lookup_class(thread, info->name);
+  // Oh boy
+  stack_frame *frame = arrlen(thread->frames) ? thread->frames[arrlen(thread->frames) - 1] : nullptr;
+  object loader = nullptr;
+  if (frame) {
+    loader = frame->method->my_class->classloader;
+  }
+
+  if (loader) {
+    cp_method *loadClass = method_lookup(loader->descriptor,
+      STR("loadClass"), STR("(Ljava/lang/String;)Ljava/lang/Class;"),
+                                         true, false);
+    object name = MakeJStringFromModifiedUTF8(thread, info->name, true);
+    stack_value result = call_interpreter_synchronous(thread, loadClass, (stack_value[]){{.obj = loader}, {.obj = name}});
+
+    if (thread->current_exception) {
+      thread->current_exception = nullptr;
+      goto welp;
+    }
+    info->classdesc = (classdesc *)result.obj;
+  } else {
+    welp:
+    info->classdesc = bootstrap_lookup_class(thread, info->name);
+  }
   if (!info->classdesc) {
     info->vm_object = thread->current_exception;
     return -1;
