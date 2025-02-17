@@ -209,6 +209,22 @@ struct native_MethodHandle {
   s32 customizationCount;      // B
   s32 updateInProgress;        // Z
 };
+struct native_VarHandle {
+  obj_header base;
+  // my fields
+  obj_header *vform;  // Ljava/lang/invoke/VarForm;
+  s32 exact;  // Z
+  obj_header *methodTypeTable;  // [Ljava/lang/invoke/MethodType;
+  obj_header *methodHandleTable;  // [Ljava/lang/invoke/MethodHandle;
+};
+struct native_VarForm {
+  obj_header base;
+  // my fields
+  obj_header *implClass;  // Ljava/lang/Class;
+  obj_header *methodType_table;  // [Ljava/lang/invoke/MethodType;
+  obj_header *memberName_table;  // [Ljava/lang/invoke/MemberName;
+  obj_header *methodType_V_table;  // [Ljava/lang/invoke/MethodType;
+};
 struct native_MethodType {
   obj_header base;
   // implementation-dependent fields

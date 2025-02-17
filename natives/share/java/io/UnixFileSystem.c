@@ -9,29 +9,38 @@
 
 DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") { return value_null(); }
 
+DECLARE_NATIVE("java/io", UnixFileSystem, checkAccess0, "(Ljava/io/File;I)Z") { return (stack_value) { .i = 1 }; }
+
 DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0, "(Ljava/io/File;)I", locals(),
                      invoked_methods()) {
-  unixlike_fs const *fs = unix_get_active_fs();
-  if (!fs) {
-    ThrowLangException(UnsupportedOperationException);
-    goto exception;
-  }
-
   // todo: replace with getPath when async natives work
   obj_header *path = LoadFieldObject(args[0].handle->obj, "java/lang/String", "path");
   heap_string str = AsHeapString(path, exception);
 
   boolean_attributes attrs;
-  fs_result result = fs->fs.get_attributes(hslc(str), &attrs);
+  // Use fstat
+  bool exists = access(str.chars, F_OK) == 0;
+  if (!exists) {
+    attrs = 0;
+  } else {
+    struct stat st;
+    if (stat(str.chars, &st) != 0) {
+      attrs = 0;
+    } else {
+      attrs = BA_EXISTS;
+      if (S_ISREG(st.st_mode)) {
+        attrs |= BA_REGULAR;
+      }
+      if (S_ISDIR(st.st_mode)) {
+        attrs |= BA_DIRECTORY;
+      }
+      // TODO BA_HIDDEN ?
+    }
+  }
 
   free_heap_str(str);
 
-  if (result != FS_OK) {
-    ThrowIOExceptionM("%.*s", fmt_slice(fs_result_to_string(result)));
-    goto exception;
-  }
-
-  ASYNC_RETURN((stack_value){.i = result});
+  ASYNC_RETURN((stack_value){.i = attrs});
 
 exception:
   ASYNC_RETURN(value_null());

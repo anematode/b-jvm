@@ -1986,67 +1986,172 @@ void wrong_method_type_error([[maybe_unused]] vm_thread *thread, [[maybe_unused]
   UNREACHABLE(); // TODO
 }
 
+enum {
+  VH_GET,
+  VH_SET,
+  VH_GET_VOLATILE,
+  VH_SET_VOLATILE,
+  VH_GET_ACQUIRE,
+  VH_SET_RELEASE,
+ VH_GET_OPAQUE,
+ VH_SET_OPAQUE,
+ VH_COMPARE_AND_SET,
+ VH_COMPARE_AND_EXCHANGE,
+ VH_COMPARE_AND_EXCHANGE_ACQUIRE,
+ VH_COMPARE_AND_EXCHANGE_RELEASE,
+ VH_WEAK_COMPARE_AND_SET,
+ VH_WEAK_COMPARE_AND_SET_PLAIN,
+ VH_WEAK_COMPARE_AND_SET_ACQUIRE,
+ VH_WEAK_COMPARE_AND_SET_RELEASE,
+ VH_GET_AND_SET,
+ VH_GET_AND_SET_ACQUIRE,
+ VH_GET_AND_SET_RELEASE,
+ VH_GET_AND_ADD,
+ VH_GET_AND_ADD_ACQUIRE,
+ VH_GET_AND_ADD_RELEASE,
+ VH_GET_AND_BITWISE_OR,
+ VH_GET_AND_BITWISE_OR_RELEASE,
+ VH_GET_AND_BITWISE_OR_ACQUIRE,
+ VH_GET_AND_BITWISE_AND,
+ VH_GET_AND_BITWISE_AND_RELEASE,
+ VH_GET_AND_BITWISE_AND_ACQUIRE,
+ VH_GET_AND_BITWISE_XOR,
+ VH_GET_AND_BITWISE_XOR_RELEASE,
+ VH_GET_AND_BITWISE_XOR_ACQUIRE,
+};
+
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
 #define target (args->target)
 #define provider_mt (args->provider_mt)
 #define thread (args->thread)
 
+  DCHECK(args->method);
+
   struct native_MethodHandle *mh = (void *)target;
-  struct native_MethodType *targ = (void *)mh->type;
+  bool doing_var_handle = false;
 
-  assert(targ && "Method type must be non-null");
+  doit:
+  if (!mh->reflected_mh) {
+    // MethodHandle!
+    struct native_MethodType *targ = (void *)mh->type;
+    assert(targ && "Method type must be non-null");
 
-  bool mts_are_same = method_types_compatible(provider_mt, targ);
-  bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
-  // only raw calls to MethodHandle.invoke involve "asType" conversions
-  bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
-                   utf8_equals(hslc(args->method->my_class->name), "java/lang/invoke/MethodHandle");
+    bool mts_are_same = method_types_compatible(provider_mt, targ);
+    bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
+    // only raw calls to MethodHandle.invoke involve "asType" conversions
+    bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
+                     utf8_equals(hslc(args->method->my_class->name), "java/lang/invoke/MethodHandle");
 
-  if (is_invoke_exact) {
-    if (!mts_are_same) {
-      wrong_method_type_error(thread, provider_mt, targ);
-      ASYNC_RETURN_VOID();
+    if (is_invoke_exact) {
+      if (!mts_are_same) {
+        wrong_method_type_error(thread, provider_mt, targ);
+        ASYNC_RETURN_VOID();
+      }
     }
-  }
 
-  if (!mts_are_same && is_invoke) {
-    // Call asType to get an adapter handle
-    cp_method *asType =
-        method_lookup(mh->base.descriptor, STR("asType"),
-                      STR("(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"), true, false);
-    if (!asType)
+    if (!mts_are_same && is_invoke) {
+      // Call asType to get an adapter handle
+      cp_method *asType =
+          method_lookup(mh->base.descriptor, STR("asType"),
+                        STR("(Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/MethodHandle;"), true, false);
+      if (!asType)
+        UNREACHABLE();
+
+      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
+      stack_value result = get_async_result(call_interpreter);
+      if (thread->current_exception != 0) // asType failed
+        ASYNC_RETURN_VOID();
+      mh = (void *)result.obj;
+    }
+
+    struct native_LambdaForm *form = (void *)mh->form;
+    struct native_MemberName *name = (void *)form->vmentry;
+
+    method_handle_kind kind = (name->flags >> 24) & 0xf;
+    if (kind == MH_KIND_INVOKE_STATIC) {
+      self->method = name->vmtarget;
+
+      u8 argc = self->argc = self->method->descriptor->args_count;
+      if (doing_var_handle) {
+        memmove(args->sp_ + 1, args->sp_, sizeof(stack_value) * argc); // includes objectref
+      }
+      args->sp_->obj = (void *)mh;
+      self->frame = push_frame(thread, self->method, args->sp_, argc);
+
+      // TODO arena allocate this in the VM so that it gets freed appropriately
+      // if the VM is deleted
+      self->interpreter_ctx = calloc(1, sizeof(interpret_t));
+      AWAIT_INNER(self->interpreter_ctx, interpret, thread, self->frame);
+      if (self->method->descriptor->return_type.base_kind != TYPE_KIND_VOID) {
+        // Store the result in the frame
+        *args->sp_ = self->interpreter_ctx->_result;
+      }
+      free(self->interpreter_ctx);
+    } else {
       UNREACHABLE();
-
-    AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
-    stack_value result = get_async_result(call_interpreter);
-    if (thread->current_exception != 0) // asType failed
-      ASYNC_RETURN_VOID();
-    mh = (void *)result.obj;
-  }
-
-  struct native_LambdaForm *form = (void *)mh->form;
-  struct native_MemberName *name = (void *)form->vmentry;
-
-  method_handle_kind kind = (name->flags >> 24) & 0xf;
-  if (kind == MH_KIND_INVOKE_STATIC) {
-    self->method = name->vmtarget;
-    DCHECK(self->method);
-
-    args->sp_->obj = (void *)mh;
-    u8 argc = self->argc = self->method->descriptor->args_count;
-    self->frame = push_frame(thread, self->method, args->sp_, argc);
-
-    // TODO arena allocate this in the VM so that it gets freed appropriately
-    // if the VM is deleted
-    self->interpreter_ctx = calloc(1, sizeof(interpret_t));
-    AWAIT_INNER(self->interpreter_ctx, interpret, thread, self->frame);
-    if (self->method->descriptor->return_type.base_kind != TYPE_KIND_VOID) {
-      // Store the result in the frame
-      *args->sp_ = self->interpreter_ctx->_result;
     }
-    free(self->interpreter_ctx);
   } else {
-    UNREACHABLE();
+    struct native_VarHandle *vh = (void*)target;
+    // Call valueFromMethodName on java.lang.invoke.VarHandle.AccessMode with the method name
+    // to get the method handle
+    classdesc *AccessMode = bootstrap_lookup_class(thread, STR("java/lang/invoke/VarHandle$AccessMode"));
+    initialize_class_t init = {.args = {thread, AccessMode}};
+    future_t fut = initialize_class(&init);
+    CHECK(fut.status == FUTURE_READY);
+
+    cp_method *valueFromMethodName = method_lookup(AccessMode, STR("valueFromMethodName"),
+                            STR("(Ljava/lang/String;)Ljava/lang/invoke/VarHandle$AccessMode;"),
+                            true, false);
+    DCHECK(valueFromMethodName);
+
+    // Now invoke it with the name of the method
+    void *str = MakeJStringFromData(thread, self->args.method->name, false);
+    // TODO oom
+    stack_value arg[] = {{.obj = (void*)str}};
+    AWAIT(call_interpreter, thread, valueFromMethodName, arg);
+    if (thread->current_exception) {
+      ASYNC_RETURN_VOID();
+    }
+
+    handle *result = make_handle(thread, get_async_result(call_interpreter).obj);
+
+    // Second, a reference to an instance of java.lang.invoke.MethodType is obtained as if by invocation of the
+    // accessModeType method of java.lang.invoke.VarHandle on the instance objectref, with the instance of
+    // java.lang.invoke.VarHandle.AccessMode as the argument.
+    cp_method *accessModeType = method_lookup(vh->base.descriptor, STR("accessModeType"),
+                            STR("(Ljava/lang/invoke/VarHandle$AccessMode;)Ljava/lang/invoke/MethodType;"),
+                            true, false);
+    DCHECK(accessModeType);
+
+    // Now invoke it with the result of the previous call
+    stack_value arg2[] = {{.obj = (void*)vh}, {.obj = result->obj}};
+    AWAIT(call_interpreter, thread, accessModeType, arg2);
+    if (thread->current_exception) {
+      ASYNC_RETURN_VOID();
+    }
+
+    // Third, a reference to an instance of java.lang.invoke.MethodHandle is obtained as if by invocation of the
+    // varHandleExactInvoker method of java.lang.invoke.MethodHandles with the instance of
+    // java.lang.invoke.VarHandle.AccessMode as the first argument and the instance of java.lang.invoke.MethodType
+    // as the second argument. The resulting instance is called the invoker method handle.
+    classdesc *MethodHandles = thread->vm->cached_classdescs->method_handles;
+    CHECK(MethodHandles);
+    stack_value arg3[] = {{.obj = result->obj}, {.obj = get_async_result(call_interpreter).obj}};
+    cp_method *varHandleExactInvoker = method_lookup(MethodHandles, STR("varHandleExactInvoker"),
+                            STR("(Ljava/lang/invoke/VarHandle$AccessMode;Ljava/lang/invoke/MethodType;)"
+                                    "Ljava/lang/invoke/MethodHandle;"),
+                            true, false);
+    DCHECK(varHandleExactInvoker);
+    AWAIT(call_interpreter, thread, varHandleExactInvoker, arg3);
+    if (thread->current_exception) {
+      ASYNC_RETURN_VOID();
+    }
+
+    mh = (void*)get_async_result(call_interpreter).obj;
+    drop_handle(thread, result);
+    doing_var_handle = true;
+
+    goto doit;
   }
 
   ASYNC_END_VOID();

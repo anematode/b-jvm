@@ -1993,7 +1993,8 @@ force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
-force_inline static s64 invokesigpoly_impl_void(ARGS_VOID) {
+__attribute__((noinline))
+static s64 invokesigpoly_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;

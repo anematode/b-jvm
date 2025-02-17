@@ -1,3 +1,5 @@
+import java.util.UUID;
+
 public final class NBodyProblem {
     static final class Body {
         public double x, y, z, vx, vy, vz, mass;
@@ -164,5 +166,9 @@ public final class NBodyProblem {
 
     public static void printString(String s) {
         System.out.println(s);
+    }
+
+    public static String randomUUID() {
+        return UUID.randomUUID().toString();
     }
 }

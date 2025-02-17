@@ -714,3 +714,14 @@ TEST_CASE("Concurrent initialisation") {
 Finished initializing!
 )");
 }
+
+TEST_CASE("VarHandle") {
+  auto result = run_test_case("test_files/var_handles/", true, "Main");
+  REQUIRE(result.stdout_ == R"(true
+new
+)");
+}
+
+TEST_CASE("Random UUID") {
+  auto result = run_test_case("test_files/random_uuid/", false, "Main");
+}

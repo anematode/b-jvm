@@ -174,15 +174,33 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   abort();
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, putLong, "(JJ)V") {
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLong, "(JJ)V", 1) {
   DCHECK(argc == 2);
   *(s64 *)args[0].l = args[1].l;
+  return value_null();
+}
+
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLong, "(Ljava/lang/Object;JJ)V", 2) {
+  DCHECK(argc == 3);
+  memcpy((char *)args[0].handle->obj + args[1].l, &args[2].l, sizeof(s64));
   return value_null();
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, putInt, "(Ljava/lang/Object;JI)V") {
   DCHECK(argc == 3);
   *(s32 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
+  return value_null();
+}
+
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putShort, "(JS)V", 1) {
+  DCHECK(argc == 3);
+  memcpy((char *)args[0].l, &args[1].i, sizeof(short));
+  return value_null();
+}
+
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putShort, "(Ljava/lang/Object;JS)V", 2) {
+  DCHECK(argc == 3);
+  memcpy((char *)args[0].handle->obj + args[1].l, &args[2].i, sizeof(short));
   return value_null();
 }
 

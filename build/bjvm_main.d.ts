@@ -200,6 +200,7 @@ interface WasmModule {
   _RandomAccessFile_close0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _RandomAccessFile_length_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _UnixFileSystem_checkAccess0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_canonicalize0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileSystem_getLastModifiedTime_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Class_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -339,8 +340,11 @@ interface WasmModule {
   _Unsafe_allocateMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_allocateInstance_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_freeMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Unsafe_putLong_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putLong_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putLong_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putShort_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putShort_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putByte_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getReference_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

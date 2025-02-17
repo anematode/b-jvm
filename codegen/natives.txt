@@ -20,8 +20,10 @@ java/lang/Thread
   vm_thread *vm_thread;
 java/lang/invoke/MethodHandle
   cp_method_handle_info *reflected_mh;
+java/lang/invoke/VarHandle
 java/lang/invoke/MethodType
   cp_method_type_info *reflected_mt;
+java/lang/invoke/VarForm
 java/lang/invoke/MemberName
   void *vmtarget;
   intptr_t vmindex;

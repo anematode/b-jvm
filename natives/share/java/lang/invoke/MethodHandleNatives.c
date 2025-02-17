@@ -65,6 +65,7 @@ heap_string unparse_method_type(const struct native_MethodType *mt) {
 #define M ((struct native_MemberName *)mn->obj)
 
 void fill_mn_with_field(vm_thread *thread, handle *mn, cp_field *field) {
+  CHECK(field);
   classdesc *search_on = field->my_class;
   reflect_initialize_field(thread, search_on, field);
   M->vmindex = field->byte_offset; // field offset
@@ -77,7 +78,7 @@ void fill_mn_with_field(vm_thread *thread, handle *mn, cp_field *field) {
 }
 
 void fill_mn_with_method(vm_thread *thread, handle *mn, cp_method *method, bool dynamic_dispatch) {
-  DCHECK(method);
+  CHECK(method);
   classdesc *search_on = method->my_class;
   if (method->is_ctor) {
     reflect_initialize_constructor(thread, search_on, method);
