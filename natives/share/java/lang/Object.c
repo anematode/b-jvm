@@ -1,4 +1,5 @@
 #include <natives-dsl.h>
+#include <roundrobin_scheduler.h>
 
 DECLARE_NATIVE("java/lang", Object, hashCode, "()I") { return (stack_value){.i = (s32)get_object_hash_code(obj->obj)}; }
 
@@ -56,13 +57,29 @@ DECLARE_NATIVE("java/lang", Object, getClass, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Object, notifyAll, "()V") {
-  return value_null(); // TODO
+  return value_null(); // TODO: no-op
 }
 
 DECLARE_NATIVE("java/lang", Object, notify, "()V") {
-  return value_null(); // TODO
+  return value_null(); // TODO: no-op
 }
 
-DECLARE_NATIVE("java/lang", Object, wait, "()V") {
-  return value_null(); // TODO
+DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(rr_wakeup_info wakeup_info), invoked_methods()) {
+  assert(argc == 1);
+  s64 timeoutMillis = args[0].l;
+  assert(timeoutMillis >= 0); // this is always checked before calling this private method
+
+  (void) timeoutMillis; // cope with unused var
+
+  if (thread->thread_obj->interrupted) {
+    thread->thread_obj->interrupted = false; // throw and reset flag
+    raise_vm_exception(thread, STR("java/lang/InterruptedException"), STR("Thread interrupted before monitor waiting"));
+    ASYNC_RETURN_VOID();
+  }
+
+  // todo: we always just yield once and return; always "spuriously" wake up (very inefficient
+  self->wakeup_info.kind = RR_WAKEUP_YIELDING;
+  ASYNC_YIELD((void *) &self->wakeup_info);
+
+  ASYNC_END_VOID();
 }
