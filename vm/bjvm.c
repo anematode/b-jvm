@@ -133,7 +133,8 @@ obj_header *deref_js_handle(vm *vm, int index) {
   if (index < 0 || index >= arrlen(vm->js_handles)) {
     return nullptr;
   }
-  return vm->js_handles[index];
+  object o = vm->js_handles[index];
+  return o;
 }
 
 int make_js_handle(vm *vm, obj_header *obj) {

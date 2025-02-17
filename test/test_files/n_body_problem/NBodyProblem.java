@@ -157,4 +157,12 @@ public final class NBodyProblem {
 
         System.out.println("Simulation took: " + (System.currentTimeMillis() - time) + "ms");
     }
+
+    public static String getString() {
+        return "Hello, World!";
+    }
+
+    public static void printString(String s) {
+        System.out.println(s);
+    }
 }

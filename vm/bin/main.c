@@ -12,9 +12,10 @@
 #include <roundrobin_scheduler.h>
 
 EMSCRIPTEN_KEEPALIVE
-vm *ffi_create_vm(const char *classpath, write_bytes stdout_, write_bytes stderr_) {
+vm *ffi_create_vm(const char *classpath, size_t heap_size, write_bytes stdout_, write_bytes stderr_) {
   vm_options options = default_vm_options();
   options.classpath = (slice){.chars = (char *)classpath, .len = (int)strlen(classpath)};
+  options.heap_size = heap_size;
   options.write_stdout = stdout_;
   options.write_stderr = stderr_;
   options.stdio_override_param = nullptr;
@@ -115,12 +116,17 @@ stack_value *ffi_get_execution_record_result_pointer(execution_record *record) {
 }
 
 EMSCRIPTEN_KEEPALIVE
+int ffi_get_execution_record_js_handle(execution_record *record) { return record->js_handle; }
+
+EMSCRIPTEN_KEEPALIVE
 scheduler_status_t ffi_execute_immediately(execution_record *record) {
   return rr_scheduler_execute_immediately(record);
 }
 
 EMSCRIPTEN_KEEPALIVE
-void ffi_free_execution_record(execution_record *record) { free_execution_record(record); }
+void ffi_free_execution_record(execution_record *record) {
+  free_execution_record(record);
+}
 
 void ffi_free_rr_scheduler(rr_scheduler *scheduler) { rr_scheduler_uninit(scheduler); }
 
@@ -145,6 +151,11 @@ object ffi_allocate_object(vm_thread *thr, cp_method *method) {
 EMSCRIPTEN_KEEPALIVE
 object ffi_create_string(vm_thread *thread, const char *str, size_t len) {
   return MakeJStringFromModifiedUTF8(thread, (slice) { .chars = (char*)str, .len = len }, false);
+}
+
+EMSCRIPTEN_KEEPALIVE
+bool ffi_is_string(object obj) {
+  return obj && utf8_equals(hslc(obj->descriptor->name), "java/lang/String");
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -199,8 +210,6 @@ EMSCRIPTEN_KEEPALIVE
 char *ffi_get_class_json(classdesc *desc) {
   cp_field **fields = nullptr;
   cp_method **methods = nullptr;
-
-  printf("Class name: %.*s\n", fmt_slice(desc->name));
 
   // Collect fields from the class and its super classes
   for (classdesc *s = desc; s->super_class; s = s->super_class->classdesc) {

@@ -20,6 +20,7 @@ let factory: Promise<void>;
 
 interface VMOptions {
     classpath: string;
+    heapSize?: number;  // default is 2^26
     stdout?: (buf: number, len: number) => void;
     stderr?: (buf: number, len: number) => void;
 }
@@ -76,17 +77,22 @@ function explainObject(value: any) {
     return typeof value;
 }
 
-function setJavaType(vm: VM, addr: number, type: JavaType, value: any) {
+function setJavaType(thread: Thread, addr: number, type: JavaType, value: any) {
     switch (type.kind) {
         case "L":
             if (value === null) {
                 module.setValue(addr, 0, "i32");
                 return;
             }
+            if (typeof value === "string") {
+                const strPtr = thread.createString(value);
+                module.setValue(addr, strPtr, "i32");
+                return;
+            }
             if (!(value instanceof BaseHandle)) {
                 throw new TypeError("Expected BaseHandle, not " + explainObject(value));
             }
-            let obj = module._deref_js_handle(vm.ptr, value.handleIndex);
+            let obj = module._deref_js_handle(thread.vm.ptr, value.handleIndex);
             module.setValue(addr, obj, "i32");
             return;
         case "I":
@@ -472,6 +478,17 @@ class Thread {
         return handle;
     }
 
+    // Create a raw (unmanaged) pointer to a java/lang/String
+    createString(str: string): number {
+        const malloced = module._malloc(2 * str.length);
+        const arr = new Uint8Array(module.HEAPU8.buffer, malloced, str.length);  // TODO check for null bytes
+        const result = new TextEncoder().encodeInto(str, arr);
+        const ptr = module._ffi_create_string(this.ptr, malloced, result.written);
+        module._free(malloced);
+        this.throwThreadException();
+        return ptr;
+    }
+
     private _runMethod(method: MethodInfo, ...args: any[]): ForceablePromise<any> {
         let argsPtr = module._malloc(args.length * 8);
         let executionRecord = 0;
@@ -492,12 +509,12 @@ class Thread {
             let isInstanceMethod = !(method.accessFlags & 0x0008);
             let j = 0;
             if (isInstanceMethod) {
-                setJavaType(this.vm, argsPtr, { kind: 'L', className: "" }, args[0]);
+                setJavaType(this, argsPtr, { kind: 'L', className: "" }, args[0]);
                 j++;
             }
             const nonInstanceArgc = args.length - +isInstanceMethod;
             for (let i = 0; i < nonInstanceArgc; i++, j++) {
-                setJavaType(this.vm, argsPtr + j * 8, parsed.parameterTypes[i], args[j]);
+                setJavaType(this, argsPtr + j * 8, parsed.parameterTypes[i], args[j]);
             }
             const scheduled = this.vm.scheduleMethod(this, method, argsPtr);
             executionRecord = scheduled.record;
@@ -512,9 +529,12 @@ class Thread {
                 if (!await scheduled.waitForResolution) {
                     return;  // cancelled
                 }
-                this.throwThreadException();
-                freeData();
-                return readResult();
+                try {
+                    this.throwThreadException();
+                    return readResult();
+                } finally {
+                    freeData();
+                }
             })() as ForceablePromise<any>;
 
             promise.__forceSync = (raiseIllegalState: boolean) => {
@@ -525,7 +545,7 @@ class Thread {
                     return ret;
                 } else {
                     const ptr = module._ffi_get_current_exception(this.ptr);
-                    const handle = this.vm.createHandle(ptr);
+                    const handle = this.vm.createHandle(ptr) as BaseHandle | null;
                     return { success: false, illegalStateException: handle };
                 }
             };
@@ -584,7 +604,7 @@ class VM {
         options.stderr ??= buffered();
 
         this.timeout = -1;
-        this.ptr = module._ffi_create_vm(classpath, module.addFunction(options.stdout, 'viii'), module.addFunction(options.stderr, 'viii'));
+        this.ptr = module._ffi_create_vm(classpath, options.heapSize ?? 1 << 26, module.addFunction(options.stdout, 'viii'), module.addFunction(options.stderr, 'viii'));
         module._free(classpath);
 
         this.scheduler = module._ffi_create_rr_scheduler(this.ptr);
@@ -664,8 +684,21 @@ class VM {
         return made;
     }
 
-    createHandle(ptr: number): BaseHandle | null {
+    createHandle(ptr: number): BaseHandle | string | null {
         if (ptr === 0) return null;
+
+        let isString = module._ffi_is_string(ptr);
+        if (isString) {
+            const chars = module._ffi_get_string_data(ptr);
+            const length = module._ffi_get_string_len(ptr);
+            const coder = module._ffi_get_string_coder(ptr);
+            enum Coder { STRING_CODER_LATIN1 = 0, STRING_CODER_UTF16 = 1 }
+            if (coder === Coder.STRING_CODER_LATIN1) {
+                return new TextDecoder('latin1').decode(new Uint8Array(module.HEAPU8.buffer, chars, length));
+            } else {
+                return new TextDecoder('utf16').decode(new Uint8Array(module.HEAPU8.buffer, chars, length));
+            }
+        }
 
         let handleIndex = module._make_js_handle(this.ptr, ptr);
         let classdesc = module._ffi_get_classdesc(ptr);
@@ -682,9 +715,6 @@ class VM {
 
         let thread = module._ffi_create_thread(this.ptr);
         return this.cachedThread = new Thread(this, thread);
-    }
-
-    async runMain(main: string, main2: string, param3: any[]) {
     }
 }
 

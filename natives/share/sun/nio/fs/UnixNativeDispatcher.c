@@ -144,3 +144,7 @@ DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, unmap0, "(JJ)V") {
   }
   return value_null();
 }
+
+DECLARE_NATIVE("sun/nio/ch", FileDispatcherImpl, init0, "()V") {
+  return value_null();
+}

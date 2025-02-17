@@ -163,7 +163,6 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
     }
 
     free(call->call.args.args); // free the copied arguments
-
     unshift(impl, info);
   } else {
     info->wakeup_info = (void *)fut.wakeup;

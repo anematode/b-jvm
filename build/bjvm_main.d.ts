@@ -138,7 +138,7 @@ declare namespace RuntimeExports {
     let removeRunDependency: any;
 }
 interface WasmModule {
-  _ffi_create_vm(_0: number, _1: number, _2: number): number;
+  _ffi_create_vm(_0: number, _1: number, _2: number, _3: number): number;
   _ffi_create_thread(_0: number): number;
   _ffi_get_class(_0: number, _1: number): number;
   _ffi_get_current_exception(_0: number): number;
@@ -152,11 +152,13 @@ interface WasmModule {
   _ffi_rr_schedule(_0: number, _1: number, _2: number): number;
   _ffi_get_execution_record_result_pointer(_0: number): number;
   _deref_js_handle(_0: number, _1: number): number;
+  _ffi_get_execution_record_js_handle(_0: number): number;
   _ffi_execute_immediately(_0: number): number;
   _ffi_free_execution_record(_0: number): void;
   _ffi_async_run(_0: number, _1: number, _2: number): number;
   _ffi_allocate_object(_0: number, _1: number): number;
   _ffi_create_string(_0: number, _1: number, _2: number): number;
+  _ffi_is_string(_0: number): number;
   _ffi_get_string_data(_0: number): number;
   _ffi_get_string_len(_0: number): number;
   _ffi_get_string_coder(_0: number): number;
@@ -310,6 +312,7 @@ interface WasmModule {
   _CDS_isDumpingArchive0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _CDS_isSharingEnabled0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _CDS_getRandomSeedForDumping_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _CDS_getCDSConfigStatus_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _CDS_initializeFromArchive_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _ScopedMemoryAccess_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Signal_findSignal0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -373,6 +376,7 @@ interface WasmModule {
   _UnixFileDispatcherImpl_allocationGranularity0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileDispatcherImpl_map0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _UnixFileDispatcherImpl_unmap0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _FileDispatcherImpl_init0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
 }
 
 export type MainModule = WasmModule & typeof RuntimeExports;

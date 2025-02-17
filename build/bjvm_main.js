@@ -792,11 +792,11 @@ async function createWasm() {
 // === Body ===
 
 var ASM_CONSTS = {
-  5079664: () => { if (ENVIRONMENT_IS_NODE) { if (!FS.initialized) FS.init(); const fs = require('f' + String.fromCharCode(115)); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } },  
- 5080035: ($0) => { const fs = require('f' + String.fromCharCode(115)); return fs.existsSync(UTF8ToString($0)); },  
- 5080131: ($0, $1) => { const fs = require('f' + String.fromCharCode(115)); const buffer = fs.readFileSync(UTF8ToString($0)); const length = buffer.length; const result = _malloc(length); Module.HEAPU32[$1 >> 2] = length; Module.HEAPU8.set(buffer, result); return result; },  
- 5080383: () => { return ENVIRONMENT_IS_NODE; },  
- 5080415: () => { return ENVIRONMENT_IS_NODE; }
+  5079736: () => { if (ENVIRONMENT_IS_NODE) { if (!FS.initialized) FS.init(); const fs = require('f' + String.fromCharCode(115)); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } },  
+ 5080107: ($0) => { const fs = require('f' + String.fromCharCode(115)); return fs.existsSync(UTF8ToString($0)); },  
+ 5080203: ($0, $1) => { const fs = require('f' + String.fromCharCode(115)); const buffer = fs.readFileSync(UTF8ToString($0)); const length = buffer.length; const result = _malloc(length); Module.HEAPU32[$1 >> 2] = length; Module.HEAPU8.set(buffer, result); return result; },  
+ 5080455: () => { return ENVIRONMENT_IS_NODE; },  
+ 5080487: () => { return ENVIRONMENT_IS_NODE; }
 };
 
 // end include: preamble.js
@@ -2655,7 +2655,7 @@ var wasmImports = {
 };
 var wasmExports = await createWasm();
 var ___wasm_call_ctors = createExportWrapper('__wasm_call_ctors', 0);
-var _ffi_create_vm = Module['_ffi_create_vm'] = createExportWrapper('ffi_create_vm', 3);
+var _ffi_create_vm = Module['_ffi_create_vm'] = createExportWrapper('ffi_create_vm', 4);
 var _ffi_create_thread = Module['_ffi_create_thread'] = createExportWrapper('ffi_create_thread', 1);
 var _ffi_get_class = Module['_ffi_get_class'] = createExportWrapper('ffi_get_class', 2);
 var _ffi_get_current_exception = Module['_ffi_get_current_exception'] = createExportWrapper('ffi_get_current_exception', 1);
@@ -2669,11 +2669,13 @@ var _ffi_rr_record_is_ready = Module['_ffi_rr_record_is_ready'] = createExportWr
 var _ffi_rr_schedule = Module['_ffi_rr_schedule'] = createExportWrapper('ffi_rr_schedule', 3);
 var _ffi_get_execution_record_result_pointer = Module['_ffi_get_execution_record_result_pointer'] = createExportWrapper('ffi_get_execution_record_result_pointer', 1);
 var _deref_js_handle = Module['_deref_js_handle'] = createExportWrapper('deref_js_handle', 2);
+var _ffi_get_execution_record_js_handle = Module['_ffi_get_execution_record_js_handle'] = createExportWrapper('ffi_get_execution_record_js_handle', 1);
 var _ffi_execute_immediately = Module['_ffi_execute_immediately'] = createExportWrapper('ffi_execute_immediately', 1);
 var _ffi_free_execution_record = Module['_ffi_free_execution_record'] = createExportWrapper('ffi_free_execution_record', 1);
 var _ffi_async_run = Module['_ffi_async_run'] = createExportWrapper('ffi_async_run', 3);
 var _ffi_allocate_object = Module['_ffi_allocate_object'] = createExportWrapper('ffi_allocate_object', 2);
 var _ffi_create_string = Module['_ffi_create_string'] = createExportWrapper('ffi_create_string', 3);
+var _ffi_is_string = Module['_ffi_is_string'] = createExportWrapper('ffi_is_string', 1);
 var _ffi_get_string_data = Module['_ffi_get_string_data'] = createExportWrapper('ffi_get_string_data', 1);
 var _ffi_get_string_len = Module['_ffi_get_string_len'] = createExportWrapper('ffi_get_string_len', 1);
 var _ffi_get_string_coder = Module['_ffi_get_string_coder'] = createExportWrapper('ffi_get_string_coder', 1);
@@ -2827,6 +2829,7 @@ var _CDS_isDumpingClassList0_cb0 = Module['_CDS_isDumpingClassList0_cb0'] = crea
 var _CDS_isDumpingArchive0_cb0 = Module['_CDS_isDumpingArchive0_cb0'] = createExportWrapper('CDS_isDumpingArchive0_cb0', 5);
 var _CDS_isSharingEnabled0_cb0 = Module['_CDS_isSharingEnabled0_cb0'] = createExportWrapper('CDS_isSharingEnabled0_cb0', 5);
 var _CDS_getRandomSeedForDumping_cb0 = Module['_CDS_getRandomSeedForDumping_cb0'] = createExportWrapper('CDS_getRandomSeedForDumping_cb0', 5);
+var _CDS_getCDSConfigStatus_cb0 = Module['_CDS_getCDSConfigStatus_cb0'] = createExportWrapper('CDS_getCDSConfigStatus_cb0', 5);
 var _CDS_initializeFromArchive_cb0 = Module['_CDS_initializeFromArchive_cb0'] = createExportWrapper('CDS_initializeFromArchive_cb0', 5);
 var _ScopedMemoryAccess_registerNatives_cb0 = Module['_ScopedMemoryAccess_registerNatives_cb0'] = createExportWrapper('ScopedMemoryAccess_registerNatives_cb0', 5);
 var _Signal_findSignal0_cb0 = Module['_Signal_findSignal0_cb0'] = createExportWrapper('Signal_findSignal0_cb0', 5);
@@ -2890,6 +2893,7 @@ var _UnixFileDispatcherImpl_size0_cb0 = Module['_UnixFileDispatcherImpl_size0_cb
 var _UnixFileDispatcherImpl_allocationGranularity0_cb0 = Module['_UnixFileDispatcherImpl_allocationGranularity0_cb0'] = createExportWrapper('UnixFileDispatcherImpl_allocationGranularity0_cb0', 5);
 var _UnixFileDispatcherImpl_map0_cb0 = Module['_UnixFileDispatcherImpl_map0_cb0'] = createExportWrapper('UnixFileDispatcherImpl_map0_cb0', 5);
 var _UnixFileDispatcherImpl_unmap0_cb0 = Module['_UnixFileDispatcherImpl_unmap0_cb0'] = createExportWrapper('UnixFileDispatcherImpl_unmap0_cb0', 5);
+var _FileDispatcherImpl_init0_cb0 = Module['_FileDispatcherImpl_init0_cb0'] = createExportWrapper('FileDispatcherImpl_init0_cb0', 5);
 var _emscripten_stack_get_base = wasmExports['emscripten_stack_get_base']
 var _emscripten_stack_get_end = wasmExports['emscripten_stack_get_end']
 var _emscripten_builtin_memalign = createExportWrapper('emscripten_builtin_memalign', 2);
@@ -3095,69 +3099,71 @@ var _NATIVE_INFO_CDS_isDumpingClassList0_0 = Module['_NATIVE_INFO_CDS_isDumpingC
 var _NATIVE_INFO_CDS_isDumpingArchive0_0 = Module['_NATIVE_INFO_CDS_isDumpingArchive0_0'] = 5076236;
 var _NATIVE_INFO_CDS_isSharingEnabled0_0 = Module['_NATIVE_INFO_CDS_isSharingEnabled0_0'] = 5076268;
 var _NATIVE_INFO_CDS_getRandomSeedForDumping_0 = Module['_NATIVE_INFO_CDS_getRandomSeedForDumping_0'] = 5076300;
-var _NATIVE_INFO_CDS_initializeFromArchive_0 = Module['_NATIVE_INFO_CDS_initializeFromArchive_0'] = 5076332;
-var _NATIVE_INFO_ScopedMemoryAccess_registerNatives_0 = Module['_NATIVE_INFO_ScopedMemoryAccess_registerNatives_0'] = 5076364;
-var _NATIVE_INFO_Signal_findSignal0_0 = Module['_NATIVE_INFO_Signal_findSignal0_0'] = 5076396;
-var _NATIVE_INFO_Signal_handle0_0 = Module['_NATIVE_INFO_Signal_handle0_0'] = 5076428;
-var _NATIVE_INFO_Unsafe_registerNatives_0 = Module['_NATIVE_INFO_Unsafe_registerNatives_0'] = 5076460;
-var _NATIVE_INFO_Unsafe_arrayBaseOffset0_0 = Module['_NATIVE_INFO_Unsafe_arrayBaseOffset0_0'] = 5076492;
-var _NATIVE_INFO_Unsafe_shouldBeInitialized0_0 = Module['_NATIVE_INFO_Unsafe_shouldBeInitialized0_0'] = 5076524;
-var _NATIVE_INFO_Unsafe_ensureClassInitialized0_0 = Module['_NATIVE_INFO_Unsafe_ensureClassInitialized0_0'] = 5076556;
-var _NATIVE_INFO_Unsafe_objectFieldOffset0_0 = Module['_NATIVE_INFO_Unsafe_objectFieldOffset0_0'] = 5076588;
-var _NATIVE_INFO_Unsafe_objectFieldOffset1_0 = Module['_NATIVE_INFO_Unsafe_objectFieldOffset1_0'] = 5076620;
-var _NATIVE_INFO_Unsafe_staticFieldOffset0_0 = Module['_NATIVE_INFO_Unsafe_staticFieldOffset0_0'] = 5076652;
-var _NATIVE_INFO_Unsafe_staticFieldBase0_0 = Module['_NATIVE_INFO_Unsafe_staticFieldBase0_0'] = 5076684;
-var _NATIVE_INFO_Unsafe_arrayIndexScale0_0 = Module['_NATIVE_INFO_Unsafe_arrayIndexScale0_0'] = 5076716;
-var _NATIVE_INFO_Unsafe_getIntVolatile_0 = Module['_NATIVE_INFO_Unsafe_getIntVolatile_0'] = 5076748;
-var _NATIVE_INFO_Unsafe_getLongVolatile_0 = Module['_NATIVE_INFO_Unsafe_getLongVolatile_0'] = 5076780;
-var _NATIVE_INFO_Unsafe_putReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_putReferenceVolatile_0'] = 5076812;
-var _NATIVE_INFO_Unsafe_putOrderedReference_0 = Module['_NATIVE_INFO_Unsafe_putOrderedReference_0'] = 5076844;
-var _NATIVE_INFO_Unsafe_putOrderedLong_0 = Module['_NATIVE_INFO_Unsafe_putOrderedLong_0'] = 5076876;
-var _NATIVE_INFO_Unsafe_putReference_0 = Module['_NATIVE_INFO_Unsafe_putReference_0'] = 5076908;
-var _NATIVE_INFO_Unsafe_compareAndSetInt_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetInt_0'] = 5076940;
-var _NATIVE_INFO_Unsafe_compareAndSetLong_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetLong_0'] = 5076972;
-var _NATIVE_INFO_Unsafe_compareAndSetReference_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetReference_0'] = 5077004;
-var _NATIVE_INFO_Unsafe_addressSize_0 = Module['_NATIVE_INFO_Unsafe_addressSize_0'] = 5077036;
-var _NATIVE_INFO_Unsafe_allocateMemory0_0 = Module['_NATIVE_INFO_Unsafe_allocateMemory0_0'] = 5077068;
-var _NATIVE_INFO_Unsafe_allocateInstance_0 = Module['_NATIVE_INFO_Unsafe_allocateInstance_0'] = 5077100;
-var _NATIVE_INFO_Unsafe_freeMemory0_0 = Module['_NATIVE_INFO_Unsafe_freeMemory0_0'] = 5077132;
-var _NATIVE_INFO_Unsafe_putLong_0 = Module['_NATIVE_INFO_Unsafe_putLong_0'] = 5077164;
-var _NATIVE_INFO_Unsafe_putInt_0 = Module['_NATIVE_INFO_Unsafe_putInt_0'] = 5077196;
-var _NATIVE_INFO_Unsafe_putByte_0 = Module['_NATIVE_INFO_Unsafe_putByte_0'] = 5077228;
-var _NATIVE_INFO_Unsafe_getReference_0 = Module['_NATIVE_INFO_Unsafe_getReference_0'] = 5077260;
-var _NATIVE_INFO_Unsafe_getInt_0 = Module['_NATIVE_INFO_Unsafe_getInt_0'] = 5077292;
-var _NATIVE_INFO_Unsafe_getShort_0 = Module['_NATIVE_INFO_Unsafe_getShort_0'] = 5077324;
-var _NATIVE_INFO_Unsafe_getByte_0 = Module['_NATIVE_INFO_Unsafe_getByte_0'] = 5077356;
-var _NATIVE_INFO_Unsafe_getLong_0 = Module['_NATIVE_INFO_Unsafe_getLong_0'] = 5077388;
-var _NATIVE_INFO_Unsafe_getByte_1 = Module['_NATIVE_INFO_Unsafe_getByte_1'] = 5077420;
-var _NATIVE_INFO_Unsafe_getReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_getReferenceVolatile_0'] = 5077452;
-var _NATIVE_INFO_Unsafe_defineClass_0 = Module['_NATIVE_INFO_Unsafe_defineClass_0'] = 5077484;
-var _NATIVE_INFO_Unsafe_storeFence_0 = Module['_NATIVE_INFO_Unsafe_storeFence_0'] = 5077516;
-var _NATIVE_INFO_Unsafe_fullFence_0 = Module['_NATIVE_INFO_Unsafe_fullFence_0'] = 5077548;
-var _NATIVE_INFO_Unsafe_copyMemory0_0 = Module['_NATIVE_INFO_Unsafe_copyMemory0_0'] = 5077580;
-var _NATIVE_INFO_VM_initialize_0 = Module['_NATIVE_INFO_VM_initialize_0'] = 5077612;
-var _NATIVE_INFO_ConstantPool_getUTF8At0_0 = Module['_NATIVE_INFO_ConstantPool_getUTF8At0_0'] = 5077644;
-var _NATIVE_INFO_ConstantPool_getIntAt0_0 = Module['_NATIVE_INFO_ConstantPool_getIntAt0_0'] = 5077676;
-var _NATIVE_INFO_Reflection_getCallerClass_0 = Module['_NATIVE_INFO_Reflection_getCallerClass_0'] = 5077708;
-var _NATIVE_INFO_Reflection_getClassAccessFlags_0 = Module['_NATIVE_INFO_Reflection_getClassAccessFlags_0'] = 5077740;
-var _NATIVE_INFO_Reflection_areNestMates_0 = Module['_NATIVE_INFO_Reflection_areNestMates_0'] = 5077772;
-var _NATIVE_INFO_SystemProps_Raw_platformProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_platformProperties_0'] = 5077804;
-var _NATIVE_INFO_SystemProps_Raw_vmProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_vmProperties_0'] = 5077836;
-var _NATIVE_INFO_URLClassPath_getLookupCacheURLs_0 = Module['_NATIVE_INFO_URLClassPath_getLookupCacheURLs_0'] = 5077868;
-var _NATIVE_INFO_VM_initialize_1 = Module['_NATIVE_INFO_VM_initialize_1'] = 5077900;
-var _NATIVE_INFO_IOUtil_initIDs_0 = Module['_NATIVE_INFO_IOUtil_initIDs_0'] = 5077932;
-var _NATIVE_INFO_IOUtil_iovMax_0 = Module['_NATIVE_INFO_IOUtil_iovMax_0'] = 5077964;
-var _NATIVE_INFO_IOUtil_writevMax_0 = Module['_NATIVE_INFO_IOUtil_writevMax_0'] = 5077996;
-var _NATIVE_INFO_NativeThread_init_0 = Module['_NATIVE_INFO_NativeThread_init_0'] = 5078028;
-var _NATIVE_INFO_NativeThread_current0_0 = Module['_NATIVE_INFO_NativeThread_current0_0'] = 5078060;
-var _NATIVE_INFO_UnixNativeDispatcher_init_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_init_0'] = 5078092;
-var _NATIVE_INFO_UnixNativeDispatcher_getcwd_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_getcwd_0'] = 5078124;
-var _NATIVE_INFO_UnixNativeDispatcher_stat0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_stat0_0'] = 5078156;
-var _NATIVE_INFO_UnixNativeDispatcher_open0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_open0_0'] = 5078188;
-var _NATIVE_INFO_UnixFileDispatcherImpl_size0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_size0_0'] = 5078220;
-var _NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0'] = 5078252;
-var _NATIVE_INFO_UnixFileDispatcherImpl_map0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_map0_0'] = 5078284;
-var _NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0'] = 5078316;
+var _NATIVE_INFO_CDS_getCDSConfigStatus_0 = Module['_NATIVE_INFO_CDS_getCDSConfigStatus_0'] = 5076332;
+var _NATIVE_INFO_CDS_initializeFromArchive_0 = Module['_NATIVE_INFO_CDS_initializeFromArchive_0'] = 5076364;
+var _NATIVE_INFO_ScopedMemoryAccess_registerNatives_0 = Module['_NATIVE_INFO_ScopedMemoryAccess_registerNatives_0'] = 5076396;
+var _NATIVE_INFO_Signal_findSignal0_0 = Module['_NATIVE_INFO_Signal_findSignal0_0'] = 5076428;
+var _NATIVE_INFO_Signal_handle0_0 = Module['_NATIVE_INFO_Signal_handle0_0'] = 5076460;
+var _NATIVE_INFO_Unsafe_registerNatives_0 = Module['_NATIVE_INFO_Unsafe_registerNatives_0'] = 5076492;
+var _NATIVE_INFO_Unsafe_arrayBaseOffset0_0 = Module['_NATIVE_INFO_Unsafe_arrayBaseOffset0_0'] = 5076524;
+var _NATIVE_INFO_Unsafe_shouldBeInitialized0_0 = Module['_NATIVE_INFO_Unsafe_shouldBeInitialized0_0'] = 5076556;
+var _NATIVE_INFO_Unsafe_ensureClassInitialized0_0 = Module['_NATIVE_INFO_Unsafe_ensureClassInitialized0_0'] = 5076588;
+var _NATIVE_INFO_Unsafe_objectFieldOffset0_0 = Module['_NATIVE_INFO_Unsafe_objectFieldOffset0_0'] = 5076620;
+var _NATIVE_INFO_Unsafe_objectFieldOffset1_0 = Module['_NATIVE_INFO_Unsafe_objectFieldOffset1_0'] = 5076652;
+var _NATIVE_INFO_Unsafe_staticFieldOffset0_0 = Module['_NATIVE_INFO_Unsafe_staticFieldOffset0_0'] = 5076684;
+var _NATIVE_INFO_Unsafe_staticFieldBase0_0 = Module['_NATIVE_INFO_Unsafe_staticFieldBase0_0'] = 5076716;
+var _NATIVE_INFO_Unsafe_arrayIndexScale0_0 = Module['_NATIVE_INFO_Unsafe_arrayIndexScale0_0'] = 5076748;
+var _NATIVE_INFO_Unsafe_getIntVolatile_0 = Module['_NATIVE_INFO_Unsafe_getIntVolatile_0'] = 5076780;
+var _NATIVE_INFO_Unsafe_getLongVolatile_0 = Module['_NATIVE_INFO_Unsafe_getLongVolatile_0'] = 5076812;
+var _NATIVE_INFO_Unsafe_putReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_putReferenceVolatile_0'] = 5076844;
+var _NATIVE_INFO_Unsafe_putOrderedReference_0 = Module['_NATIVE_INFO_Unsafe_putOrderedReference_0'] = 5076876;
+var _NATIVE_INFO_Unsafe_putOrderedLong_0 = Module['_NATIVE_INFO_Unsafe_putOrderedLong_0'] = 5076908;
+var _NATIVE_INFO_Unsafe_putReference_0 = Module['_NATIVE_INFO_Unsafe_putReference_0'] = 5076940;
+var _NATIVE_INFO_Unsafe_compareAndSetInt_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetInt_0'] = 5076972;
+var _NATIVE_INFO_Unsafe_compareAndSetLong_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetLong_0'] = 5077004;
+var _NATIVE_INFO_Unsafe_compareAndSetReference_0 = Module['_NATIVE_INFO_Unsafe_compareAndSetReference_0'] = 5077036;
+var _NATIVE_INFO_Unsafe_addressSize_0 = Module['_NATIVE_INFO_Unsafe_addressSize_0'] = 5077068;
+var _NATIVE_INFO_Unsafe_allocateMemory0_0 = Module['_NATIVE_INFO_Unsafe_allocateMemory0_0'] = 5077100;
+var _NATIVE_INFO_Unsafe_allocateInstance_0 = Module['_NATIVE_INFO_Unsafe_allocateInstance_0'] = 5077132;
+var _NATIVE_INFO_Unsafe_freeMemory0_0 = Module['_NATIVE_INFO_Unsafe_freeMemory0_0'] = 5077164;
+var _NATIVE_INFO_Unsafe_putLong_0 = Module['_NATIVE_INFO_Unsafe_putLong_0'] = 5077196;
+var _NATIVE_INFO_Unsafe_putInt_0 = Module['_NATIVE_INFO_Unsafe_putInt_0'] = 5077228;
+var _NATIVE_INFO_Unsafe_putByte_0 = Module['_NATIVE_INFO_Unsafe_putByte_0'] = 5077260;
+var _NATIVE_INFO_Unsafe_getReference_0 = Module['_NATIVE_INFO_Unsafe_getReference_0'] = 5077292;
+var _NATIVE_INFO_Unsafe_getInt_0 = Module['_NATIVE_INFO_Unsafe_getInt_0'] = 5077324;
+var _NATIVE_INFO_Unsafe_getShort_0 = Module['_NATIVE_INFO_Unsafe_getShort_0'] = 5077356;
+var _NATIVE_INFO_Unsafe_getByte_0 = Module['_NATIVE_INFO_Unsafe_getByte_0'] = 5077388;
+var _NATIVE_INFO_Unsafe_getLong_0 = Module['_NATIVE_INFO_Unsafe_getLong_0'] = 5077420;
+var _NATIVE_INFO_Unsafe_getByte_1 = Module['_NATIVE_INFO_Unsafe_getByte_1'] = 5077452;
+var _NATIVE_INFO_Unsafe_getReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_getReferenceVolatile_0'] = 5077484;
+var _NATIVE_INFO_Unsafe_defineClass_0 = Module['_NATIVE_INFO_Unsafe_defineClass_0'] = 5077516;
+var _NATIVE_INFO_Unsafe_storeFence_0 = Module['_NATIVE_INFO_Unsafe_storeFence_0'] = 5077548;
+var _NATIVE_INFO_Unsafe_fullFence_0 = Module['_NATIVE_INFO_Unsafe_fullFence_0'] = 5077580;
+var _NATIVE_INFO_Unsafe_copyMemory0_0 = Module['_NATIVE_INFO_Unsafe_copyMemory0_0'] = 5077612;
+var _NATIVE_INFO_VM_initialize_0 = Module['_NATIVE_INFO_VM_initialize_0'] = 5077644;
+var _NATIVE_INFO_ConstantPool_getUTF8At0_0 = Module['_NATIVE_INFO_ConstantPool_getUTF8At0_0'] = 5077676;
+var _NATIVE_INFO_ConstantPool_getIntAt0_0 = Module['_NATIVE_INFO_ConstantPool_getIntAt0_0'] = 5077708;
+var _NATIVE_INFO_Reflection_getCallerClass_0 = Module['_NATIVE_INFO_Reflection_getCallerClass_0'] = 5077740;
+var _NATIVE_INFO_Reflection_getClassAccessFlags_0 = Module['_NATIVE_INFO_Reflection_getClassAccessFlags_0'] = 5077772;
+var _NATIVE_INFO_Reflection_areNestMates_0 = Module['_NATIVE_INFO_Reflection_areNestMates_0'] = 5077804;
+var _NATIVE_INFO_SystemProps_Raw_platformProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_platformProperties_0'] = 5077836;
+var _NATIVE_INFO_SystemProps_Raw_vmProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_vmProperties_0'] = 5077868;
+var _NATIVE_INFO_URLClassPath_getLookupCacheURLs_0 = Module['_NATIVE_INFO_URLClassPath_getLookupCacheURLs_0'] = 5077900;
+var _NATIVE_INFO_VM_initialize_1 = Module['_NATIVE_INFO_VM_initialize_1'] = 5077932;
+var _NATIVE_INFO_IOUtil_initIDs_0 = Module['_NATIVE_INFO_IOUtil_initIDs_0'] = 5077964;
+var _NATIVE_INFO_IOUtil_iovMax_0 = Module['_NATIVE_INFO_IOUtil_iovMax_0'] = 5077996;
+var _NATIVE_INFO_IOUtil_writevMax_0 = Module['_NATIVE_INFO_IOUtil_writevMax_0'] = 5078028;
+var _NATIVE_INFO_NativeThread_init_0 = Module['_NATIVE_INFO_NativeThread_init_0'] = 5078060;
+var _NATIVE_INFO_NativeThread_current0_0 = Module['_NATIVE_INFO_NativeThread_current0_0'] = 5078092;
+var _NATIVE_INFO_UnixNativeDispatcher_init_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_init_0'] = 5078124;
+var _NATIVE_INFO_UnixNativeDispatcher_getcwd_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_getcwd_0'] = 5078156;
+var _NATIVE_INFO_UnixNativeDispatcher_stat0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_stat0_0'] = 5078188;
+var _NATIVE_INFO_UnixNativeDispatcher_open0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_open0_0'] = 5078220;
+var _NATIVE_INFO_UnixFileDispatcherImpl_size0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_size0_0'] = 5078252;
+var _NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0'] = 5078284;
+var _NATIVE_INFO_UnixFileDispatcherImpl_map0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_map0_0'] = 5078316;
+var _NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0'] = 5078348;
+var _NATIVE_INFO_FileDispatcherImpl_init0_0 = Module['_NATIVE_INFO_FileDispatcherImpl_init0_0'] = 5078380;
 function invoke_vi(index,a1) {
   var sp = stackSave();
   try {
