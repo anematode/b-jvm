@@ -1830,6 +1830,7 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   cf->bootstrap_methods = nullptr;
   cf->indy_insns = nullptr;
   cf->sigpoly_insns = nullptr;
+  cf->array_type = nullptr;
 
   bool in_MethodHandle = utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle") ||
                          utf8_equals(hslc(cf->name), "java/lang/invoke/VarHandle");

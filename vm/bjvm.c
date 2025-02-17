@@ -1726,14 +1726,19 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
     cp_method *loadClass = method_lookup(loader->descriptor,
       STR("loadClass"), STR("(Ljava/lang/String;)Ljava/lang/Class;"),
                                          true, false);
-    object name = MakeJStringFromModifiedUTF8(thread, info->name, true);
+    INIT_STACK_STRING(s, 1000);
+    exchange_slashes_and_dots(&s, info->name);
+    s.len = info->name.len;
+
+    object name = MakeJStringFromModifiedUTF8(thread, s, false);
     stack_value result = call_interpreter_synchronous(thread, loadClass, (stack_value[]){{.obj = loader}, {.obj = name}});
 
     if (thread->current_exception) {
       thread->current_exception = nullptr;
       goto welp;
     }
-    info->classdesc = (classdesc *)result.obj;
+
+    info->classdesc = (classdesc *)unmirror_class(result.obj);
   } else {
     welp:
     info->classdesc = bootstrap_lookup_class(thread, info->name);
