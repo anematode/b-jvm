@@ -22,6 +22,9 @@ typedef struct {
 } impl;
 
 void free_thread_info(thread_info *info) {
+  printf("free_thread_info %d\n", info->thread->tid);
+  info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
+
   arrfree(info->call_queue);
   free(info);
 }

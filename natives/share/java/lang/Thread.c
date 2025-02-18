@@ -1,4 +1,5 @@
 #include <natives-dsl.h>
+#include <monitors.h>
 #include <roundrobin_scheduler.h>
 
 DECLARE_NATIVE("java/lang", Thread, registerNatives, "()V") { return value_null(); }
@@ -9,12 +10,16 @@ DECLARE_NATIVE("java/lang", Thread, currentThread, "()Ljava/lang/Thread;") {
 
 DECLARE_NATIVE("java/lang", Thread, setPriority0, "(I)V") { return value_null(); }
 
-DECLARE_NATIVE("java/lang", Thread, isAlive, "()Z") {
-  return (stack_value){.i = 1}; // TODO
-}
-
 DECLARE_NATIVE("java/lang", Thread, holdsLock, "(Ljava/lang/Object;)Z") {
-  return (stack_value){.i = 1}; // TODO
+  assert(argc == 1);
+  handle *lock_obj = args[0].handle;
+  if (!lock_obj) {
+    ThrowLangException(NullPointerException);
+    return value_null();
+  }
+
+  u32 hold_count = current_thread_hold_count(thread, lock_obj->obj);
+  return (stack_value) { .i = hold_count > 0 };
 }
 
 DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
@@ -71,6 +76,14 @@ DECLARE_ASYNC_NATIVE("java/lang", Thread, sleepNanos0, "(J)V", locals(rr_wakeup_
   self->wakeup_info.kind = RR_WAKEUP_SLEEP;
   self->wakeup_info.wakeup_us = end;
   ASYNC_YIELD((void *)&self->wakeup_info);
+
+  // re-check interrupt status after wakeup
+  if (thread->thread_obj->interrupted) {
+    thread->thread_obj->interrupted = false; // throw and reset flag
+    raise_vm_exception(thread, STR("java/lang/InterruptedException"), STR("Thread interrupted while sleeping"));
+    ASYNC_RETURN_VOID();
+  }
+
   ASYNC_END_VOID();
 }
 

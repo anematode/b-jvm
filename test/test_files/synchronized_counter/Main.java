@@ -9,6 +9,7 @@ public class Main {
         for (int i = 0; i < 10; i++) {
             Thread t = new Thread(() -> {
                 for (int j = 0; j < 1000; j++) {
+                    System.out.println("Incrementing");
                     counter.increment();
                 }
             });
@@ -19,6 +20,7 @@ public class Main {
         for (int i = 0; i < 10; i++) {
             Thread t = new Thread(() -> {
                 for (int j = 0; j < 500; j++) {
+                    System.out.println("Decrementing");
                     counter.decrement();
                 }
             });
@@ -28,6 +30,7 @@ public class Main {
 
         for (Thread t : threads) {
             try {
+                System.out.println("Joining");
                 t.join();
             } catch (InterruptedException e) {
                 e.printStackTrace();

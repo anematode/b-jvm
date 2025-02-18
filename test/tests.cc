@@ -721,7 +721,7 @@ new
 }
 
 TEST_CASE("Synchronized counter") {
-  auto result = run_scheduled_test_case("test_files/synchronized_counter/", true, "Main");
+  auto result = run_scheduled_test_case("test_files/synchronized_counter/", false, "Main");
   REQUIRE(result.stdout_ == R"(Final count: 5000
 )");
 }
