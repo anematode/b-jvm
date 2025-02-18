@@ -735,3 +735,10 @@ TEST_CASE("URLClassLoader") {
   auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
   REQUIRE(result.stdout_ == "Hello, world!\n");
 }
+
+TEST_CASE("frem and drem") {
+  auto result = run_test_case("test_files/frem_drem/", true, "FremDremTest");
+  REQUIRE(result.stdout_ == R"(0.099999994
+0.09999999999999998
+)");
+}

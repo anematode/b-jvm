@@ -100,13 +100,24 @@
 #pragma GCC optimize("optimize-sibling-calls")
 
 // TODO consider what to do here so that it's efficient but not UB
+#ifdef EMSCRIPTEN
 #define WITH_UNDEF(expr)                                                                                               \
   do {                                                                                                                 \
-    s64 a_undef;                                                                                                       \
-    float b_undef;                                                                                                     \
-    double c_undef;                                                                                                    \
+    s64 a_undef = 0;                                                                                                       \
+    float b_undef = 0;                                                                                                     \
+    double c_undef = 0;                                                                                                    \
     MUSTTAIL return (expr);                                                                                            \
   } while (0);
+#else
+#define WITH_UNDEF(expr)                                                                                               \
+do {                                                                                                                 \
+s64 a_undef;                                                                                                       \
+float b_undef;                                                                                                     \
+double c_undef;                                                                                                    \
+asm volatile ("" : "=r"(a_undef), "=r"(b_undef), "=r"(c_undef)); \
+MUSTTAIL return (expr);                                                                                            \
+} while (0);
+#endif
 
 #ifdef EMSCRIPTEN
 
@@ -2596,6 +2607,20 @@ static s64 sqrt_impl_float(ARGS_FLOAT) {
   NEXT_FLOAT(sqrt(tos))
 }
 
+static s64 frem_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  float a = (sp - 2)->f, b = tos;
+  sp -= 1;
+  NEXT_FLOAT(fmodf(a, b))
+}
+
+static s64 drem_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  double a = (sp - 2)->d, b = tos;
+  sp -= 1;
+  NEXT_DOUBLE(fmod(a, b))
+}
+
 [[maybe_unused]] static s64 notco_fallback(ARGS_VOID, int index) {
   return bytecode_tables[index & 0x3][index >> 2](thread, frame, insns, pc_, sp_, arg_1, arg_2, arg_3);
 }
@@ -3084,6 +3109,7 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_double,
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
+    [insn_drem] = drem_impl_double,
     [insn_cos] = cos_impl_double,
     [insn_sin] = sin_impl_double,
     [insn_sqrt] = sqrt_impl_double};
@@ -3319,6 +3345,7 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_float,
     [insn_getstatic_L] = getstatic_L_impl_float,
     [insn_putstatic_F] = putstatic_F_impl_float,
+    [insn_frem] = frem_impl_float,
     [insn_sin] = sin_impl_float,
     [insn_cos] = cos_impl_float,
     [insn_sqrt] = sqrt_impl_float};
