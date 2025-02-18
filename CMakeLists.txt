@@ -40,7 +40,6 @@ endif()
 if (EMSCRIPTEN)
     target_link_options(bjvm_static PUBLIC -sEXPORTED_FUNCTIONS=_malloc,_free,_main
             -sSTACK_SIZE=5000000
-            -sWASMFS
             -sWASM_BIGINT
             -sFORCE_FILESYSTEM=1
             -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1
@@ -52,5 +51,5 @@ if (EMSCRIPTEN)
     run_emscripten_postprocess(bjvm_main)
 
     target_link_libraries(bjvm_main PRIVATE bjvm_static)
-    target_link_options(bjvm_main PUBLIC -sENVIRONMENT=web -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
+    target_link_options(bjvm_main PUBLIC -sWASMFS -sENVIRONMENT=web -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
 endif ()

@@ -35,34 +35,6 @@ static struct loaded_bytes read_file(FILE *f) {
   return (struct loaded_bytes){.bytes = data, .length = (u32)length};
 }
 
-#ifdef EMSCRIPTEN
-// Read the file using the Node filesystem. TODO see whether NodeFS can obviate this
-struct loaded_bytes node_read_file(const char *filename) {
-  struct loaded_bytes result = {0};
-  bool exists = EM_ASM_INT(
-      {
-        const fs = require('f' + String.fromCharCode(115));
-        return fs.existsSync(UTF8ToString($0));
-      },
-      filename);
-  if (exists) {
-    result.bytes = EM_ASM_PTR(
-        {
-          const fs = require('f' + String.fromCharCode(115));
-          const buffer = fs.readFileSync(UTF8ToString($0));
-          const length = buffer.length;
-
-          const result = _malloc(length);
-          Module.HEAPU32[$1 >> 2] = length;
-          Module.HEAPU8.set(buffer, result);
-          return result;
-        },
-        filename, &result.length);
-  }
-  return result;
-}
-#endif
-
 static char *map_jar(const char *filename, mapped_jar *jar) {
   char error[256];
 #ifdef USE_MMAP
@@ -83,18 +55,6 @@ static char *map_jar(const char *filename, mapped_jar *jar) {
   jar->is_mmap = true;
   close(fd);
   return nullptr;
-#elif defined(EMSCRIPTEN)
-  int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
-  if (is_node) {
-    struct loaded_bytes load = node_read_file(filename);
-    if (!load.bytes)
-      goto missing;
-
-    jar->data = load.bytes;
-    jar->size_bytes = load.length;
-    jar->is_mmap = false;
-    return nullptr;
-  }
 #endif
 
   // Implementation w/o mmap and not Node
@@ -402,23 +362,12 @@ int lookup_classpath(classpath *cp, const slice filename, u8 **bytes, size_t *le
     DCHECK(search.chars[search.len] == '\0', "Must be null terminated");
 
     struct loaded_bytes lb;
-#ifdef EMSCRIPTEN
-    int is_node = EM_ASM_INT({ return ENVIRONMENT_IS_NODE; });
-    if (is_node) {
-      lb = node_read_file(search.chars);
-      free_heap_str(search);
-      if (!lb.bytes)
-        continue;
-    } else
-#endif
-    {
-      FILE *f = fopen(search.chars, "rb");
-      free_heap_str(search);
-      if (!f)
-        continue;
-      lb = read_file(f);
-      fclose(f);
-    }
+    FILE *f = fopen(search.chars, "rb");
+    free_heap_str(search);
+    if (!f)
+      continue;
+    lb = read_file(f);
+    fclose(f);
     *bytes = (u8 *)lb.bytes;
     *len = lb.length;
     return 0;

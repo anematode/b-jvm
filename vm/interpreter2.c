@@ -99,25 +99,14 @@
 #endif
 #pragma GCC optimize("optimize-sibling-calls")
 
-#ifdef EMSCRIPTEN
-// Sad :(
-#define WITH_UNDEF(expr)                                                                                               \
-  do {                                                                                                                 \
-    [[maybe_unused]] s64 a_undef = 0;                                                                                  \
-    [[maybe_unused]] float b_undef = 0;                                                                                \
-    [[maybe_unused]] double c_undef = 0;                                                                               \
-    expr                                                                                                               \
-  } while (0);
-#else
+// TODO consider what to do here so that it's efficient but not UB
 #define WITH_UNDEF(expr)                                                                                               \
   do {                                                                                                                 \
     s64 a_undef;                                                                                                       \
     float b_undef;                                                                                                     \
     double c_undef;                                                                                                    \
-    asm("" : "=r"(a_undef), "=r"(b_undef), "=r"(c_undef));                                                             \
     MUSTTAIL return (expr);                                                                                            \
   } while (0);
-#endif
 
 #ifdef EMSCRIPTEN
 
@@ -169,11 +158,9 @@
   float __tos = (tos);                                                                                                 \
   WITH_UNDEF(jmp_table_float[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, __tos, c_undef));
 #define ADVANCE_DOUBLE_(tos, insn_off)                                                                                 \
-  do {                                                                                                                 \
-    int k = insns[insn_off].kind;                                                                                      \
-    double __tos = (tos);                                                                                              \
-    WITH_UNDEF(jmp_table_double[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, b_undef, __tos));      \
-  } while (0);
+  int k = insns[insn_off].kind;                                                                                      \
+  double __tos = (tos);                                                                                              \
+  WITH_UNDEF(jmp_table_double[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, b_undef, __tos));      \
 
 #define JMP_INT(tos) ADVANCE_INT_(tos, 0)
 #define JMP_FLOAT(tos) ADVANCE_FLOAT_(tos, 0)
@@ -351,6 +338,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                             \
   }
 
+// Emit a null pointer exception when the given expression is null.
 #define NPE_ON_NULL(expr) \
   if (unlikely(!expr)) { \
     SPILL_VOID \
@@ -360,7 +348,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
 /** Helper functions */
 
-static s32 java_idiv_(s32 const a, s32 const b) {
+static s32 java_idiv(s32 const a, s32 const b) {
   DCHECK(b != 0);
   if (a == INT_MIN && b == -1)
     return INT_MIN;
@@ -388,8 +376,11 @@ static s64 java_lrem(s64 const a, s64 const b) {
   return a % b;
 }
 
-// Java saturates the conversion
+// Java saturates the conversion. For Emscripten we use the builtins for saturating conversions.
 static int double_to_int(double const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i32_f64(x);
+#else
   if (x > INT_MAX)
     return INT_MAX;
   if (x < INT_MIN)
@@ -397,10 +388,22 @@ static int double_to_int(double const x) {
   if (isnan(x))
     return 0;
   return (int)x;
+#endif
+}
+
+static int float_to_int(float const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i32_f32(x);
+#else
+  return double_to_int(x);
+#endif
 }
 
 // Java saturates the conversion
 static s64 double_to_long(double const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i64_f64(x);
+#else
   if (x >= (double)(ULLONG_MAX / 2))
     return LLONG_MAX;
   if (x < (double)LLONG_MIN)
@@ -408,6 +411,15 @@ static s64 double_to_long(double const x) {
   if (isnan(x))
     return 0;
   return (s64)x;
+#endif
+}
+
+static s64 float_to_long(float const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i64_f32(x);
+#else
+  return double_to_long(x);
+#endif
 }
 
 // Convert getstatic and putstatic instructions into one of the resolved forms -- or throw a linkage error if
@@ -1189,8 +1201,8 @@ FLOAT_BIN_OP(cmpg, a > b ? 1 : (a < b ? -1 : (a == b ? 0 : 1)), int, int, NEXT_I
 FLOAT_BIN_OP(cmpl, a > b ? 1 : (a < b ? -1 : (a == b ? 0 : -1)), int, int, NEXT_INT, NEXT_INT)
 
 FLOAT_UN_OP(fneg, -a, float, NEXT_FLOAT)
-FLOAT_UN_OP(f2i, double_to_int(a), int, NEXT_INT)
-FLOAT_UN_OP(f2l, double_to_long(a), s64, NEXT_INT)
+FLOAT_UN_OP(f2i, float_to_int(a), int, NEXT_INT)
+FLOAT_UN_OP(f2l, float_to_long(a), s64, NEXT_INT)
 FLOAT_UN_OP(f2d, (double)a, double, NEXT_DOUBLE)
 
 DOUBLE_UN_OP(dneg, -a, double, NEXT_DOUBLE)
@@ -1207,7 +1219,7 @@ static s64 idiv_impl_int(ARGS_INT) {
     return 0;
   }
   sp--;
-  NEXT_INT(java_idiv_(a, b));
+  NEXT_INT(java_idiv(a, b));
 }
 
 static s64 ldiv_impl_int(ARGS_INT) {

@@ -91,10 +91,8 @@ DECLARE_NATIVE("java/io", RandomAccessFile, length0, "()J") {
   return (stack_value){.l = length};
 }
 
-
-
 DECLARE_NATIVE("java/io", RandomAccessFile, readBytes0, "([BII)I") {
-  object *fd = *get_fd(obj->obj);
+  object fd = *get_fd(obj->obj);
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
@@ -102,7 +100,7 @@ DECLARE_NATIVE("java/io", RandomAccessFile, readBytes0, "([BII)I") {
                          STR("File not open"));
     return value_null();
   }
-  object *buf = args[0].handle->obj;
+  object buf = args[0].handle->obj;
   s32 off = args[1].i;
   s32 len = args[2].i;
   s32 read = fread((char*)ArrayData(buf) + off, 1, len, file);
