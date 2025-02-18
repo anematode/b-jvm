@@ -59,6 +59,7 @@
   X(long_, "java/lang/Long") \
   X(float_, "java/lang/Float") \
   X(double_, "java/lang/Double") \
+  X(throwable, "java/lang/Throwable")
 
 #define CACHED_CLASSDESCS(X)                                                                                           \
   __CACHED_EXCEPTION_CLASSES(X)                                                                                        \

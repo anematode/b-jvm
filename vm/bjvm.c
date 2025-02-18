@@ -80,17 +80,17 @@ DEFINE_ASYNC(init_cached_classdescs) {
   ASYNC_END(0);
 }
 
-inline bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
+bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
-inline mark_word_t *get_mark_word(header_word *data) {
+mark_word_t *get_mark_word(header_word *data) {
   return has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
 }
 
-inline monitor_data *inspect_monitor(header_word *data) {
+monitor_data *inspect_monitor(header_word *data) {
   return has_expanded_data(data) ? data->expanded_data : nullptr;
 }
 
-inline monitor_data *allocate_monitor(vm_thread *thread) {
+monitor_data *allocate_monitor(vm_thread *thread) {
   monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
   return data;
 }
@@ -101,7 +101,7 @@ u16 stack_depth(const stack_frame *frame) {
   DCHECK(!is_frame_native(frame), "Can't get stack depth of native frame");
   DCHECK(frame->method, "Can't get stack depth of fake frame");
   int pc = frame->plain.program_counter;
-  if (pc == 0)
+  if (pc == 0)  // stack is always 0 at method entry, common case
     return 0;
   code_analysis *analy = frame->method->code_analysis;
   DCHECK(pc < analy->insn_count);
