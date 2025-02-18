@@ -123,7 +123,7 @@ static object lookup_interned_jstring(vm_thread *thread, object s) {
   object raw = RawStringData(thread, s);
 
   u8 *data = ArrayData(raw);
-  s32 len = *ArrayLength(raw);
+  s32 len = ArrayLength(raw);
 
   return hash_table_lookup(&thread->vm->interned_strings, (char const *)data, len);
 }
@@ -132,7 +132,7 @@ static void insert_interned_jstring(vm_thread *thread, object s) {
   object raw = RawStringData(thread, s);
 
   u8 *data = ArrayData(raw);
-  s32 len = *ArrayLength(raw);
+  s32 len = ArrayLength(raw);
 
   (void)hash_table_insert(&thread->vm->interned_strings, (char const *)data, len, s);
 }
@@ -198,7 +198,7 @@ obj_header *InternJString(vm_thread *thread, object s) {
   object raw = RawStringData(thread, s);
 
   u8 *data = ArrayData(raw);
-  s32 len = *ArrayLength(raw);
+  s32 len = ArrayLength(raw);
 
   (void)hash_table_insert(&thread->vm->interned_strings, (char const *)data, len, s);
   return s;

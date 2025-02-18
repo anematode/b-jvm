@@ -51,7 +51,7 @@ heap_string unparse_method_type(const struct native_MethodType *mt) {
   INIT_STACK_STRING(desc, 10000);
   slice write = desc;
   write = subslice(write, bprintf(write, "(").len);
-  for (int i = 0; i < *ArrayLength(mt->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(mt->ptypes); ++i) {
     struct native_Class *class = *((struct native_Class **)ArrayData(mt->ptypes) + i);
     write = subslice(write, unparse_classdesc_to_field_descriptor(write, class->reflected_class).len);
   }

@@ -89,7 +89,7 @@ DECLARE_NATIVE("java/io", FileInputStream, readBytes, "([BII)I") {
   s32 offset = args[1].i;
   s32 length = args[2].i;
 
-  if (offset < 0 || length < 0 || (s64)offset + length > *ArrayLength(array)) {
+  if (offset < 0 || length < 0 || (s64)offset + length > ArrayLength(array)) {
     ThrowLangException(ArrayIndexOutOfBoundsException);
     return value_null();
   }

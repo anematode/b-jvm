@@ -13,7 +13,7 @@ DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
   [[maybe_unused]] bool append = args[3].i; // todo: append to first advance the position to the end of file
   char *data = (char *)ArrayData(bytes);
 
-  if (offset < 0 || length < 0 || (long)offset + length > *ArrayLength(bytes)) {
+  if (offset < 0 || length < 0 || (long)offset + length > ArrayLength(bytes)) {
     ThrowLangException(ArrayIndexOutOfBoundsException);
     return value_null();
   }

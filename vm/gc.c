@@ -218,7 +218,7 @@ static void mark_reachable(gc_ctx *ctx, obj_header *obj, int **bitsets, int dept
     }
   } else if (desc->kind == CD_KIND_ORDINARY_ARRAY || (desc->kind == CD_KIND_PRIMITIVE_ARRAY && desc->dimensions > 1)) {
     // Visit all components
-    int arr_len = *ArrayLength(obj);
+    int arr_len = ArrayLength(obj);
     for (int i = 0; i < arr_len; ++i) {
       obj_header *arr_element = *((obj_header **)ArrayData(obj) + i);
       if (arr_element && !(*get_flags(arr_element) & IS_REACHABLE) && in_heap(ctx, arr_element)) {
@@ -236,9 +236,9 @@ static size_t size_of_object(obj_header *obj) {
   }
   if (obj->descriptor->kind == CD_KIND_ORDINARY_ARRAY ||
       (obj->descriptor->kind == CD_KIND_PRIMITIVE_ARRAY && obj->descriptor->dimensions > 1)) {
-    return kArrayDataOffset + *ArrayLength(obj) * sizeof(void *);
+    return kArrayDataOffset + ArrayLength(obj) * sizeof(void *);
   }
-  return kArrayDataOffset + *ArrayLength(obj) * sizeof_type_kind(obj->descriptor->primitive_component);
+  return kArrayDataOffset + ArrayLength(obj) * sizeof_type_kind(obj->descriptor->primitive_component);
 }
 
 static void relocate_object(const gc_ctx *ctx, obj_header **obj) {
@@ -291,7 +291,7 @@ void relocate_instance_fields(gc_ctx *ctx) {
       }
     } else if (obj->descriptor->kind == CD_KIND_ORDINARY_ARRAY ||
                (obj->descriptor->kind == CD_KIND_PRIMITIVE_ARRAY && obj->descriptor->dimensions > 1)) {
-      int arr_len = *ArrayLength(obj);
+      int arr_len = ArrayLength(obj);
       for (int j = 0; j < arr_len; ++j) {
         obj_header **field = (obj_header **)ArrayData(obj) + j;
         relocate_object(ctx, field);

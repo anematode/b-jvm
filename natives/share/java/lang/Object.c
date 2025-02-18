@@ -17,9 +17,9 @@ static bool cloneable(vm *vm, classdesc *cd) {
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   switch (obj->obj->descriptor->kind) {
   case CD_KIND_ORDINARY_ARRAY: {
-    obj_header *new_array = CreateObjectArray1D(thread, obj->obj->descriptor->one_fewer_dim, *ArrayLength(obj->obj));
+    obj_header *new_array = CreateObjectArray1D(thread, obj->obj->descriptor->one_fewer_dim, ArrayLength(obj->obj));
     if (new_array) {
-      memcpy(ArrayData(new_array), ArrayData(obj->obj), *ArrayLength(obj->obj) * sizeof(void *));
+      memcpy(ArrayData(new_array), ArrayData(obj->obj), ArrayLength(obj->obj) * sizeof(void *));
     }
     return (stack_value){.obj = new_array};
   }
@@ -38,12 +38,12 @@ DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   }
   case CD_KIND_PRIMITIVE_ARRAY: {
     obj_header *new_array =
-        CreatePrimitiveArray1D(thread, obj->obj->descriptor->primitive_component, *ArrayLength(obj->obj));
+        CreatePrimitiveArray1D(thread, obj->obj->descriptor->primitive_component, ArrayLength(obj->obj));
     if (!new_array) {
       return value_null();
     }
     memcpy(ArrayData(new_array), ArrayData(obj->obj),
-           *ArrayLength(obj->obj) * sizeof_type_kind(obj->obj->descriptor->primitive_component));
+           ArrayLength(obj->obj) * sizeof_type_kind(obj->obj->descriptor->primitive_component));
     return (stack_value){.obj = new_array};
   }
   default:

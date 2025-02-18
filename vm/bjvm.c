@@ -444,7 +444,7 @@ void read_string(vm_thread *, obj_header *obj, s8 **buf, size_t *len) {
   DCHECK(utf8_equals(obj->descriptor->name, "java/lang/String"));
   obj_header *array = ((struct native_String *)obj)->value;
   *buf = ArrayData(array);
-  *len = *ArrayLength(array);
+  *len = ArrayLength(array);
 }
 
 int read_string_to_utf8(vm_thread *thread, heap_string *result, obj_header *obj) {
@@ -2001,10 +2001,10 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
   // Compare ptypes
   if (provider_mt == targ)
     return true;
-  if (*ArrayLength(provider_mt->ptypes) != *ArrayLength(targ->ptypes)) {
+  if (ArrayLength(provider_mt->ptypes) != ArrayLength(targ->ptypes)) {
     return false;
   }
-  for (int i = 0; i < *ArrayLength(provider_mt->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(provider_mt->ptypes); ++i) {
     classdesc *left = unmirror_class(((obj_header **)ArrayData(provider_mt->ptypes))[i]);
     classdesc *right = unmirror_class(((obj_header **)ArrayData(targ->ptypes))[i]);
 
@@ -2018,10 +2018,10 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
 // Dump the contents of the method type to the specified stream.
 [[maybe_unused]] static void dump_method_type(FILE *stream, struct native_MethodType *type) {
   fprintf(stream, "(");
-  for (int i = 0; i < *ArrayLength(type->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(type->ptypes); ++i) {
     classdesc *desc = unmirror_class(((obj_header **)ArrayData(type->ptypes))[i]);
     fprintf(stream, "%.*s", fmt_slice(desc->name));
-    if (i + 1 < *ArrayLength(type->ptypes))
+    if (i + 1 < ArrayLength(type->ptypes))
       fprintf(stream, ", ");
   }
   fprintf(stream, ") -> %.*s\n", fmt_slice(unmirror_class(type->rtype)->name));

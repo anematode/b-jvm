@@ -71,14 +71,14 @@ cleanup:
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceDepth, "()I") {
   DCHECK(argc == 0);
-  return (stack_value){.i = *ArrayLength(*backtrace_object(obj->obj))};
+  return (stack_value){.i = ArrayLength(*backtrace_object(obj->obj))};
 }
 
 DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement, "(I)Ljava/lang/StackTraceElement;") {
   DCHECK(argc == 1);
   obj_header *stack_trace = *backtrace_object(obj->obj);
   int index = args[0].i;
-  if (index < 0 || index >= *ArrayLength(stack_trace)) {
+  if (index < 0 || index >= ArrayLength(stack_trace)) {
     return value_null();
   }
   obj_header *element = *((obj_header **)ArrayData(stack_trace) + index);
@@ -88,8 +88,8 @@ DECLARE_NATIVE("java/lang", Throwable, getStackTraceElement, "(I)Ljava/lang/Stac
 DECLARE_NATIVE("java/lang", StackTraceElement, initStackTraceElements,
                "([Ljava/lang/StackTraceElement;Ljava/lang/Object;I)V") {
   handle *stack_trace = args[1].handle;
-  int depth = *ArrayLength(stack_trace->obj);
-  int array_length = *ArrayLength(args[0].handle->obj);
+  int depth = ArrayLength(stack_trace->obj);
+  int array_length = ArrayLength(args[0].handle->obj);
   if (array_length < depth) {
     depth = array_length;
   }

@@ -116,7 +116,7 @@ static obj_header *create_1d_primitive_array(vm_thread *thread, type_kind array_
 
   obj_header *array = AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
   if (array)
-    *ArrayLength(array) = count;
+    *(int *)((char *)array + kArrayLengthOffset) = count;
 
   return array;
 }
@@ -130,7 +130,7 @@ static obj_header *create_1d_object_array(vm_thread *thread, classdesc *cd, int 
 
   obj_header *array = AllocateObject(thread, array_desc, kArrayHeaderSize + count * sizeof(obj_header *));
   if (array)
-    *ArrayLength(array) = count;
+    *(int *)((char *)array + kArrayLengthOffset) = count;
 
   return array;
 }

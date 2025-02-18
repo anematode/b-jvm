@@ -1282,7 +1282,7 @@ static s64 arraylength_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *array = (obj_header *)tos;
   NPE_ON_NULL(array);
-  NEXT_INT(*ArrayLength(array))
+  NEXT_INT(ArrayLength(array))
 }
 
 #define ARRAY_LOAD(which, load, type, NEXT)                                                                            \
@@ -1291,7 +1291,7 @@ static s64 arraylength_impl_int(ARGS_INT) {
     obj_header *array = (obj_header *)(sp - 2)->obj;                                                                   \
     int index = (int)tos;                                                                                              \
     NPE_ON_NULL(array);                                                                                                \
-    int length = *ArrayLength(array);                                                                                  \
+    int length = ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
@@ -1317,7 +1317,7 @@ ARRAY_LOAD(caload, CharArrayLoad, s64, NEXT_INT)
     obj_header *array = (obj_header *)(sp - 3)->obj;                                                                   \
     int index = (int)(sp - 2)->i;                                                                                      \
     NPE_ON_NULL(array);                                                                                                            \
-    int length = *ArrayLength(array);                                                                                  \
+    int length = ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
@@ -1344,7 +1344,7 @@ static s64 aastore_impl_int(ARGS_INT) {
   obj_header *value = (obj_header *)tos;
   int index = (int)(sp - 2)->i;
   NPE_ON_NULL(array);
-  int length = *ArrayLength(array);
+  int length = ArrayLength(array);
   if (unlikely(index < 0 || index >= length)) {
     SPILL(tos);
     raise_array_index_oob_exception(thread, index, length);

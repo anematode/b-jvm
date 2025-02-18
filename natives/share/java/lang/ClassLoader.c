@@ -101,7 +101,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass1,
   int length = args[4].i;
   handle *pd = args[5].handle;
 
-  DCHECK(length <= *ArrayLength(data->obj));
+  DCHECK(length <= ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
@@ -121,7 +121,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
   int flags = args[8].i;
   handle *source = args[9].handle;
 
-  DCHECK(length <= *ArrayLength(data->obj));
+  DCHECK(length <= ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
   return define_class(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);

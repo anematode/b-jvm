@@ -57,8 +57,8 @@ DECLARE_NATIVE("java/lang", System, arraycopy, "(Ljava/lang/Object;ILjava/lang/O
   int src_pos = args[1].i;
   int dest_pos = args[3].i;
   int length = args[4].i;
-  int src_length = *ArrayLength(src);
-  int dest_length = *ArrayLength(dest);
+  int src_length = ArrayLength(src);
+  int dest_length = ArrayLength(dest);
   // Verify that everything is in bounds
   // TODO add more descriptive error messages
   if (src_pos < 0 || dest_pos < 0 || length < 0 || (s64)src_pos + length > src_length ||

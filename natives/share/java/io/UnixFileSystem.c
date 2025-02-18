@@ -67,7 +67,7 @@ DECLARE_NATIVE("java/io", UnixFileSystem, canonicalize0, "(Ljava/lang/String;)Lj
 
   // Concatenate the current working directory with the given path
   object raw = RawStringData(thread, args[0].handle->obj);
-  slice data = (slice){.chars = ArrayData(raw), .len = *ArrayLength(raw)};
+  slice data = (slice){.chars = ArrayData(raw), .len = ArrayLength(raw)};
 
   heap_string canonical = canonicalize_path(data); // todo: deal with oom here
 
