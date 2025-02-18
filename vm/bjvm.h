@@ -392,6 +392,9 @@ typedef struct vm {
   // Vector of allocations done via mmap, to be unmapped
   mmap_allocation *mmap_allocations;
 
+  // Vector of z_streams, to be freed
+  void **z_streams;  // z_stream **
+
   // Latest TID
   s32 next_tid;
 

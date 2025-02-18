@@ -49,7 +49,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
 #define E ((struct native_StackTraceElement *)e->obj)
     int line = is_frame_native(frame) ? -1 : get_line_number(method->code, frame->plain.program_counter);
     E->declaringClassObject = (void *)get_class_mirror(thread, method->my_class);
-    E->declaringClass = MakeJStringFromModifiedUTF8(thread, hslc(method->my_class->name), true);
+    E->declaringClass = MakeJStringFromModifiedUTF8(thread, method->my_class->name, true);
     E->methodName = MakeJStringFromModifiedUTF8(thread, method->name, true);
     attribute_source_file *sf = method->my_class->source_file;
     E->fileName = sf ? MakeJStringFromModifiedUTF8(thread, sf->name, true) : nullptr;

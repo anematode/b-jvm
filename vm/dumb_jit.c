@@ -25,11 +25,19 @@ static wasm_type tuple_from_array(wasm_module *module, wasm_value_type *array) {
 void init_function_builder(wasm_module *module, function_builder *builder, const wasm_value_type *params, wasm_type returns) {
   builder->module = module;
   builder->params = nullptr;
+  builder->returns = returns;
   for (int i = 0; i < arrlen(params); ++i) {
     arrput(builder->params, params[i]);
   }
   builder->locals = nullptr;
   builder->next_local = arrlen(builder->params);
+}
+
+[[maybe_unused]] static int fb_new_local(function_builder *builder, wasm_value_type local) {
+  int local_i = builder->next_local++;
+  arrput(builder->locals, local);
+  DCHECK(arrlen(builder->locals) + arrlen(builder->params) == local_i);
+  return local_i;
 }
 
 wasm_function *finalize_function_builder(function_builder *builder, const char *name, expression body) {

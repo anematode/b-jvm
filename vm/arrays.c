@@ -15,7 +15,6 @@ static void free_array_classdesc(classdesc *classdesc) {
   DCHECK(classdesc->kind == CD_KIND_ORDINARY_ARRAY || classdesc->kind == CD_KIND_PRIMITIVE_ARRAY);
   if (classdesc->array_type)
     free_array_classdesc(classdesc->array_type);
-  free_heap_str(classdesc->name);
   free(classdesc->super_class);
   free(classdesc->interfaces[0]); // Cloneable and Serializable together
   free(classdesc->interfaces);
@@ -54,8 +53,9 @@ static classdesc *primitive_array_classdesc(vm_thread *thread, classdesc *compon
   result->dimensions = component_type->dimensions + 1;
   result->one_fewer_dim = component_type;
   result->primitive_component = component_type->primitive_component;
-  result->name = make_heap_str(2);
-  bprintf(hslc(result->name), "[%c", (char)component_type->primitive_component);
+  INIT_STACK_STRING(name, 3);
+  name = bprintf(name, "[%c", (char)component_type->primitive_component);
+  result->name = arena_make_str(&result->arena, name.chars, (int)name.len);
   setup_super_hierarchy(result);
   set_up_function_tables(result);
   return result;
@@ -69,16 +69,17 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
   result->dimensions = component->dimensions + 1;
   result->one_fewer_dim = component;
 
+  INIT_STACK_STRING(name, 1000);
+  CHECK(component->name.len + 3 < 1000);
   if (component->kind == CD_KIND_ORDINARY) {
     result->base_component = component;
-    result->name = make_heap_str(component->name.len + 3);
-    bprintf(hslc(result->name), "[L%.*s;", fmt_slice(component->name));
+    name = bprintf(name, "[L%.*s;", fmt_slice(component->name));
   } else {
     result->base_component = component->base_component;
-    result->name = make_heap_str(component->name.len + 1);
-    bprintf(hslc(result->name), "[%.*s", fmt_slice(component->name));
+    name = bprintf(name, "[%.*s", fmt_slice(component->name));
     DCHECK(result->dimensions == component->dimensions + 1);
   }
+  result->name = arena_make_str(&result->arena, name.chars, (int)name.len);
 
   // propagate to n-D primitive arrays
   result->primitive_component = component->primitive_component;

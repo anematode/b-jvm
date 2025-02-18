@@ -26,7 +26,7 @@ __attribute__((noinline)) void raise_negative_array_size_exception(vm_thread *th
 __attribute__((noinline)) void raise_null_pointer_exception(vm_thread *thread);
 
 // Raise an ArrayStoreException.
-__attribute__((noinline)) void raise_array_store_exception(vm_thread *thread, const heap_string *class_name);
+__attribute__((noinline)) void raise_array_store_exception(vm_thread *thread, const slice class_name);
 
 // Raise an IncompatibleClassChangeError.
 __attribute__((noinline)) void raise_incompatible_class_change_error(vm_thread *thread, const slice complaint);

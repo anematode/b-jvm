@@ -271,8 +271,6 @@ double *arg_3;
 // The current instruction
 #define insn (&insns[0])
 
-#define MAX_INSN_KIND (insn_sqrt + 1)
-
 typedef s64 (*bytecode_handler_t)(ARGS_VOID);
 
 // Used when the TOS is int (i.e., the stack is empty)
@@ -698,7 +696,7 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     }                                                                                                                  \
   } while (0)
 
-force_inline static s64 getstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
@@ -714,7 +712,7 @@ FORWARD_TO_NULLARY(getstatic)
 
 // Never actually directly called -- we just do it this way because it's easier and we might as well merge code paths
 // for different TOS types.
-force_inline static s64 putstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   TryResolve(thread, insn, &frame->plain, sp);
@@ -1332,7 +1330,7 @@ static s64 aastore_impl_int(ARGS_INT) {
   // Instanceof check against the component type
   if (value && !instanceof(value->descriptor, array->descriptor->one_fewer_dim)) {
     SPILL(tos);
-    raise_array_store_exception(thread, &value->descriptor->name);
+    raise_array_store_exception(thread, value->descriptor->name);
     return 0;
   }
   ReferenceArrayStore(array, index, value);
@@ -1674,7 +1672,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
 
 static int intrinsify(bytecode_insn *inst) {
   cp_method *method = inst->ic;
-  if (utf8_equals(hslc(method->my_class->name), "java/lang/Math")) {
+  if (utf8_equals(method->my_class->name, "java/lang/Math")) {
     if (utf8_equals(method->name, "sqrt")) {
       inst->kind = insn_sqrt;
       return 1;
@@ -1884,7 +1882,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   }
 
   // If this is the <init> method of Object, make it a nop
-  if (utf8_equals(hslc(candidate->my_class->name), "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
+  if (utf8_equals(candidate->my_class->name, "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
     insn->kind = insn_pop;
   } else {
     insn->kind = insn_invokespecial_resolved;

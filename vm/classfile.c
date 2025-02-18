@@ -1791,9 +1791,9 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   cp_class_info *this_class =
       &checked_cp_entry(cf->pool, reader_next_u16(&reader, "this class"), CP_KIND_CLASS, "this class")->class_info;
   cf->self = this_class;
-  cf->name = (heap_string){.chars = this_class->name.chars, .len = this_class->name.len}; // TODO unjank
+  cf->name = this_class->name;
 
-  bool is_primordial_object = utf8_equals(hslc(cf->name), "java/lang/Object");
+  bool is_primordial_object = utf8_equals(cf->name, "java/lang/Object");
 
   u16 super_class = reader_next_u16(&reader, "super class");
   cf->super_class = ((cf->access_flags & ACCESS_MODULE) | is_primordial_object)
@@ -1829,8 +1829,8 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   cf->sigpoly_insns = nullptr;
   cf->array_type = nullptr;
 
-  bool in_MethodHandle = utf8_equals(hslc(cf->name), "java/lang/invoke/MethodHandle") ||
-                         utf8_equals(hslc(cf->name), "java/lang/invoke/VarHandle");
+  bool in_MethodHandle = utf8_equals(cf->name, "java/lang/invoke/MethodHandle") ||
+                         utf8_equals(cf->name, "java/lang/invoke/VarHandle");
   for (int i = 0; i < cf->methods_count; ++i) {
     cp_method *method = cf->methods + i;
     *method = parse_method(&reader, &ctx);

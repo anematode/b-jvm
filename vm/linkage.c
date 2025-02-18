@@ -107,7 +107,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
       return status;
     }
   } else {
-    assert(utf8_equals(hslc(cd->name), "java/lang/Object"));
+    assert(utf8_equals(cd->name, "java/lang/Object"));
   }
 
   setup_super_hierarchy(cd);

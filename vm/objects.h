@@ -15,7 +15,7 @@ obj_header *InternJString(vm_thread *thread, obj_header *str);
 
 /// Helper for java.lang.String#length
 static inline int JavaStringLength(vm_thread *thread, obj_header *string) {
-  DCHECK(utf8_equals(hslc(string->descriptor->name), "java/lang/String"));
+  DCHECK(utf8_equals(string->descriptor->name, "java/lang/String"));
 
   auto method = method_lookup(string->descriptor, STR("length"), STR("()I"), false, false);
   stack_value result = call_interpreter_synchronous(thread, method, (stack_value[]){});

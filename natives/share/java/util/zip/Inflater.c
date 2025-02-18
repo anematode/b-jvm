@@ -6,6 +6,7 @@ DECLARE_NATIVE("java/util/zip", Inflater, initIDs, "()V") {
   return value_null();
 }
 
+#define ZS thread->vm->z_streams
 DECLARE_NATIVE("java/util/zip", Inflater, init, "(Z)J") {
   // Create an inflater.
   assert(argc == 1);
@@ -15,6 +16,8 @@ DECLARE_NATIVE("java/util/zip", Inflater, init, "(Z)J") {
   stream->zfree = Z_NULL;
   stream->opaque = Z_NULL;
   int ret = inflateInit2(stream, nowrap ? -MAX_WBITS : MAX_WBITS);
+  // Add to vm->zstreams
+  arrput(ZS, stream);
   if (ret != Z_OK) {
     free(stream);
     return (stack_value){.l = 0};
@@ -66,6 +69,15 @@ DECLARE_NATIVE("java/util/zip", Inflater, reset, "(J)V") {
 DECLARE_NATIVE("java/util/zip", Inflater, end, "(J)V") {
   z_stream *stream = (z_stream *)args[0].l;
   inflateEnd(stream);
+  // Remove from vm->zstreams
+  for (int i = 0; i < arrlen(ZS); ++i) {
+    if (ZS[i] == stream) {
+      arrdelswap(ZS, i);
+      break;
+    }
+  }
+#undef ZS
+  free(stream);
   return value_null();
 }
 

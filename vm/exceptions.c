@@ -74,8 +74,8 @@ void raise_null_pointer_exception(vm_thread *thread) {
   raise_vm_exception(thread, STR("java/lang/NullPointerException"), null_str());
 }
 
-void raise_array_store_exception(vm_thread *thread, const heap_string *class_name) {
-  raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), hslc(*(heap_string *)class_name));
+void raise_array_store_exception(vm_thread *thread, const slice class_name) {
+  raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), class_name);
 }
 
 void raise_incompatible_class_change_error(vm_thread *thread, const slice complaint) {
@@ -93,8 +93,8 @@ void raise_class_cast_exception(vm_thread *thread, const classdesc *from, const 
   INIT_STACK_STRING(from_str, 1000);
   INIT_STACK_STRING(to_str, 1000);
 
-  exchange_slashes_and_dots(&from_str, hslc(from->name));
-  exchange_slashes_and_dots(&to_str, hslc(to->name));
+  exchange_slashes_and_dots(&from_str, from->name);
+  exchange_slashes_and_dots(&to_str, to->name);
 
   complaint = bprintf(complaint, "%.*s cannot be cast to %.*s", fmt_slice(from_str), fmt_slice(to_str));
   raise_vm_exception(thread, STR("java/lang/ClassCastException"), complaint);

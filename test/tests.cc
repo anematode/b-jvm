@@ -411,7 +411,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   classdesc desc;
   auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();
   parse_classfile(cursed_file.data(), cursed_file.size(), &desc, nullptr);
-  REQUIRE(utf8_equals(hslc(desc.name), "Main"));
+  REQUIRE(utf8_equals(desc.name, "Main"));
 
   cp_method *m = desc.methods + 4;
   REQUIRE(utf8_equals(m->name, "main"));

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <zlib.h>
 
 #include "analysis.h"
 #include "arrays.h"
@@ -387,7 +388,6 @@ static void free_primitive_classdesc(classdesc *classdesc) {
   DCHECK(classdesc->kind == CD_KIND_PRIMITIVE);
   if (classdesc->array_type)
     classdesc->array_type->dtor(classdesc->array_type);
-  free_heap_str(classdesc->name);
   arena_uninit(&classdesc->arena);
   free(classdesc);
 }
@@ -441,7 +441,7 @@ void register_native(vm *vm, slice class, const slice method_name, const slice m
 }
 
 void read_string(vm_thread *, obj_header *obj, s8 **buf, size_t *len) {
-  DCHECK(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
+  DCHECK(utf8_equals(obj->descriptor->name, "java/lang/String"));
   obj_header *array = ((struct native_String *)obj)->value;
   *buf = ArrayData(array);
   *len = *ArrayLength(array);
@@ -535,7 +535,7 @@ classdesc *make_primitive_classdesc(type_kind kind, const slice name) {
 
   desc->kind = CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
-  desc->name = make_heap_str_from(name);
+  desc->name = arena_make_str(&desc->arena, name.chars, (int)name.len);
   desc->access_flags = ACCESS_PUBLIC | ACCESS_FINAL | ACCESS_ABSTRACT;
   desc->array_type = nullptr;
   desc->primitive_component = kind;
@@ -696,6 +696,14 @@ void free_unsafe_allocations(vm *vm) {
   arrfree(vm->unsafe_allocations);
 }
 
+void free_zstreams(vm *vm) {
+  for (int i = 0; i < arrlen(vm->z_streams); ++i) {
+    inflateEnd(vm->z_streams[i]);
+    free(vm->z_streams[i]);
+  }
+  arrfree(vm->z_streams);
+}
+
 void free_vm(vm *vm) {
   free_hash_table(vm->classes);
   free_hash_table(vm->natives);
@@ -720,6 +728,7 @@ void free_vm(vm *vm) {
   arrfree(vm->active_threads);
   free(vm->heap);
   free_unsafe_allocations(vm);
+  free_zstreams(vm);
 
   free(vm);
 }
@@ -1360,7 +1369,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
     // class with a matching name
     for (int i = (int)arrlen(thread->frames) - 1; i >= 0; --i) {
       classdesc *d = get_frame_method(thread->frames[i])->my_class;
-      if (utf8_equals_utf8(hslc(d->name), chars)) {
+      if (utf8_equals_utf8(d->name, chars)) {
         class = d;
         break;
       }
@@ -1462,7 +1471,7 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
 
 // Returns true if the class descriptor is a subclass of java.lang.Error.
 bool is_error(classdesc *d) {
-  return utf8_equals(hslc(d->name), "java/lang/Error") || (d->super_class && is_error(d->super_class->classdesc));
+  return utf8_equals(d->name, "java/lang/Error") || (d->super_class && is_error(d->super_class->classdesc));
 }
 
 attribute *find_attribute(attribute *attrs, int attrc, attribute_kind kind) {
@@ -1866,7 +1875,7 @@ obj_header *new_object(vm_thread *thread, classdesc *classdesc) {
 }
 
 bool is_instanceof_name(const obj_header *mirror, const slice name) {
-  return mirror && utf8_equals_utf8(hslc(mirror->descriptor->name), name);
+  return mirror && utf8_equals_utf8(mirror->descriptor->name, name);
 }
 
 classdesc *unmirror_class(obj_header *mirror) {
@@ -2088,7 +2097,7 @@ DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
     bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
     // only raw calls to MethodHandle.invoke involve "asType" conversions
     bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
-                     utf8_equals(hslc(args->method->my_class->name), "java/lang/invoke/MethodHandle");
+                     utf8_equals(args->method->my_class->name, "java/lang/invoke/MethodHandle");
 
     if (is_invoke_exact) {
       if (!mts_are_same) {
