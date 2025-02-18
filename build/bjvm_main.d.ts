@@ -314,7 +314,6 @@ interface WasmModule {
   _Inflater_reset_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Inflater_end_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _CRC32_updateBytes0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _ZipFile_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NativeImageBuffer_getNativeMap_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _BootLoader_setBootLoaderUnnamedModule0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NativeLibraries_findBuiltinLib_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

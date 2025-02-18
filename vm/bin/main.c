@@ -220,7 +220,7 @@ object ffi_create_string(vm_thread *thread, const char *str, size_t len) {
 
 EMSCRIPTEN_KEEPALIVE
 bool ffi_is_string(object obj) {
-  return obj && utf8_equals(hslc(obj->descriptor->name), "java/lang/String");
+  return obj && utf8_equals(obj->descriptor->name, "java/lang/String");
 }
 
 EMSCRIPTEN_KEEPALIVE
