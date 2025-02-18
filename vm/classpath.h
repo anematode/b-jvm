@@ -1,3 +1,4 @@
+// Classpath utilities.
 
 #ifndef CLASSPATH_H
 #define CLASSPATH_H
@@ -43,9 +44,19 @@ typedef struct {
   heap_string as_colon_separated;
 } classpath;
 
-// Returns nullptr if all elements in the path were loaded ok.
+// Try to initialize the classpath using the colon-separated data in "path". Supported entries are JAR files and
+// folders. (TODO index folders instead of rescanning each time)
+// Returns nullptr if all elements in the path were loaded ok. Otherwise, returns a heap-allocated error message that
+// is the caller's responsibility to free.
 [[nodiscard]] char *init_classpath(classpath *cp, slice path);
+
+// Free the classpath. (Does not call free(cp).)
 void free_classpath(classpath *cp);
+
+// Look for a classfile in the classpath.
+// Example usage:
+//   u8 *bytes; size_t len;
+//   int failed = lookup_classpath(&cp, STR("java/lang/Object.class"), &bytes, &len);
 int lookup_classpath(classpath *cp, slice filename, u8 **bytes, size_t *len);
 
 #ifdef __cplusplus
