@@ -159,7 +159,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
                                                              : allocate_field(&nonstatic_offset, kind);
 
 #if AGGRESSIVE_DEBUG
-    printf("Allocating field %.*s for class %.*s at %d\n", fmt_slice(field->name), fmt_slice(classdesc->name),
+    printf("Allocating field %.*s for class %.*s at %zu\n", fmt_slice(field->name), fmt_slice(cd->name),
            field->byte_offset);
 #endif
   }
