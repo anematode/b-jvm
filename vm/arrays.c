@@ -15,9 +15,6 @@ static void free_array_classdesc(classdesc *classdesc) {
   DCHECK(classdesc->kind == CD_KIND_ORDINARY_ARRAY || classdesc->kind == CD_KIND_PRIMITIVE_ARRAY);
   if (classdesc->array_type)
     free_array_classdesc(classdesc->array_type);
-  free(classdesc->super_class);
-  free(classdesc->interfaces[0]); // Cloneable and Serializable together
-  free(classdesc->interfaces);
   free_function_tables(classdesc);
   arena_uninit(&classdesc->arena);
   free(classdesc);
@@ -28,19 +25,19 @@ static void fill_array_classdesc(vm_thread *thread, classdesc *base) {
   base->access_flags = ACCESS_PUBLIC | ACCESS_FINAL | ACCESS_ABSTRACT;
 
   slice name = STR("java/lang/Object");
-  cp_class_info *info = calloc(1, sizeof(cp_class_info));
+  cp_class_info *info = arena_alloc(&base->arena, 1, sizeof(cp_class_info));
   info->classdesc = bootstrap_lookup_class(thread, name);
   info->name = name;
   base->super_class = info;
 
-  cp_class_info *Cloneable = calloc(2, sizeof(cp_class_info)), *Serializable = Cloneable + 1;
+  cp_class_info *Cloneable = arena_alloc(&base->arena, 2, sizeof(cp_class_info)), *Serializable = Cloneable + 1;
   Cloneable->classdesc = bootstrap_lookup_class(thread, STR("java/lang/Cloneable"));
   Cloneable->name = STR("java/lang/Cloneable");
   Serializable->classdesc = bootstrap_lookup_class(thread, STR("java/io/Serializable"));
   Serializable->name = STR("java/io/Serializable");
 
   base->interfaces_count = 2;
-  base->interfaces = calloc(2, sizeof(cp_class_info *));
+  base->interfaces = arena_alloc(&base->arena, 2, sizeof(cp_class_info *));
   base->interfaces[0] = Cloneable;
   base->interfaces[1] = Serializable;
 }

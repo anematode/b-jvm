@@ -4,7 +4,10 @@
 #include <natives-dsl.h>
 
 // Returns true if the frame is currently constructing the given object.
-static bool is_frame_constructing(stack_frame *frame, object obj) {
+static bool is_frame_part_of_throwable_construction(stack_frame *frame, object obj) {
+  if (utf8_equals(frame->method->name, "fillInStackTrace")) {  // hack for now
+    return true;
+  }
   if (!frame->method->is_ctor || is_frame_native(frame) || frame->num_locals < 1) {
     return false;
   }
@@ -22,10 +25,10 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
   link_class(thread, StackTraceElement);
 
   // Find the first frame which is not an initializer of the current exception
-  int i = (int)arrlen(thread->frames) - 3 /* skip fillInStackTrace(void) and fillInStackTrace(I) */;
+  int i = (int)arrlen(thread->frames) - 1;
   for (; i >= 0; --i) {
     stack_frame *frame = thread->frames[i];
-    if (!is_frame_constructing(frame, obj->obj)) {
+    if (!is_frame_part_of_throwable_construction(frame, obj->obj)) {
       break;
     }
   }

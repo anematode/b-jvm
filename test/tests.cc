@@ -742,3 +742,8 @@ TEST_CASE("frem and drem") {
 0.09999999999999998
 )");
 }
+
+TEST_CASE("Manually thrown exception") {
+  auto result = run_test_case("test_files/manually_thrown", true, "ManuallyThrown");
+  REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat ManuallyThrown.main(ManuallyThrown.java:4)\n");
+}
