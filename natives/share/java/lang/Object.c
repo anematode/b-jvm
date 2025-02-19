@@ -58,11 +58,11 @@ DECLARE_NATIVE("java/lang", Object, getClass, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Object, notifyAll, "()V") {
-  return value_null(); // TODO: no-op
+  return value_null(); // TODO: no-op, since wait always returns spuriously rn
 }
 
 DECLARE_NATIVE("java/lang", Object, notify, "()V") {
-  return value_null(); // TODO: no-op
+  return value_null(); // TODO: no-op, since wait always returns spuriously rn
 }
 
 DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; rr_wakeup_info wakeup_info), invoked_methods(invoked_method(monitor_reacquire_hold_count))) {
@@ -84,7 +84,6 @@ DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; r
         ASYNC_RETURN_VOID();
   }
 
-  printf("wait\n");
   // todo: we always just yield once and return; always "spuriously" wake up (very inefficient, lazy)
   self->wakeup_info.kind = RR_WAKEUP_YIELDING;
   ASYNC_YIELD((void *) &self->wakeup_info);
@@ -98,7 +97,6 @@ DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; r
     raise_vm_exception(thread, STR("java/lang/InterruptedException"), STR("Thread interrupted before monitor waiting"));
     ASYNC_RETURN_VOID();
   }
-  printf("wake up from wait\n");
 
   ASYNC_END_VOID();
 }

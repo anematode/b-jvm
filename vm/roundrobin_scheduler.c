@@ -22,7 +22,7 @@ typedef struct {
 } impl;
 
 void free_thread_info(thread_info *info) {
-  printf("free_thread_info %d\n", info->thread->tid);
+  // todo: should acquire thread_obj monitor and run notifyAll
   info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
 
   arrfree(info->call_queue);

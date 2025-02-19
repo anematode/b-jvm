@@ -63,7 +63,7 @@ TEST_CASE("Async natives") {
   register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
                   native_ptr->callback);
 
-  auto thread = create_thread(vm, default_thread_options());
+  auto thread = create_main_thread(vm, default_thread_options());
 
   classdesc *desc = bootstrap_lookup_class(thread, STR("AsyncNative"));
   AWAIT_READY(initialize_class, thread, desc);

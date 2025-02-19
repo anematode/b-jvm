@@ -9,29 +9,32 @@ public class Main {
         for (int i = 0; i < 10; i++) {
             Thread t = new Thread(() -> {
                 for (int j = 0; j < 1000; j++) {
-                    System.out.println("Incrementing");
                     counter.increment();
+                    Thread.yield(); // just to make things more wild
                 }
             });
             threads.add(t);
-            t.start();
         }
 
         for (int i = 0; i < 10; i++) {
             Thread t = new Thread(() -> {
                 for (int j = 0; j < 500; j++) {
-                    System.out.println("Decrementing");
                     counter.decrement();
+                    Thread.yield(); // just to make things more wild
                 }
             });
             threads.add(t);
+        }
+
+        for (Thread t : threads) {
             t.start();
+            // System.out.println("Thread started: " + t.getName());
         }
 
         for (Thread t : threads) {
             try {
-                System.out.println("Joining");
                 t.join();
+                // System.out.println("Thread joined: " + t.getName());
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

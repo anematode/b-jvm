@@ -26,7 +26,7 @@ vm *ffi_create_vm(const char *classpath, size_t heap_size, write_bytes stdout_, 
 
 EMSCRIPTEN_KEEPALIVE
 vm_thread *ffi_create_thread(vm *vm) {
-  vm_thread *thr = create_thread(vm, default_thread_options());
+  vm_thread *thr = create_main_thread(vm, default_thread_options());
   return thr;
 }
 

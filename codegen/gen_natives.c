@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
   vm_options options = default_vm_options();
 
   vm *vm = create_vm(options);
-  vm_thread *thread = create_thread(vm, default_thread_options());
+  vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   // Read natives.txt line by line
   FILE *f = fopen(argv[1], "r");

@@ -187,7 +187,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::str
     fprintf(stderr, "Failed to create VM");
     return result;
   }
-  vm_thread *thread = create_thread(vm, default_thread_options());
+  vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
 
@@ -274,7 +274,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
     fprintf(stderr, "Failed to create VM");
     return result;
   }
-  vm_thread *thread = create_thread(vm, default_thread_options());
+  vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
 

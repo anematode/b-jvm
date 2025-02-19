@@ -27,12 +27,15 @@ DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
   if (!scheduler)
     return value_null(); // TODO throw error instead
 
-  vm_thread *new_thread = create_thread(thread->vm, default_thread_options());
-  ((struct native_Thread *)obj->obj)->eetop = (intptr_t)new_thread;
+#define this_thread ((struct native_Thread *) obj->obj)
+  vm_thread *wrapped_thread = create_vm_thread(thread->vm, thread, this_thread, default_thread_options());
 
   cp_method *run = method_lookup(obj->obj->descriptor, STR("run"), STR("()V"), false, false);
-  stack_value argz[1] = {{.obj = obj->obj}};
-  rr_scheduler_run(scheduler, (call_interpreter_t){{new_thread, run, argz}});
+  stack_value argz[1] = {{ .obj = obj->obj }};
+
+  this_thread->eetop = (intptr_t)wrapped_thread;
+  rr_scheduler_run(scheduler, (call_interpreter_t) {{ wrapped_thread, run, argz  }});
+#undef this_thread
 
   return value_null();
 }
@@ -96,8 +99,8 @@ DECLARE_ASYNC_NATIVE("java/lang", Thread, yield0, "()V", locals(rr_wakeup_info w
   // the JVM is free to implement it as a no-op or treat it as a scheduling hint.
   // This is usually used to "encourage" more context switches to improve throughput, but
   // "It is rarely appropriate to use this method" (OpenJDK).
-  //
-  //  self->wakeup_info.kind = RR_WAKEUP_YIELDING;
-  //  ASYNC_YIELD((void *) &self->wakeup_info);
+
+  self->wakeup_info.kind = RR_WAKEUP_YIELDING;
+  ASYNC_YIELD((void *) &self->wakeup_info);
   ASYNC_END_VOID();
 }

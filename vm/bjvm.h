@@ -618,7 +618,8 @@ typedef struct {
 } thread_options;
 
 thread_options default_thread_options();
-vm_thread *create_thread(vm *vm, thread_options options);
+vm_thread *create_main_thread(vm *vm, thread_options options);
+vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thread *thread_obj, thread_options options); // wraps a Thread obj
 void free_thread(vm_thread *thread);
 
 /**

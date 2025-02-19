@@ -809,7 +809,7 @@ static void init_unsafe_constants(vm_thread *thread) {
   set_static_field(unaligned_access, (stack_value){.i = 1});
 }
 
-vm_thread *create_thread(vm *vm, thread_options options) {
+vm_thread *create_main_thread(vm *vm, thread_options options) {
   vm_thread *thr = calloc(1, sizeof(vm_thread));
   arrput(vm->active_threads, thr);
 
@@ -882,8 +882,8 @@ vm_thread *create_thread(vm *vm, thread_options options) {
                                true);
         assert(method);
 
-        stack_value args[] = {{.obj = thr->current_exception}};
-        stack_value obj = call_interpreter_synchronous(thr, method, args);
+        stack_value get_message_args[] = {{.obj = thr->current_exception}};
+        stack_value obj = call_interpreter_synchronous(thr, method, get_message_args);
         heap_string message;
         if (obj.obj) {
           CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
@@ -897,6 +897,87 @@ vm_thread *create_thread(vm *vm, thread_options options) {
                              STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
       assert(method);
       stack_value args2[1] = {{.obj = (void *)MakeJStringFromCString(thr, "java.home", true)}};
+      ret = call_interpreter_synchronous(thr, method, args2); // returns a String
+
+      heap_string java_home;
+      CHECK(read_string_to_utf8(thr, &java_home, ret.obj) == 0);
+      free_heap_str(java_home);
+    }
+  }
+
+  thr->current_exception = nullptr;
+  return thr;
+}
+
+vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thread *thread_obj, thread_options options) {
+  handle *java_thread = make_handle(creator_thread, (obj_header *) thread_obj);
+
+  vm_thread *thr = calloc(1, sizeof(vm_thread));
+  arrput(vm->active_threads, thr);
+
+  thr->vm = vm;
+  thr->frame_buffer = calloc(1, thr->frame_buffer_capacity = options.stack_space);
+  thr->js_jit_enabled = options.js_jit_enabled;
+  const int HANDLES_CAPACITY = 200;
+  thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
+  thr->handles_capacity = HANDLES_CAPACITY;
+
+  thr->async_stack = calloc(1, 0x20);
+  thr->tid = vm->next_tid++;
+
+  bool initializing = !vm->vm_initialized;
+
+  if (initializing) {
+    vm->vm_initialized = true;
+
+    vm_init_primitive_classes(thr);
+    init_unsafe_constants(thr);
+
+    init_cached_classdescs_t init = { .args = { thr } };
+    future_t result = init_cached_classdescs(&init);
+    CHECK(result.status == FUTURE_READY);
+  }
+
+  // Pre-allocate OOM and stack overflow errors
+  thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
+  thr->stack_overflow_error = new_object(thr, vm->cached_classdescs->stack_overflow_error);
+
+  thr->thread_obj = ((struct native_Thread *) java_thread->obj);
+  drop_handle(thr, java_thread);
+
+  if (initializing) {
+    slice const phases[3] = { STR("initPhase1"), STR("initPhase2"), STR("initPhase3") };
+    slice const signatures[3] = { STR("()V"), STR("(ZZ)I"), STR("()V") };
+
+    cp_method *method;
+    stack_value ret;
+    for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); i++) {
+      method = method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
+      assert(method);
+      stack_value args[2] = {{ .i = 1 }, { .i = 1 }};
+      call_interpreter_synchronous(thr, method, args); // void methods, no result
+
+      if (thr->current_exception) {
+        // Failed to initialize
+        method = method_lookup(thr->current_exception->descriptor, STR("getMessage"), STR("()Ljava/lang/String;"), true,
+                               true);
+        assert(method);
+
+        stack_value get_message_args[] = {{ .obj = thr->current_exception }};
+        stack_value obj = call_interpreter_synchronous(thr, method, get_message_args);
+        heap_string message;
+        if (obj.obj) {
+          CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
+        }
+        fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n", fmt_slice(thr->current_exception->descriptor->name),
+                fmt_slice(phases[i]), obj.obj ? message.chars : "no message");
+        abort();
+      }
+
+      method = method_lookup(vm->cached_classdescs->system, STR("getProperty"),
+                             STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
+      assert(method);
+      stack_value args2[1] = {{ .obj = (void *) MakeJStringFromCString(thr, "java.home", true) }};
       ret = call_interpreter_synchronous(thr, method, args2); // returns a String
 
       heap_string java_home;
