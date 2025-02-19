@@ -66,6 +66,7 @@ typedef enum {
 typedef enum {
   /* i32 unary */
   WASM_OP_KIND_I32_EQZ = 0x45,
+  WASM_OP_KIND_REF_EQZ = 0x45,
   WASM_OP_KIND_I32_CLZ = 0x67,
   WASM_OP_KIND_I32_CTZ = 0x68,
   WASM_OP_KIND_I32_POPCNT = 0x69,
@@ -126,7 +127,9 @@ typedef enum {
 typedef enum {
   /* Relational instructions (consume 2 operands, produce i32 boolean) */
   WASM_OP_KIND_I32_EQ = 0x46,
+  WASM_OP_KIND_REF_EQ = 0x46,
   WASM_OP_KIND_I32_NE = 0x47,
+  WASM_OP_KIND_REF_NE = 0x46,
   WASM_OP_KIND_I32_LT_S = 0x48,
   WASM_OP_KIND_I32_LT_U = 0x49,
   WASM_OP_KIND_I32_GT_S = 0x4A,

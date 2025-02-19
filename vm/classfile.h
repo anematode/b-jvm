@@ -9,6 +9,8 @@
 #include "util.h"
 #include "vtable.h"
 
+#include <wasm_trampolines.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -761,10 +763,10 @@ typedef struct cp_method {
   // This method overrides a method in a superclass
   bool overrides;
 
-  // JIT-compiled method
-  void *compiled_method; // wasm_instantiation_result*
-  // Already tried and failed
-  bool failed_jit;
+  void *jit_entry;  // if NULL, there's no way to call this function from JITed code D:
+  jit_trampoline trampoline;  // if NULL, there's no way to call this function from the interpreter D:
+  bool jit_available;  // whether jit_entry is NOT the interpreter entry but rather a JITed result
+  void *jit_info;
 } cp_method;
 
 int method_argc(const cp_method *method);

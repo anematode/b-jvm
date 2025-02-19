@@ -43,6 +43,7 @@ struct ScheduledTestCaseResult : TestCaseResult {
   u64 ms_slept;
 };
 
+void print_method_sigs();
 TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main",
                              std::string input = "");
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio = true,

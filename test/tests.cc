@@ -744,6 +744,13 @@ TEST_CASE("frem and drem") {
 }
 
 TEST_CASE("Manually thrown exception") {
+  // Tests that frames associated with fillInStackTrace are correctly skipped
   auto result = run_test_case("test_files/manually_thrown", true, "ManuallyThrown");
   REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat ManuallyThrown.main(ManuallyThrown.java:4)\n");
 }
+
+#if 1
+TEST_CASE("Print useful trampolines") {
+  print_method_sigs();
+}
+#endif
