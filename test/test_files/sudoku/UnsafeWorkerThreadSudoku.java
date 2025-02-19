@@ -3,7 +3,7 @@ import java.io.*;
 import jdk.internal.misc.Unsafe;
 import java.lang.reflect.Field;
 
-public class WorkerThreadSudoku {
+public class UnsafeWorkerThreadSudoku {
 //     private static final AtomicReference<Board> puzzle = new AtomicReference<>(); // todo: not implemented yet
     private static final Unsafe unsafe = Unsafe.getUnsafe();
     private static Board puzzle = null; // not thread safe, but it should work on bjvm
@@ -14,7 +14,7 @@ public class WorkerThreadSudoku {
 
     static {
         try {
-            Field field = WorkerThreadSudoku.class.getDeclaredField("puzzle");
+            Field field = UnsafeWorkerThreadSudoku.class.getDeclaredField("puzzle");
             // field.setAccessible(true);
             base = unsafe.staticFieldBase(field);
             puzzleOffset = unsafe.staticFieldOffset(field);
@@ -42,23 +42,19 @@ public class WorkerThreadSudoku {
     }
 
 	public static void main(String[] args) throws Exception {
-        Thread worker = new Thread(WorkerThreadSudoku::runWorker);
+        Thread worker = new Thread(UnsafeWorkerThreadSudoku::runWorker);
         worker.start();
 
         try (BufferedReader reader = new BufferedReader(new FileReader("test_files/sudoku/sudoku.txt"))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                    System.out.println("Main thread executed!");
                 if (line.length() < 81) continue;
-                    System.out.println("Main thread continued here!");
 
                 Board board = Board.parseFrom(line);
                 while (!unsafe.compareAndSetReference(base, puzzleOffset, null, board)) {
-                    System.out.println("Main thread spins here!");
 //                 while (!puzzle.compareAndSet(null, board)) {
                     Thread.yield(); // spin lock lol
                     if (!worker.isAlive()) {
-                        System.out.println("wtf");
                         throw new IllegalStateException("worker thread died");
                     }
                 }
@@ -72,6 +68,5 @@ public class WorkerThreadSudoku {
         } finally {
             worker.join();
         }
-        System.out.println("Other thread executed!");
 	}
 }
