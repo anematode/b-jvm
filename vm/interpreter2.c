@@ -2674,7 +2674,6 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
     case 0: // special value in case of exception or suspend (theoretically also nop_impl_void, but javac doesn't use
             // that)
 
-      printf("Insn kind: %d\n", code[pc_].kind);
       DCHECK(thread->current_exception || frame->is_async_suspended);
       return 0;
     default: {
