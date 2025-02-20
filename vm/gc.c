@@ -15,7 +15,7 @@ typedef struct gc_ctx {
 } gc_ctx;
 
 static int in_heap(gc_ctx *ctx, obj_header *field) {
-  return (uintptr_t)field - (uintptr_t)ctx->vm->heap < ctx->vm->true_heap_capacity;
+  return (u8*)field >= ctx->vm->heap && (u8*)field < ctx->vm->heap + ctx->vm->true_heap_capacity;
 }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
