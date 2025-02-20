@@ -217,7 +217,7 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putDouble, "(Ljava/lang/O
   return value_null();
 }
 
-DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, getDouble, "(Ljava/lang/Object;J)Ljava/lang/Object;", 1) {
+DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, getDouble, "(Ljava/lang/Object;J)D", 1) {
   DCHECK(argc == 2);
   return (stack_value){.d = *(double *)((uintptr_t)args[0].handle->obj + args[1].l)};
 }
