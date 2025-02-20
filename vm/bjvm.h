@@ -470,16 +470,26 @@ typedef struct native_frame {
   const method_descriptor *method_shape;
 } native_frame;
 
+typedef struct {
+  int pc;
+  object oops[];
+} compiled_frame;
+
+typedef enum : u8 {
+  FRAME_KIND_INTERPRETER,
+  FRAME_KIND_NATIVE,
+  FRAME_KIND_COMPILED
+} frame_kind;
+
 // A frame is either a native frame or a plain frame. They may be distinguished
 // with is_native.
 //
 // Native frames may be consecutive: for example, a native method might invoke
 // another native method, which itself raises an interrupt.
 typedef struct stack_frame {
-  u8 is_native;
+  frame_kind is_native;
   u8 is_async_suspended;
   u16 num_locals;
-  interpret_t async_frame;
 
   // The method associated with this frame
   cp_method *method;
@@ -487,6 +497,7 @@ typedef struct stack_frame {
   union {
     plain_frame plain;
     native_frame native;
+    compiled_frame compiled;
   };
 } stack_frame;
 
@@ -494,7 +505,8 @@ typedef struct stack_frame {
 // counter.
 u16 stack_depth(const stack_frame *frame);
 
-static inline bool is_frame_native(const stack_frame *frame) { return frame->is_native != 0; }
+static inline bool is_frame_native(const stack_frame *frame) { return frame->is_native == FRAME_KIND_NATIVE; }
+static inline bool is_interpreter_frame(const stack_frame *frame) { return frame->is_native == FRAME_KIND_INTERPRETER; }
 value *get_native_args(const stack_frame *frame); // same as locals, just called args for native
 
 stack_value *frame_stack(stack_frame *frame);

@@ -31,8 +31,6 @@ typedef struct {
 } wasm_type;
 
 wasm_type wasm_void();
-wasm_type wasm_infer();
-
 wasm_type wasm_int32();
 wasm_type wasm_float32();
 wasm_type wasm_float64();
@@ -460,13 +458,7 @@ void wasm_export_function(wasm_module *module, wasm_function *fn);
 wasm_type wasm_string_to_tuple(wasm_module *module, const char *str);
 
 wasm_function *wasm_import_runtime_function_impl(wasm_module *module, const char *c_name,
-                                                 const char *params, // e.g. iii
-                                                 const char *result, // e.g. v
-                                                 void *dummy);
-
-// The function must be marked EMSCRIPTEN_KEEPALIVE for this to work!
-#define wasm_import_runtime_function(module, c_name, params, result)                                                   \
-  wasm_import_runtime_function_impl(module, #c_name, params, result, &c_name)
+                                                 const char *sig /* e.g. viii */);
 
 wasm_expression *wasm_i32_const(wasm_module *module, int value);
 wasm_expression *wasm_f32_const(wasm_module *module, float value);
@@ -494,8 +486,6 @@ wasm_expression *wasm_if_else(wasm_module *module, wasm_expression *cond, wasm_e
 wasm_expression *wasm_return(wasm_module *module, wasm_expression *expr);
 
 u32 register_function_type(wasm_module *module, wasm_type params, wasm_type results);
-
-wasm_type jvm_type_to_wasm(type_kind kind);
 
 typedef enum {
   WASM_INSTANTIATION_SUCCESS,

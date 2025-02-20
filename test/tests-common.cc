@@ -254,11 +254,12 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::str
     for (int i = 0; i < value->methods_count; i++) {
       cp_method *method = value->methods + i;
       std::string sig { (char)field_to_kind(&method->descriptor->return_type) };
+      if (!(method->access_flags & ACCESS_STATIC)) {
+        sig += "L";
+      }
       for (int j = 0; j < method->descriptor->args_count; j++) {
         sig.push_back(field_to_kind(&method->descriptor->args[j]));
       }
-      // Replace L with I since wasm doesn't care
-      std::replace(sig.begin(), sig.end(), 'L', 'I');
       method_sigs[sig]++;
     }
   }

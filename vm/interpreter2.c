@@ -2569,26 +2569,6 @@ static s64 instanceof_resolved_impl_int(ARGS_INT) {
   NEXT_INT(result)
 }
 
-static s64 cos_impl_double(ARGS_DOUBLE) {
-  DEBUG_CHECK();
-  NEXT_DOUBLE(cos(tos))
-}
-
-static s64 sin_impl_double(ARGS_DOUBLE) {
-  DEBUG_CHECK();
-  NEXT_DOUBLE(sin(tos))
-}
-
-static s64 cos_impl_float(ARGS_FLOAT) {
-  DEBUG_CHECK();
-  NEXT_FLOAT(cosf(tos))
-}
-
-static s64 sin_impl_float(ARGS_FLOAT) {
-  DEBUG_CHECK();
-  NEXT_FLOAT(sinf(tos))
-}
-
 static s64 sqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   NEXT_DOUBLE(sqrt(tos))
@@ -2735,7 +2715,7 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 #endif
 
 static exception_table_entry *find_exception_handler(vm_thread *thread, stack_frame *frame, classdesc *exception_type) {
-  DCHECK(!frame->is_native);
+  DCHECK(is_interpreter_frame(frame));
 
   attribute_exception_table *table = frame->method->code->exception_table;
   if (!table)

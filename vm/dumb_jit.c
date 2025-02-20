@@ -57,7 +57,6 @@ wasm_function *finalize_function_builder(function_builder *builder, const char *
   return fn;
 }
 
-
 typedef struct {
   int start, end;
 } loop_range_t;
@@ -81,33 +80,160 @@ typedef struct method_jit_ctx_s {
   // Mapping from topological block index to a block bjvm_wasm_expression such
   // that forward edges should break out of this block.
   expression *block_ends;
+
+  function_builder fb;
+  wasm_module *module;
+  int curr_pc;  // program counter
+  int curr_sd;  // stack depth
+  bool frame_requested;
+  int frame_local;
+
+  expression *building;  // emit(...) puts expressions here
+  pc_to_oop_count *pc_to_oops;
+  code_analysis *analysis;
+
+  int *stack_to_local;  // maps (stack_i << 2 | type) -> WASM local, or -1 if not yet available
+  int *local_to_local;  // maps (local_i << 2 | type) -> WASM local, or -1 if not yet available
+
   // Now implementation stuffs
   int current_block_i;
   int topo_i;
   int loop_depth;
-  // For each block in topological indexing, the number of loops that contain
-  // it.
+  // For each block in topological indexing, the number of loops that contain it.
   int *loop_depths;
   int *visited, *incoming_count;
   int blockc;
 
-  wasm_module *module;
-  bytecode_insn *insn;
-  int curr_pc;  // program counter
-  int curr_sd;  // stack depth
+  cp_method * method;
 } method_jit_ctx;
 
 static _Thread_local method_jit_ctx* ctx;  // current ctx
 
-static expression deopt() {
+static wasm_value_type to_wasm_type(type_kind result) {
+  switch (result) {
+  case TYPE_KIND_BYTE:
+  case TYPE_KIND_BOOLEAN:
+  case TYPE_KIND_CHAR:
+  case TYPE_KIND_SHORT:
+  case TYPE_KIND_INT:
+  case TYPE_KIND_REFERENCE:
+    return WASM_TYPE_KIND_INT32;
+  case TYPE_KIND_FLOAT:
+    return WASM_TYPE_KIND_FLOAT32;
+  case TYPE_KIND_DOUBLE:
+    return WASM_TYPE_KIND_FLOAT64;
+  case TYPE_KIND_LONG:
+    return WASM_TYPE_KIND_INT64;
+  case TYPE_KIND_VOID:
+    return WASM_TYPE_KIND_VOID;
+  }
+}
 
+static int _get_local_slot(int local_i, wasm_value_type type) {
+  int i = local_i << 2 | type;
+  if (ctx->local_to_local[i] == -1) {
+    ctx->local_to_local[i] = fb_new_local(&ctx->fb, type);
+  }
+  return ctx->local_to_local[i];
+}
+
+static int _get_stack_slot(int stack_i, wasm_value_type type) {
+  int i = stack_i << 2 | type;
+  if (ctx->stack_to_local[i] == -1) {
+    ctx->stack_to_local[i] = fb_new_local(&ctx->fb, type);
+  }
+  return ctx->stack_to_local[i];
+}
+
+static wasm_value_type type_at(int slot) {
+  if (test_compressed_bitset(ctx->analysis->insn_index_to_ints[ctx->curr_pc], slot)) {
+    return WASM_TYPE_KIND_INT32;
+  }
+  if (test_compressed_bitset(ctx->analysis->insn_index_to_references[ctx->curr_pc], slot)) {
+    return WASM_TYPE_KIND_INT32;
+  }
+  if (test_compressed_bitset(ctx->analysis->insn_index_to_floats[ctx->curr_pc], slot)) {
+    return WASM_TYPE_KIND_FLOAT32;
+  }
+  if (test_compressed_bitset(ctx->analysis->insn_index_to_doubles[ctx->curr_pc], slot)) {
+    return WASM_TYPE_KIND_FLOAT64;
+  }
+  if (test_compressed_bitset(ctx->analysis->insn_index_to_longs[ctx->curr_pc], slot)) {
+    return WASM_TYPE_KIND_INT64;
+  }
+  return WASM_TYPE_KIND_VOID;
+}
+
+static int get_frame_local() {
+  if (!ctx->frame_requested) {
+    ctx->frame_requested = true;
+    ctx->frame_local = fb_new_local(&ctx->fb, WASM_TYPE_KIND_INT32);
+  }
+  return ctx->frame_local;
+}
+
+static expression get_frame() {
+  return wasm_local_get(ctx->module, get_frame_local(), wasm_int32());
 }
 
 static expression get_local(int local_i) {
   return nullptr;
 }
 
-static expression get_stack_slot_of_type(int stack_i, type_kind tk) {
+[[maybe_unused]] static wasm_store_op_kind simple_store_op(wasm_value_type ty) {
+  switch (ty) {
+  default:
+  case WASM_TYPE_KIND_VOID:
+    UNREACHABLE();
+  case WASM_TYPE_KIND_FLOAT64:
+    return WASM_OP_KIND_F64_STORE;
+  case WASM_TYPE_KIND_FLOAT32:
+    return WASM_OP_KIND_F32_STORE;
+  case WASM_TYPE_KIND_INT64:
+    return WASM_OP_KIND_I64_STORE;
+  case WASM_TYPE_KIND_INT32:
+    return WASM_OP_KIND_I32_STORE;
+  }
+  return 0;
+}
+
+static expression deopt() {
+  // We need to construct an equivalent frame in place, then side-exit to the interpreter.
+  stack_frame dummy;
+  dummy.is_native = FRAME_KIND_INTERPRETER;
+  dummy.is_async_suspended = false;
+  dummy.method = ctx->method;
+  s32 locals = dummy.num_locals = ctx->method->code->max_locals;
+  s32 max_stack = dummy.plain.max_stack = ctx->method->code->max_stack;
+  dummy.plain.values_count = locals;
+  dummy.plain.max_stack = max_stack;
+  dummy.plain.program_counter = ctx->curr_pc;
+
+  // Tantamount to performing two i64 stores, beginning at the frame base
+  expression *exprs = nullptr;
+  s64 part1, part2;
+  memcpy(&part1, &dummy, sizeof(s64));
+  memcpy(&part2, ((char *)&dummy) + sizeof(s64), sizeof(s64));
+
+  arrput(exprs, wasm_store(ctx->module, WASM_OP_KIND_I64_STORE, get_frame(), wasm_i64_const(ctx->module, part1), 0, 0));
+  arrput(exprs, wasm_store(ctx->module, WASM_OP_KIND_I64_STORE, get_frame(), wasm_i64_const(ctx->module, part2), 0, 8));
+
+  // Now perform a store to (get_frame() - locals + i) for each live local variable i
+  for (int local_i = 0; local_i < locals; ++local_i) {
+    wasm_value_type ty = type_at(local_i + max_stack);
+    if (ty == WASM_TYPE_KIND_VOID)
+      continue;
+    int slot = _get_local_slot(local_i, ty);
+    expression value = get_local(slot);
+
+    arrput(exprs, wasm_store(ctx->module, WASM_OP_KIND_I32_STORE, get_frame(), value, 0, -8 * (locals - local_i)));
+  }
+
+  return nullptr;
+}
+
+static expression get_stack_slot_of_type(int stack_i, wasm_value_type tk) {
+  [[maybe_unused]] int slot = _get_stack_slot(stack_i, tk);
   return nullptr;
 }
 
@@ -131,33 +257,76 @@ static expression get_descriptor(expression object) {
   return wasm_load(ctx->module, WASM_OP_KIND_I32_LOAD, object, 2, offsetof(obj_header, descriptor));
 }
 
-static void emit(expression expr) {
-
+static expression set_stack(int stack_i, expression value, wasm_value_type type) {
+  return nullptr;
 }
 
-static void fail() {
+static expression set_local(int local_i, expression value, wasm_value_type type) {
+  return nullptr;
+}
 
+static void emit(expression expr) {
+  arrput(ctx->building, expr);
 }
 
 static expression thread_param() {
+  return wasm_local_get(ctx->module, 0, wasm_int32());
+}
 
+static expression set_pc() {
+  return nullptr;
+  /*
+  return wasm_store(ctx->module, WASM_OP_KIND_I32_STORE, get_frame(),
+    wasm_i32_const(ctx->module, ctx->curr_pc), 2, offsetof(stack_frame, compiled) + offsetof(compiled_frame, pc));*/
+}
+
+static expression spill_or_reload_oops(int max_stack_i, bool is_reload) {
+  int spill_i = 0;
+  compressed_bitset bs = ctx->analysis->insn_index_to_references[ctx->curr_pc];
+  int *vec = nullptr;
+  list_compressed_bitset_bits(bs, &vec);
+  expression *exprs = nullptr;
+  if (!is_reload)
+    arrput(exprs, set_pc());
+  for (int i = 0; i < arrlen(vec); ++i) {
+    int stack_i = vec[i];
+    if (stack_i >= max_stack_i && stack_i < ctx->curr_sd)
+      continue;
+    int offs = 0; // offsetof(stack_frame, compiled) + offsetof(compiled_frame, oops);
+    offs += (int)(spill_i * sizeof(void*));
+    if (is_reload) {
+      expression value = wasm_load(ctx->module, WASM_OP_KIND_I32_LOAD, get_frame(), 2, offs);
+      arrput(exprs, set_stack(stack_i, value, WASM_TYPE_KIND_INT32));
+    } else {
+      expression value = get_stack(stack_i);
+      arrput(exprs, wasm_store(ctx->module, WASM_OP_KIND_I32_STORE, get_frame(), value, 2, offs));
+    }
+  }
+  expression block = nullptr;
+  DCHECK(exprs);
+  block = wasm_block(ctx->module, exprs, arrlen(exprs), wasm_void(), false);
+  arrfree(vec);
+  ctx->pc_to_oops->count[ctx->curr_pc] = spill_i;
+  return block;
 }
 
 static expression spill_oops(int max_stack_i) {
-
+  return spill_or_reload_oops(max_stack_i, false);
 }
 
 static expression reload_oops(int max_stack_i) {
-
+  return spill_or_reload_oops(max_stack_i, true);
 }
 
 static expression load_jit_entry(expression method) {
-
+  return wasm_load(ctx->module, WASM_OP_KIND_I32_LOAD, method, 0, offsetof(cp_method, jit_entry));
 }
 
-// Import the given function with the given signature. The function must be exported with EMSCRIPTEN_KEEPALIVE.
-static expression upcall_impl(void *fn, const char *fn_name, const char *sig, expression *args) {
-
+// Import the given function with the given signature. The function must be exported, with EMSCRIPTEN_KEEPALIVE.
+static expression upcall_impl([[maybe_unused]] void *fn, const char *fn_name, const char *sig, expression *args) {
+  DCHECK(fn != nullptr);
+  wasm_function *f = wasm_import_runtime_function_impl(ctx->module, fn_name, sig);
+  return wasm_call(ctx->module, f, args, arrlen(args));
 }
 
 #define upcall(fn, sig, args) upcall_impl(&fn, #fn, sig, args)
@@ -166,28 +335,46 @@ static u32 get_method_func_type(cp_method *method) {
   return 0;
 }
 
-static wasm_value_type to_wasm_type(type_kind result) {
-
-}
-
 static expression branch_target(int pc) {
-
+  // Iterate over blocks to find the block with the correct start pc.
+  int block_i = 0;
+  for (int i = 0; i < ctx->blockc; ++i) {
+    if (ctx->analysis->blocks[i].start_index == pc) {
+      block_i = ctx->block_to_topo[i];
+      goto found;
+    }
+  }
+  UNREACHABLE();
+  found:
+  if (pc <= ctx->curr_pc) {
+    // Look for a loop header so we can jump backwards
+    expression loop = ctx->loop_headers[block_i];
+    CHECK(loop);
+    return loop;
+  }
+  expression blk = ctx->block_ends[block_i];
+  CHECK(blk);
+  return blk;
 }
 
 static expression do_exit() {
-
-}
-
-static expression set_stack(int stack_i, expression value, wasm_value_type type) {
-
-}
-
-static expression set_local(int local_i, expression value, wasm_value_type type) {
-
+  // Return the 0 of whatever the current function's return type is
+  switch (ctx->fb.returns.val) {
+  case WASM_TYPE_KIND_INT32:
+    return wasm_return(ctx->module, wasm_i32_const(ctx->module, 0));
+  case WASM_TYPE_KIND_FLOAT32:
+    return wasm_return(ctx->module, wasm_f32_const(ctx->module, 0.0f));
+  case WASM_TYPE_KIND_FLOAT64:
+    return wasm_return(ctx->module, wasm_f64_const(ctx->module, 0.0));
+  case WASM_TYPE_KIND_INT64:
+    return wasm_return(ctx->module, wasm_i64_const(ctx->module, 0));
+  default:
+    return wasm_return(ctx->module, nullptr);
+  }
 }
 
 // Call where there is only one possible target.
-static void lower_monomorphic_call(bytecode_insn *insn) {
+static void lower_monomorphic_call(const bytecode_insn *insn) {
   bool is_monomorphic_vtable = insn->kind == insn_invokevtable_monomorphic || insn->kind == insn_invokeitable_monomorphic;
   bool is_invokespecial = insn->kind == insn_invokespecial_resolved;
   bool is_invokestatic = insn->kind == insn_invokestatic_resolved;
@@ -247,7 +434,7 @@ static void lower_monomorphic_call(bytecode_insn *insn) {
   emit(reload_oops(ctx->curr_sd - argc));
 }
 
-static void lower_vtable_call(bytecode_insn *insn) {
+static void lower_vtable_call(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_invokevtable_polymorphic);
 
   int argc = insn->args;
@@ -291,9 +478,10 @@ static cp_method *wasm_runtime_itable_lookup(vm_thread *thread, object target, c
   if (unlikely(!method)) {
     raise_abstract_method_error(thread, reference);
   }
+  return method;
 }
 
-static void lower_itable_call(bytecode_insn *insn) {
+static void lower_itable_call(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_invokeitable_polymorphic);
   // The logic here is painful so for now do an upcall to itable_lookup
   expression receiver = get_stack(ctx->curr_sd - insn->args);
@@ -336,7 +524,7 @@ static void lower_itable_call(bytecode_insn *insn) {
   emit(reload_oops(ctx->curr_sd - insn->args));
 }
 
-static void lower_invokecallsite(bytecode_insn *insn) {
+static void lower_invokecallsite(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_invokecallsite);
 
   struct native_CallSite *cs = insn->ic;
@@ -385,7 +573,7 @@ static object wasm_runtime_allocate_object(vm_thread *thread, classdesc *cd) {
   return AllocateObject(thread, cd, cd->instance_bytes);
 }
 
-static void lower_new_resolved(bytecode_insn *insn) {
+static void lower_new_resolved(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_new_resolved);
 
   emit(spill_oops(ctx->curr_sd));
@@ -402,7 +590,7 @@ static bool wasm_runtime_instanceof(object o, classdesc *cd) {
   return o != nullptr && instanceof(o->descriptor, cd);
 }
 
-static void lower_instanceof_resolved(bytecode_insn *insn) {
+static void lower_instanceof_resolved(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_instanceof_resolved);  // instanceof(obj->descriptor, insn->classdesc)
 
   expression args[2] = {
@@ -419,7 +607,7 @@ static float wasm_runtime_frem(float a, float b) {
   return fmodf(a, b);
 }
 
-static void lower_frem(bytecode_insn *insn) {
+static void lower_frem(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_frem);
   expression right = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_FLOAT32);
   expression left = get_stack_assert(ctx->curr_sd - 2, WASM_TYPE_KIND_FLOAT32);
@@ -428,7 +616,7 @@ static void lower_frem(bytecode_insn *insn) {
   emit(set_stack(ctx->curr_sd - 2, call, WASM_TYPE_KIND_FLOAT32));
 }
 
-static void lower_drem(bytecode_insn *insn) {
+static void lower_drem(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_drem);
   expression right = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_FLOAT64);
   expression left = get_stack_assert(ctx->curr_sd - 2, WASM_TYPE_KIND_FLOAT64);
@@ -442,12 +630,12 @@ static void wasm_runtime_throw_div0(vm_thread *thread) {
   raise_div0_arithmetic_exception(thread);
 }
 
-static void lower_integral_div_rem(bytecode_insn *insn) {
+static void lower_integral_div_rem(const bytecode_insn *insn) {
   bool is_div = insn->kind == insn_ldiv || insn->kind == insn_idiv;
   DCHECK(is_div || insn->kind == insn_lrem || insn->kind == insn_irem);
   bool is_long = insn->kind == insn_ldiv || insn->kind == insn_lrem;
 
-  wasm_value_type type = is_long ? WASM_OP_KIND_I64_EQ : WASM_OP_KIND_I32_EQ;
+  wasm_value_type type = is_long ? WASM_TYPE_KIND_INT64 : WASM_TYPE_KIND_INT32;
 
   // Two cases: 0 and INT_MIN / -1. This can be simplified to b == 0 ? div0 : b == -1 ? -a : a / b
   expression right = get_stack_assert(ctx->curr_sd - 1, type);
@@ -465,7 +653,8 @@ static void lower_integral_div_rem(bytecode_insn *insn) {
     div0, nullptr, wasm_void());
 
 
-  expression denom_is_neg1 = wasm_binop(ctx->module, type, right,
+  wasm_binary_op_kind eq = is_long ? WASM_OP_KIND_I64_EQ : WASM_OP_KIND_I32_EQ;
+  expression denom_is_neg1 = wasm_binop(ctx->module, eq, right,
     is_long ? wasm_i64_const(ctx->module, -1) : wasm_i32_const(ctx->module, -1));
   expression negate_numerator = wasm_binop(ctx->module, is_long ? WASM_OP_KIND_I64_SUB : WASM_OP_KIND_I32_SUB,
     is_long ? wasm_i64_const(ctx->module, 0) : wasm_i32_const(ctx->module, 0), left);
@@ -478,7 +667,7 @@ static void lower_integral_div_rem(bytecode_insn *insn) {
   emit(division);
 }
 
-static void lower_direct_binop(bytecode_insn *insn) {
+static void lower_direct_binop(const bytecode_insn *insn) {
   struct binop_entry {
     wasm_value_type lhs, rhs, result;
     wasm_binary_op_kind op;
@@ -516,13 +705,41 @@ static void lower_direct_binop(bytecode_insn *insn) {
 #undef CASE
 
   struct binop_entry entry = tbl[insn->kind];
+  DCHECK(entry.op != 0);
+
+  expression right = get_stack_assert(ctx->curr_sd - 1, entry.rhs);
+  expression left = get_stack_assert(ctx->curr_sd - 2, entry.lhs);
+
+  expression result = wasm_binop(ctx->module, entry.op, left, right);
+  result = set_stack(ctx->curr_sd - 2, result, entry.result);
+
+  emit(result);
 }
 
-static void lower_long_shiftop(bytecode_insn *insn) {
-
+static void lower_long_shiftop(const bytecode_insn *insn) {
+  expression left = get_stack_assert(ctx->curr_sd - 2, WASM_TYPE_KIND_INT64);
+  expression right = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
+  wasm_binary_op_kind op;
+  switch (insn->kind) {
+  case insn_lshl:
+    op = WASM_OP_KIND_I64_SHL;
+    break;
+  case insn_lshr:
+    op = WASM_OP_KIND_I64_SHR_S;
+    break;
+  case insn_lushr:
+    op = WASM_OP_KIND_I64_SHR_U;
+    break;
+  default:
+    UNREACHABLE();
+  }
+  right = wasm_unop(ctx->module, WASM_OP_KIND_I64_EXTEND_U_I32, right);
+  expression result = wasm_binop(ctx->module, op, left, right);
+  result = set_stack(ctx->curr_sd - 2, result, WASM_TYPE_KIND_INT64);
+  emit(result);
 }
 
-static void lower_direct_unop(bytecode_insn *insn) {
+static void lower_direct_unop(const bytecode_insn *insn) {
   struct unop_entry {
     wasm_value_type operand, result;
     wasm_unary_op_kind op;
@@ -545,26 +762,33 @@ static void lower_direct_unop(bytecode_insn *insn) {
     CASE(insn_i2s, INT32, INT32, I32_EXTEND_S_I16),
     CASE(insn_l2d, INT64, FLOAT64, F64_CONVERT_S_I64),
     CASE(insn_l2f, INT64, FLOAT32, F32_CONVERT_S_I64),
-    CASE(insn_l2i, INT64, INT32, I32_WRAP_I64)
+    CASE(insn_l2i, INT64, INT32, I32_WRAP_I64),
+    CASE(insn_dneg, FLOAT64, FLOAT64, F64_NEG),
+    CASE(insn_fneg, FLOAT32, FLOAT32, F32_NEG)
   };
 #undef CASE
+
+  expression operand = get_stack_assert(ctx->curr_sd - 1, tbl[insn->kind].operand);
+  expression result = wasm_unop(ctx->module, tbl[insn->kind].op, operand);
+  result = set_stack(ctx->curr_sd - 1, result, tbl[insn->kind].result);
+  emit(result);
 }
 
-static void lower_ineg(bytecode_insn *insn) {
+static void lower_ineg(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_ineg);
   expression value = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
   expression neg = wasm_binop(ctx->module, WASM_OP_KIND_I32_SUB, wasm_i32_const(ctx->module, 0), value);
   emit(set_stack(ctx->curr_sd - 1, neg, WASM_TYPE_KIND_INT32));
 }
 
-static void lower_lneg(bytecode_insn *insn) {
+static void lower_lneg(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_lneg);
   expression value = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT64);
   expression neg = wasm_binop(ctx->module, WASM_OP_KIND_I64_SUB, wasm_i64_const(ctx->module, 0), value);
   emit(set_stack(ctx->curr_sd - 1, neg, WASM_TYPE_KIND_INT64));
 }
 
-static void lower_i2c(bytecode_insn *insn) {
+static void lower_i2c(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_i2c);
   expression value = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
   expression extend = wasm_binop(ctx->module, WASM_OP_KIND_I32_AND, value, wasm_i32_const(ctx->module, 0xffff));
@@ -572,7 +796,7 @@ static void lower_i2c(bytecode_insn *insn) {
   emit(extend);
 }
 
-static void lower_arraylength(bytecode_insn *insn) {
+static void lower_arraylength(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_arraylength);
   expression array = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
   expression if_npe = wasm_if_else(ctx->module,
@@ -588,7 +812,7 @@ static void wasm_runtime_array_oob(vm_thread *thread, int index, int length) {
   raise_array_index_oob_exception(thread, index, length);
 }
 
-static void lower_array_load_store(bytecode_insn *insn) {
+static void lower_array_load_store(const bytecode_insn *insn) {
   wasm_load_op_kind load_op;
   wasm_store_op_kind store_op;
   type_kind data_type;
@@ -685,7 +909,7 @@ static void lower_array_load_store(bytecode_insn *insn) {
   }
 }
 
-static void lower_fused_compare(bytecode_insn *insn) {
+static void lower_fused_compare(const bytecode_insn *insn) {
   // fcmpg(a, b): a > b ? 1 : (a < b ? -1 : (a == b ? 0 : 1))
   // fcmpl(a, b): a > b ? 1 : (a < b ? -1 : (a == b ? 0 : -1))
   // Hence fcmpg returns 1 on NaN and fcmpl returns -1 on NaN.
@@ -696,7 +920,7 @@ static void lower_fused_compare(bytecode_insn *insn) {
     insn->kind == insn_dcmpg || insn->kind == insn_dcmpl;
   DCHECK(fp_compare || insn->kind == insn_lcmp);
 
-  bytecode_insn *branch = insn + 1;
+  const bytecode_insn *branch = insn + 1;
   CHECK(branch->kind == insn_iflt || branch->kind == insn_ifge || branch->kind == insn_ifgt || branch->kind == insn_ifle ||
     branch->kind == insn_ifeq || branch->kind == insn_ifne);
 
@@ -753,7 +977,7 @@ static bool wasm_runtime_checkcast(vm_thread *thread, object o, classdesc *cd) {
   return true;
 }
 
-static void lower_checkcast_resolved(bytecode_insn *insn) {
+static void lower_checkcast_resolved(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_checkcast_resolved);  // instanceof(obj->descriptor, insn->classdesc)
   expression receiver = get_stack(ctx->curr_sd - 1);
   expression args[3] = {
@@ -767,7 +991,7 @@ static void lower_checkcast_resolved(bytecode_insn *insn) {
   emit(check);
 }
 
-static int lower_ldc(bytecode_insn *insn) {
+static int lower_ldc(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_ldc2_w || insn->kind == insn_ldc);
   if (insn->kind == insn_ldc2_w) {
     UNREACHABLE();  // should have been removed at analysis time and converted to dconst or lconst
@@ -790,9 +1014,10 @@ static int lower_ldc(bytecode_insn *insn) {
     load_class = set_stack(ctx->curr_sd, load_class, WASM_TYPE_KIND_INT32);
     emit(load_class);
   }
+  return 0;
 }
 
-static void lower_constant(bytecode_insn *insn) {
+static void lower_constant(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_aconst_null || insn->kind == insn_iconst || insn->kind == insn_dconst ||
     insn->kind == insn_fconst || insn->kind == insn_lconst);
   switch (insn->kind) {
@@ -811,10 +1036,11 @@ static void lower_constant(bytecode_insn *insn) {
   case insn_dconst:
     emit(set_stack(ctx->curr_sd, wasm_f64_const(ctx->module, insn->d_imm), WASM_TYPE_KIND_FLOAT64));
     break;
+  default: UNREACHABLE();
   }
 }
 
-static void lower_return(bytecode_insn *insn) {
+static void lower_return(const bytecode_insn *insn) {
   switch (insn->kind) {
   case insn_return:
     emit(do_exit());
@@ -825,7 +1051,7 @@ static void lower_return(bytecode_insn *insn) {
   }
 }
 
-static void lower_athrow(bytecode_insn *insn) {
+static void lower_athrow(const bytecode_insn *insn) {
   DCHECK(insn->kind == insn_athrow);
   expression exception = get_stack(ctx->curr_sd - 1);
   // Store to thread->current_exception
@@ -833,35 +1059,101 @@ static void lower_athrow(bytecode_insn *insn) {
   emit(store_exception);
 }
 
-static void lower_dneg(bytecode_insn *insn) {
-  DCHECK(insn->kind == insn_dneg);
-  expression value = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_FLOAT64);
-  expression neg = wasm_binop(ctx->module, WASM_OP_KIND_F64_SUB, wasm_f64_const(ctx->module, 0), value);
-  emit(set_stack(ctx->curr_sd - 1, neg, WASM_TYPE_KIND_FLOAT64));
+static void lower_stack_manipulation(const bytecode_insn *insn) {
+  int sd = ctx->curr_sd;
+  switch (insn->kind) {
+  case insn_dup:
+    //   A    B   ->    A    B    B
+    // sp-2 sp-1  ->  sp-2 sp-1  sp
+    emit(set_stack(sd, get_stack(sd - 1), type_at(sd - 1)));
+    break;
+  case insn_dup2:
+    //   A    B   ->    A    B    A   B
+    // sp-2 sp-1  ->  sp-2 sp-1 sp  sp+1
+    emit(set_stack(sd, get_stack(sd - 2), type_at(sd - 2)));
+    emit(set_stack(sd + 1, get_stack(sd - 1), type_at(sd - 1)));
+    break;
+  case insn_dup_x1:
+    //   A    B   ->    B    A    B
+    // sp-2 sp-1  ->  sp-2 sp-1  sp
+    emit(set_stack(sd, get_stack(sd - 1), type_at(sd - 1)));
+    emit(set_stack(sd - 1, get_stack(sd - 2), type_at(sd - 2)));
+    emit(set_stack(sd - 2, get_stack_slot_of_type(sd, type_at(sd - 1)), type_at(sd - 1)));
+    break;
+  case insn_dup_x2:
+    //   A    B    C  ->   C    A      B     C
+    // sp-3 sp-2 sp-1 -> sp-3 sp-2  sp-1  sp+1
+    break; //  TODO
+  default:
+    UNREACHABLE();
+  }
 }
 
-static void lower_fneg(bytecode_insn *insn) {
-  DCHECK(insn->kind == insn_fneg);
-  expression value = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_FLOAT32);
-  expression neg = wasm_binop(ctx->module, WASM_OP_KIND_F32_SUB, wasm_f32_const(ctx->module, 0), value);
-  emit(set_stack(ctx->curr_sd - 1, neg, WASM_TYPE_KIND_FLOAT32));
+static void lower_branch(const bytecode_insn *insn) {
+  if (insn->kind == insn_goto) {
+    emit(wasm_br(ctx->module, nullptr, branch_target(insn->index)));
+    return;
+  }
+  wasm_binary_op_kind op;
+  bool lhs_zero = false;
+  switch (insn->kind) {
+  case insn_ifeq:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_acmpeq:
+  case insn_if_icmpeq:
+    op = WASM_OP_KIND_I32_EQ;
+    break;
+  case insn_ifne:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_acmpne:
+  case insn_if_icmpne:
+    op = WASM_OP_KIND_I32_NE;
+    break;
+  case insn_iflt:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_icmplt:
+    op = WASM_OP_KIND_I32_LT_S;
+    break;
+  case insn_ifge:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_icmpge:
+    op = WASM_OP_KIND_I32_GE_S;
+    break;
+  case insn_ifgt:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_icmpgt:
+    op = WASM_OP_KIND_I32_GT_S;
+    break;
+  case insn_ifle:
+    lhs_zero = true;
+    [[fallthrough]];
+  case insn_if_icmple:
+    op = WASM_OP_KIND_I32_LE_S;
+    break;
+  default:
+    UNREACHABLE();
+  }
+
+  // Get top two ints from the stack
+  expression right = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
+  expression left = lhs_zero ? wasm_i32_const(ctx->module, 0) : get_stack_assert(ctx->curr_sd - 2, WASM_TYPE_KIND_INT32);
+  expression cmp = wasm_binop(ctx->module, op, left, right);
+  emit(wasm_br(ctx->module, cmp, branch_target((int)insn->index)));
+  emit(wasm_br(ctx->module, nullptr, branch_target(ctx->curr_pc + 1)));
 }
 
-static void lower_stack_manipulation(bytecode_insn *insn) {
-
-}
-
-static void lower_branch(bytecode_insn *insn) {
-
-}
-
-void lower_get_put_resolved(bytecode_insn *insn) {
+void lower_get_put_resolved(const bytecode_insn *insn) {
   wasm_load_op_kind load_op;
   wasm_store_op_kind store_op;
   type_kind type;
 
   bool is_getfield = insn->kind >= insn_getfield_B && insn->kind <= insn_getfield_L;
-  bool is_putfield = insn->kind >= insn_putfield_B && insn->kind <= insn_getfield_L;
+  bool is_putfield = insn->kind >= insn_putfield_B && insn->kind <= insn_putfield_L;
   bool is_getstatic = insn->kind >= insn_getstatic_B && insn->kind <= insn_getstatic_L;
   bool is_putstatic = insn->kind >= insn_putstatic_B && insn->kind <= insn_putstatic_L;
 
@@ -941,7 +1233,7 @@ void lower_get_put_resolved(bytecode_insn *insn) {
       wasm_unop(ctx->module, WASM_OP_KIND_REF_EQZ, receiver), npe_and_exit(), nullptr, wasm_void());
     emit(if_null_npe);
     addr = receiver;
-    offset = (int)insn->ic2;
+    offset = (int)(intptr_t)insn->ic2;
   } else {
     addr = wasm_i32_const(ctx->module, (int)(intptr_t)insn->ic);
     offset = 0;
@@ -955,13 +1247,13 @@ void lower_get_put_resolved(bytecode_insn *insn) {
   }
 }
 
-void lower_iinc(bytecode_insn *insn) {
+void lower_iinc(const bytecode_insn *insn) {
   expression expr = get_local(insn->iinc.index);
   expr = wasm_binop(ctx->module, WASM_OP_KIND_I32_ADD, expr, wasm_i32_const(ctx->module, insn->iinc.const_));
   emit(set_local(insn->iinc.index, expr, WASM_TYPE_KIND_INT32));
 }
 
-void lower_local_load(bytecode_insn * insn) {
+void lower_local_load(const bytecode_insn * insn) {
   wasm_value_type type;
   switch (insn->kind) {
   case insn_dload:
@@ -982,7 +1274,7 @@ void lower_local_load(bytecode_insn * insn) {
   emit(set_stack(ctx->curr_sd, get_local(insn->index), type));
 }
 
-void lower_local_store(bytecode_insn * insn) {
+void lower_local_store(const bytecode_insn * insn) {
   wasm_value_type type;
   switch (insn->kind) {
   case insn_dstore:
@@ -1013,7 +1305,7 @@ obj_header *wasm_runtime_newarray(vm_thread *thread, type_kind array_type, s32 c
   return array;
 }
 
-void lower_newarray(bytecode_insn *insn) {
+void lower_newarray(const bytecode_insn *insn) {
   emit(spill_oops(0));
   expression count = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
   expression args[3] = {thread_param(), wasm_i32_const(ctx->module, insn->array_type), count};
@@ -1035,7 +1327,7 @@ obj_header *wasm_runtime_anewarray(vm_thread *thread, classdesc *type, s32 count
   return array;
 }
 
-void lower_anewarray_resolved(bytecode_insn *insn) {
+void lower_anewarray_resolved(const bytecode_insn *insn) {
   emit(spill_oops(0));
   expression count = get_stack_assert(ctx->curr_sd - 1, WASM_TYPE_KIND_INT32);
   expression args[3] = {thread_param(), wasm_i32_const(ctx->module, (intptr_t)insn->classdesc), count};
@@ -1047,8 +1339,19 @@ void lower_anewarray_resolved(bytecode_insn *insn) {
   emit(wasm_if_else(ctx->module, wasm_unop(ctx->module, WASM_OP_KIND_REF_EQZ, newarray), do_exit(), nullptr, wasm_void()));
 }
 
-static int lower_instruction(bytecode_insn *insn) {
+void lower_sqrt(const bytecode_insn * insn) {
+  DCHECK(insn->kind == insn_sqrt);
+  wasm_unary_op_kind op = insn->tos_before == TOS_FLOAT ? WASM_OP_KIND_F32_SQRT : WASM_OP_KIND_F64_SQRT;
+  wasm_value_type type = insn->tos_before == TOS_FLOAT ? WASM_TYPE_KIND_FLOAT32 : WASM_TYPE_KIND_FLOAT64;
+  expression value = get_stack_assert(ctx->curr_sd - 1, type);
+  expression sqrt = wasm_unop(ctx->module, op, value);
+  emit(set_stack(ctx->curr_sd - 1, sqrt, type));
+}
+
+static int lower_instruction(const bytecode_insn *insn) {
   switch (insn->kind) {
+  default:
+    UNREACHABLE();
   case insn_nop:
     UNREACHABLE();
   case insn_aaload:
@@ -1101,8 +1404,12 @@ static int lower_instruction(bytecode_insn *insn) {
   case insn_l2d:
   case insn_l2f:
   case insn_l2i:
-  case insn_sqrt:
+  case insn_dneg:
+  case insn_fneg:
     lower_direct_unop(insn);
+    return 0;
+  case insn_sqrt:
+    lower_sqrt(insn);
     return 0;
   case insn_dadd:
   case insn_ddiv:
@@ -1135,10 +1442,7 @@ static int lower_instruction(bytecode_insn *insn) {
     lower_fused_compare(insn);
     return 0;
   case insn_drem:
-    lower_frem(insn);
-    return 0;
-  case insn_dneg:
-    lower_dneg(insn);
+    lower_drem(insn);
     return 0;
   case insn_dup:
   case insn_dup_x1:
@@ -1150,9 +1454,6 @@ static int lower_instruction(bytecode_insn *insn) {
   case insn_pop:
   case insn_pop2:
     lower_stack_manipulation(insn);
-    return 0;
-  case insn_fneg:
-    lower_fneg(insn);
     return 0;
   case insn_frem:
     lower_frem(insn);
@@ -1303,8 +1604,6 @@ static int lower_instruction(bytecode_insn *insn) {
   case insn_putfield_D:
   case insn_putfield_Z:
   case insn_putfield_L:
-    lower_get_put_resolved(insn);
-    return 0;
   case insn_getstatic_B:
   case insn_getstatic_C:
   case insn_getstatic_S:
@@ -1340,6 +1639,8 @@ void free_topo_ctx(method_jit_ctx ctx) {
   free(ctx.loop_depths);
   free(ctx.block_ends);
   free(ctx.loop_headers);
+  free(ctx.stack_to_local);
+  free(ctx.local_to_local);
   for (int i = 0; i < ctx.blockc; ++i) {
     free(ctx.creations[i].requested);
   }
@@ -1402,7 +1703,7 @@ void topo_walk_idom(code_analysis *analy, method_jit_ctx *ctx) {
   free(sorted);
 }
 
-method_jit_ctx *make_ctx(code_analysis *analy) {
+method_jit_ctx *make_topo(code_analysis *analy) {
   method_jit_ctx *ctx = calloc(1, sizeof(*ctx));
   ctx->topo_to_block = calloc(analy->block_count, sizeof(int));
   ctx->block_to_topo = calloc(analy->block_count, sizeof(int));
@@ -1424,11 +1725,12 @@ method_jit_ctx *make_ctx(code_analysis *analy) {
   // in the subtree as one contiguous block. We output them in reverse postorder
   // relative to a DFS on the original CFG, to guarantee that the final
   // topological sort respects the forward edges in the original graph.
-  topo_walk_idom(analy, &ctx);
+  topo_walk_idom(analy, ctx);
   assert(ctx->topo_i == analy->block_count);
-  find_block_insertion_points(analy, &ctx);
+  find_block_insertion_points(analy, ctx);
   return ctx;
 }
+
 typedef struct {
   expression ref;
   // Wasm block started here (in topological sort)
@@ -1450,7 +1752,22 @@ void free_dumb_jit_result(dumb_jit_result *result){
 }
 
 expression compile_bb(basic_block *bb) {
-  return nullptr;
+  // Go instruction by instruction, if an instruction returns -1 then we're done
+  ctx->building = nullptr;
+  ctx->curr_pc = bb->start_index;
+  ctx->curr_sd = ctx->analysis->insn_index_to_stack_depth[ctx->curr_pc];
+  CHECK(bb->insn_count > 0);
+  for (int i = 0; i < bb->insn_count; ++i) {
+    const bytecode_insn *insn = bb->start + i;
+    int ret = lower_instruction(insn);
+    if (ret != 0)
+      break;
+  }
+  CHECK(arrlen(ctx->building) > 0);
+  expression result = arrlen(ctx->building) == 1 ? ctx->building[0] :
+    wasm_block(ctx->module, ctx->building, arrlen(ctx->building), wasm_void(), false);
+  arrfree(ctx->building);
+  return result;
 }
 
 dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options) {
@@ -1466,12 +1783,36 @@ dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options) {
     return nullptr;
   }
 
+  dumb_jit_result *result = nullptr;
+
   pc_to_oop_count pc_to_oops = {};
   pc_to_oops.count = calloc(code->insn_count, sizeof(u16));
   pc_to_oops.max_pc = code->insn_count;
 
   wasm_module *module = wasm_module_create();
-  ctx = make_ctx(analy);
+  ctx = make_topo(analy);
+  ctx->module = module;
+  ctx->pc_to_oops = &pc_to_oops;
+  ctx->stack_to_local = calloc(4 * (code->max_stack + 1), sizeof(int));
+  memset(ctx->stack_to_local, -1, 16 * (code->max_stack + 1));
+  ctx->local_to_local = calloc(4 * code->max_locals, sizeof(int));
+  memset(ctx->local_to_local, -1, 16 * code->max_locals);
+
+  wasm_value_type returns = to_wasm_type(field_to_kind(&method->descriptor->return_type));
+
+  wasm_value_type *params_list = nullptr;
+  arrput(params_list, WASM_TYPE_KIND_INT32);
+  arrput(params_list, WASM_TYPE_KIND_INT32);
+  if (!(method->access_flags & ACCESS_STATIC)) {  // this
+    arrput(params_list, WASM_TYPE_KIND_INT32);
+  }
+  for (int i = 0; i < method->descriptor->args_count; ++i) {
+    arrput(params_list, to_wasm_type(field_to_kind(&method->descriptor->args[i])));
+  }
+  CHECK(arrlen(params_list) == method_argc(method) + 2 /* thread, method */);
+  init_function_builder(ctx->module, &ctx->fb, params_list, (wasm_type) { .val = returns });
+  arrfree(params_list);
+
   inchoate_expression *expr_stack = nullptr;
 
   // Push an initial boi
@@ -1527,7 +1868,7 @@ dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options) {
         ctx->block_ends[block_i] = block;
     }
     int block_i = ctx->topo_to_block[ctx->topo_i];
-    [[maybe_unused]] basic_block *bb = analy->blocks + block_i;
+    basic_block *bb = analy->blocks + block_i;
     expression expr = compile_bb(bb);
     if (!expr) {
       goto error_2;
@@ -1535,10 +1876,26 @@ dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options) {
     *arraddnptr(expr_stack, 1) =
         (inchoate_expression){expr, ctx->topo_i, -1, false};
   }
-  [[maybe_unused]] expression body = expr_stack[0].ref;
+
+  expression body = expr_stack[0].ref;
+  wasm_function *fn = finalize_function_builder(&ctx->fb, "run", body);
+  fn->exported = true;
+
+  wasm_instantiation_result *instantiated = wasm_instantiate_module(ctx->module, method->name.chars);
+  if (instantiated->status == WASM_INSTANTIATION_FAIL) {
+    free_wasm_instantiation_result(instantiated);
+    goto error_2;
+  }
+
+  wasm_module_free(ctx->module);
+
+  result = calloc(1, sizeof(dumb_jit_result));
+  result->entry = instantiated->run;
+  result->instantiation = instantiated;
+  result->pc_to_oops = pc_to_oops;
 
 error_2:
   free_topo_ctx(*ctx);
   free(ctx);
-  return nullptr;
+  return result;
 }

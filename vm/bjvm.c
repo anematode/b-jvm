@@ -259,7 +259,7 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
 
   thread->frame_buffer_used = (char *)frame + sizeof(*frame) - thread->frame_buffer;
 
-  frame->is_native = 1;
+  frame->is_native = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
   frame->method = method;
   frame->native.method_shape = descriptor;
@@ -294,7 +294,7 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
 
   thread->frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->frame_buffer;
   arrput(thread->frames, frame);
-  frame->is_native = 0;
+  frame->is_native = FRAME_KIND_INTERPRETER;
   frame->num_locals = code->max_locals;
   frame->plain.program_counter = 0;
   frame->plain.max_stack = code->max_stack;
@@ -372,15 +372,32 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
   fprintf(stream, "%s", buf);
 }
 
-void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
+u32 compute_used(vm_thread * thread) {
+  if (arrlen(thread->frames) == 0) {
+    return 0;
+  }
+  stack_frame *frame = arrlast(thread->frames);
+  DCHECK(frame);
+  switch (frame->is_native) {
+  case FRAME_KIND_INTERPRETER:
+    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) - thread->frame_buffer;
+  case FRAME_KIND_NATIVE:
+    return (char *)frame + sizeof(stack_frame) - thread->frame_buffer;
+  case FRAME_KIND_COMPILED:
+    UNREACHABLE();
+  default:
+    UNREACHABLE();
+  }
+}
+
+;void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   DCHECK(arrlen(thr->frames) > 0);
   stack_frame *frame = arrpop(thr->frames);
   DCHECK(reference == nullptr || reference == frame);
   if (is_frame_native(frame)) {
     drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
   }
-  thr->frame_buffer_used =
-      arrlen(thr->frames) == 0 ? 0 : (char *)(frame->plain.stack + frame->plain.max_stack) - thr->frame_buffer;
+  thr->frame_buffer_used = compute_used(thr);
 }
 
 // Symmetry with make_primitive_classdesc
@@ -1686,6 +1703,13 @@ static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_metho
 
   u8 argc = method_argc(method);
   stack_value *stack_top = (stack_value *)(thread->frame_buffer + thread->frame_buffer_used);
+  if (arrlen(thread->frames)) {
+    stack_frame *last = arrlast(thread->frames);
+    if (last->is_native == FRAME_KIND_INTERPRETER) {
+      // Make sure we're not trampling over the previous interpreter frame
+      DCHECK((uintptr_t)last->plain.stack + last->plain.max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
+    }
+  }
   size_t args_size = sizeof(stack_value) * argc;
 
   if (args_size + thread->frame_buffer_used > thread->frame_buffer_capacity) {

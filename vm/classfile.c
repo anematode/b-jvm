@@ -304,7 +304,7 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
     u16 index = reader_next_u16(reader, "string index");
     return (cp_entry){
         .kind = CP_KIND_STRING,
-        .string = {.chars = skip_linking ? null_str() : checked_get_utf8(ctx->cp, index, "string value")}};
+        .string = {.chars = skip_linking ? null_str() : checked_get_utf8(ctx->cp, index, "string value"), .interned = nullptr}};
   }
   case CONSTANT_Integer: {
     s32 value = reader_next_s32(reader, "integer value");
