@@ -212,8 +212,8 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putDouble, "(JD)V", 1) {
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putDouble, "(Ljava/lang/Object;JD)V", 2) {
   DCHECK(argc == 3);
-  raise_null_pointer_exception(thread);
   memcpy((char *)args[0].handle->obj + args[1].l, &args[2].d, sizeof(double));
+  raise_null_pointer_exception(thread);
   return value_null();
 }
 

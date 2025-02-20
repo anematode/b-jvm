@@ -2001,9 +2001,10 @@ force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     return 0;
 
   stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception)
+  if (thread->current_exception) {
+    printf("Propagating!\n");
     return 0;
+  }
 
   if (returns) {
     *(sp - insn->args) = result;
