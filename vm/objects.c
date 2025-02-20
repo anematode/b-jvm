@@ -58,9 +58,11 @@ inval:
   return -1; // invalid UTF-8 sequence
 }
 
-// TODO restore implementation calling <init> when we can figure it out
 obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
-  handle *str = make_handle(thread, new_object(thread, thread->vm->cached_classdescs->string));
+  // This function is called very early at VM boot, so we can't necessarily use the cache.
+  classdesc *String = thread->vm->_cached_classdescs ? cached_classes(thread->vm)->string :
+    bootstrap_lookup_class(thread, STR("java/lang/String"));
+  handle *str = make_handle(thread, new_object(thread, String));
 
 #define S ((struct native_String *)str->obj)
 
@@ -97,7 +99,7 @@ error:
 }
 
 object make_jstring_cstr(vm_thread *thread, char const *cstr) {
-  handle *str = make_handle(thread, new_object(thread, thread->vm->cached_classdescs->string));
+  handle *str = make_handle(thread, new_object(thread, cached_classes(thread->vm)->string));
 
 #define S ((struct native_String *)str->obj)
 
@@ -169,7 +171,7 @@ obj_header *MakeJStringFromCString(vm_thread *thread, char const *data, bool int
 }
 
 obj_header *MakeJStringFromData(vm_thread *thread, slice data, string_coder_kind encoding) {
-  handle *str = make_handle(thread, new_object(thread, thread->vm->cached_classdescs->string));
+  handle *str = make_handle(thread, new_object(thread, cached_classes(thread->vm)->string));
 
 #define S ((struct native_String *)str->obj)
 

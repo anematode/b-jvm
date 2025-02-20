@@ -381,7 +381,7 @@ typedef struct vm {
   obj_header **js_handles;
 
   /// Struct containing cached classdescs
-  struct cached_classdescs *cached_classdescs;
+  void *_cached_classdescs;  // struct cached_classdescs* -- type erased to discourage unsafe accesses
 
   s64 next_thread_id; // MUST BE 64 BITS
 
@@ -402,6 +402,8 @@ typedef struct vm {
   void *scheduler; // rr_scheduler or null
   void *debugger;  // standard_debugger or null
 } vm;
+
+struct cached_classdescs *cached_classes(vm *vm);
 
 // Java Module
 typedef struct module {

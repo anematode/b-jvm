@@ -6,12 +6,7 @@ DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") { return value_null(
 
 // Check whether the class is cloneable.
 static bool cloneable(vm *vm, classdesc *cd) {
-  for (int i = 0; i < arrlen(cd->itables.interfaces); i++) {
-    if (cd->itables.interfaces[i] == vm->cached_classdescs->cloneable) {
-      return true;
-    }
-  }
-  return false;
+  return instanceof(cd, cached_classes(vm)->cloneable);
 }
 
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {

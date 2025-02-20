@@ -225,7 +225,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0, "(Z)[Ljava/lang/reflect/F
       ++fields;
     }
   }
-  classdesc *Field = thread->vm->cached_classdescs->field;
+  classdesc *Field = cached_classes(thread->vm)->field;
   obj_header *result = CreateObjectArray1D(thread, Field, fields);
   if (!result)
     return value_null();

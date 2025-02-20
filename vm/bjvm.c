@@ -55,11 +55,9 @@ DECLARE_ASYNC(int, init_cached_classdescs,
 );
 
 DEFINE_ASYNC(init_cached_classdescs) {
-  DCHECK(!args->thread->vm->cached_classdescs);
+  DCHECK(!args->thread->vm->_cached_classdescs && "Cached classdescs already initialized");
 
   self->cached_classdescs = malloc(cached_classdesc_count * sizeof(classdesc *));
-  args->thread->vm->cached_classdescs = (struct cached_classdescs *)self->cached_classdescs;
-
   if (!self->cached_classdescs) {
     out_of_memory(args->thread);
     ASYNC_RETURN(-1);
@@ -77,6 +75,9 @@ DEFINE_ASYNC(init_cached_classdescs) {
       ASYNC_RETURN(result);
     }
   }
+
+  // Populate the field
+  args->thread->vm->_cached_classdescs = (struct cached_classdescs *)self->cached_classdescs;
   ASYNC_END(0);
 }
 
@@ -390,7 +391,9 @@ u32 compute_used(vm_thread * thread) {
   }
 }
 
-;void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
+
+
+void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   DCHECK(arrlen(thr->frames) > 0);
   stack_frame *frame = arrpop(thr->frames);
   DCHECK(reference == nullptr || reference == frame);
@@ -639,6 +642,11 @@ void existing_classes_are_javabase(vm *vm, module *module) {
   }
 }
 
+struct cached_classdescs *cached_classes(vm *vm) {
+  CHECK(vm->_cached_classdescs && "Cached classdescs not yet initialized");
+  return vm->_cached_classdescs;
+}
+
 int define_module(vm *vm, slice module_name, obj_header *module_) {
   module *mod = calloc(1, sizeof(module));
   mod->reflection_object = module_;
@@ -737,7 +745,7 @@ void free_vm(vm *vm) {
 
   free_classpath(&vm->classpath);
 
-  free(vm->cached_classdescs);
+  free(cached_classes(vm));
   // Free all threads, iterate backwards because they remove themselves
   for (int i = arrlen(vm->active_threads) - 1; i >= 0; --i) {
     free_thread(vm->active_threads[i]);
@@ -863,10 +871,10 @@ vm_thread *create_thread(vm *vm, thread_options options) {
   }
 
   // Pre-allocate OOM and stack overflow errors
-  thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
-  thr->stack_overflow_error = new_object(thr, vm->cached_classdescs->stack_overflow_error);
+  thr->out_of_mem_error = new_object(thr, cached_classes(vm)->oom_error);
+  thr->stack_overflow_error = new_object(thr, cached_classes(vm)->stack_overflow_error);
 
-  handle *java_thread = make_handle(thr, new_object(thr, vm->cached_classdescs->thread));
+  handle *java_thread = make_handle(thr, new_object(thr, cached_classes(vm)->thread));
 #define java_thr ((struct native_Thread *)java_thread->obj)
   thr->thread_obj = java_thr;
 
@@ -874,7 +882,7 @@ vm_thread *create_thread(vm *vm, thread_options options) {
   java_thr->name = MakeJStringFromCString(thr, "main", true);
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
-  cp_method *make_thread = method_lookup(vm->cached_classdescs->thread, STR("<init>"),
+  cp_method *make_thread = method_lookup(cached_classes(vm)->thread, STR("<init>"),
                                          STR("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"), false, false);
 
   obj_header *main_thread_group = options.thread_group;
@@ -895,9 +903,8 @@ vm_thread *create_thread(vm *vm, thread_options options) {
 
     cp_method *method;
     stack_value ret;
-    for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases);
-         ++i) { // todo: these init phases should only be called once per VM
-      method = method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
+    for (unsigned i = 0; i < sizeof(phases) / sizeof(*phases); ++i) {
+      method = method_lookup(cached_classes(vm)->system, phases[i], signatures[i], false, false);
       assert(method);
       stack_value args[2] = {{.i = 1}, {.i = 1}};
       call_interpreter_synchronous(thr, method, args); // void methods, no result
@@ -919,7 +926,7 @@ vm_thread *create_thread(vm *vm, thread_options options) {
         abort();
       }
 
-      method = method_lookup(vm->cached_classdescs->system, STR("getProperty"),
+      method = method_lookup(cached_classes(vm)->system, STR("getProperty"),
                              STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
       assert(method);
       stack_value args2[1] = {{.obj = (void *)MakeJStringFromCString(thr, "java.home", true)}};
@@ -968,7 +975,7 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
   // exists
   DCHECK(method);
 
-  classdesc *Class = thread->vm->cached_classdescs->klass;
+  classdesc *Class = cached_classes(thread->vm)->klass;
   handle *ptypes = make_handle(thread, CreateObjectArray1D(thread, Class, method->args_count));
 
   for (int i = 0; i < method->args_count; ++i) {
@@ -984,7 +991,7 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
     return nullptr;
   struct native_Class *rtype = get_class_mirror(thread, ret_desc);
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
-  classdesc *MethodType = thread->vm->cached_classdescs->method_type;
+  classdesc *MethodType = cached_classes(thread->vm)->method_type;
   cp_method *init = method_lookup(MethodType, STR("makeImpl"),
                                   STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                       "lang/invoke/MethodType;"),
@@ -1089,13 +1096,13 @@ DEFINE_ASYNC(resolve_mh_mt) {
   CHECK(err == 0);
 
   // Call MethodType.makeImpl(rtype, ptypes, true)
-  cp_method *make = method_lookup(args->thread->vm->cached_classdescs->method_type, STR("makeImpl"),
+  cp_method *make = method_lookup(cached_classes(args->thread->vm)->method_type, STR("makeImpl"),
                                   STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                       "lang/invoke/MethodType;"),
                                   false, false);
 
   self->ptypes_array = make_handle(
-      args->thread, CreateObjectArray1D(args->thread, args->thread->vm->cached_classdescs->klass, info.ptypes_count));
+      args->thread, CreateObjectArray1D(args->thread, cached_classes(args->thread->vm)->klass, info.ptypes_count));
   for (u32 i = 0; i < info.ptypes_count; ++i) {
     *((obj_header **)ArrayData(self->ptypes_array->obj) + i) = (void *)get_class_mirror(args->thread, info.ptypes[i]);
   }
@@ -1255,7 +1262,7 @@ module *get_unnamed_module(vm_thread *thread) {
     return result;
   }
 
-  obj_header *module = new_object(thread, vm->cached_classdescs->module);
+  obj_header *module = new_object(thread, cached_classes(vm)->module);
   if (!module) {
     return nullptr;
   }
@@ -1544,7 +1551,7 @@ bool initialize_constant_value_fields(vm_thread *thread, classdesc *classdesc) {
 // and raise it.
 void wrap_in_exception_in_initializer_error(vm_thread *thread) {
   handle *exc = make_handle(thread, thread->current_exception);
-  classdesc *EIIE = thread->vm->cached_classdescs->exception_in_initializer_error;
+  classdesc *EIIE = cached_classes(thread->vm)->exception_in_initializer_error;
   handle *eiie = make_handle(thread, new_object(thread, EIIE));
   cp_method *ctor = method_lookup(EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
   thread->current_exception = nullptr; // clear exception
@@ -1940,7 +1947,7 @@ struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdes
     return nullptr;
   if (cd->cp_mirror)
     return cd->cp_mirror;
-  classdesc *java_lang_ConstantPool = thread->vm->cached_classdescs->constant_pool;
+  classdesc *java_lang_ConstantPool = cached_classes(thread->vm)->constant_pool;
   struct native_ConstantPool *cp_mirror = cd->cp_mirror = (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = cd;
   return cp_mirror;
@@ -2215,7 +2222,7 @@ DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
     // varHandleExactInvoker method of java.lang.invoke.MethodHandles with the instance of
     // java.lang.invoke.VarHandle.AccessMode as the first argument and the instance of java.lang.invoke.MethodType
     // as the second argument. The resulting instance is called the invoker method handle.
-    classdesc *MethodHandles = thread->vm->cached_classdescs->method_handles;
+    classdesc *MethodHandles = cached_classes(thread->vm)->method_handles;
     CHECK(MethodHandles);
     stack_value arg3[] = {{.obj = result->obj}, {.obj = get_async_result(call_interpreter).obj}};
     cp_method *varHandleExactInvoker = method_lookup(MethodHandles, STR("varHandleExactInvoker"),
@@ -2309,25 +2316,25 @@ static stack_value box_cp_integral(vm_thread *thread, cp_kind kind, cp_entry *en
   case CP_KIND_INTEGER: {
     stack_value args[1] = { {.i = (jint)ent->integral.value} };
     // Call Integer.valueOf
-    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->integer,
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->integer,
       STR("valueOf"), STR("(I)Ljava/lang/Integer;"), true, false);
     return call_interpreter_synchronous(thread, valueOf, args);
   }
   case CP_KIND_FLOAT: {
     stack_value args[1] = { {.f = (jfloat)ent->floating.value} };
-    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->float_,
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->float_,
       STR("valueOf"), STR("(F)Ljava/lang/Float;"), true, false);
     return call_interpreter_synchronous(thread, valueOf, args);
   }
   case CP_KIND_LONG: {
     stack_value args[1] = { {.l = (jlong)ent->integral.value} };
-    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->long_,
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->long_,
       STR("valueOf"), STR("(J)Ljava/lang/Long;"), true, false);
     return call_interpreter_synchronous(thread, valueOf, args);
   }
   case CP_KIND_DOUBLE: {
     stack_value args[1] = { {.d = (jdouble)ent->floating.value} };
-    cp_method *valueOf = method_lookup(thread->vm->cached_classdescs->double_,
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->double_,
       STR("valueOf"), STR("(D)Ljava/lang/Double;"), true, false);
     return call_interpreter_synchronous(thread, valueOf, args);
   }
@@ -2390,14 +2397,14 @@ DEFINE_ASYNC(indy_resolve) {
   self->bootstrap_handle = make_handle(thread, (void *)get_async_result(resolve_method_handle));
 
   // MethodHandles class
-  classdesc *lookup_class = thread->vm->cached_classdescs->method_handles;
+  classdesc *lookup_class = cached_classes(thread->vm)->method_handles;
   cp_method *lookup_factory =
       method_lookup(lookup_class, STR("lookup"), STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
 
   handle *lookup_handle = make_handle(thread, call_interpreter_synchronous(thread, lookup_factory, nullptr).obj);
 
   self->invoke_array =
-      make_handle(thread, CreateObjectArray1D(thread, thread->vm->cached_classdescs->object, m->args_count + 3));
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->object, m->args_count + 3));
 
   self->static_i = 0;
   for (; self->static_i < m->args_count; ++self->static_i) {
@@ -2528,7 +2535,7 @@ int get_line_number(const attribute_code *code, u16 pc) {
 obj_header *get_main_thread_group(vm_thread *thread) {
   vm *vm = thread->vm;
   if (!vm->main_thread_group) {
-    classdesc *ThreadGroup = vm->cached_classdescs->thread_group;
+    classdesc *ThreadGroup = cached_classes(vm)->thread_group;
     cp_method *init = method_lookup(ThreadGroup, STR("<init>"), STR("()V"), false, false);
 
     DCHECK(init);

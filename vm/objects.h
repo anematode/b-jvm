@@ -26,8 +26,7 @@ static inline int JavaStringLength(vm_thread *thread, obj_header *string) {
 /// Extracts the inner array of the given java.lang.String.
 /// The data are either UTF-16 or latin1 encoded.
 static inline obj_header *RawStringData([[maybe_unused]] vm_thread const *thread, obj_header const *string) {
-  DCHECK(string->descriptor == thread->vm->cached_classdescs->string);
-
+  DCHECK(utf8_equals(string->descriptor->name, "java/lang/String"));
   return ((struct native_String *)string)->value;
 }
 

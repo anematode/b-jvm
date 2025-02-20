@@ -8,7 +8,7 @@
 #include <reflection.h>
 
 void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field) {
-  classdesc *reflect_Field = thread->vm->cached_classdescs->field;
+  classdesc *reflect_Field = cached_classes(thread->vm)->field;
   handle *field_mirror = make_handle(thread, new_object(thread, reflect_Field));
   if (!field_mirror->obj) { // out of memory
     return;
@@ -39,7 +39,7 @@ void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field)
 
 void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method *method) {
   DCHECK(method->is_ctor, "Method is not a constructor");
-  classdesc *reflect_Constructor = thread->vm->cached_classdescs->constructor;
+  classdesc *reflect_Constructor = cached_classes(thread->vm)->constructor;
 
   method->reflection_ctor = (void *)new_object(thread, reflect_Constructor);
 
@@ -48,7 +48,7 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   C->reflected_ctor = method;
   C->clazz = (void *)get_class_mirror(thread, cd);
   C->modifiers = method->access_flags;
-  C->parameterTypes = CreateObjectArray1D(thread, thread->vm->cached_classdescs->klass, method->descriptor->args_count);
+  C->parameterTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
@@ -62,7 +62,7 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
 
 void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *method) {
   DCHECK(!method->is_ctor && !method->is_clinit, "Method is a constructor or <clinit>");
-  classdesc *reflect_Method = thread->vm->cached_classdescs->method;
+  classdesc *reflect_Method = cached_classes(thread->vm)->method;
 
   handle *result = make_handle(thread, new_object(thread, reflect_Method));
 
@@ -121,7 +121,7 @@ oom: // OOM while creating the Method
 
 static obj_header *get_method_parameters_impl(vm_thread *thread, cp_method *method,
                                               attribute_method_parameters mparams) {
-  classdesc *Parameter = thread->vm->cached_classdescs->parameter;
+  classdesc *Parameter = cached_classes(thread->vm)->parameter;
   handle *params = make_handle(thread, CreateObjectArray1D(thread, Parameter, mparams.count));
   if (!params->obj)
     return nullptr;

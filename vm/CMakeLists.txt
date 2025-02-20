@@ -6,12 +6,8 @@ include(Zlib)
 include(CheckIncludeFile)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DCHECK_DEFAULT ON)
-else ()
-    set(DCHECK_DEFAULT OFF)
+    add_compile_definitions(DCHECKS_ENABLED=1)
 endif ()
-
-option( DCHECKS_ENABLED "Enable DCHECKs" ${DCHECK_DEFAULT})
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "*.c" "*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")
