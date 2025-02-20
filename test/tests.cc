@@ -586,8 +586,8 @@ param3
 }
 
 TEST_CASE("Extended NPE message") {
-  auto result = run_test_case("test_files/extended_npe/", false, "ExtendedNPETests");
-  REQUIRE(result.stdout_ == "");
+  auto result = run_test_case("test_files/extended_npe/", true, "ExtendedNPETests");
+  REQUIRE(result.stderr_ == "");
 }
 
 #if 0
@@ -599,7 +599,14 @@ TEST_CASE("ITextPDF") {
 #endif
 
 TEST_CASE("Class loading") {
-  auto result = run_test_case("test_files/basic_classloader/", false, "URLClassLoaderExample");
+  auto result = run_test_case("test_files/basic_classloader/", true, "URLClassLoaderExample");
+  REQUIRE(result.stdout_ == R"(Loaded class: ExternalClass
+ExternalClass instance created!
+someMethod() in ExternalClass was called!
+Loaded class: ExternalClass
+ExternalClass instance created!
+someMethod() in ExternalClass was called!
+)");
 }
 
 TEST_CASE("java.lang.reflect.Method") {
@@ -721,7 +728,8 @@ new
 }
 
 TEST_CASE("Random UUID") {
-  auto result = run_test_case("test_files/random_uuid/", false, "Main");
+  auto result = run_test_case("test_files/random_uuid/", true, "Main");
+  REQUIRE(result.stderr_ == "");
 }
 
 TEST_CASE("New instance") {
