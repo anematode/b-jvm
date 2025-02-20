@@ -20,6 +20,7 @@
 struct loaded_bytes {
   char *bytes;
   u32 length;
+  bool needs_free;
 };
 
 // Read the entirety of the file using the C filesystem API.
@@ -32,7 +33,7 @@ static struct loaded_bytes read_file(FILE *f) {
   length = fread(data, 1, length, f);
 
   DCHECK(length <= UINT32_MAX);
-  return (struct loaded_bytes){.bytes = data, .length = (u32)length};
+  return (struct loaded_bytes){.bytes = data, .length = (u32)length, .needs_free = true};
 }
 
 static char *map_jar(const char *filename, mapped_jar *jar) {
@@ -66,6 +67,7 @@ static char *map_jar(const char *filename, mapped_jar *jar) {
   jar->data = lb.bytes;
   jar->size_bytes = lb.length;
   jar->is_mmap = false;
+  jar->needs_free = lb.needs_free;
   fclose(f);
   return nullptr;
 
@@ -158,7 +160,8 @@ char *parse_central_directory(mapped_jar *jar, u64 cd_offset, u32 expected) {
 static void free_jar(mapped_jar *jar) {
   free_hash_table(jar->entries);
   if (!jar->is_mmap) {
-    free(jar->data);
+    if (jar->needs_free)
+      free(jar->data);
     jar->data = nullptr;
   } else {
 #ifdef USE_MMAP

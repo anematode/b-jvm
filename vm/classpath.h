@@ -28,7 +28,8 @@ typedef struct {
 
   char *data;
   u32 size_bytes;
-  bool is_mmap; // true = mmap, false = heap allocation
+  bool is_mmap; // true = mmap, false = heap allocation or WASMFS map
+  bool needs_free;  // false = WASMFS map
 } mapped_jar;
 
 typedef struct {
