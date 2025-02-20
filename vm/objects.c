@@ -214,7 +214,6 @@ s32 get_object_hash_code(object o) {
     // Hash not yet computed -- make it always nonzero
     while (!((*hc = ObjNextHashCode())))
       ;
-    printf("Hash code: %x\n", *hc);
   }
   return (s32)*hc;
 }
