@@ -23,6 +23,7 @@ static int in_heap(gc_ctx *ctx, obj_header *field) {
   {                                                                                                                    \
     __typeof(x) v = (x);                                                                                               \
     if (*v && in_heap(ctx, (void *)*v)) {                                                                              \
+      printf("%p %.*s %d\n", (void *)*v, fmt_slice(((object)*v)->descriptor->name), __LINE__);                         \
       arrput(ctx->roots, (obj_header **)v);                                                                            \
     }                                                                                                                  \
   }
