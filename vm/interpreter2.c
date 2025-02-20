@@ -2519,6 +2519,7 @@ FORWARD_TO_NULLARY(dup2_x2)
 static s64 athrow_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL(tos)
+  NPE_ON_NULL(tos);
   thread->current_exception = (obj_header *)tos;
   return 0;
 }
