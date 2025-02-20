@@ -2002,7 +2002,6 @@ force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
 
   stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
   if (thread->current_exception) {
-    printf("Propagating!\n");
     return 0;
   }
 
@@ -2673,6 +2672,8 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 
     case 0: // special value in case of exception or suspend (theoretically also nop_impl_void, but javac doesn't use
             // that)
+
+      printf("Insn kind: %d\n", code[pc_].kind);
       DCHECK(thread->current_exception || frame->is_async_suspended);
       return 0;
     default: {
