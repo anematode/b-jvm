@@ -206,12 +206,14 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putShort, "(Ljava/lang/Ob
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putDouble, "(JD)V", 1) {
   DCHECK(argc == 3);
+  printf("Writing double: %f\n", args[1].d);
   memcpy((char *)args[0].l, &args[1].d, sizeof(double));
   return value_null();
 }
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putDouble, "(Ljava/lang/Object;JD)V", 2) {
   DCHECK(argc == 3);
+  printf("Writing double: %f\n", args[2].d);
   memcpy((char *)args[0].handle->obj + args[1].l, &args[2].d, sizeof(double));
   return value_null();
 }
