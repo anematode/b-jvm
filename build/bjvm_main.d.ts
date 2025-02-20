@@ -174,6 +174,8 @@ interface WasmModule {
   _make_js_handle(_0: number, _1: number): number;
   _drop_js_handle(_0: number, _1: number): void;
   _set_max_calls(_0: number): number;
+  _wasm_runtime_newarray(_0: number, _1: number, _2: number): number;
+  _wasm_runtime_anewarray(_0: number, _1: number, _2: number): number;
   ___interpreter_intrinsic_void_table_base(): number;
   ___interpreter_intrinsic_int_table_base(): number;
   ___interpreter_intrinsic_float_table_base(): number;

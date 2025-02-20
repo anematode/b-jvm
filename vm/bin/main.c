@@ -179,7 +179,7 @@ enum ArrayClassification ffi_classify_array(object obj) {
 
 EMSCRIPTEN_KEEPALIVE
 uintptr_t ffi_get_element_ptr(vm_thread *thread, object obj, int index) {
-  int length = *ArrayLength(obj);
+  int length = ArrayLength(obj);
   if (index < 0 || index >= length) {
     raise_array_index_oob_exception(thread, index, length);
     return 0;
@@ -191,7 +191,7 @@ uintptr_t ffi_get_element_ptr(vm_thread *thread, object obj, int index) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-int ffi_get_array_length(object obj) { return *ArrayLength(obj); }
+int ffi_get_array_length(object obj) { return ArrayLength(obj); }
 
 void ffi_free_rr_scheduler(rr_scheduler *scheduler) { rr_scheduler_uninit(scheduler); }
 
@@ -236,7 +236,7 @@ size_t ffi_get_string_len(object str) {
   assert(str);
   assert(utf8_equals(str->descriptor->name, "java/lang/String"));
   object array = ((struct native_String *)str)->value;
-  return *ArrayLength(array);
+  return ArrayLength(array);
 }
 
 EMSCRIPTEN_KEEPALIVE
