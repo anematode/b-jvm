@@ -358,6 +358,7 @@ interface WasmModule {
   _Unsafe_putShort_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putDouble_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putDouble_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_getDouble_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putByte_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getReference_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
