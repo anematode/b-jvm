@@ -792,7 +792,7 @@ async function createWasm() {
 // === Body ===
 
 var ASM_CONSTS = {
-  5092568: () => { if (ENVIRONMENT_IS_NODE) { if (!FS.initialized) FS.init(); const fs = require('f' + String.fromCharCode(115)); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } }
+  5092528: () => { if (ENVIRONMENT_IS_NODE) { if (!FS.initialized) FS.init(); const fs = require('f' + String.fromCharCode(115)); const needed = ([ 'jdk23.jar', 'jdk23/lib/modules' ]); for (let i = 0; i < needed.length; ++i) { const path = needed[i]; const data = fs.readFileSync("./" + path); FS.createPath('/', path.substring(0, path.lastIndexOf('/'))); FS.writeFile(path, data); } } }
 };
 
 // end include: preamble.js
@@ -2852,8 +2852,7 @@ var _Unsafe_putLong_cb2 = Module['_Unsafe_putLong_cb2'] = createExportWrapper('U
 var _Unsafe_putInt_cb0 = Module['_Unsafe_putInt_cb0'] = createExportWrapper('Unsafe_putInt_cb0', 5);
 var _Unsafe_putShort_cb1 = Module['_Unsafe_putShort_cb1'] = createExportWrapper('Unsafe_putShort_cb1', 5);
 var _Unsafe_putShort_cb2 = Module['_Unsafe_putShort_cb2'] = createExportWrapper('Unsafe_putShort_cb2', 5);
-var _Unsafe_putDouble_cb1 = Module['_Unsafe_putDouble_cb1'] = createExportWrapper('Unsafe_putDouble_cb1', 5);
-var _Unsafe_putDouble_cb2 = Module['_Unsafe_putDouble_cb2'] = createExportWrapper('Unsafe_putDouble_cb2', 5);
+var _Unsafe_getDouble_cb1 = Module['_Unsafe_getDouble_cb1'] = createExportWrapper('Unsafe_getDouble_cb1', 5);
 var _Unsafe_putByte_cb0 = Module['_Unsafe_putByte_cb0'] = createExportWrapper('Unsafe_putByte_cb0', 5);
 var _Unsafe_getReference_cb0 = Module['_Unsafe_getReference_cb0'] = createExportWrapper('Unsafe_getReference_cb0', 5);
 var _Unsafe_getInt_cb0 = Module['_Unsafe_getInt_cb0'] = createExportWrapper('Unsafe_getInt_cb0', 5);
@@ -3137,47 +3136,46 @@ var _NATIVE_INFO_Unsafe_putLong_2 = Module['_NATIVE_INFO_Unsafe_putLong_2'] = 50
 var _NATIVE_INFO_Unsafe_putInt_0 = Module['_NATIVE_INFO_Unsafe_putInt_0'] = 5089772;
 var _NATIVE_INFO_Unsafe_putShort_1 = Module['_NATIVE_INFO_Unsafe_putShort_1'] = 5089804;
 var _NATIVE_INFO_Unsafe_putShort_2 = Module['_NATIVE_INFO_Unsafe_putShort_2'] = 5089836;
-var _NATIVE_INFO_Unsafe_putDouble_1 = Module['_NATIVE_INFO_Unsafe_putDouble_1'] = 5089868;
-var _NATIVE_INFO_Unsafe_putDouble_2 = Module['_NATIVE_INFO_Unsafe_putDouble_2'] = 5089900;
-var _NATIVE_INFO_Unsafe_putByte_0 = Module['_NATIVE_INFO_Unsafe_putByte_0'] = 5089932;
-var _NATIVE_INFO_Unsafe_getReference_0 = Module['_NATIVE_INFO_Unsafe_getReference_0'] = 5089964;
-var _NATIVE_INFO_Unsafe_getInt_0 = Module['_NATIVE_INFO_Unsafe_getInt_0'] = 5089996;
-var _NATIVE_INFO_Unsafe_getShort_0 = Module['_NATIVE_INFO_Unsafe_getShort_0'] = 5090028;
-var _NATIVE_INFO_Unsafe_getByte_0 = Module['_NATIVE_INFO_Unsafe_getByte_0'] = 5090060;
-var _NATIVE_INFO_Unsafe_getLong_0 = Module['_NATIVE_INFO_Unsafe_getLong_0'] = 5090092;
-var _NATIVE_INFO_Unsafe_getByte_1 = Module['_NATIVE_INFO_Unsafe_getByte_1'] = 5090124;
-var _NATIVE_INFO_Unsafe_getReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_getReferenceVolatile_0'] = 5090156;
-var _NATIVE_INFO_Unsafe_defineClass_0 = Module['_NATIVE_INFO_Unsafe_defineClass_0'] = 5090188;
-var _NATIVE_INFO_Unsafe_storeFence_0 = Module['_NATIVE_INFO_Unsafe_storeFence_0'] = 5090220;
-var _NATIVE_INFO_Unsafe_fullFence_0 = Module['_NATIVE_INFO_Unsafe_fullFence_0'] = 5090252;
-var _NATIVE_INFO_Unsafe_copyMemory0_0 = Module['_NATIVE_INFO_Unsafe_copyMemory0_0'] = 5090284;
-var _NATIVE_INFO_Unsafe_setMemory0_0 = Module['_NATIVE_INFO_Unsafe_setMemory0_0'] = 5090316;
-var _NATIVE_INFO_VM_initialize_0 = Module['_NATIVE_INFO_VM_initialize_0'] = 5090348;
-var _NATIVE_INFO_Perf_registerNatives_0 = Module['_NATIVE_INFO_Perf_registerNatives_0'] = 5090380;
-var _NATIVE_INFO_Perf_createLong_0 = Module['_NATIVE_INFO_Perf_createLong_0'] = 5090412;
-var _NATIVE_INFO_ConstantPool_getUTF8At0_0 = Module['_NATIVE_INFO_ConstantPool_getUTF8At0_0'] = 5090444;
-var _NATIVE_INFO_ConstantPool_getIntAt0_0 = Module['_NATIVE_INFO_ConstantPool_getIntAt0_0'] = 5090476;
-var _NATIVE_INFO_Reflection_getCallerClass_0 = Module['_NATIVE_INFO_Reflection_getCallerClass_0'] = 5090508;
-var _NATIVE_INFO_Reflection_getClassAccessFlags_0 = Module['_NATIVE_INFO_Reflection_getClassAccessFlags_0'] = 5090540;
-var _NATIVE_INFO_Reflection_areNestMates_0 = Module['_NATIVE_INFO_Reflection_areNestMates_0'] = 5090572;
-var _NATIVE_INFO_SystemProps_Raw_platformProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_platformProperties_0'] = 5090604;
-var _NATIVE_INFO_SystemProps_Raw_vmProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_vmProperties_0'] = 5090636;
-var _NATIVE_INFO_URLClassPath_getLookupCacheURLs_0 = Module['_NATIVE_INFO_URLClassPath_getLookupCacheURLs_0'] = 5090668;
-var _NATIVE_INFO_VM_initialize_1 = Module['_NATIVE_INFO_VM_initialize_1'] = 5090700;
-var _NATIVE_INFO_IOUtil_initIDs_0 = Module['_NATIVE_INFO_IOUtil_initIDs_0'] = 5090732;
-var _NATIVE_INFO_IOUtil_iovMax_0 = Module['_NATIVE_INFO_IOUtil_iovMax_0'] = 5090764;
-var _NATIVE_INFO_IOUtil_writevMax_0 = Module['_NATIVE_INFO_IOUtil_writevMax_0'] = 5090796;
-var _NATIVE_INFO_NativeThread_init_0 = Module['_NATIVE_INFO_NativeThread_init_0'] = 5090828;
-var _NATIVE_INFO_NativeThread_current0_0 = Module['_NATIVE_INFO_NativeThread_current0_0'] = 5090860;
-var _NATIVE_INFO_UnixNativeDispatcher_init_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_init_0'] = 5090892;
-var _NATIVE_INFO_UnixNativeDispatcher_getcwd_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_getcwd_0'] = 5090924;
-var _NATIVE_INFO_UnixNativeDispatcher_stat0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_stat0_0'] = 5090956;
-var _NATIVE_INFO_UnixNativeDispatcher_open0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_open0_0'] = 5090988;
-var _NATIVE_INFO_UnixFileDispatcherImpl_size0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_size0_0'] = 5091020;
-var _NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0'] = 5091052;
-var _NATIVE_INFO_UnixFileDispatcherImpl_map0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_map0_0'] = 5091084;
-var _NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0'] = 5091116;
-var _NATIVE_INFO_FileDispatcherImpl_init0_0 = Module['_NATIVE_INFO_FileDispatcherImpl_init0_0'] = 5091148;
+var _NATIVE_INFO_Unsafe_getDouble_1 = Module['_NATIVE_INFO_Unsafe_getDouble_1'] = 5089868;
+var _NATIVE_INFO_Unsafe_putByte_0 = Module['_NATIVE_INFO_Unsafe_putByte_0'] = 5089900;
+var _NATIVE_INFO_Unsafe_getReference_0 = Module['_NATIVE_INFO_Unsafe_getReference_0'] = 5089932;
+var _NATIVE_INFO_Unsafe_getInt_0 = Module['_NATIVE_INFO_Unsafe_getInt_0'] = 5089964;
+var _NATIVE_INFO_Unsafe_getShort_0 = Module['_NATIVE_INFO_Unsafe_getShort_0'] = 5089996;
+var _NATIVE_INFO_Unsafe_getByte_0 = Module['_NATIVE_INFO_Unsafe_getByte_0'] = 5090028;
+var _NATIVE_INFO_Unsafe_getLong_0 = Module['_NATIVE_INFO_Unsafe_getLong_0'] = 5090060;
+var _NATIVE_INFO_Unsafe_getByte_1 = Module['_NATIVE_INFO_Unsafe_getByte_1'] = 5090092;
+var _NATIVE_INFO_Unsafe_getReferenceVolatile_0 = Module['_NATIVE_INFO_Unsafe_getReferenceVolatile_0'] = 5090124;
+var _NATIVE_INFO_Unsafe_defineClass_0 = Module['_NATIVE_INFO_Unsafe_defineClass_0'] = 5090156;
+var _NATIVE_INFO_Unsafe_storeFence_0 = Module['_NATIVE_INFO_Unsafe_storeFence_0'] = 5090188;
+var _NATIVE_INFO_Unsafe_fullFence_0 = Module['_NATIVE_INFO_Unsafe_fullFence_0'] = 5090220;
+var _NATIVE_INFO_Unsafe_copyMemory0_0 = Module['_NATIVE_INFO_Unsafe_copyMemory0_0'] = 5090252;
+var _NATIVE_INFO_Unsafe_setMemory0_0 = Module['_NATIVE_INFO_Unsafe_setMemory0_0'] = 5090284;
+var _NATIVE_INFO_VM_initialize_0 = Module['_NATIVE_INFO_VM_initialize_0'] = 5090316;
+var _NATIVE_INFO_Perf_registerNatives_0 = Module['_NATIVE_INFO_Perf_registerNatives_0'] = 5090348;
+var _NATIVE_INFO_Perf_createLong_0 = Module['_NATIVE_INFO_Perf_createLong_0'] = 5090380;
+var _NATIVE_INFO_ConstantPool_getUTF8At0_0 = Module['_NATIVE_INFO_ConstantPool_getUTF8At0_0'] = 5090412;
+var _NATIVE_INFO_ConstantPool_getIntAt0_0 = Module['_NATIVE_INFO_ConstantPool_getIntAt0_0'] = 5090444;
+var _NATIVE_INFO_Reflection_getCallerClass_0 = Module['_NATIVE_INFO_Reflection_getCallerClass_0'] = 5090476;
+var _NATIVE_INFO_Reflection_getClassAccessFlags_0 = Module['_NATIVE_INFO_Reflection_getClassAccessFlags_0'] = 5090508;
+var _NATIVE_INFO_Reflection_areNestMates_0 = Module['_NATIVE_INFO_Reflection_areNestMates_0'] = 5090540;
+var _NATIVE_INFO_SystemProps_Raw_platformProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_platformProperties_0'] = 5090572;
+var _NATIVE_INFO_SystemProps_Raw_vmProperties_0 = Module['_NATIVE_INFO_SystemProps_Raw_vmProperties_0'] = 5090604;
+var _NATIVE_INFO_URLClassPath_getLookupCacheURLs_0 = Module['_NATIVE_INFO_URLClassPath_getLookupCacheURLs_0'] = 5090636;
+var _NATIVE_INFO_VM_initialize_1 = Module['_NATIVE_INFO_VM_initialize_1'] = 5090668;
+var _NATIVE_INFO_IOUtil_initIDs_0 = Module['_NATIVE_INFO_IOUtil_initIDs_0'] = 5090700;
+var _NATIVE_INFO_IOUtil_iovMax_0 = Module['_NATIVE_INFO_IOUtil_iovMax_0'] = 5090732;
+var _NATIVE_INFO_IOUtil_writevMax_0 = Module['_NATIVE_INFO_IOUtil_writevMax_0'] = 5090764;
+var _NATIVE_INFO_NativeThread_init_0 = Module['_NATIVE_INFO_NativeThread_init_0'] = 5090796;
+var _NATIVE_INFO_NativeThread_current0_0 = Module['_NATIVE_INFO_NativeThread_current0_0'] = 5090828;
+var _NATIVE_INFO_UnixNativeDispatcher_init_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_init_0'] = 5090860;
+var _NATIVE_INFO_UnixNativeDispatcher_getcwd_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_getcwd_0'] = 5090892;
+var _NATIVE_INFO_UnixNativeDispatcher_stat0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_stat0_0'] = 5090924;
+var _NATIVE_INFO_UnixNativeDispatcher_open0_0 = Module['_NATIVE_INFO_UnixNativeDispatcher_open0_0'] = 5090956;
+var _NATIVE_INFO_UnixFileDispatcherImpl_size0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_size0_0'] = 5090988;
+var _NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_allocationGranularity0_0'] = 5091020;
+var _NATIVE_INFO_UnixFileDispatcherImpl_map0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_map0_0'] = 5091052;
+var _NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0 = Module['_NATIVE_INFO_UnixFileDispatcherImpl_unmap0_0'] = 5091084;
+var _NATIVE_INFO_FileDispatcherImpl_init0_0 = Module['_NATIVE_INFO_FileDispatcherImpl_init0_0'] = 5091116;
 function invoke_vi(index,a1) {
   var sp = stackSave();
   try {
