@@ -4,6 +4,8 @@
 
 #include "monitors.h"
 
+#define NOT_HELD_TID -1
+
 DEFINE_ASYNC(monitor_acquire) {
   // since this is a single-threaded vm, we don't need atomic operations
   self->handle = make_handle(args->thread, args->obj);
@@ -31,7 +33,7 @@ DEFINE_ASYNC(monitor_acquire) {
     }
 
     allocated_data->mark_word = fetched_header.mark_word;
-    allocated_data->tid = -1; // not owned (as a microöptimisation, we could claim it here beforehand)
+    allocated_data->tid = NOT_HELD_TID; // not owned (as a microöptimisation, we could claim it here beforehand)
     allocated_data->hold_count = 0;
 
     header_word proposed_header = {.expanded_data = allocated_data};
@@ -48,7 +50,7 @@ DEFINE_ASYNC(monitor_acquire) {
     monitor_data *lock =
         __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
     assert(lock);
-    s32 freed = -1;
+    s32 freed = NOT_HELD_TID;
 
     if (__atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE) == args->thread->tid) {
       // we already own the monitor
@@ -88,7 +90,7 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
     monitor_data *lock =
         __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
     assert(lock);
-    s32 freed = -1;
+    s32 freed = NOT_HELD_TID;
 
     if (__atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE) == args->thread->tid) {
       // we already own the monitor
@@ -98,6 +100,7 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
     }
 
     // try to acquire mutex- loop again if CAS fails
+    // todo: are these memory semantics even correct
     if (__atomic_compare_exchange_n(&lock->tid, &freed, args->thread->tid, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
       lock->hold_count = args->hold_count;
       break; // success
@@ -144,7 +147,7 @@ u32 monitor_release_all_hold_count(vm_thread *thread, obj_header *obj) {
 
   u32 hold_count = lock->hold_count;
   lock->hold_count = 0;
-  __atomic_store_n(&lock->tid, -1, __ATOMIC_RELEASE);
+  __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
   return hold_count;
 }
 
@@ -167,7 +170,7 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
   u32 new_hold_count = --lock->hold_count;
 
   if (new_hold_count == 0) {
-    __atomic_store_n(&lock->tid, -1, __ATOMIC_RELEASE);
+    __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
   }
   return 0;
 }

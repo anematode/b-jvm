@@ -34,6 +34,7 @@ DECLARE_NATIVE("java/lang", Thread, start0, "()V") {
   stack_value argz[1] = {{ .obj = obj->obj }};
 
   this_thread->eetop = (intptr_t)wrapped_thread;
+  printf("starting thread with tid %d\n", wrapped_thread->tid);
   rr_scheduler_run(scheduler, (call_interpreter_t) {{ wrapped_thread, run, argz  }});
 #undef this_thread
 

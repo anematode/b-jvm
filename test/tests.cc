@@ -725,6 +725,15 @@ TEST_CASE("Synchronized counter") {
   auto result = run_scheduled_test_case("test_files/synchronized_counter/", true, "Main");
   REQUIRE(result.stdout_ == R"(Final count: 5000
 )");
+  std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
+}
+
+TEST_CASE("Synchronized wait/notify") {
+  auto result = run_scheduled_test_case("test_files/synchronized_counter/", true, "TestSynchronizedCountdown");
+  REQUIRE(result.stdout_ == R"(Num arrived: 21
+Countdown value: 0
+)");
+  std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
 }
 
 TEST_CASE("Random UUID") {

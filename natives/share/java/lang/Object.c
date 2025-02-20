@@ -79,6 +79,8 @@ DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; r
   }
 
   self->holdCount = monitor_release_all_hold_count(thread, obj->obj);
+  printf("tid %d released hold count %d\n", thread->tid, self->holdCount);
+  printf("(the hold count is %d)\n", current_thread_hold_count(thread, obj->obj));
   if (self->holdCount == 0) {
         raise_vm_exception(thread, STR("java/lang/IllegalMonitorStateException"), STR("Thread does not hold monitor before waiting"));
         ASYNC_RETURN_VOID();
@@ -89,6 +91,7 @@ DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; r
   ASYNC_YIELD((void *) &self->wakeup_info);
 
   // wake up: re-acquire the monitor
+  printf("tid %d reacquiring hold count %d\n", thread->tid, self->holdCount);
   AWAIT(monitor_reacquire_hold_count, thread, obj->obj, self->holdCount);
   assert(get_async_result(monitor_reacquire_hold_count) == 0);
 

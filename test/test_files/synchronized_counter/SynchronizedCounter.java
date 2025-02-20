@@ -14,7 +14,7 @@ public class SynchronizedCounter {
         count--;
     }
 
-    public int getCount() {
+    public synchronized int getCount() {
         return count;
     }
 }
