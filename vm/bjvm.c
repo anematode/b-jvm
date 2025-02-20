@@ -84,7 +84,7 @@ DEFINE_ASYNC(init_cached_classdescs) {
 bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
 mark_word_t *get_mark_word(header_word *data) {
-  printf("Has expanded data: %d\n", has_expanded_data(data));
+  printf("Has expanded data: %d %p\n", has_expanded_data(data), data->expanded_data);
   return has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
 }
 
