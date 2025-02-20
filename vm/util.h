@@ -12,6 +12,7 @@ extern "C" {
 #include <string.h>
 #include <types.h>
 #include <wchar.h>
+#include "config.h"
 
 // These are unlikely (ha!) to actually improve codegen, but are actually kind
 // of nice to indicate what we "think" is going to happen. Long term we might

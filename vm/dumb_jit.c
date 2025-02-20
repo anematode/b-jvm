@@ -127,6 +127,7 @@ static wasm_value_type to_wasm_type(type_kind result) {
   case TYPE_KIND_VOID:
     return WASM_TYPE_KIND_VOID;
   }
+  UNREACHABLE();
 }
 
 static int _get_local_slot(int local_i, wasm_value_type type) {
