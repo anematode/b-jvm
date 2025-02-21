@@ -266,7 +266,7 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   frame->native.method_shape = descriptor;
   frame->native.state = 0;
   frame->is_async_suspended = false;
-  thread->synchronized_state = 0;
+  frame->attempted_synchronize = false;
 
   // Now wrap arguments in handles and copy them into the frame
   make_handles_array(thread, descriptor, method->access_flags & ACCESS_STATIC, args, locals);
@@ -302,7 +302,7 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
   frame->plain.max_stack = code->max_stack;
   frame->method = method;
   frame->is_async_suspended = false;
-  thread->synchronized_state = 0;
+  frame->attempted_synchronize = false;
 
   memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));
 

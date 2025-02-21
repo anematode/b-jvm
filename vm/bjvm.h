@@ -491,6 +491,8 @@ typedef enum : u8 {
 typedef struct stack_frame {
   frame_kind is_native;
   u8 is_async_suspended;
+  // todo: enum 0- non 1- synchronize in progress, 2- synchronized, and done
+  u8 attempted_synchronize; // whether this frame method has been synchronized
   u16 num_locals;
 
   // The method associated with this frame
@@ -579,8 +581,6 @@ typedef struct vm_thread {
   // Current number of active synchronous calls
   u32 synchronous_depth;
 
-  // todo: enum 0- nothing at all 1- synchronize in progress, 2- synchronized, and done
-  u8 synchronized_state; // whether this frame method has been synchronized
   char synchronize_acquire_continuation[56];
 
   s32 tid;
