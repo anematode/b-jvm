@@ -972,11 +972,11 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
   }
 
   // Pre-allocate OOM and stack overflow errors
-  thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
-  thr->stack_overflow_error = new_object(thr, vm->cached_classdescs->stack_overflow_error);
+  thr->out_of_mem_error = new_object(thr, cached_classes(vm)->oom_error);
+  thr->stack_overflow_error = new_object(thr, cached_classes(vm)->stack_overflow_error);
 
   thr->thread_obj = ((struct native_Thread *) java_thread->obj);
-  drop_handle(thr, java_thread);
+  drop_handle(creator_thread, java_thread);
 
   if (initializing) {
     slice const phases[3] = { STR("initPhase1"), STR("initPhase2"), STR("initPhase3") };
@@ -985,7 +985,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
     cp_method *method;
     stack_value ret;
     for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); i++) {
-      method = method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
+      method = method_lookup(cached_classes(vm)->system, phases[i], signatures[i], false, false);
       assert(method);
       stack_value args[2] = {{ .i = 1 }, { .i = 1 }};
       call_interpreter_synchronous(thr, method, args); // void methods, no result
@@ -1007,7 +1007,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
         abort();
       }
 
-      method = method_lookup(vm->cached_classdescs->system, STR("getProperty"),
+      method = method_lookup(cached_classes(vm)->system, STR("getProperty"),
                              STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
       assert(method);
       stack_value args2[1] = {{ .obj = (void *) MakeJStringFromCString(thr, "java.home", true) }};

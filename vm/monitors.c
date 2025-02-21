@@ -4,7 +4,7 @@
 
 #include "monitors.h"
 
-#define NOT_HELD_TID -1
+#define NOT_HELD_TID (-1)
 
 DEFINE_ASYNC(monitor_acquire) {
   // since this is a single-threaded vm, we don't need atomic operations
@@ -39,7 +39,7 @@ DEFINE_ASYNC(monitor_acquire) {
     header_word proposed_header = {.expanded_data = allocated_data};
 
     // try to put it in- loop again if CAS fails
-    if (__atomic_compare_exchange(shared_header, &fetched_header, &proposed_header, false, __ATOMIC_ACQUIRE,
+    if (__atomic_compare_exchange(shared_header, &fetched_header, &proposed_header, false, __ATOMIC_ACQ_REL,
                                   __ATOMIC_ACQUIRE)) {
       break; // success
     }
@@ -50,24 +50,26 @@ DEFINE_ASYNC(monitor_acquire) {
     monitor_data *lock =
         __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
     assert(lock);
-    s32 freed = NOT_HELD_TID;
+    s32 read_tid = NOT_HELD_TID;
 
-    if (__atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE) == args->thread->tid) {
+    // try to acquire mutex- loop again if CAS fails
+    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+      lock->hold_count = 1;
+      break; // success
+    }
+
+    if (read_tid == args->thread->tid) {
       // we already own the monitor
       lock->hold_count++; // I think (?) this works under the C memory model, but if not, just use volatile
       break;
     }
 
-    // try to acquire mutex- loop again if CAS fails
-    if (__atomic_compare_exchange_n(&lock->tid, &freed, args->thread->tid, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
-      lock->hold_count = 1;
-      break; // success
-    }
-
-    // since the strong CAS failed, we need to wait
+    // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_WAKEUP_YIELDING;
     ASYNC_YIELD((void *)&self->wakeup_info);
   }
+
+  printf("(tid %d = %p) acquiring hold count %d\n", args->thread->tid, args->thread, __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE)->hold_count);
 
   // done acquiring the monitor
   drop_handle(args->thread, self->handle);
@@ -85,28 +87,29 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
   __atomic_load(shared_header, &fetched_header, __ATOMIC_ACQUIRE);
   assert(inspect_monitor(&fetched_header) != nullptr);
 
+  printf("trying to reacquire hold count %d\n", args->hold_count);
+
   // a monitor should be guaranteed to exist
   for (;;) {
     monitor_data *lock =
         __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
     assert(lock);
-    s32 freed = NOT_HELD_TID;
-
-    if (__atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE) == args->thread->tid) {
-      // we already own the monitor
-      // this scenario makes no sense for a reacquire: todo: assert instead of return -1?
-      drop_handle(args->thread, self->handle);
-      ASYNC_RETURN(-1);
-    }
+    s32 read_tid = NOT_HELD_TID;
 
     // try to acquire mutex- loop again if CAS fails
     // todo: are these memory semantics even correct
-    if (__atomic_compare_exchange_n(&lock->tid, &freed, args->thread->tid, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
+    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
       lock->hold_count = args->hold_count;
       break; // success
     }
 
-    // since the strong CAS failed, we need to wait
+    if (read_tid == args->thread->tid) {
+      // we already own the monitor, this should be illegal
+      drop_handle(args->thread, self->handle);
+      ASYNC_RETURN(-1);
+    }
+
+    // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_WAKEUP_YIELDING;
     ASYNC_YIELD((void *)&self->wakeup_info);
   }
@@ -157,6 +160,8 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
   header_word fetched_header;
   __atomic_load(&obj->header_word, &fetched_header, __ATOMIC_ACQUIRE);
   monitor_data *lock = inspect_monitor(&fetched_header);
+
+  printf("(tid %d = %p) releasing hold count %d\n", thread->tid, thread, lock->hold_count);
 
   // todo: error code enum? or just always cause an InternalError/IllegalMonitorStateException
   s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
