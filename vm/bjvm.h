@@ -546,7 +546,7 @@ typedef struct vm_thread {
     stack_frame **frames;
 
     /// Secondary stack for async calls from the interpreter
-    async_stack_t *async_stack;
+    async_stack_t *async_call_stack;
 
     // Current number of active synchronous calls
     u32 synchronous_depth;

@@ -532,26 +532,26 @@ struct async_stack {
 };
 
 static s32 grow_async_stack(vm_thread *thread) {
-  struct async_stack *stk = thread->stack.async_stack;
+  struct async_stack *stk = thread->stack.async_call_stack;
 
   size_t new_capacity = stk->max_height + stk->max_height / 2;
   if (new_capacity == 0)
     new_capacity = 4;
 
-  stk = realloc(thread->stack.async_stack, sizeof(struct async_stack) + new_capacity * sizeof(continuation_frame));
+  stk = realloc(thread->stack.async_call_stack, sizeof(struct async_stack) + new_capacity * sizeof(continuation_frame));
   ;
   if (unlikely(!stk)) {
     thread->current_exception = thread->stack_overflow_error;
     return -1;
   }
-  thread->stack.async_stack = stk;
+  thread->stack.async_call_stack = stk;
 
   stk->max_height = new_capacity;
   return 0;
 }
 
 static continuation_frame *async_stack_push(vm_thread *thread) {
-#define stk thread->stack.async_stack
+#define stk thread->stack.async_call_stack
 
   if (unlikely(stk->height == stk->max_height)) {
     if ((grow_async_stack(thread)) < 0) {
@@ -560,19 +560,19 @@ static continuation_frame *async_stack_push(vm_thread *thread) {
     }
   }
 
-  return &thread->stack.async_stack->frames[thread->stack.async_stack->height++];
+  return &thread->stack.async_call_stack->frames[thread->stack.async_call_stack->height++];
 
 #undef stk
 }
 
 static continuation_frame *async_stack_pop(vm_thread *thread) {
-  DCHECK(thread->stack.async_stack->height > 0);
-  return &thread->stack.async_stack->frames[--thread->stack.async_stack->height];
+  DCHECK(thread->stack.async_call_stack->height > 0);
+  return &thread->stack.async_call_stack->frames[--thread->stack.async_call_stack->height];
 }
 
 static void *async_stack_top(vm_thread *thread) {
-  assert(thread->stack.async_stack->height > 0);
-  return thread->stack.async_stack->frames[thread->stack.async_stack->height - 1].wakeup;
+  assert(thread->stack.async_call_stack->height > 0);
+  return thread->stack.async_call_stack->frames[thread->stack.async_call_stack->height - 1].wakeup;
 }
 
 /** FUEL CHECKING */

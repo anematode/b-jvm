@@ -857,7 +857,7 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
 
-  thr->stack.async_stack = calloc(1, 0x20);
+  thr->stack.async_call_stack = calloc(1, 0x20);
   thr->tid = vm->next_tid++;
 
   bool initializing = !vm->vm_initialized;
@@ -958,7 +958,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
 
-  thr->stack.async_stack = calloc(1, 0x20);
+  thr->stack.async_call_stack = calloc(1, 0x20);
   thr->tid = vm->next_tid++;
 
   bool initializing = !vm->vm_initialized;
@@ -1038,7 +1038,7 @@ static void remove_thread_from_vm_list(vm_thread *thread) {
 void free_thread(vm_thread *thread) {
   // TODO remove from the VM
 
-  free(thread->stack.async_stack);
+  free(thread->stack.async_call_stack);
   arrfree(thread->stack.frames);
   free(thread->stack.frame_buffer);
   free(thread->handles);
