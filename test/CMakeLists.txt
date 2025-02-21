@@ -23,6 +23,7 @@ if (NOT EMSCRIPTEN)
     target_link_libraries(tests PRIVATE bjvm_static)
 else()
     target_link_libraries(tests PRIVATE "-Wl,--whole-archive" bjvm_static)
+    target_link_options(tests PRIVATE -sNODERAWFS)  # We're running our tests in Node, so just do this
 endif()
 
 target_link_libraries(tests PUBLIC doctest::doctest)

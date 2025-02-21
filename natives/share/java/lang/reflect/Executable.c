@@ -7,7 +7,7 @@ DECLARE_NATIVE("java/lang/reflect", Executable, getParameters0, "()[Ljava/lang/r
   // Could be a Method or a Constructor, check which one
   obj_header *executable = obj->obj;
   cp_method *method;
-  slice name = hslc(executable->descriptor->name);
+  slice name = executable->descriptor->name;
   if (utf8_equals(name, "java/lang/reflect/Method")) {
     method = *unmirror_method((void *)executable);
   } else if (utf8_equals(name, "java/lang/reflect/Constructor")) {

@@ -8,6 +8,8 @@
 #include "util.h"
 #include "bjvm.h"
 
+#include <wasm/wasm_utils.h>
+
 typedef struct {
   u16 *count;
   int max_pc;
@@ -16,6 +18,7 @@ typedef struct {
 typedef struct {
   pc_to_oop_count pc_to_oops;
   void *entry;  // (vm_thread *, cp_method *, arg1, arg2 ...) -> double
+  wasm_instantiation_result *instantiation;
 } dumb_jit_result;
 
 // Reads arguments from "args", calls the entry point and writes the return value to "result". Yielding is signaled

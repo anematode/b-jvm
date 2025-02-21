@@ -155,6 +155,9 @@ interface WasmModule {
   _ffi_get_execution_record_js_handle(_0: number): number;
   _ffi_execute_immediately(_0: number): number;
   _ffi_free_execution_record(_0: number): void;
+  _ffi_classify_array(_0: number): number;
+  _ffi_get_element_ptr(_0: number, _1: number, _2: number): number;
+  _ffi_get_array_length(_0: number): number;
   _ffi_async_run(_0: number, _1: number, _2: number): number;
   _ffi_allocate_object(_0: number, _1: number): number;
   _ffi_create_string(_0: number, _1: number, _2: number): number;
@@ -171,6 +174,8 @@ interface WasmModule {
   _make_js_handle(_0: number, _1: number): number;
   _drop_js_handle(_0: number, _1: number): void;
   _set_max_calls(_0: number): number;
+  _wasm_runtime_newarray(_0: number, _1: number, _2: number): number;
+  _wasm_runtime_anewarray(_0: number, _1: number, _2: number): number;
   ___interpreter_intrinsic_void_table_base(): number;
   ___interpreter_intrinsic_int_table_base(): number;
   ___interpreter_intrinsic_float_table_base(): number;
@@ -311,7 +316,6 @@ interface WasmModule {
   _Inflater_reset_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Inflater_end_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _CRC32_updateBytes0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _ZipFile_initIDs_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NativeImageBuffer_getNativeMap_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _BootLoader_setBootLoaderUnnamedModule0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NativeLibraries_findBuiltinLib_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -352,6 +356,9 @@ interface WasmModule {
   _Unsafe_putInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putShort_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putShort_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putDouble_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putDouble_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_getDouble_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putByte_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getReference_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_getInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

@@ -11,7 +11,7 @@ else ()
     set(DCHECK_DEFAULT OFF)
 endif ()
 
-option( DCHECKS_ENABLED "Enable DCHECKs" ${DCHECK_DEFAULT})
+option(DCHECKS_ENABLED "Enable DCHECKs" ${DCHECK_DEFAULT})
 
 file(GLOB bjvm_SRC CONFIGURE_DEPENDS "*.c" "*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")

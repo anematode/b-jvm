@@ -31,7 +31,7 @@ function buffered() {
         buffer += new TextDecoder().decode(new Uint8Array(module.HEAPU8.buffer, buf, len));
         let idx: number;
         while ((idx = buffer.indexOf('\n')) != -1) {
-            console.log(buffer.slice(0, idx));
+            console.log(buffer.slice(0, idx + 1));
             buffer = buffer.slice(idx + 1);
         }
     }
@@ -199,6 +199,13 @@ type ClassInfo = {
     methods: MethodInfo[],
 };
 
+function ptr(handle: BaseHandle) {
+    if (handle.handleIndex === -1) {
+        throw new Error("Attempting to de-reference dropped handle");
+    }
+    return module._deref_js_handle(handle.vm.ptr, handle.handleIndex);
+}
+
 // Handle to a Java object
 class BaseHandle {
     vm: VM;
@@ -215,7 +222,12 @@ class BaseHandle {
 }
 
 function binaryNameToJSName(name: string) {
-    return name.replaceAll('/', "_");
+    name = name.replaceAll('/', "_");
+    // Remove potentially dangerous characters (only allow a-zA-Z0-9)
+    if (!name.match(/^[a-zA-Z0-9_]$/)) {
+        name = "";
+    }
+    return name;
 }
 
 function stringifyParameter(type: JavaType) {
@@ -300,10 +312,6 @@ class OverloadResolver {
 
         return impls.join('\n');
     }
-
-    createTSDefs() {
-
-    }
 }
 
 interface HandleConstructor {
@@ -332,11 +340,14 @@ function createClassImpl(vm: VM, bjvm_classdesc_ptr: number): HandleConstructor 
         }
     }
 
+    let arrayMethods = `get(index) { return vm.createThread().readArray(this, index); } get length() { return vm.createThread().getArrayLength(this); }`;
+
     const cow = binaryNameToJSName(classInfo.binaryName);
-    const body = `class ${cow} extends BaseHandle {
+    const body = `return class ${cow} extends BaseHandle {
     ${instanceResolver.createImpls(classInfo, false)}
     ${staticResolver.createImpls(classInfo, true)}
-    }; return ${cow}`;
+    ${arrayMethods}
+    };`;
 
     const Class = new Function("name", "BaseHandle", "vm", "methods", body)(classInfo.binaryName, BaseHandle, vm, classInfo.methods);
     Object.defineProperty(Class, 'name', { value: classInfo.binaryName });
@@ -565,6 +576,63 @@ class Thread {
         const handle = this.vm.createHandle(ptr);
         module._ffi_clear_current_exception(this.ptr);
         throw handle;
+    }
+
+    getArrayLength(array: BaseHandle): number {
+        return module._ffi_get_array_length(ptr(array));
+    }
+
+    readArray(array: BaseHandle, index: number): any {
+        let elementPtr = module._ffi_get_element_ptr(this.ptr, ptr(array), index);
+        this.throwThreadException();
+
+        let javaType: JavaType;
+        let classify: Classification = module._ffi_classify_array(ptr(array));
+        enum Classification {
+            BYTE_ARRAY = 0,
+            SHORT_ARRAY = 1,
+            INT_ARRAY = 2,
+            LONG_ARRAY = 3,
+            FLOAT_ARRAY = 4,
+            DOUBLE_ARRAY = 5,
+            CHAR_ARRAY = 6,
+            BOOLEAN_ARRAY = 7,
+            OBJECT_ARRAY = 8
+        }
+
+        switch (classify) {
+            case Classification.BYTE_ARRAY:
+                javaType = { kind: 'B', className: "" };
+                break;
+            case Classification.SHORT_ARRAY:
+                javaType = { kind: 'S', className: "" };
+                break;
+            case Classification.INT_ARRAY:
+                javaType = { kind: 'I', className: "" };
+                break;
+            case Classification.LONG_ARRAY:
+                javaType = { kind: 'J', className: "" };
+                break;
+            case Classification.FLOAT_ARRAY:
+                javaType = { kind: 'F', className: "" };
+                break;
+            case Classification.DOUBLE_ARRAY:
+                javaType = { kind: 'D', className: "" };
+                break;
+            case Classification.CHAR_ARRAY:
+                javaType = { kind: 'C', className: "" };
+                break;
+            case Classification.BOOLEAN_ARRAY:
+                javaType = { kind: 'Z', className: "" };
+                break;
+            case Classification.OBJECT_ARRAY:
+                javaType = { kind: 'L', className: "" };
+                break;
+            default:
+                throw new Error("Internal error: Bad array classification");
+        }
+
+        return readJavaType(this.vm, elementPtr, javaType);
     }
 
     async loadClass<N extends LoadableClassName>(name: N): Promise<LoadedClass<N>> {

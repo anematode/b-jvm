@@ -51,7 +51,7 @@ heap_string unparse_method_type(const struct native_MethodType *mt) {
   INIT_STACK_STRING(desc, 10000);
   slice write = desc;
   write = subslice(write, bprintf(write, "(").len);
-  for (int i = 0; i < *ArrayLength(mt->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(mt->ptypes); ++i) {
     struct native_Class *class = *((struct native_Class **)ArrayData(mt->ptypes) + i);
     write = subslice(write, unparse_classdesc_to_field_descriptor(write, class->reflected_class).len);
   }
@@ -225,7 +225,7 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init, "(Ljava/lang/invok
   handle *mn = args[0].handle;
   obj_header *target = args[1].handle->obj;
 
-  slice s = hslc(target->descriptor->name);
+  slice s = target->descriptor->name;
   if (utf8_equals(s, "java/lang/reflect/Method")) {
     cp_method *m = *unmirror_method(target);
     fill_mn_with_method(thread, mn, m, true);

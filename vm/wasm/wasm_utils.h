@@ -31,8 +31,6 @@ typedef struct {
 } wasm_type;
 
 wasm_type wasm_void();
-wasm_type wasm_infer();
-
 wasm_type wasm_int32();
 wasm_type wasm_float32();
 wasm_type wasm_float64();
@@ -66,6 +64,7 @@ typedef enum {
 typedef enum {
   /* i32 unary */
   WASM_OP_KIND_I32_EQZ = 0x45,
+  WASM_OP_KIND_REF_EQZ = 0x45,
   WASM_OP_KIND_I32_CLZ = 0x67,
   WASM_OP_KIND_I32_CTZ = 0x68,
   WASM_OP_KIND_I32_POPCNT = 0x69,
@@ -126,7 +125,9 @@ typedef enum {
 typedef enum {
   /* Relational instructions (consume 2 operands, produce i32 boolean) */
   WASM_OP_KIND_I32_EQ = 0x46,
+  WASM_OP_KIND_REF_EQ = 0x46,
   WASM_OP_KIND_I32_NE = 0x47,
+  WASM_OP_KIND_REF_NE = 0x46,
   WASM_OP_KIND_I32_LT_S = 0x48,
   WASM_OP_KIND_I32_LT_U = 0x49,
   WASM_OP_KIND_I32_GT_S = 0x4A,
@@ -457,13 +458,7 @@ void wasm_export_function(wasm_module *module, wasm_function *fn);
 wasm_type wasm_string_to_tuple(wasm_module *module, const char *str);
 
 wasm_function *wasm_import_runtime_function_impl(wasm_module *module, const char *c_name,
-                                                 const char *params, // e.g. iii
-                                                 const char *result, // e.g. v
-                                                 void *dummy);
-
-// The function must be marked EMSCRIPTEN_KEEPALIVE for this to work!
-#define wasm_import_runtime_function(module, c_name, params, result)                                                   \
-  wasm_import_runtime_function_impl(module, #c_name, params, result, &c_name)
+                                                 const char *sig /* e.g. viii */);
 
 wasm_expression *wasm_i32_const(wasm_module *module, int value);
 wasm_expression *wasm_f32_const(wasm_module *module, float value);
@@ -491,8 +486,6 @@ wasm_expression *wasm_if_else(wasm_module *module, wasm_expression *cond, wasm_e
 wasm_expression *wasm_return(wasm_module *module, wasm_expression *expr);
 
 u32 register_function_type(wasm_module *module, wasm_type params, wasm_type results);
-
-wasm_type jvm_type_to_wasm(type_kind kind);
 
 typedef enum {
   WASM_INSTANTIATION_SUCCESS,

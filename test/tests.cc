@@ -411,7 +411,7 @@ TEST_CASE("Immediate dominators computation on cursed CFG") {
   classdesc desc;
   auto cursed_file = ReadFile("test_files/cfg_fuck/Main.class").value();
   parse_classfile(cursed_file.data(), cursed_file.size(), &desc, nullptr);
-  REQUIRE(utf8_equals(hslc(desc.name), "Main"));
+  REQUIRE(utf8_equals(desc.name, "Main"));
 
   cp_method *m = desc.methods + 4;
   REQUIRE(utf8_equals(m->name, "main"));
@@ -587,8 +587,8 @@ param3
 }
 
 TEST_CASE("Extended NPE message") {
-  auto result = run_test_case("test_files/extended_npe/", false, "ExtendedNPETests");
-  REQUIRE(result.stdout_ == "");
+  auto result = run_test_case("test_files/extended_npe/", true, "ExtendedNPETests");
+  REQUIRE(result.stderr_ == "");
 }
 
 #if 0
@@ -600,7 +600,14 @@ TEST_CASE("ITextPDF") {
 #endif
 
 TEST_CASE("Class loading") {
-  auto result = run_test_case("test_files/basic_classloader/", false, "URLClassLoaderExample");
+  auto result = run_test_case("test_files/basic_classloader/", true, "URLClassLoaderExample");
+  REQUIRE(result.stdout_ == R"(Loaded class: ExternalClass
+ExternalClass instance created!
+someMethod() in ExternalClass was called!
+Loaded class: ExternalClass
+ExternalClass instance created!
+someMethod() in ExternalClass was called!
+)");
 }
 
 TEST_CASE("java.lang.reflect.Method") {
@@ -737,7 +744,8 @@ Countdown value: 0
 }
 
 TEST_CASE("Random UUID") {
-  auto result = run_test_case("test_files/random_uuid/", false, "Main");
+  auto result = run_test_case("test_files/random_uuid/", true, "Main");
+  REQUIRE(result.stderr_ == "");
 }
 
 TEST_CASE("New instance") {
@@ -751,3 +759,22 @@ TEST_CASE("URLClassLoader") {
   auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
   REQUIRE(result.stdout_ == "Hello, world!\n");
 }
+
+TEST_CASE("frem and drem") {
+  auto result = run_test_case("test_files/frem_drem/", true, "FremDremTest");
+  REQUIRE(result.stdout_ == R"(0.099999994
+0.09999999999999998
+)");
+}
+
+TEST_CASE("Manually thrown exception") {
+  // Tests that frames associated with fillInStackTrace are correctly skipped
+  auto result = run_test_case("test_files/manually_thrown", true, "ManuallyThrown");
+  REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat ManuallyThrown.main(ManuallyThrown.java:4)\n");
+}
+
+#if 1
+TEST_CASE("Print useful trampolines") {
+  print_method_sigs();
+}
+#endif

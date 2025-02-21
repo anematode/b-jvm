@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <zlib.h>
 
 #include "analysis.h"
 #include "arrays.h"
@@ -54,11 +55,9 @@ DECLARE_ASYNC(int, init_cached_classdescs,
 );
 
 DEFINE_ASYNC(init_cached_classdescs) {
-  DCHECK(!args->thread->vm->cached_classdescs);
+  DCHECK(!args->thread->vm->_cached_classdescs && "Cached classdescs already initialized");
 
   self->cached_classdescs = malloc(cached_classdesc_count * sizeof(classdesc *));
-  args->thread->vm->cached_classdescs = (struct cached_classdescs *)self->cached_classdescs;
-
   if (!self->cached_classdescs) {
     out_of_memory(args->thread);
     ASYNC_RETURN(-1);
@@ -76,20 +75,23 @@ DEFINE_ASYNC(init_cached_classdescs) {
       ASYNC_RETURN(result);
     }
   }
+
+  // Populate the field
+  args->thread->vm->_cached_classdescs = (struct cached_classdescs *)self->cached_classdescs;
   ASYNC_END(0);
 }
 
-inline bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
+bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
-inline mark_word_t *get_mark_word(header_word *data) {
+mark_word_t *get_mark_word(header_word *data) {
   return has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
 }
 
-inline monitor_data *inspect_monitor(header_word *data) {
+monitor_data *inspect_monitor(header_word *data) {
   return has_expanded_data(data) ? data->expanded_data : nullptr;
 }
 
-inline monitor_data *allocate_monitor(vm_thread *thread) {
+monitor_data *allocate_monitor(vm_thread *thread) {
   monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
   return data;
 }
@@ -100,7 +102,7 @@ u16 stack_depth(const stack_frame *frame) {
   DCHECK(!is_frame_native(frame), "Can't get stack depth of native frame");
   DCHECK(frame->method, "Can't get stack depth of fake frame");
   int pc = frame->plain.program_counter;
-  if (pc == 0)
+  if (pc == 0)  // stack is always 0 at method entry, common case
     return 0;
   code_analysis *analy = frame->method->code_analysis;
   DCHECK(pc < analy->insn_count);
@@ -258,7 +260,7 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
 
   thread->frame_buffer_used = (char *)frame + sizeof(*frame) - thread->frame_buffer;
 
-  frame->is_native = 1;
+  frame->is_native = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
   frame->method = method;
   frame->native.method_shape = descriptor;
@@ -293,7 +295,7 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
 
   thread->frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->frame_buffer;
   arrput(thread->frames, frame);
-  frame->is_native = 0;
+  frame->is_native = FRAME_KIND_INTERPRETER;
   frame->num_locals = code->max_locals;
   frame->plain.program_counter = 0;
   frame->plain.max_stack = code->max_stack;
@@ -371,6 +373,26 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
   fprintf(stream, "%s", buf);
 }
 
+u32 compute_used(vm_thread * thread) {
+  if (arrlen(thread->frames) == 0) {
+    return 0;
+  }
+  stack_frame *frame = arrlast(thread->frames);
+  DCHECK(frame);
+  switch (frame->is_native) {
+  case FRAME_KIND_INTERPRETER:
+    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) - thread->frame_buffer;
+  case FRAME_KIND_NATIVE:
+    return (char *)frame + sizeof(stack_frame) - thread->frame_buffer;
+  case FRAME_KIND_COMPILED:
+    UNREACHABLE();
+  default:
+    UNREACHABLE();
+  }
+}
+
+
+
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   DCHECK(arrlen(thr->frames) > 0);
   stack_frame *frame = arrpop(thr->frames);
@@ -378,8 +400,7 @@ void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   if (is_frame_native(frame)) {
     drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
   }
-  thr->frame_buffer_used =
-      arrlen(thr->frames) == 0 ? 0 : (char *)(frame->plain.stack + frame->plain.max_stack) - thr->frame_buffer;
+  thr->frame_buffer_used = compute_used(thr);
 }
 
 // Symmetry with make_primitive_classdesc
@@ -387,7 +408,6 @@ static void free_primitive_classdesc(classdesc *classdesc) {
   DCHECK(classdesc->kind == CD_KIND_PRIMITIVE);
   if (classdesc->array_type)
     classdesc->array_type->dtor(classdesc->array_type);
-  free_heap_str(classdesc->name);
   arena_uninit(&classdesc->arena);
   free(classdesc);
 }
@@ -441,10 +461,10 @@ void register_native(vm *vm, slice class, const slice method_name, const slice m
 }
 
 void read_string(vm_thread *, obj_header *obj, s8 **buf, size_t *len) {
-  DCHECK(utf8_equals(hslc(obj->descriptor->name), "java/lang/String"));
+  DCHECK(utf8_equals(obj->descriptor->name, "java/lang/String"));
   obj_header *array = ((struct native_String *)obj)->value;
   *buf = ArrayData(array);
-  *len = *ArrayLength(array);
+  *len = ArrayLength(array);
 }
 
 int read_string_to_utf8(vm_thread *thread, heap_string *result, obj_header *obj) {
@@ -535,7 +555,7 @@ classdesc *make_primitive_classdesc(type_kind kind, const slice name) {
 
   desc->kind = CD_KIND_PRIMITIVE;
   desc->super_class = nullptr;
-  desc->name = make_heap_str_from(name);
+  desc->name = arena_make_str(&desc->arena, name.chars, (int)name.len);
   desc->access_flags = ACCESS_PUBLIC | ACCESS_FINAL | ACCESS_ABSTRACT;
   desc->array_type = nullptr;
   desc->primitive_component = kind;
@@ -622,6 +642,11 @@ void existing_classes_are_javabase(vm *vm, module *module) {
   }
 }
 
+struct cached_classdescs *cached_classes(vm *vm) {
+  CHECK(vm->_cached_classdescs && "Cached classdescs not yet initialized");
+  return vm->_cached_classdescs;
+}
+
 int define_module(vm *vm, slice module_name, obj_header *module_) {
   module *mod = calloc(1, sizeof(module));
   mod->reflection_object = module_;
@@ -696,6 +721,14 @@ void free_unsafe_allocations(vm *vm) {
   arrfree(vm->unsafe_allocations);
 }
 
+void free_zstreams(vm *vm) {
+  for (int i = 0; i < arrlen(vm->z_streams); ++i) {
+    inflateEnd(vm->z_streams[i]);
+    free(vm->z_streams[i]);
+  }
+  arrfree(vm->z_streams);
+}
+
 void free_vm(vm *vm) {
   free_hash_table(vm->classes);
   free_hash_table(vm->natives);
@@ -712,7 +745,7 @@ void free_vm(vm *vm) {
 
   free_classpath(&vm->classpath);
 
-  free(vm->cached_classdescs);
+  free(cached_classes(vm));
   // Free all threads, iterate backwards because they remove themselves
   for (int i = arrlen(vm->active_threads) - 1; i >= 0; --i) {
     free_thread(vm->active_threads[i]);
@@ -720,6 +753,7 @@ void free_vm(vm *vm) {
   arrfree(vm->active_threads);
   free(vm->heap);
   free_unsafe_allocations(vm);
+  free_zstreams(vm);
 
   free(vm);
 }
@@ -837,10 +871,10 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   }
 
   // Pre-allocate OOM and stack overflow errors
-  thr->out_of_mem_error = new_object(thr, vm->cached_classdescs->oom_error);
-  thr->stack_overflow_error = new_object(thr, vm->cached_classdescs->stack_overflow_error);
+  thr->out_of_mem_error = new_object(thr, cached_classes(vm)->oom_error);
+  thr->stack_overflow_error = new_object(thr, cached_classes(vm)->stack_overflow_error);
 
-  handle *java_thread = make_handle(thr, new_object(thr, vm->cached_classdescs->thread));
+  handle *java_thread = make_handle(thr, new_object(thr, cached_classes(vm)->thread));
 #define java_thr ((struct native_Thread *)java_thread->obj)
   thr->thread_obj = java_thr;
 
@@ -848,7 +882,7 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   java_thr->name = MakeJStringFromCString(thr, "main", true);
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
-  cp_method *make_thread = method_lookup(vm->cached_classdescs->thread, STR("<init>"),
+  cp_method *make_thread = method_lookup(cached_classes(vm)->thread, STR("<init>"),
                                          STR("(Ljava/lang/ThreadGroup;Ljava/lang/String;)V"), false, false);
 
   obj_header *main_thread_group = options.thread_group;
@@ -869,9 +903,8 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
 
     cp_method *method;
     stack_value ret;
-    for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases);
-         ++i) { // todo: these init phases should only be called once per VM
-      method = method_lookup(vm->cached_classdescs->system, phases[i], signatures[i], false, false);
+    for (unsigned i = 0; i < sizeof(phases) / sizeof(*phases); ++i) {
+      method = method_lookup(cached_classes(vm)->system, phases[i], signatures[i], false, false);
       assert(method);
       stack_value args[2] = {{.i = 1}, {.i = 1}};
       call_interpreter_synchronous(thr, method, args); // void methods, no result
@@ -893,7 +926,7 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
         abort();
       }
 
-      method = method_lookup(vm->cached_classdescs->system, STR("getProperty"),
+      method = method_lookup(cached_classes(vm)->system, STR("getProperty"),
                              STR("(Ljava/lang/String;)Ljava/lang/String;"), false, false);
       assert(method);
       stack_value args2[1] = {{.obj = (void *)MakeJStringFromCString(thr, "java.home", true)}};
@@ -1023,7 +1056,7 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
   // exists
   DCHECK(method);
 
-  classdesc *Class = thread->vm->cached_classdescs->klass;
+  classdesc *Class = cached_classes(thread->vm)->klass;
   handle *ptypes = make_handle(thread, CreateObjectArray1D(thread, Class, method->args_count));
 
   for (int i = 0; i < method->args_count; ++i) {
@@ -1039,7 +1072,7 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
     return nullptr;
   struct native_Class *rtype = get_class_mirror(thread, ret_desc);
   // Call <init>(Ljava/lang/Class;[Ljava/lang/Class;Z)V
-  classdesc *MethodType = thread->vm->cached_classdescs->method_type;
+  classdesc *MethodType = cached_classes(thread->vm)->method_type;
   cp_method *init = method_lookup(MethodType, STR("makeImpl"),
                                   STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                       "lang/invoke/MethodType;"),
@@ -1130,9 +1163,9 @@ static int compute_mh_type_info(vm_thread *thread, cp_method_handle_info *info, 
 }
 
 DEFINE_ASYNC(resolve_mh_mt) {
-  DCHECK(mh_handle_supported(args->info->handle_kind), "Unsupported method handle kind");
+  CHECK(mh_handle_supported(args->info->handle_kind), "Unsupported method handle kind");
 
-  cp_class_info *required_type = args->info->handle_kind == MH_KIND_GET_FIELD
+  cp_class_info *required_type = args->info->handle_kind == MH_KIND_GET_FIELD || args->info->handle_kind == MH_KIND_PUT_FIELD
                                      ? args->info->reference->field.class_info
                                      : args->info->reference->methodref.class_info;
 
@@ -1144,13 +1177,13 @@ DEFINE_ASYNC(resolve_mh_mt) {
   CHECK(err == 0);
 
   // Call MethodType.makeImpl(rtype, ptypes, true)
-  cp_method *make = method_lookup(args->thread->vm->cached_classdescs->method_type, STR("makeImpl"),
+  cp_method *make = method_lookup(cached_classes(args->thread->vm)->method_type, STR("makeImpl"),
                                   STR("(Ljava/lang/Class;[Ljava/lang/Class;Z)Ljava/"
                                       "lang/invoke/MethodType;"),
                                   false, false);
 
   self->ptypes_array = make_handle(
-      args->thread, CreateObjectArray1D(args->thread, args->thread->vm->cached_classdescs->klass, info.ptypes_count));
+      args->thread, CreateObjectArray1D(args->thread, cached_classes(args->thread->vm)->klass, info.ptypes_count));
   for (u32 i = 0; i < info.ptypes_count; ++i) {
     *((obj_header **)ArrayData(self->ptypes_array->obj) + i) = (void *)get_class_mirror(args->thread, info.ptypes[i]);
   }
@@ -1310,7 +1343,7 @@ module *get_unnamed_module(vm_thread *thread) {
     return result;
   }
 
-  obj_header *module = new_object(thread, vm->cached_classdescs->module);
+  obj_header *module = new_object(thread, cached_classes(vm)->module);
   if (!module) {
     return nullptr;
   }
@@ -1441,7 +1474,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
     // class with a matching name
     for (int i = (int)arrlen(thread->frames) - 1; i >= 0; --i) {
       classdesc *d = get_frame_method(thread->frames[i])->my_class;
-      if (utf8_equals_utf8(hslc(d->name), chars)) {
+      if (utf8_equals_utf8(d->name, chars)) {
         class = d;
         break;
       }
@@ -1543,7 +1576,7 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
 
 // Returns true if the class descriptor is a subclass of java.lang.Error.
 bool is_error(classdesc *d) {
-  return utf8_equals(hslc(d->name), "java/lang/Error") || (d->super_class && is_error(d->super_class->classdesc));
+  return utf8_equals(d->name, "java/lang/Error") || (d->super_class && is_error(d->super_class->classdesc));
 }
 
 attribute *find_attribute(attribute *attrs, int attrc, attribute_kind kind) {
@@ -1599,7 +1632,7 @@ bool initialize_constant_value_fields(vm_thread *thread, classdesc *classdesc) {
 // and raise it.
 void wrap_in_exception_in_initializer_error(vm_thread *thread) {
   handle *exc = make_handle(thread, thread->current_exception);
-  classdesc *EIIE = thread->vm->cached_classdescs->exception_in_initializer_error;
+  classdesc *EIIE = cached_classes(thread->vm)->exception_in_initializer_error;
   handle *eiie = make_handle(thread, new_object(thread, EIIE));
   cp_method *ctor = method_lookup(EIIE, STR("<init>"), STR("(Ljava/lang/Throwable;)V"), false, false);
   thread->current_exception = nullptr; // clear exception
@@ -1758,6 +1791,13 @@ static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_metho
 
   u8 argc = method_argc(method);
   stack_value *stack_top = (stack_value *)(thread->frame_buffer + thread->frame_buffer_used);
+  if (arrlen(thread->frames)) {
+    stack_frame *last = arrlast(thread->frames);
+    if (last->is_native == FRAME_KIND_INTERPRETER) {
+      // Make sure we're not trampling over the previous interpreter frame
+      DCHECK((uintptr_t)last->plain.stack + last->plain.max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
+    }
+  }
   size_t args_size = sizeof(stack_value) * argc;
 
   if (args_size + thread->frame_buffer_used > thread->frame_buffer_capacity) {
@@ -1796,25 +1836,51 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
                            info->vm_object); // already failed
     return -1;
   }
-  // Oh boy
-  stack_frame *frame = arrlen(thread->frames) ? thread->frames[arrlen(thread->frames) - 1] : nullptr;
+
+  // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
+  // with reflection n' shit)
   object loader = nullptr;
-  if (frame) {
-    loader = frame->method->my_class->classloader;
+  for (int i = arrlen(thread->frames) - 1; i >= 0; --i) {
+    void *candidate = thread->frames[i]->method->my_class->classloader;
+    if (candidate) {
+      loader = candidate;
+      break;
+    }
   }
 
   if (loader) {
+    // First strip off [ so that we only call loadClass on the component type
+    int i = 0;
+    while (info->name.chars[i] == '[') {
+      ++i;
+    }
+    int dims = i;
+    // Then strip the L and ; if it's an array type
+    if (dims && info->name.chars[dims] != 'L') {
+      goto welp;
+    }
+    slice subslice = subslice_to(info->name, dims + (dims != 0), info->name.len - (dims != 0));
+
     cp_method *loadClass = method_lookup(loader->descriptor,
       STR("loadClass"), STR("(Ljava/lang/String;)Ljava/lang/Class;"),
                                          true, false);
-    object name = MakeJStringFromModifiedUTF8(thread, info->name, true);
+    INIT_STACK_STRING(s, 1000);
+    exchange_slashes_and_dots(&s, subslice);
+    s.len = subslice.len;
+
+    object name = MakeJStringFromModifiedUTF8(thread, s, false);
     stack_value result = call_interpreter_synchronous(thread, loadClass, (stack_value[]){{.obj = loader}, {.obj = name}});
 
     if (thread->current_exception) {
       thread->current_exception = nullptr;
       goto welp;
     }
-    info->classdesc = (classdesc *)result.obj;
+
+    info->classdesc = (classdesc *)unmirror_class(result.obj);
+    // Now repeatedly instantiate array classes
+    for (int i = 0; i < dims; ++i) {
+      info->classdesc = make_array_classdesc(thread, info->classdesc);
+    }
   } else {
     welp:
     info->classdesc = bootstrap_lookup_class(thread, info->name);
@@ -1921,7 +1987,7 @@ obj_header *new_object(vm_thread *thread, classdesc *classdesc) {
 }
 
 bool is_instanceof_name(const obj_header *mirror, const slice name) {
-  return mirror && utf8_equals_utf8(hslc(mirror->descriptor->name), name);
+  return mirror && utf8_equals_utf8(mirror->descriptor->name, name);
 }
 
 classdesc *unmirror_class(obj_header *mirror) {
@@ -1962,7 +2028,7 @@ struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdes
     return nullptr;
   if (cd->cp_mirror)
     return cd->cp_mirror;
-  classdesc *java_lang_ConstantPool = thread->vm->cached_classdescs->constant_pool;
+  classdesc *java_lang_ConstantPool = cached_classes(thread->vm)->constant_pool;
   struct native_ConstantPool *cp_mirror = cd->cp_mirror = (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = cd;
   return cp_mirror;
@@ -2047,10 +2113,10 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
   // Compare ptypes
   if (provider_mt == targ)
     return true;
-  if (*ArrayLength(provider_mt->ptypes) != *ArrayLength(targ->ptypes)) {
+  if (ArrayLength(provider_mt->ptypes) != ArrayLength(targ->ptypes)) {
     return false;
   }
-  for (int i = 0; i < *ArrayLength(provider_mt->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(provider_mt->ptypes); ++i) {
     classdesc *left = unmirror_class(((obj_header **)ArrayData(provider_mt->ptypes))[i]);
     classdesc *right = unmirror_class(((obj_header **)ArrayData(targ->ptypes))[i]);
 
@@ -2064,10 +2130,10 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
 // Dump the contents of the method type to the specified stream.
 [[maybe_unused]] static void dump_method_type(FILE *stream, struct native_MethodType *type) {
   fprintf(stream, "(");
-  for (int i = 0; i < *ArrayLength(type->ptypes); ++i) {
+  for (int i = 0; i < ArrayLength(type->ptypes); ++i) {
     classdesc *desc = unmirror_class(((obj_header **)ArrayData(type->ptypes))[i]);
     fprintf(stream, "%.*s", fmt_slice(desc->name));
-    if (i + 1 < *ArrayLength(type->ptypes))
+    if (i + 1 < ArrayLength(type->ptypes))
       fprintf(stream, ", ");
   }
   fprintf(stream, ") -> %.*s\n", fmt_slice(unmirror_class(type->rtype)->name));
@@ -2143,7 +2209,7 @@ DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
     bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
     // only raw calls to MethodHandle.invoke involve "asType" conversions
     bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
-                     utf8_equals(hslc(args->method->my_class->name), "java/lang/invoke/MethodHandle");
+                     utf8_equals(args->method->my_class->name, "java/lang/invoke/MethodHandle");
 
     if (is_invoke_exact) {
       if (!mts_are_same) {
@@ -2237,7 +2303,7 @@ DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
     // varHandleExactInvoker method of java.lang.invoke.MethodHandles with the instance of
     // java.lang.invoke.VarHandle.AccessMode as the first argument and the instance of java.lang.invoke.MethodType
     // as the second argument. The resulting instance is called the invoker method handle.
-    classdesc *MethodHandles = thread->vm->cached_classdescs->method_handles;
+    classdesc *MethodHandles = cached_classes(thread->vm)->method_handles;
     CHECK(MethodHandles);
     stack_value arg3[] = {{.obj = result->obj}, {.obj = get_async_result(call_interpreter).obj}};
     cp_method *varHandleExactInvoker = method_lookup(MethodHandles, STR("varHandleExactInvoker"),
@@ -2326,21 +2392,33 @@ int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_
   return 0;
 }
 
-static stack_value box_cp_integral(cp_kind kind, cp_entry *ent) {
+static stack_value box_cp_integral(vm_thread *thread, cp_kind kind, cp_entry *ent) {
   switch (kind) {
-  case CP_KIND_INTEGER:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.i = (jint)ent->integral.value};
-  case CP_KIND_FLOAT:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.f = (jfloat)ent->floating.value};
-  case CP_KIND_LONG:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.l = ent->integral.value};
-  case CP_KIND_DOUBLE:
-    UNREACHABLE("BOX THIS");
-    return (stack_value){.d = ent->floating.value};
-
+  case CP_KIND_INTEGER: {
+    stack_value args[1] = { {.i = (jint)ent->integral.value} };
+    // Call Integer.valueOf
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->integer,
+      STR("valueOf"), STR("(I)Ljava/lang/Integer;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_FLOAT: {
+    stack_value args[1] = { {.f = (jfloat)ent->floating.value} };
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->float_,
+      STR("valueOf"), STR("(F)Ljava/lang/Float;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_LONG: {
+    stack_value args[1] = { {.l = (jlong)ent->integral.value} };
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->long_,
+      STR("valueOf"), STR("(J)Ljava/lang/Long;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
+  case CP_KIND_DOUBLE: {
+    stack_value args[1] = { {.d = (jdouble)ent->floating.value} };
+    cp_method *valueOf = method_lookup(cached_classes(thread->vm)->double_,
+      STR("valueOf"), STR("(D)Ljava/lang/Double;"), true, false);
+    return call_interpreter_synchronous(thread, valueOf, args);
+  }
   default:
     UNREACHABLE();
   }
@@ -2351,7 +2429,7 @@ DEFINE_ASYNC(resolve_indy_static_argument) {
 #define ent args->ent
 
   if (cp_kind_is_primitive(ent->kind)) {
-    ASYNC_RETURN(box_cp_integral(ent->kind, ent));
+    ASYNC_RETURN(box_cp_integral(thread, ent->kind, ent));
   }
 
   if (ent->kind == CP_KIND_CLASS) {
@@ -2400,14 +2478,14 @@ DEFINE_ASYNC(indy_resolve) {
   self->bootstrap_handle = make_handle(thread, (void *)get_async_result(resolve_method_handle));
 
   // MethodHandles class
-  classdesc *lookup_class = thread->vm->cached_classdescs->method_handles;
+  classdesc *lookup_class = cached_classes(thread->vm)->method_handles;
   cp_method *lookup_factory =
       method_lookup(lookup_class, STR("lookup"), STR("()Ljava/lang/invoke/MethodHandles$Lookup;"), true, false);
 
   handle *lookup_handle = make_handle(thread, call_interpreter_synchronous(thread, lookup_factory, nullptr).obj);
 
   self->invoke_array =
-      make_handle(thread, CreateObjectArray1D(thread, thread->vm->cached_classdescs->object, m->args_count + 3));
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->object, m->args_count + 3));
 
   self->static_i = 0;
   for (; self->static_i < m->args_count; ++self->static_i) {
@@ -2538,7 +2616,7 @@ int get_line_number(const attribute_code *code, u16 pc) {
 obj_header *get_main_thread_group(vm_thread *thread) {
   vm *vm = thread->vm;
   if (!vm->main_thread_group) {
-    classdesc *ThreadGroup = vm->cached_classdescs->thread_group;
+    classdesc *ThreadGroup = cached_classes(vm)->thread_group;
     cp_method *init = method_lookup(ThreadGroup, STR("<init>"), STR("()V"), false, false);
 
     DCHECK(init);

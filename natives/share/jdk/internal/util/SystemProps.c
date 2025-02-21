@@ -50,7 +50,7 @@ enum {
 
 static handle *make_string_array(vm_thread *thread, int length) {
   handle *arr =
-      make_handle(thread, CreateArray(thread, thread->vm->cached_classdescs->string->array_type, (int[]){length}, 1));
+      make_handle(thread, CreateArray(thread, cached_classes(thread->vm)->string->array_type, (int[]){length}, 1));
   DCHECK(arr->obj);
   return arr;
 }

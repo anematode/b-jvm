@@ -10,6 +10,7 @@
 
 #include "doctest/doctest.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <optional>
@@ -18,6 +19,7 @@
 
 #include <roundrobin_scheduler.h>
 #include <unistd.h>
+#include <unordered_map>
 
 using std::ifstream;
 using std::optional;
@@ -151,6 +153,23 @@ std::optional<std::vector<u8>> ReadFile(const std::string &file) {
 #endif
 }
 
+std::unordered_map<std::string, int> method_sigs;
+
+void print_method_sigs() {
+  std::vector<std::pair<std::string, int>> method_sigs_vec;
+  for (const auto &sig : method_sigs) {
+    method_sigs_vec.emplace_back(sig.first, sig.second);
+  }
+  // Sort so most common are first
+  std::sort(method_sigs_vec.begin(), method_sigs_vec.end(), [](const auto &a, const auto &b) {
+    return a.second > b.second;
+  });
+  // Print
+  for (const auto &sig : method_sigs_vec) {
+    printf("%s\t%d\n", sig.first.c_str(), sig.second);
+  }
+}
+
 TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::string main_class, std::string input) {
   printf("Classpath: %s\n", classpath.c_str());
   vm_options options = default_vm_options();
@@ -226,6 +245,25 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::str
     call_interpreter_synchronous(thread, method, to_string_args);
   }
 
+  // Iterate through all classes and methods and accumulate the signatures
+  hash_table_iterator it;
+  classdesc *value;
+  for (it = hash_table_get_iterator(&vm->classes);
+    hash_table_iterator_has_next(it, nullptr, nullptr, (void**) &value);
+    hash_table_iterator_next(&it)) {
+    for (int i = 0; i < value->methods_count; i++) {
+      cp_method *method = value->methods + i;
+      std::string sig { (char)field_to_kind(&method->descriptor->return_type) };
+      if (!(method->access_flags & ACCESS_STATIC)) {
+        sig += "L";
+      }
+      for (int j = 0; j < method->descriptor->args_count; j++) {
+        sig.push_back(field_to_kind(&method->descriptor->args[j]));
+      }
+      method_sigs[sig]++;
+    }
+  }
+
   free_thread(thread);
   free_vm(vm);
 
@@ -238,7 +276,6 @@ static void busy_wait(double us) { EM_ASM("const endAt = Date.now() + $0 / 1000;
 
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio, std::string main_class,
                                                 std::string input) {
-
   printf("Classpath: %s\n", classpath.c_str());
   vm_options options = default_vm_options();
 

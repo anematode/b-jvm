@@ -73,7 +73,7 @@ typedef struct {
 // variables are references, so that the GC can follow them.
 typedef struct code_analysis {
   union {
-    // wasm jit depends on the order here
+    // For each of these, the first max_stack bits are stack, and the rest are locals.
     compressed_bitset *insn_index_to_references;
     compressed_bitset *insn_index_to_ints;
     compressed_bitset *insn_index_to_floats;

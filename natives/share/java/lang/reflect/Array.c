@@ -21,5 +21,5 @@ DECLARE_NATIVE("java/lang/reflect", Array, newArray, "(Ljava/lang/Class;I)Ljava/
 
 DECLARE_NATIVE("java/lang/reflect", Array, getLength, "(Ljava/lang/Object;)I") {
   DCHECK(argc == 1);
-  return (stack_value){.i = *ArrayLength(args[0].handle->obj)};
+  return (stack_value){.i = ArrayLength(args[0].handle->obj)};
 }

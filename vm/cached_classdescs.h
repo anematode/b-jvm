@@ -54,7 +54,12 @@
   X(thread_group, "java/lang/ThreadGroup")                                                                             \
   X(module, "java/lang/Module")                                                                                        \
   X(system, "java/lang/System")                                                                                        \
-  X(cloneable, "java/lang/Cloneable")
+  X(cloneable, "java/lang/Cloneable") \
+  X(integer, "java/lang/Integer") \
+  X(long_, "java/lang/Long") \
+  X(float_, "java/lang/Float") \
+  X(double_, "java/lang/Double") \
+  X(throwable, "java/lang/Throwable")
 
 #define CACHED_CLASSDESCS(X)                                                                                           \
   __CACHED_EXCEPTION_CLASSES(X)                                                                                        \

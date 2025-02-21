@@ -12,6 +12,7 @@ extern "C" {
 #include <string.h>
 #include <types.h>
 #include <wchar.h>
+#include "config.h"
 
 // These are unlikely (ha!) to actually improve codegen, but are actually kind
 // of nice to indicate what we "think" is going to happen. Long term we might
@@ -46,6 +47,7 @@ extern "C" {
       fprintf(stderr, "%s: %s%d: CHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                       \
       fprintf(stderr, " " __VA_ARGS__);                                                                                \
       fprintf(stderr, "\n");                                                                                           \
+      *(char*)1 = 0; \
       abort();                                                                                                         \
     }                                                                                                                  \
   } while (0)

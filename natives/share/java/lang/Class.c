@@ -27,7 +27,7 @@ DECLARE_NATIVE("java/lang", Class, getPrimitiveClass, "(Ljava/lang/String;)Ljava
   // this is fine because if it's a primitive type, it'll look the same regardless of how it's encoded
   obj_header *str_data = RawStringData(thread, args[0].handle->obj);
   char *chars = ArrayData(str_data);
-  int len = *ArrayLength(str_data);
+  int len = ArrayLength(str_data);
 
   if (len > 10) {
     return value_null();
@@ -225,7 +225,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0, "(Z)[Ljava/lang/reflect/F
       ++fields;
     }
   }
-  classdesc *Field = thread->vm->cached_classdescs->field;
+  classdesc *Field = cached_classes(thread->vm)->field;
   obj_header *result = CreateObjectArray1D(thread, Field, fields);
   if (!result)
     return value_null();

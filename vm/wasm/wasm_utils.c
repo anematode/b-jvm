@@ -608,13 +608,18 @@ wasm_type wasm_string_to_tuple(wasm_module *module, const char *str) {
   return wasm_make_tuple(module, types, i);
 }
 
-wasm_function *wasm_import_runtime_function_impl(wasm_module *module, const char *c_name, const char *params,
-                                                 const char *result, void *dummy) {
-  (void)dummy;
+wasm_function *wasm_import_runtime_function_impl(wasm_module *module, const char *c_name, const char *sig) {
+  DCHECK(strlen(sig) > 1);
+
+  // Search for existing import
+  for (int i = 0; i < arrlen(module->imports); ++i) {
+    if (strcmp(module->imports[i].name, c_name) == 0)
+      return module->imports[i].func.associated;
+  }
 
   wasm_function *fn = module_calloc(module, sizeof(wasm_function));
-  fn->params = wasm_string_to_tuple(module, params);
-  fn->results = from_basic_type(char_to_basic_type(result[0]));
+  fn->params = wasm_string_to_tuple(module, sig + 1);
+  fn->results = from_basic_type(char_to_basic_type(sig[0]));
   fn->locals = wasm_void();
   const char *name_cpy = wasm_copy_string(module, c_name);
   fn->name = name_cpy;

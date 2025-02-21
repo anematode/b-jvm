@@ -99,24 +99,24 @@
 #endif
 #pragma GCC optimize("optimize-sibling-calls")
 
+// TODO consider what to do here so that it's efficient but not UB
 #ifdef EMSCRIPTEN
-// Sad :(
 #define WITH_UNDEF(expr)                                                                                               \
   do {                                                                                                                 \
-    [[maybe_unused]] s64 a_undef = 0;                                                                                  \
-    [[maybe_unused]] float b_undef = 0;                                                                                \
-    [[maybe_unused]] double c_undef = 0;                                                                               \
-    expr                                                                                                               \
+    s64 a_undef = 0;                                                                                                       \
+    float b_undef = 0;                                                                                                     \
+    double c_undef = 0;                                                                                                    \
+    MUSTTAIL return (expr);                                                                                            \
   } while (0);
 #else
 #define WITH_UNDEF(expr)                                                                                               \
-  do {                                                                                                                 \
-    s64 a_undef;                                                                                                       \
-    float b_undef;                                                                                                     \
-    double c_undef;                                                                                                    \
-    asm("" : "=r"(a_undef), "=r"(b_undef), "=r"(c_undef));                                                             \
-    MUSTTAIL return (expr);                                                                                            \
-  } while (0);
+do {                                                                                                                 \
+s64 a_undef;                                                                                                       \
+float b_undef;                                                                                                     \
+double c_undef;                                                                                                    \
+asm volatile ("" : "=r"(a_undef), "=r"(b_undef), "=r"(c_undef)); \
+MUSTTAIL return (expr);                                                                                            \
+} while (0);
 #endif
 
 #ifdef EMSCRIPTEN
@@ -169,11 +169,9 @@
   float __tos = (tos);                                                                                                 \
   WITH_UNDEF(jmp_table_float[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, __tos, c_undef));
 #define ADVANCE_DOUBLE_(tos, insn_off)                                                                                 \
-  do {                                                                                                                 \
-    int k = insns[insn_off].kind;                                                                                      \
-    double __tos = (tos);                                                                                              \
-    WITH_UNDEF(jmp_table_double[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, b_undef, __tos));      \
-  } while (0);
+  int k = insns[insn_off].kind;                                                                                      \
+  double __tos = (tos);                                                                                              \
+  WITH_UNDEF(jmp_table_double[k](thread, frame, insns + insn_off, pc + insn_off, sp, a_undef, b_undef, __tos));      \
 
 #define JMP_INT(tos) ADVANCE_INT_(tos, 0)
 #define JMP_FLOAT(tos) ADVANCE_FLOAT_(tos, 0)
@@ -271,8 +269,6 @@ double *arg_3;
 // The current instruction
 #define insn (&insns[0])
 
-#define MAX_INSN_KIND (insn_sqrt + 1)
-
 typedef s64 (*bytecode_handler_t)(ARGS_VOID);
 
 // Used when the TOS is int (i.e., the stack is empty)
@@ -353,6 +349,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                             \
   }
 
+// Emit a null pointer exception when the given expression is null.
 #define NPE_ON_NULL(expr) \
   if (unlikely(!expr)) { \
     SPILL_VOID \
@@ -362,7 +359,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
 /** Helper functions */
 
-static s32 java_idiv_(s32 const a, s32 const b) {
+static s32 java_idiv(s32 const a, s32 const b) {
   DCHECK(b != 0);
   if (a == INT_MIN && b == -1)
     return INT_MIN;
@@ -390,8 +387,11 @@ static s64 java_lrem(s64 const a, s64 const b) {
   return a % b;
 }
 
-// Java saturates the conversion
+// Java saturates the conversion. For Emscripten we use the builtins for saturating conversions.
 static int double_to_int(double const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i32_f64(x);
+#else
   if (x > INT_MAX)
     return INT_MAX;
   if (x < INT_MIN)
@@ -399,10 +399,22 @@ static int double_to_int(double const x) {
   if (isnan(x))
     return 0;
   return (int)x;
+#endif
+}
+
+static int float_to_int(float const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i32_f32(x);
+#else
+  return double_to_int(x);
+#endif
 }
 
 // Java saturates the conversion
 static s64 double_to_long(double const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i64_f64(x);
+#else
   if (x >= (double)(ULLONG_MAX / 2))
     return LLONG_MAX;
   if (x < (double)LLONG_MIN)
@@ -410,6 +422,15 @@ static s64 double_to_long(double const x) {
   if (isnan(x))
     return 0;
   return (s64)x;
+#endif
+}
+
+static s64 float_to_long(float const x) {
+#ifdef EMSCRIPTEN
+  return __builtin_wasm_trunc_saturate_s_i64_f32(x);
+#else
+  return double_to_long(x);
+#endif
 }
 
 // Convert getstatic and putstatic instructions into one of the resolved forms -- or throw a linkage error if
@@ -698,7 +719,7 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     }                                                                                                                  \
   } while (0)
 
-force_inline static s64 getstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
@@ -714,7 +735,7 @@ FORWARD_TO_NULLARY(getstatic)
 
 // Never actually directly called -- we just do it this way because it's easier and we might as well merge code paths
 // for different TOS types.
-force_inline static s64 putstatic_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   TryResolve(thread, insn, &frame->plain, sp);
@@ -1191,8 +1212,8 @@ FLOAT_BIN_OP(cmpg, a > b ? 1 : (a < b ? -1 : (a == b ? 0 : 1)), int, int, NEXT_I
 FLOAT_BIN_OP(cmpl, a > b ? 1 : (a < b ? -1 : (a == b ? 0 : -1)), int, int, NEXT_INT, NEXT_INT)
 
 FLOAT_UN_OP(fneg, -a, float, NEXT_FLOAT)
-FLOAT_UN_OP(f2i, double_to_int(a), int, NEXT_INT)
-FLOAT_UN_OP(f2l, double_to_long(a), s64, NEXT_INT)
+FLOAT_UN_OP(f2i, float_to_int(a), int, NEXT_INT)
+FLOAT_UN_OP(f2l, float_to_long(a), s64, NEXT_INT)
 FLOAT_UN_OP(f2d, (double)a, double, NEXT_DOUBLE)
 
 DOUBLE_UN_OP(dneg, -a, double, NEXT_DOUBLE)
@@ -1209,7 +1230,7 @@ static s64 idiv_impl_int(ARGS_INT) {
     return 0;
   }
   sp--;
-  NEXT_INT(java_idiv_(a, b));
+  NEXT_INT(java_idiv(a, b));
 }
 
 static s64 ldiv_impl_int(ARGS_INT) {
@@ -1261,7 +1282,7 @@ static s64 arraylength_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *array = (obj_header *)tos;
   NPE_ON_NULL(array);
-  NEXT_INT(*ArrayLength(array))
+  NEXT_INT(ArrayLength(array))
 }
 
 #define ARRAY_LOAD(which, load, type, NEXT)                                                                            \
@@ -1270,7 +1291,7 @@ static s64 arraylength_impl_int(ARGS_INT) {
     obj_header *array = (obj_header *)(sp - 2)->obj;                                                                   \
     int index = (int)tos;                                                                                              \
     NPE_ON_NULL(array);                                                                                                \
-    int length = *ArrayLength(array);                                                                                  \
+    int length = ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
@@ -1296,7 +1317,7 @@ ARRAY_LOAD(caload, CharArrayLoad, s64, NEXT_INT)
     obj_header *array = (obj_header *)(sp - 3)->obj;                                                                   \
     int index = (int)(sp - 2)->i;                                                                                      \
     NPE_ON_NULL(array);                                                                                                            \
-    int length = *ArrayLength(array);                                                                                  \
+    int length = ArrayLength(array);                                                                                  \
     if (unlikely(index < 0 || index >= length)) {                                                                      \
       SPILL_VOID;                                                                                                      \
       raise_array_index_oob_exception(thread, index, length);                                                          \
@@ -1323,7 +1344,7 @@ static s64 aastore_impl_int(ARGS_INT) {
   obj_header *value = (obj_header *)tos;
   int index = (int)(sp - 2)->i;
   NPE_ON_NULL(array);
-  int length = *ArrayLength(array);
+  int length = ArrayLength(array);
   if (unlikely(index < 0 || index >= length)) {
     SPILL(tos);
     raise_array_index_oob_exception(thread, index, length);
@@ -1332,7 +1353,7 @@ static s64 aastore_impl_int(ARGS_INT) {
   // Instanceof check against the component type
   if (value && !instanceof(value->descriptor, array->descriptor->one_fewer_dim)) {
     SPILL(tos);
-    raise_array_store_exception(thread, &value->descriptor->name);
+    raise_array_store_exception(thread, value->descriptor->name);
     return 0;
   }
   ReferenceArrayStore(array, index, value);
@@ -1674,7 +1695,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
 
 static int intrinsify(bytecode_insn *inst) {
   cp_method *method = inst->ic;
-  if (utf8_equals(hslc(method->my_class->name), "java/lang/Math")) {
+  if (utf8_equals(method->my_class->name, "java/lang/Math")) {
     if (utf8_equals(method->name, "sqrt")) {
       inst->kind = insn_sqrt;
       return 1;
@@ -1876,7 +1897,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   }
 
   // If this is the <init> method of Object, make it a nop
-  if (utf8_equals(hslc(candidate->my_class->name), "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
+  if (utf8_equals(candidate->my_class->name, "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
     insn->kind = insn_pop;
   } else {
     insn->kind = insn_invokespecial_resolved;
@@ -1980,9 +2001,9 @@ force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     return 0;
 
   stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception)
+  if (thread->current_exception) {
     return 0;
+  }
 
   if (returns) {
     *(sp - insn->args) = result;
@@ -2498,6 +2519,7 @@ FORWARD_TO_NULLARY(dup2_x2)
 static s64 athrow_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL(tos)
+  NPE_ON_NULL(tos);
   thread->current_exception = (obj_header *)tos;
   return 0;
 }
@@ -2556,6 +2578,20 @@ static s64 sqrt_impl_double(ARGS_DOUBLE) {
 static s64 sqrt_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   NEXT_FLOAT(sqrt(tos))
+}
+
+static s64 frem_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  float a = (sp - 2)->f, b = tos;
+  sp -= 1;
+  NEXT_FLOAT(fmodf(a, b))
+}
+
+static s64 drem_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  double a = (sp - 2)->d, b = tos;
+  sp -= 1;
+  NEXT_DOUBLE(fmod(a, b))
 }
 
 [[maybe_unused]] static s64 notco_fallback(ARGS_VOID, int index) {
@@ -2637,6 +2673,7 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 
     case 0: // special value in case of exception or suspend (theoretically also nop_impl_void, but javac doesn't use
             // that)
+
       DCHECK(thread->current_exception || frame->is_async_suspended);
       return 0;
     default: {
@@ -2680,7 +2717,7 @@ force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, 
 #endif
 
 static exception_table_entry *find_exception_handler(vm_thread *thread, stack_frame *frame, classdesc *exception_type) {
-  DCHECK(!frame->is_native);
+  DCHECK(is_interpreter_frame(frame));
 
   attribute_exception_table *table = frame->method->code->exception_table;
   if (!table)
@@ -3046,6 +3083,7 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_double,
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
+    [insn_drem] = drem_impl_double,
     [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3279,4 +3317,5 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_Z] = getstatic_Z_impl_float,
     [insn_getstatic_L] = getstatic_L_impl_float,
     [insn_putstatic_F] = putstatic_F_impl_float,
+    [insn_frem] = frem_impl_float,
     [insn_sqrt] = sqrt_impl_float};
