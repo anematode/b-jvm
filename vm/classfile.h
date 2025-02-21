@@ -410,6 +410,7 @@ typedef struct {
 } cp_indy_info;
 
 enum cp_kind : u32 {
+  // Bitset so that we can have masks for valid cp kinds
   CP_KIND_INVALID = 0,
   CP_KIND_UTF8 = 1 << 0,
   CP_KIND_INTEGER = 1 << 1,
@@ -564,17 +565,17 @@ typedef struct {
   int count;
 } attribute_method_parameters;
 
-struct bc_tableswitch_data {
+struct tableswitch_data {
   // Note: If changing this, make sure the layout of the first three fields
   // is the same as bc_lookupswitch_data.
   int default_target;
-  int *targets;
   int targets_count;
 
   int low, high;
+  int targets[];
 };
 
-struct bc_lookupswitch_data {
+struct lookupswitch_data {
   // Note: If changing this, make sure the layout of the first three fields
   // is the same as bc_tableswitch_data.
   int default_target;
@@ -585,7 +586,7 @@ struct bc_lookupswitch_data {
   int keys_count;
 };
 
-struct bc_iinc_data {
+struct iinc_data {
   u16 index;
   s16 const_;
 };
@@ -612,11 +613,11 @@ typedef struct bytecode_insn {
     // Double immediate
     double d_imm;
     // lookupswitch
-    struct bc_lookupswitch_data *lookupswitch;
+    struct lookupswitch_data *lookupswitch;
     // tableswitch
-    struct bc_tableswitch_data *tableswitch;
+    struct tableswitch_data *tableswitch;
     // iinc
-    struct bc_iinc_data iinc;
+    struct iinc_data iinc;
     // multianewarray
     struct multianewarray_data *multianewarray;
     // non-owned pointer into the constant pool

@@ -11,7 +11,6 @@
 
 DECLARE_NATIVE("java/lang", System, mapLibraryName, "(Ljava/lang/String;)Ljava/lang/String;") {
   struct native_String *orig_name = (struct native_String *)args[0].handle->obj;
-
   heap_string str = AsHeapString((object)orig_name, on_oom);
 
   if (heap_str_append(&str, STR(".lib"))) {

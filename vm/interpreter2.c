@@ -1461,7 +1461,7 @@ static s64 tableswitch_impl_int(ARGS_INT) {
 
 static s64 lookupswitch_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  struct bc_lookupswitch_data data = *insn->lookupswitch;
+  struct lookupswitch_data data = *insn->lookupswitch;
 
   s32 key = (s32)tos;
   s32 *keys = data.keys;

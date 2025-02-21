@@ -122,11 +122,10 @@ static u8 const *reader_advance(cf_byteslice *reader, const char *reason, size_t
 #define PUN_READER_NEXT_IMPL(width, type)                                                                              \
   _Static_assert(sizeof(type) * 8 == width);                                                                           \
   static type reader_next_##type(cf_byteslice *reader, const char *reason) {                                           \
-    union pun {                                                                                                        \
-      u##width u;                                                                                                      \
-      type s;                                                                                                          \
-    };                                                                                                                 \
-    return ((union pun){.u = reader_next_u##width(reader, reason)}).s;                                                 \
+    u##width u = reader_next_u##width(reader, reason); \
+    type s; \
+    memcpy(&s, &u, sizeof(u)); \
+    return s;                                                 \
   }
 
 #define READER_NEXT_IMPL(width)                                                                                        \
@@ -182,7 +181,7 @@ cp_entry *check_cp_entry(cp_entry *entry, cp_kind expected_kinds, const char *re
                            "Unexpected constant pool entry kind %d at index "
                            "%d (expected one of: [ ",
                            entry->kind, entry->my_index);
-  for (int i = 0; i < 14; ++i)
+  for (int i = 0; 1 << i <= CP_KIND_LAST; ++i)
     if (expected_kinds & 1 << i)
       write += snprintf(write, end - write, "%s ", cp_kind_to_string(1 << i));
   write += snprintf(write, end - write, "]) while reading %s", reason);
@@ -228,27 +227,32 @@ char *parse_complete_field_descriptor(const slice entry, field_descriptor *resul
   return nullptr;
 }
 
+enum cp_resolution_pass {
+  READ,  // parse UTF-8 entries and list out all other entries, but don't link them
+  LINK   // link entries using the partially filled-out constant pool
+};
+
 /**
  * Parse a single constant pool entry.
  * @param reader The reader to parse from.
  * @param ctx The parse context.
- * @param skip_linking If true, don't add pointers to other constant pool
- * entries.
+ * @param pass Whether we're reading or linking. UTF-8 entries are
  * @return The resolved entry.
  */
-cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ctx, bool skip_linking) {
-  enum {
-    CONSTANT_Class = 7,
-    CONSTANT_Fieldref = 9,
-    CONSTANT_Methodref = 10,
-    CONSTANT_InterfaceMethodref = 11,
-    CONSTANT_String = 8,
+cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ctx, enum cp_resolution_pass pass) {
+  bool skip_linking = pass == READ;
+  enum {  // given by the spec
+    CONSTANT_Utf8 = 1,
     CONSTANT_Integer = 3,
     CONSTANT_Float = 4,
     CONSTANT_Long = 5,
     CONSTANT_Double = 6,
+    CONSTANT_Class = 7,
+    CONSTANT_String = 8,
+    CONSTANT_Fieldref = 9,
+    CONSTANT_Methodref = 10,
+    CONSTANT_InterfaceMethodref = 11,
     CONSTANT_NameAndType = 12,
-    CONSTANT_Utf8 = 1,
     CONSTANT_MethodHandle = 15,
     CONSTANT_MethodType = 16,
     CONSTANT_Dynamic = 17,
@@ -260,9 +264,7 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
   u8 kind = reader_next_u8(reader, "cp kind");
   switch (kind) {
   case CONSTANT_Module:
-    [[fallthrough]];
   case CONSTANT_Package:
-    [[fallthrough]];
   case CONSTANT_Class: {
     cp_kind entry_kind = kind == CONSTANT_Class    ? CP_KIND_CLASS
                          : kind == CONSTANT_Module ? CP_KIND_MODULE
@@ -308,11 +310,11 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
   }
   case CONSTANT_Integer: {
     s32 value = reader_next_s32(reader, "integer value");
-    return (cp_entry){.kind = CP_KIND_INTEGER, .integral = {.value = value}};
+    return (cp_entry){.kind = CP_KIND_INTEGER, .integral = {.value = (s64)value}};
   }
   case CONSTANT_Float: {
     double value = reader_next_f32(reader, "double value");
-    return (cp_entry){.kind = CP_KIND_FLOAT, .floating = {.value = value}};
+    return (cp_entry){.kind = CP_KIND_FLOAT, .floating = {.value = (double)value}};
   }
   case CONSTANT_Long: {
     s64 value = reader_next_s64(reader, "long value");
@@ -327,7 +329,6 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
     u16 descriptor_index = reader_next_u16(reader, "descriptor index");
 
     slice name = skip_linking ? null_str() : checked_get_utf8(ctx->cp, name_index, "name and type name");
-
     return (cp_entry){.kind = CP_KIND_NAME_AND_TYPE,
                       .name_and_type = {.name = name,
                                         .descriptor = skip_linking ? null_str()
@@ -359,7 +360,6 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
                                                    : checked_get_utf8(ctx->cp, desc_index, "method type descriptor")}};
   }
   case CONSTANT_Dynamic:
-    [[fallthrough]];
   case CONSTANT_InvokeDynamic: {
     u16 bootstrap_method_attr_index = reader_next_u16(reader, "bootstrap method attr index");
     u16 name_and_type_index = reader_next_u16(reader, "name and type index");
@@ -368,9 +368,9 @@ cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_ctx *ct
                      : &checked_cp_entry(ctx->cp, name_and_type_index, CP_KIND_NAME_AND_TYPE, "indy name and type")
                             ->name_and_type;
 
+    // The "method" will be converted into an actual pointer to the method in link_bootstrap_methods
     return (cp_entry){.kind = (kind == CONSTANT_Dynamic) ? CP_KIND_DYNAMIC_CONSTANT : CP_KIND_INVOKE_DYNAMIC,
-                      .indy_info = {// will be converted into a pointer to the method in
-                                    // link_bootstrap_methods
+                      .indy_info = {
                                     .method = (void *)(uintptr_t)bootstrap_method_attr_index,
                                     .name_and_type = name_and_type,
                                     .method_descriptor = nullptr}};
@@ -446,15 +446,16 @@ constant_pool *parse_constant_pool(cf_byteslice *reader, classfile_parse_ctx *ct
 
   get_constant_pool_entry(pool, 0)->kind = CP_KIND_INVALID; // entry at 0 is always invalid
   cf_byteslice initial_reader_state = *reader;
-  for (int resolution_pass = 0; resolution_pass < 2; ++resolution_pass) {
-    // In the first pass, read entries; in the second pass, link them via
-    // pointers
+
+  enum cp_resolution_pass passes[2] = {READ, LINK};
+  for (int pass_i = 0; pass_i < 2; ++pass_i) {
+    enum cp_resolution_pass pass = passes[pass_i];
+
     for (int cp_i = 1; cp_i < cp_count; ++cp_i) {
       cp_entry *ent = get_constant_pool_entry(pool, cp_i);
-      cp_entry new_entry = parse_constant_pool_entry(reader, ctx, !(bool)resolution_pass);
-      if (new_entry.kind != CP_KIND_UTF8 || resolution_pass == 0) {
-        *ent = new_entry; // don't store UTF-8 entries on the second pass
-        // TODO fix ^^ this is janky af
+      cp_entry new_entry = parse_constant_pool_entry(reader, ctx, pass);
+      if (new_entry.kind != CP_KIND_UTF8 || pass == READ) {
+        *ent = new_entry; // we skip UTF-8 entries on the second pass because they don't link to anything
       }
       ent->my_index = cp_i;
 
@@ -463,7 +464,7 @@ constant_pool *parse_constant_pool(cf_byteslice *reader, classfile_parse_ctx *ct
         cp_i++;
       }
     }
-    if (resolution_pass == 0)
+    if (pass_i == 0)  // go back to the beginning to parse
       *reader = initial_reader_state;
   }
 
@@ -505,16 +506,14 @@ bytecode_insn parse_tableswitch_insn(cf_byteslice *reader, int pc, classfile_par
     format_error_static("tableswitch high < low");
   }
 
-  int *targets = arena_alloc(ctx->arena, targets_count, sizeof(int));
-  for (int i = 0; i < targets_count; ++i) {
-    targets[i] = checked_pc(original_pc, reader_next_s32(reader, "tableswitch target"), ctx);
-  }
-  struct bc_tableswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
-  *data = (struct bc_tableswitch_data){.default_target = default_target,
+  struct tableswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data) + targets_count * sizeof(int));
+  *data = (struct tableswitch_data){.default_target = default_target,
                                        .low = low,
                                        .high = high,
-                                       .targets = targets,
                                        .targets_count = (int)targets_count};
+  for (int i = 0; i < targets_count; ++i) {
+    data->targets[i] = checked_pc(original_pc, reader_next_s32(reader, "tableswitch target"), ctx);
+  }
 
   return (bytecode_insn){.kind = insn_tableswitch, .original_pc = original_pc, .tableswitch = data};
 }
@@ -541,8 +540,8 @@ bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc, classfile_pa
     targets[i] = checked_pc(original_pc, reader_next_s32(reader, "lookupswitch target"), ctx);
   }
 
-  struct bc_lookupswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
-  *data = (struct bc_lookupswitch_data){.default_target = default_target,
+  struct lookupswitch_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
+  *data = (struct lookupswitch_data){.default_target = default_target,
                                         .keys = keys,
                                         .keys_count = pairs_count,
                                         .targets = targets,

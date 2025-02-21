@@ -1436,12 +1436,16 @@ int scan_basic_blocks(const attribute_code *code, code_analysis *analy) {
       ts[tc++] = insn->index;
       if (insn->kind != insn_goto)
         ts[tc++] = i + 1; // fallthrough
-    } else if (insn->kind == insn_tableswitch || insn->kind == insn_lookupswitch) {
-      const struct bc_tableswitch_data *tsd = insn->tableswitch;
-      // Layout is the same between tableswitch and lookupswitch, so ok
+    } else if (insn->kind == insn_tableswitch) {
+      const struct tableswitch_data *tsd = insn->tableswitch;
       ts[tc++] = tsd->default_target;
       memcpy(ts + tc, tsd->targets, tsd->targets_count * sizeof(int));
       tc += tsd->targets_count;
+    } else if (insn->kind == insn_lookupswitch) {
+      const struct lookupswitch_data *lsd = insn->lookupswitch;
+      ts[tc++] = lsd->default_target;
+      memcpy(ts + tc, lsd->targets, lsd->targets_count * sizeof(int));
+      tc += lsd->targets_count;
     }
   }
   // Then, sort, remove duplicates and create basic block entries for each
@@ -1465,11 +1469,17 @@ int scan_basic_blocks(const attribute_code *code, code_analysis *analy) {
       push_bb_branch(b, FIND_TARGET_BLOCK(last->index));
       if (last->kind == insn_goto)
         continue;
-    } else if (last->kind == insn_tableswitch || last->kind == insn_lookupswitch) {
-      const struct bc_tableswitch_data *tsd = last->tableswitch;
+    } else if (last->kind == insn_tableswitch) {
+      const struct tableswitch_data *tsd = last->tableswitch;
       push_bb_branch(b, FIND_TARGET_BLOCK(tsd->default_target));
       for (int i = 0; i < tsd->targets_count; ++i)
         push_bb_branch(b, FIND_TARGET_BLOCK(tsd->targets[i]));
+      continue;
+    } else if (last->kind == insn_lookupswitch) {
+      const struct lookupswitch_data *lsd = last->lookupswitch;
+      push_bb_branch(b, FIND_TARGET_BLOCK(lsd->default_target));
+      for (int i = 0; i < lsd->targets_count; ++i)
+        push_bb_branch(b, FIND_TARGET_BLOCK(lsd->targets[i]));
       continue;
     }
     if (block_i + 1 < block_count)

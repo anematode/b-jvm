@@ -83,7 +83,7 @@ typedef struct {
 #define INIT_STACK_STRING(name, buffer_size)                                                                           \
   char name##_chars[buffer_size + 1] = {0};                                                                            \
   slice name = {.chars = name##_chars, .len = buffer_size}
-#define null_str() ((slice){.chars = nullptr, .len = 0})
+#define null_str() ((slice){.chars = "\0", .len = 0})
 
 /// Slices the given string from the given start index to the end.
 static inline slice subslice(slice str, u32 start) {

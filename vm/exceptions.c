@@ -38,7 +38,7 @@ int raise_vm_exception(vm_thread *thread, const slice exception_name, slice msg_
 
   // Create the exception object
   handle *handle = make_handle(thread, new_object(thread, classdesc));
-  if (msg_utf8.chars) {
+  if (msg_utf8.len > 0) {
     // Call the constructor taking in a single String value
     object msg = MakeJStringFromModifiedUTF8(thread, msg_utf8, false);
     cp_method *method = method_lookup(classdesc, STR("<init>"), STR("(Ljava/lang/String;)V"), true, false);
