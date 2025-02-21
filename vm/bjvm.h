@@ -168,8 +168,8 @@ typedef int (*poll_available_bytes)(void *param); // returns the number of bytes
 
 #define CARD_BYTES 4096
 
-typedef struct plain_frame plain_frame;
 typedef struct stack_frame stack_frame;
+typedef struct plain_frame plain_frame;
 typedef struct native_frame native_frame;
 
 // Continue execution of a thread.
@@ -491,8 +491,11 @@ typedef enum : u8 {
 typedef struct stack_frame {
   frame_kind is_native;
   u8 is_async_suspended;
-  // todo: enum 0- non 1- synchronize in progress, 2- synchronized, and done
-  u8 attempted_synchronize; // whether this frame method has been synchronized
+  enum : u8 {
+      SYNCHRONIZE_NONE = 0,
+      SYNCHRONIZE_IN_PROGRESS = 1,
+      SYNCHRONIZE_DONE = 2
+  } synchronized_state; // info about whether this frame method has been synchronized
   u16 num_locals;
 
   // The method associated with this frame
