@@ -491,6 +491,8 @@ typedef enum : u8 {
 typedef struct stack_frame {
   frame_kind is_native;
   u8 is_async_suspended;
+  // todo: enum 0- non 1- synchronize in progress, 2- synchronized, and done
+  u8 attempted_synchronize; // whether this frame method has been synchronized
   u16 num_locals;
 
   // The method associated with this frame
@@ -528,6 +530,7 @@ void drop_js_handle(vm *vm, int index);
 struct async_stack;
 typedef struct async_stack async_stack_t;
 
+#define MONITOR_ACQUIRE_CONTINUATION_SIZE 56
 typedef struct vm_thread {
   // Global VM corresponding to this thread
   vm *vm;
@@ -578,6 +581,8 @@ typedef struct vm_thread {
   u64 yield_at_time;
   // Current number of active synchronous calls
   u32 synchronous_depth;
+
+  char synchronize_acquire_continuation[MONITOR_ACQUIRE_CONTINUATION_SIZE];
 
   s32 tid;
 
@@ -635,7 +640,8 @@ typedef struct {
 } thread_options;
 
 thread_options default_thread_options();
-vm_thread *create_thread(vm *vm, thread_options options);
+vm_thread *create_main_thread(vm *vm, thread_options options);
+vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thread *thread_obj, thread_options options); // wraps a Thread obj
 void free_thread(vm_thread *thread);
 
 /**

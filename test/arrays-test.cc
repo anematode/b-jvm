@@ -18,7 +18,7 @@ constexpr static int testArrayDimensions[] = {7, 8, 9};
 
 TEST_CASE("Multi-dimensional boolean array") {
   auto vm = CreateTestVM();
-  auto thr = create_thread(vm.get(), default_thread_options());
+  auto thr = create_main_thread(vm.get(), default_thread_options());
 
   auto kind = primitive_classdesc(thr, TYPE_KIND_BOOLEAN);
   for (int i = 0; i < 3; i++) {

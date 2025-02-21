@@ -503,7 +503,8 @@ As a char: A
   REQUIRE(result_many.stdin_ == ""); // BufferedReader tries to consume 8192 bytes, but we only provide 7
 }
 
-#if 0 // these cases are slowwww
+#define ALL_PERF_TESTS 0
+#if ALL_PERF_TESTS // these cases are slowwww
 
 TEST_CASE("Sudoku solver") {
   int num_puzzles = 33761;
@@ -545,7 +546,7 @@ TEST_CASE("Scheduled worker sudoku solver") {
   std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
   auto now = std::chrono::system_clock::now();
 
-  auto result = run_scheduled_test_case("test_files/sudoku/", false, "WorkerThreadSudoku");
+  auto result = run_scheduled_test_case("test_files/sudoku/", true, "UnsafeWorkerThreadSudoku");
   // last puzzle
   REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
   REQUIRE(result.sleep_count == 0); // chop chop
@@ -725,6 +726,21 @@ TEST_CASE("VarHandle") {
   REQUIRE(result.stdout_ == R"(true
 new
 )");
+}
+
+TEST_CASE("Synchronized counter") {
+  auto result = run_scheduled_test_case("test_files/synchronized_counter/", true, "Main");
+  REQUIRE(result.stdout_ == R"(Final count: 5000
+)");
+  std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
+}
+
+TEST_CASE("Synchronized wait/notify") {
+  auto result = run_scheduled_test_case("test_files/synchronized_counter/", true, "TestSynchronizedCountdown");
+  REQUIRE(result.stdout_ == R"(Num arrived: 21
+Countdown value: 0
+)");
+  std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
 }
 
 TEST_CASE("Random UUID") {

@@ -14,6 +14,17 @@ DECLARE_ASYNC(int, monitor_acquire,
                     locals(handle *handle; rr_wakeup_info wakeup_info;), arguments(vm_thread *thread; obj_header *obj;),
                     invoked_methods());
 
+// sets the hold count to a given value
+DECLARE_ASYNC(int, monitor_reacquire_hold_count,
+                    locals(handle *handle; rr_wakeup_info wakeup_info;), arguments(vm_thread *thread; obj_header *obj; int hold_count),
+                    invoked_methods());
+
+// returns how the hold count this thread has on the monitor (0 if not held by current thread)
+u32 current_thread_hold_count(vm_thread *thread, obj_header *obj);
+
+// returns the hold count that got released (returns 0 if fail)
+u32 monitor_release_all_hold_count(vm_thread *thread, obj_header *obj);
+
 // DECLARE_ASYNC(int, monitor_wait,
 //                     locals(), arguments(thread *thread; obj_header *obj;),
 //                     invoked_methods());

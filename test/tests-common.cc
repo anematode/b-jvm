@@ -206,7 +206,7 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::str
     fprintf(stderr, "Failed to create VM");
     return result;
   }
-  vm_thread *thread = create_thread(vm, default_thread_options());
+  vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
 
@@ -311,7 +311,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
     fprintf(stderr, "Failed to create VM");
     return result;
   }
-  vm_thread *thread = create_thread(vm, default_thread_options());
+  vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
 
@@ -375,6 +375,8 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
     // Then call printStackTrace ()V
     method = method_lookup(to_string_args[0].obj->descriptor, STR("printStackTrace"), STR("()V"), true, false);
     call_interpreter_synchronous(thread, method, to_string_args);
+    if (capture_stdio)
+      std::cerr << result.stderr_;
   }
 
   free_thread(thread);
