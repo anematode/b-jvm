@@ -25,9 +25,9 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
   link_class(thread, StackTraceElement);
 
   // Find the first frame which is not an initializer of the current exception
-  int i = (int)arrlen(thread->frames) - 1;
+  int i = (int)arrlen(thread->stack.frames) - 1;
   for (; i >= 0; --i) {
-    stack_frame *frame = thread->frames[i];
+    stack_frame *frame = thread->stack.frames[i];
     if (!is_frame_part_of_throwable_construction(frame, obj->obj)) {
       break;
     }
@@ -41,7 +41,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
   ((struct native_Throwable *)obj->obj)->depth = i + 1;
 
   for (int j = 0; i >= 0; --i, ++j) {
-    stack_frame *frame = thread->frames[i];
+    stack_frame *frame = thread->stack.frames[i];
     // Create the stack trace element
     handle *e = make_handle(thread, new_object(thread, StackTraceElement));
     if (!e->obj) // Failed to allocate StackTraceElement

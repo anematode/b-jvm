@@ -532,26 +532,26 @@ struct async_stack {
 };
 
 static s32 grow_async_stack(vm_thread *thread) {
-  struct async_stack *stk = thread->async_stack;
+  struct async_stack *stk = thread->stack.async_stack;
 
   size_t new_capacity = stk->max_height + stk->max_height / 2;
   if (new_capacity == 0)
     new_capacity = 4;
 
-  stk = realloc(thread->async_stack, sizeof(struct async_stack) + new_capacity * sizeof(continuation_frame));
+  stk = realloc(thread->stack.async_stack, sizeof(struct async_stack) + new_capacity * sizeof(continuation_frame));
   ;
   if (unlikely(!stk)) {
     thread->current_exception = thread->stack_overflow_error;
     return -1;
   }
-  thread->async_stack = stk;
+  thread->stack.async_stack = stk;
 
   stk->max_height = new_capacity;
   return 0;
 }
 
 static continuation_frame *async_stack_push(vm_thread *thread) {
-#define stk thread->async_stack
+#define stk thread->stack.async_stack
 
   if (unlikely(stk->height == stk->max_height)) {
     if ((grow_async_stack(thread)) < 0) {
@@ -560,19 +560,19 @@ static continuation_frame *async_stack_push(vm_thread *thread) {
     }
   }
 
-  return &thread->async_stack->frames[thread->async_stack->height++];
+  return &thread->stack.async_stack->frames[thread->stack.async_stack->height++];
 
 #undef stk
 }
 
 static continuation_frame *async_stack_pop(vm_thread *thread) {
-  DCHECK(thread->async_stack->height > 0);
-  return &thread->async_stack->frames[--thread->async_stack->height];
+  DCHECK(thread->stack.async_stack->height > 0);
+  return &thread->stack.async_stack->frames[--thread->stack.async_stack->height];
 }
 
 static void *async_stack_top(vm_thread *thread) {
-  assert(thread->async_stack->height > 0);
-  return thread->async_stack->frames[thread->async_stack->height - 1].wakeup;
+  assert(thread->stack.async_stack->height > 0);
+  return thread->stack.async_stack->frames[thread->stack.async_stack->height - 1].wakeup;
 }
 
 /** FUEL CHECKING */
@@ -581,7 +581,7 @@ __attribute__((noinline)) static bool refuel_check(vm_thread *thread) {
   const int REFUEL = 50000;
   thread->fuel = REFUEL;
 
-  if (thread->synchronous_depth) // we're in a synchronous call, don't try to yield
+  if (thread->stack.synchronous_depth) // we're in a synchronous call, don't try to yield
     return false;
 
   // Get the current time in milliseconds since 1970
@@ -589,7 +589,7 @@ __attribute__((noinline)) static bool refuel_check(vm_thread *thread) {
   gettimeofday(&tv, NULL);
   u64 now = tv.tv_sec * 1000000 + tv.tv_usec;
   if (thread->yield_at_time != 0 && now >= thread->yield_at_time) {
-    arrlast(thread->frames)->is_async_suspended = true;
+    arrlast(thread->stack.frames)->is_async_suspended = true;
 
     continuation_frame *cont = async_stack_push(thread);
     // Provide a way for us to free the wakeup info. There will never be multiple refuel checks in flight within a
@@ -1806,9 +1806,9 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
   ctx.args.info = &insn->cp->methodref;
-  thread->synchronous_depth++; // TODO remove
+  thread->stack.synchronous_depth++; // TODO remove
   future_t fut = resolve_methodref(&ctx);
-  thread->synchronous_depth--;
+  thread->stack.synchronous_depth--;
   CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception) {
     return 0;
@@ -2111,9 +2111,9 @@ __attribute__((noinline)) static s64 invokedynamic_impl_void(ARGS_VOID) {
 #define insn (&insns[0])
       insn;
   ctx.args.indy = indy;
-  thread->synchronous_depth++;
+  thread->stack.synchronous_depth++;
   future_t fut = indy_resolve(&ctx);
-  thread->synchronous_depth--;
+  thread->stack.synchronous_depth--;
   CHECK(fut.status == FUTURE_READY);
 
   if (thread->current_exception) {
@@ -2932,14 +2932,14 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
 
   object synchronized_on = get_sync_object(thread, frame_);
   if (unlikely(synchronized_on) && frame_->attempted_synchronize < 2) {
-    char *store = thread->synchronize_acquire_continuation;
+    char *store = thread->stack.synchronize_acquire_continuation;
     monitor_acquire_t ctx = frame_->attempted_synchronize ? *(monitor_acquire_t *)store
                                                         : (monitor_acquire_t){.args = {thread, synchronized_on}};
     frame_->attempted_synchronize = 1;
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
-      static_assert(sizeof(ctx) <= sizeof(thread->synchronize_acquire_continuation), "context can not be stored within thread cache");
+      static_assert(sizeof(ctx) <= sizeof(thread->stack.synchronize_acquire_continuation), "context can not be stored within thread cache");
       return value_null();
     }
     frame_->attempted_synchronize = 2;

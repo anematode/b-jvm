@@ -2,10 +2,10 @@
 
 DECLARE_NATIVE("jdk/internal/reflect", Reflection, getCallerClass, "()Ljava/lang/Class;") {
   // Look at frame before latest frame
-  if (arrlen(thread->frames) < 3) {
+  if (arrlen(thread->stack.frames) < 3) {
     return value_null();
   }
-  stack_frame *frame = thread->frames[arrlen(thread->frames) - 3];
+  stack_frame *frame = thread->stack.frames[arrlen(thread->stack.frames) - 3];
   return (stack_value){.obj = (void *)get_class_mirror(thread, get_frame_method(frame)->my_class)};
 }
 

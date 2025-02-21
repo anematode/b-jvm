@@ -248,7 +248,7 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   size_t args_bytes = argc * sizeof(value);
   size_t total = header_bytes + args_bytes;
 
-  if (total + thread->frame_buffer_used > thread->frame_buffer_capacity) {
+  if (total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return nullptr;
   }
@@ -257,9 +257,9 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   stack_frame *frame = (stack_frame *)(locals + argc);
 
   DCHECK((uintptr_t)frame % 8 == 0, "Frame is aligned");
-  arrput(thread->frames, frame);
+  arrput(thread->stack.frames, frame);
 
-  thread->frame_buffer_used = (char *)frame + sizeof(*frame) - thread->frame_buffer;
+  thread->stack.frame_buffer_used = (char *)frame + sizeof(*frame) - thread->stack.frame_buffer;
 
   frame->is_native = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
@@ -287,16 +287,16 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
   size_t values_bytes = code->max_stack * sizeof(stack_value);
   size_t total = header_bytes + values_bytes;
 
-  if (total + thread->frame_buffer_used > thread->frame_buffer_capacity) {
+  if (total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return nullptr;
   }
 
-  //  stack_frame *frame = (stack_frame *)(thread->frame_buffer + thread->frame_buffer_used);
+  //  stack_frame *frame = (stack_frame *)(thread->stack.frame_buffer + thread->stack.frame_buffer_used);
   stack_frame *frame = (stack_frame *)(args + code->max_locals);
 
-  thread->frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->frame_buffer;
-  arrput(thread->frames, frame);
+  thread->stack.frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->stack.frame_buffer;
+  arrput(thread->stack.frames, frame);
   frame->is_native = FRAME_KIND_INTERPRETER;
   frame->num_locals = code->max_locals;
   frame->plain.program_counter = 0;
@@ -377,16 +377,16 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
 }
 
 u32 compute_used(vm_thread * thread) {
-  if (arrlen(thread->frames) == 0) {
+  if (arrlen(thread->stack.frames) == 0) {
     return 0;
   }
-  stack_frame *frame = arrlast(thread->frames);
+  stack_frame *frame = arrlast(thread->stack.frames);
   DCHECK(frame);
   switch (frame->is_native) {
   case FRAME_KIND_INTERPRETER:
-    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) - thread->frame_buffer;
+    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) - thread->stack.frame_buffer;
   case FRAME_KIND_NATIVE:
-    return (char *)frame + sizeof(stack_frame) - thread->frame_buffer;
+    return (char *)frame + sizeof(stack_frame) - thread->stack.frame_buffer;
   case FRAME_KIND_COMPILED:
     UNREACHABLE();
   default:
@@ -395,13 +395,13 @@ u32 compute_used(vm_thread * thread) {
 }
 
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
-  DCHECK(arrlen(thr->frames) > 0);
-  stack_frame *frame = arrpop(thr->frames);
+  DCHECK(arrlen(thr->stack.frames) > 0);
+  stack_frame *frame = arrpop(thr->stack.frames);
   DCHECK(reference == nullptr || reference == frame);
   if (is_frame_native(frame)) {
     drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
   }
-  thr->frame_buffer_used = compute_used(thr);
+  thr->stack.frame_buffer_used = compute_used(thr);
 }
 
 // Symmetry with make_primitive_classdesc
@@ -776,13 +776,13 @@ stack_value call_interpreter_synchronous(vm_thread *thread, cp_method *method, s
     args = (stack_value[]){};
   }
 
-  thread->synchronous_depth++;
+  thread->stack.synchronous_depth++;
 
   call_interpreter_t ctx = (call_interpreter_t){.args = {thread, method, args}};
   future_t fut = call_interpreter(&ctx);
   CHECK(fut.status == FUTURE_READY, "method tried to suspend");
 
-  thread->synchronous_depth--;
+  thread->stack.synchronous_depth--;
 
   return ctx._result;
 }
@@ -851,13 +851,13 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   arrput(vm->active_threads, thr);
 
   thr->vm = vm;
-  thr->frame_buffer = calloc(1, thr->frame_buffer_capacity = options.stack_space);
+  thr->stack.frame_buffer = calloc(1, thr->stack.frame_buffer_capacity = options.stack_space);
   thr->js_jit_enabled = options.js_jit_enabled;
   const int HANDLES_CAPACITY = 200;
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
 
-  thr->async_stack = calloc(1, 0x20);
+  thr->stack.async_stack = calloc(1, 0x20);
   thr->tid = vm->next_tid++;
 
   bool initializing = !vm->vm_initialized;
@@ -952,13 +952,13 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
   arrput(vm->active_threads, thr);
 
   thr->vm = vm;
-  thr->frame_buffer = calloc(1, thr->frame_buffer_capacity = options.stack_space);
+  thr->stack.frame_buffer = calloc(1, thr->stack.frame_buffer_capacity = options.stack_space);
   thr->js_jit_enabled = options.js_jit_enabled;
   const int HANDLES_CAPACITY = 200;
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
   thr->handles_capacity = HANDLES_CAPACITY;
 
-  thr->async_stack = calloc(1, 0x20);
+  thr->stack.async_stack = calloc(1, 0x20);
   thr->tid = vm->next_tid++;
 
   bool initializing = !vm->vm_initialized;
@@ -1038,9 +1038,9 @@ static void remove_thread_from_vm_list(vm_thread *thread) {
 void free_thread(vm_thread *thread) {
   // TODO remove from the VM
 
-  free(thread->async_stack);
-  arrfree(thread->frames);
-  free(thread->frame_buffer);
+  free(thread->stack.async_stack);
+  arrfree(thread->stack.frames);
+  free(thread->stack.frame_buffer);
   free(thread->handles);
   free(thread->refuel_wakeup_info);
   remove_thread_from_vm_list(thread);
@@ -1475,8 +1475,8 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
   if (!class) {
     // Maybe it's an anonymous class, read the thread stack looking for a
     // class with a matching name
-    for (int i = (int)arrlen(thread->frames) - 1; i >= 0; --i) {
-      classdesc *d = get_frame_method(thread->frames[i])->my_class;
+    for (int i = (int)arrlen(thread->stack.frames) - 1; i >= 0; --i) {
+      classdesc *d = get_frame_method(thread->stack.frames[i])->my_class;
       if (utf8_equals_utf8(d->name, chars)) {
         class = d;
         break;
@@ -1793,9 +1793,9 @@ static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_metho
   memset(ctx, 0, sizeof(*ctx));
 
   u8 argc = method_argc(method);
-  stack_value *stack_top = (stack_value *)(thread->frame_buffer + thread->frame_buffer_used);
-  if (arrlen(thread->frames)) {
-    stack_frame *last = arrlast(thread->frames);
+  stack_value *stack_top = (stack_value *)(thread->stack.frame_buffer + thread->stack.frame_buffer_used);
+  if (arrlen(thread->stack.frames)) {
+    stack_frame *last = arrlast(thread->stack.frames);
     if (last->is_native == FRAME_KIND_INTERPRETER) {
       // Make sure we're not trampling over the previous interpreter frame
       DCHECK((uintptr_t)last->plain.stack + last->plain.max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
@@ -1803,13 +1803,13 @@ static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_metho
   }
   size_t args_size = sizeof(stack_value) * argc;
 
-  if (args_size + thread->frame_buffer_used > thread->frame_buffer_capacity) {
+  if (args_size + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return true;
   }
 
   memcpy(stack_top, args, args_size);
-  thread->frame_buffer_used += args_size;
+  thread->stack.frame_buffer_used += args_size;
 
   ctx->thread = thread;
   ctx->frame = push_frame(thread, method, stack_top, argc);
@@ -1843,8 +1843,8 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
   // with reflection n' shit)
   object loader = nullptr;
-  for (int i = arrlen(thread->frames) - 1; i >= 0; --i) {
-    void *candidate = thread->frames[i]->method->my_class->classloader;
+  for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
+    void *candidate = thread->stack.frames[i]->method->my_class->classloader;
     if (candidate) {
       loader = candidate;
       break;
@@ -2575,7 +2575,7 @@ DEFINE_ASYNC(run_native) {
 DEFINE_ASYNC(interpret) {
 #define thread args->thread
 #define raw_frame args->raw_frame
-  DCHECK(arrlast(thread->frames) == raw_frame, "Frame is not last frame on stack");
+  DCHECK(arrlast(thread->stack.frames) == raw_frame, "Frame is not last frame on stack");
 
   for (;;) {
     future_t f;

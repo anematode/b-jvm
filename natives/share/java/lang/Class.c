@@ -185,9 +185,9 @@ DECLARE_NATIVE("java/lang", Class, forName0,
 
   if (c && args[1].i) {
     initialize_class_t ctx = {.args = {thread, c}};
-    thread->synchronous_depth++;
+    thread->stack.synchronous_depth++;
     future_t f = initialize_class(&ctx);
-    thread->synchronous_depth--;
+    thread->stack.synchronous_depth--;
     CHECK(f.status == FUTURE_READY);
 
     if (ctx._result) {

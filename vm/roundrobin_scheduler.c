@@ -197,9 +197,9 @@ scheduler_status_t rr_scheduler_execute_immediately(execution_record *record) {
       thread_info *info = I->round_robin[i];
       while (arrlen(info->call_queue) > 0) {
         pending_call *call = &info->call_queue[0];
-        info->thread->synchronous_depth++; // force it to be synchronous
+        info->thread->stack.synchronous_depth++; // force it to be synchronous
         future_t fut = call_interpreter(&call->call);
-        info->thread->synchronous_depth--;
+        info->thread->stack.synchronous_depth--;
 
         if (fut.status == FUTURE_NOT_READY) {
           // Raise IllegalStateException
