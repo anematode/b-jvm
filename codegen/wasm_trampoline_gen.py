@@ -52,7 +52,6 @@ def gen_trampoline(return_type, arguments, _freq):
         the_args = ", "
     print(f"static {c_types[return_type]} jit_tramp_{name}({c_types[return_type]} (*f)(vm_thread *, cp_method *{the_args} {arguments}), vm_thread *thread, cp_method *method, stack_value *args) {{")
 
-
     maybe_return = "return" if return_type != "V" else ""
     print(f"  MUSTTAIL {maybe_return} f(thread, method{the_args}{', '.join([f"args[{i}].{union_types[arg]}" for i, arg in enumerate(old_args)])});")
     print("}")
