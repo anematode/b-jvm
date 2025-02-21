@@ -25,7 +25,7 @@ DEFINE_ASYNC(monitor_acquire) {
     }
     // we need to allocate one ourselves
     if (!allocated_data) {
-      allocated_data = allocate_monitor(args->thread);
+      allocated_data = allocate_monitor_for(args->thread, self->handle->obj);
       if (unlikely(!allocated_data)) { // oom
         drop_handle(args->thread, self->handle);
         out_of_memory(args->thread);

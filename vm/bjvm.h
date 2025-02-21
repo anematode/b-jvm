@@ -154,7 +154,7 @@ mark_word_t *get_mark_word(header_word *data);
 monitor_data *inspect_monitor(header_word *data);
 // only call this if inspect_monitor returns nullptr
 // doesn't store this allocated data onto the object, because that should later be done atomically by someone else
-monitor_data *allocate_monitor(vm_thread *thread); // doesn't initialize any monitor data
+monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj); // doesn't initialize any monitor data
 
 void read_string(vm_thread *thread, obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of

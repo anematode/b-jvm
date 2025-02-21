@@ -3,6 +3,7 @@
 
 #include <bjvm.h>
 
+int in_heap(vm *vm, object field);
 void major_gc(vm *vm);
 
 #endif

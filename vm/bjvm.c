@@ -92,7 +92,13 @@ monitor_data *inspect_monitor(header_word *data) {
   return has_expanded_data(data) ? data->expanded_data : nullptr;
 }
 
-monitor_data *allocate_monitor(vm_thread *thread) {
+monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
+  if (unlikely(!in_heap(thread->vm, obj))) {
+    // this object is not heap-allocated, so it should not heap allocate its monitor
+    // monitor_data *data = malloc(sizeof(monitor_data)); // todo: this leaks memory, never freed
+    UNREACHABLE("Monitor allocated for an off-heap object"); // todo: should this just throw an illegal monitor exception instead
+    // return data;
+  }
   monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
   return data;
 }
