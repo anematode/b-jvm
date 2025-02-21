@@ -136,9 +136,9 @@ u32 monitor_release_all_hold_count(vm_thread *thread, obj_header *obj) {
   monitor_data *lock = inspect_monitor(&fetched_header);
 
   // todo: error code enum? or just always cause an InternalError/IllegalMonitorStateException
-  s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
   if (unlikely(!lock))
     return 0;
+  s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
   if (unlikely(tid != thread->tid))
     return 0;
   if (unlikely(lock->hold_count == 0))
@@ -157,10 +157,9 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
   __atomic_load(&obj->header_word, &fetched_header, __ATOMIC_ACQUIRE);
   monitor_data *lock = inspect_monitor(&fetched_header);
 
-  // todo: error code enum? or just always cause an InternalError/IllegalMonitorStateException
-  s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
   if (unlikely(!lock))
     return -1;
+  s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
   if (unlikely(tid != thread->tid))
     return -1;
   if (unlikely(lock->hold_count == 0))
