@@ -746,7 +746,7 @@ __attribute__((noinline)) static s64 putstatic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(putstatic)
 
-force_inline static s64 getstatic_L_impl_void(ARGS_VOID) {
+static s64 getstatic_L_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -754,7 +754,7 @@ force_inline static s64 getstatic_L_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_L)
 
-force_inline static s64 getstatic_F_impl_void(ARGS_VOID) {
+static s64 getstatic_F_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -762,7 +762,7 @@ force_inline static s64 getstatic_F_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_F)
 
-force_inline static s64 getstatic_D_impl_void(ARGS_VOID) {
+static s64 getstatic_D_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -770,7 +770,7 @@ force_inline static s64 getstatic_D_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_D)
 
-force_inline static s64 getstatic_J_impl_void(ARGS_VOID) {
+static s64 getstatic_J_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -778,7 +778,7 @@ force_inline static s64 getstatic_J_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_J)
 
-force_inline static s64 getstatic_I_impl_void(ARGS_VOID) {
+static s64 getstatic_I_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -786,7 +786,7 @@ force_inline static s64 getstatic_I_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_I)
 
-force_inline static s64 getstatic_S_impl_void(ARGS_VOID) {
+static s64 getstatic_S_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -794,7 +794,7 @@ force_inline static s64 getstatic_S_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_S)
 
-force_inline static s64 getstatic_C_impl_void(ARGS_VOID) {
+static s64 getstatic_C_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -802,7 +802,7 @@ force_inline static s64 getstatic_C_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_C)
 
-force_inline static s64 getstatic_B_impl_void(ARGS_VOID) {
+static s64 getstatic_B_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -810,7 +810,7 @@ force_inline static s64 getstatic_B_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(getstatic_B)
 
-force_inline static s64 getstatic_Z_impl_void(ARGS_VOID) {
+static s64 getstatic_Z_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   DCHECK(insn->ic, "Static field location not found");
   sp++;
@@ -957,7 +957,7 @@ static s64 getfield_impl_int(ARGS_INT) {
   JMP_INT(tos)
 }
 
-force_inline static s64 putfield_impl_void(ARGS_VOID) {
+static s64 putfield_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   TryResolve(thread, insn, &frame->plain, sp);
@@ -1122,7 +1122,7 @@ static s64 putfield_D_impl_double(ARGS_DOUBLE) {
 
 // Binary operation on two integers (ints or longs)
 #define INTEGER_BIN_OP(which, eval)                                                                                    \
-  force_inline static s64 which##_impl_int(ARGS_INT) {                                                                 \
+  static s64 which##_impl_int(ARGS_INT) {                                                                 \
     DEBUG_CHECK();                                                                                                     \
     s64 a = (sp - 2)->l, b = tos;                                                                                      \
     s64 result = eval;                                                                                                 \
@@ -1152,7 +1152,7 @@ INTEGER_BIN_OP(lushr, (s64)((u64)a >> (b & 0x3f)))
 #undef INTEGER_BIN_OP
 
 #define INTEGER_UN_OP(which, eval, NEXT)                                                                               \
-  force_inline static s64 which##_impl_int(ARGS_INT) {                                                                 \
+  static s64 which##_impl_int(ARGS_INT) {                                                                 \
     DEBUG_CHECK();                                                                                                     \
     s64 a = tos;                                                                                                       \
     NEXT(eval)                                                                                                         \
@@ -1173,14 +1173,14 @@ INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
 #undef INTEGER_UN_OP
 
 #define FLOAT_BIN_OP(which, eval, out_float, out_double, NEXT1, NEXT2)                                                 \
-  force_inline static s64 f##which##_impl_float(ARGS_FLOAT) {                                                          \
+  static s64 f##which##_impl_float(ARGS_FLOAT) {                                                          \
     DEBUG_CHECK();                                                                                                     \
     float a = (sp - 2)->f, b = tos;                                                                                    \
     out_float result = eval;                                                                                           \
     sp--;                                                                                                              \
     NEXT1(result)                                                                                                      \
   }                                                                                                                    \
-  force_inline static s64 d##which##_impl_double(ARGS_DOUBLE) {                                                        \
+  static s64 d##which##_impl_double(ARGS_DOUBLE) {                                                        \
     DEBUG_CHECK();                                                                                                     \
     double a = (sp - 2)->d, b = tos;                                                                                   \
     out_double result = eval;                                                                                          \
@@ -1189,7 +1189,7 @@ INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
   }
 
 #define FLOAT_UN_OP(which, eval, out, NEXT)                                                                            \
-  force_inline static s64 which##_impl_float(ARGS_FLOAT) {                                                             \
+  static s64 which##_impl_float(ARGS_FLOAT) {                                                             \
     DEBUG_CHECK();                                                                                                     \
     float a = tos;                                                                                                     \
     out result = eval;                                                                                                 \
@@ -1197,7 +1197,7 @@ INTEGER_UN_OP(l2d, (double)a, NEXT_DOUBLE)
   }
 
 #define DOUBLE_UN_OP(which, eval, out, NEXT)                                                                           \
-  force_inline static s64 which##_impl_double(ARGS_DOUBLE) {                                                           \
+  static s64 which##_impl_double(ARGS_DOUBLE) {                                                           \
     DEBUG_CHECK();                                                                                                     \
     double a = tos;                                                                                                    \
     out result = eval;                                                                                                 \
@@ -1363,7 +1363,7 @@ static s64 aastore_impl_int(ARGS_INT) {
 
 /** Control-flow instructions (returns, jumps, branches) */
 
-force_inline static s64 return_impl_void(ARGS_VOID) {
+static s64 return_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   return 0;
@@ -1607,7 +1607,7 @@ DEFINE_ASYNC(resolve_new_inst) {
   ASYNC_END(0);
 }
 
-force_inline static s64 new_impl_void(ARGS_VOID) {
+static s64 new_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
@@ -1621,7 +1621,7 @@ force_inline static s64 new_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(new)
 
-force_inline static s64 new_resolved_impl_void(ARGS_VOID) {
+static s64 new_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   obj_header *obj = new_object(thread, insn->classdesc);
@@ -1760,7 +1760,7 @@ attempt_invoke(vm_thread *thread, stack_frame *invoked_frame, stack_frame *outer
     result;                                                                                                            \
   })
 
-force_inline static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
+static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method *method = insn->ic;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
@@ -1907,7 +1907,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokespecial)
 
-force_inline static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
+static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
@@ -1983,7 +1983,7 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
   inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
 }
 
-force_inline static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
+static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
   bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
@@ -2181,40 +2181,40 @@ static s64 invokecallsite_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokecallsite)
 
-force_inline static stack_value *get_local(stack_frame *frame, bytecode_insn *inst) {
+static stack_value *get_local(stack_frame *frame, bytecode_insn *inst) {
   return frame_locals(frame) + inst->index;
 }
 
 /** Local variable accessors */
-force_inline static s64 iload_impl_void(ARGS_VOID) {
+static s64 iload_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
   NEXT_INT(get_local(frame, insn)->i)
 }
 FORWARD_TO_NULLARY(iload)
 
-force_inline static s64 fload_impl_void(ARGS_VOID) {
+static s64 fload_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
   NEXT_FLOAT(get_local(frame, insn)->f)
 }
 FORWARD_TO_NULLARY(fload)
 
-force_inline static s64 dload_impl_void(ARGS_VOID) {
+static s64 dload_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
   NEXT_DOUBLE(get_local(frame, insn)->d)
 }
 FORWARD_TO_NULLARY(dload)
 
-force_inline static s64 lload_impl_void(ARGS_VOID) {
+static s64 lload_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
   NEXT_INT(get_local(frame, insn)->l)
 }
 FORWARD_TO_NULLARY(lload)
 
-force_inline static s64 aload_impl_void(ARGS_VOID) {
+static s64 aload_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
   NEXT_INT(get_local(frame, insn)->obj)
@@ -2612,7 +2612,7 @@ void debugger_pause(vm_thread *thread, stack_frame *frame) {
 #if DO_TAILS
 static s64 entry_impl_void(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
 #else
-force_inline static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_,
+static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_,
                                                  stack_value *sp_, unsigned handler_i, bool check_stepping) {
   struct {
     stack_value *temp_sp_;
