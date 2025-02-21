@@ -69,8 +69,6 @@ DEFINE_ASYNC(monitor_acquire) {
     ASYNC_YIELD((void *)&self->wakeup_info);
   }
 
-  printf("(tid %d = %p) acquiring hold count %d\n", args->thread->tid, args->thread, __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE)->hold_count);
-
   // done acquiring the monitor
   drop_handle(args->thread, self->handle);
   ASYNC_END(0);
@@ -86,8 +84,6 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
   header_word fetched_header;
   __atomic_load(shared_header, &fetched_header, __ATOMIC_ACQUIRE);
   assert(inspect_monitor(&fetched_header) != nullptr);
-
-  printf("trying to reacquire hold count %d\n", args->hold_count);
 
   // a monitor should be guaranteed to exist
   for (;;) {
@@ -160,8 +156,6 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
   header_word fetched_header;
   __atomic_load(&obj->header_word, &fetched_header, __ATOMIC_ACQUIRE);
   monitor_data *lock = inspect_monitor(&fetched_header);
-
-  printf("(tid %d = %p) releasing hold count %d\n", thread->tid, thread, lock->hold_count);
 
   // todo: error code enum? or just always cause an InternalError/IllegalMonitorStateException
   s32 tid = __atomic_load_n(&lock->tid, __ATOMIC_ACQUIRE);
