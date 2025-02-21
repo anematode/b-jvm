@@ -92,8 +92,8 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
 
   uintptr_t min_frame_addr_scanned = UINTPTR_MAX;
 
-  for (int frame_i = arrlen(thr->frames) - 1; frame_i >= 0; --frame_i) {
-    stack_frame *raw_frame = thr->frames[frame_i];
+  for (int frame_i = arrlen(thr->stack.frames) - 1; frame_i >= 0; --frame_i) {
+    stack_frame *raw_frame = thr->stack.frames[frame_i];
     if (is_frame_native(raw_frame))
       continue;
     plain_frame *frame = get_plain_frame(raw_frame);

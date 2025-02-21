@@ -535,19 +535,34 @@ typedef struct vm_thread {
   // Global VM corresponding to this thread
   vm *vm;
 
-  // Essentially the stack of the thread -- a contiguous buffer which stores
-  // stack_frames
-  char *frame_buffer;
-  u32 frame_buffer_capacity;
-  // Also pointer one past the end of the last stack frame
-  u32 frame_buffer_used;
+  struct {
+    // a contiguous buffer which stores stack_frames and intermediate data
+    char *frame_buffer;
+    u32 frame_buffer_capacity;
+    // index of one past the end of the last stack frame
+    u32 frame_buffer_used;
+
+    // Pointers into the frame_buffer
+    stack_frame **frames;
+
+    /// Secondary stack for async calls from the interpreter
+    async_stack_t *async_call_stack;
+
+    // Current number of active synchronous calls
+    u32 synchronous_depth;
+
+    // If true, the call stack must fully unwind because we are e.g. waiting for
+    // a JS Promise. This should only be cleared by the top-level scheduler.
+    // This function is used in thread_run, which attempts to run code in
+    // a synchronous manner.
+    bool must_unwind;
+
+    char synchronize_acquire_continuation[MONITOR_ACQUIRE_CONTINUATION_SIZE];
+  } stack;
 
   // Pre-allocated out-of-memory and stack overflow errors
   obj_header *out_of_mem_error;
   obj_header *stack_overflow_error;
-
-  // Pointers into the frame_buffer
-  stack_frame **frames;
 
   // Currently propagating exception
   obj_header *current_exception;
@@ -565,24 +580,11 @@ typedef struct vm_thread {
   // Handle for null
   handle null_handle;
 
-  // If true, the call stack must fully unwind because we are e.g. waiting for
-  // a JS Promise. This should only be cleared by the top-level scheduler.
-  // This function is used in thread_run, which attempts to run code in
-  // a synchronous manner.
-  bool must_unwind;
-
-  /// Secondary stack for async calls from the interpreter
-  async_stack_t *async_stack;
-
   int allocations_so_far;
   // This value is used to periodically check whether we should yield back to the scheduler ...
   u32 fuel;
   // ... if the current time is past this value
   u64 yield_at_time;
-  // Current number of active synchronous calls
-  u32 synchronous_depth;
-
-  char synchronize_acquire_continuation[MONITOR_ACQUIRE_CONTINUATION_SIZE];
 
   s32 tid;
 
