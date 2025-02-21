@@ -23,6 +23,7 @@
 
 #include "cached_classdescs.h"
 #include <errno.h>
+#include <jit_allocator.h>
 #include <linkage.h>
 #include <monitors.h>
 #include <sys/mman.h>
@@ -391,8 +392,6 @@ u32 compute_used(vm_thread * thread) {
   }
 }
 
-
-
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   DCHECK(arrlen(thr->frames) > 0);
   stack_frame *frame = arrpop(thr->frames);
@@ -665,6 +664,8 @@ module *get_module(vm *vm, slice module_name) {
 
 vm *create_vm(const vm_options options) {
   vm *vm = calloc(1, sizeof(*vm));
+
+  // initialize_jit_arena();
 
   INIT_STACK_STRING(classpath, 1000);
   classpath = bprintf(classpath, "%.*s:%.*s", fmt_slice(options.runtime_classpath), fmt_slice(options.classpath));
