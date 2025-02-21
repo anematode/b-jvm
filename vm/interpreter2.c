@@ -2932,13 +2932,14 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
 
   object synchronized_on = get_sync_object(thread, frame_);
   if (unlikely(synchronized_on) && frame_->attempted_synchronize < 2) {
-    char *store = thread->frame_buffer + thread->frame_buffer_used;
+    char *store = thread->synchronize_acquire_continuation;
     monitor_acquire_t ctx = frame_->attempted_synchronize ? *(monitor_acquire_t *)store
                                                         : (monitor_acquire_t){.args = {thread, synchronized_on}};
     frame_->attempted_synchronize = 1;
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
+      static_assert(sizeof(ctx) <= sizeof(thread->synchronize_acquire_continuation), "context can not be stored within thread cache");
       return value_null();
     }
     frame_->attempted_synchronize = 2;

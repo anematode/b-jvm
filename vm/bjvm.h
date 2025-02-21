@@ -530,6 +530,7 @@ void drop_js_handle(vm *vm, int index);
 struct async_stack;
 typedef struct async_stack async_stack_t;
 
+#define MONITOR_ACQUIRE_CONTINUATION_SIZE 56
 typedef struct vm_thread {
   // Global VM corresponding to this thread
   vm *vm;
@@ -581,7 +582,7 @@ typedef struct vm_thread {
   // Current number of active synchronous calls
   u32 synchronous_depth;
 
-  char synchronize_acquire_continuation[56];
+  char synchronize_acquire_continuation[MONITOR_ACQUIRE_CONTINUATION_SIZE];
 
   s32 tid;
 
