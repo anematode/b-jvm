@@ -1582,7 +1582,6 @@ static s64 monitorexit_impl_int(ARGS_INT) {
 
   obj_header *obj = (obj_header *)tos;
   int result = monitor_release(thread, obj);
-  assert(!thread->current_exception && "monitor_release raised an exception");
 
   if (unlikely(result)) {
     SPILL_VOID

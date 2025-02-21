@@ -44,13 +44,13 @@ DEFINE_ASYNC(monitor_acquire) {
                                   __ATOMIC_ACQUIRE)) {
       break; // success
     }
-#undef shared_header
   }
 
   // now, a monitor is guaranteed to exist
   for (;;) {
     monitor_data *lock =
-        __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
+        __atomic_load_n(shared_header.expanded_data, __ATOMIC_ACQUIRE); // must refetch
+    assert(!((u64) lock & IS_MARK_WORD) && "Monitor data does not exist"); // weird, because we just set it up above
     assert(lock);
     s32 read_tid = NOT_HELD_TID;
 
@@ -72,6 +72,7 @@ DEFINE_ASYNC(monitor_acquire) {
   }
 
   // done acquiring the monitor
+#undef shared_header
   drop_handle(args->thread, self->handle);
   ASYNC_END(0);
 }
