@@ -773,6 +773,7 @@ thread_options default_thread_options() {
 /// to suspend.
 stack_value call_interpreter_synchronous(vm_thread *thread, cp_method *method, stack_value *args) {
   if (args == nullptr) {
+    assert(method->descriptor->args_count == 0 && "No arguments provided for method with arguments");
     args = (stack_value[]){};
   }
 
