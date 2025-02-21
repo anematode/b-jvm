@@ -14,23 +14,23 @@
 maybe_extern_begin;
 void push_native(slice class_name, slice method_name, slice signature, native_callback native);
 
-static inline void __obj_store_field(obj_header *thing, slice field_name, stack_value value, slice desc) {
+static void __obj_store_field(obj_header *thing, slice field_name, stack_value value, slice desc) {
   cp_field *field = field_lookup(thing->descriptor, field_name, desc);
   DCHECK(field);
-
+  DCHECK(!(field->access_flags & ACCESS_STATIC));
   set_field(thing, field, value);
 }
 
-static inline stack_value __obj_load_field(obj_header *thing, slice field_name, slice desc) {
+static stack_value __obj_load_field(obj_header *thing, slice field_name, slice desc) {
   cp_field *field = field_lookup(thing->descriptor, field_name, desc);
   DCHECK(field);
-
+  DCHECK(!(field->access_flags & ACCESS_STATIC));
   return get_field(thing, field);
 }
 
 maybe_extern_end;
 
-static inline obj_header *check_is_object(obj_header *thing) { return thing; }
+static obj_header *check_is_object(obj_header *thing) { return thing; }
 
 #define AsHeapString(expr, on_oom)                                                                                     \
   ({                                                                                                                   \
@@ -43,24 +43,32 @@ static inline obj_header *check_is_object(obj_header *thing) { return thing; }
     __hstr;                                                                                                            \
   })
 
-static inline object __LoadFieldObject(obj_header *thing, slice desc, slice name) {
+static object __LoadFieldObject(obj_header *thing, slice desc, slice name) {
   return __obj_load_field(thing, name, desc).obj;
 }
 
-static inline void __StoreFieldObject(obj_header *thing, slice desc, slice name, object value) {
+static void __StoreFieldObject(obj_header *thing, slice desc, slice name, object value) {
   __obj_store_field(thing, name, (stack_value){.obj = value}, desc);
 }
 
+static void __StoreStaticFieldObject(classdesc *clazz, slice desc, slice name, object value) {
+  cp_field *field = field_lookup(clazz, name, desc);
+  DCHECK(field);
+  DCHECK(field->access_flags & ACCESS_STATIC);
+  set_static_field(field, (stack_value) { .obj = value });
+}
+
 #define StoreFieldObject(obj, type, name, value) __StoreFieldObject(obj, STR("L" type ";"), STR(name), value)
+#define StoreStaticFieldObject(obj, type, name, value) __StoreStaticFieldObject(obj, STR("L" type ";"), STR(name), value)
 #define LoadFieldObject(obj, type, name) __LoadFieldObject(obj, STR("L" type ";"), STR(name))
 
 #define GeneratePrimitiveStoreField(type_cap, type, stack_field, desc, modifier)                                       \
-  static inline void __StoreField##type_cap(obj_header *thing, slice name, type value) {                               \
+  static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                               \
     __obj_store_field(thing, name, (stack_value){.stack_field = value modifier}, STR(#desc));                          \
   }
 
 #define GeneratePrimitiveLoadField(type_cap, type, stack_field, desc)                                                  \
-  static inline type __LoadField##type_cap(obj_header *thing, slice name) {                                            \
+  static type __LoadField##type_cap(obj_header *thing, slice name) {                                            \
     return __obj_load_field(thing, name, STR(#desc)).stack_field;                                                      \
   }
 

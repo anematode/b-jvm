@@ -23,7 +23,7 @@ void raise_exception_object(vm_thread *thread, object obj) {
 #undef T
 }
 
-[[noreturn]] __attribute__((noinline)) static void vm_exception_was_not_initialized(slice name) {
+[[noreturn]] static void vm_exception_was_not_initialized(slice name) {
   fprintf(stderr, "VM-generated exceptions should be initialised at VM boot\n");
   fprintf(stderr, "Raising exception of type %.*s\n", fmt_slice(name));
   abort();

@@ -670,6 +670,7 @@ cp_method **unmirror_method(obj_header *mirror);
 cp_method **unmirror_ctor(obj_header *mirror);
 
 void set_field(obj_header *obj, cp_field *field, stack_value stack_value);
+void set_static_field(cp_field *field, stack_value stack_value);
 int resolve_field(vm_thread *thread, cp_field_info *info);
 stack_value get_field(obj_header *obj, cp_field *field);
 // Look up a (possibly inherited) field on the class.

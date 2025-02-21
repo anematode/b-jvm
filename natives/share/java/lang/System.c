@@ -121,27 +121,21 @@ DECLARE_NATIVE("java/lang", System, registerNatives, "()V") { return value_null(
 
 DECLARE_NATIVE("java/lang", System, setOut0, "(Ljava/io/PrintStream;)V") {
   // Look up the field System.out
-  classdesc *system_class = bootstrap_lookup_class(thread, STR("java/lang/System"));
-  cp_field *out_field = field_lookup(system_class, STR("out"), STR("Ljava/io/PrintStream;"));
-  void *field = &system_class->static_fields[out_field->byte_offset];
-  *(obj_header **)field = args[0].handle->obj;
+  classdesc *system_class = cached_classes(thread->vm)->system;
+  StoreStaticFieldObject(system_class, "java/io/PrintStream", "out", args[0].handle->obj);
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", System, setIn0, "(Ljava/io/InputStream;)V") {
   // Look up the field System.in
-  classdesc *system_class = bootstrap_lookup_class(thread, STR("java/lang/System"));
-  cp_field *in_field = field_lookup(system_class, STR("in"), STR("Ljava/io/InputStream;"));
-  void *field = &system_class->static_fields[in_field->byte_offset];
-  *(obj_header **)field = args[0].handle->obj;
+  classdesc *system_class = cached_classes(thread->vm)->system;
+  StoreStaticFieldObject(system_class, "java/io/InputStream", "in", args[0].handle->obj);
   return value_null();
 }
 
 DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
-  classdesc *system_class = bootstrap_lookup_class(thread, STR("java/lang/System"));
-  cp_field *out_field = field_lookup(system_class, STR("err"), STR("Ljava/io/PrintStream;"));
-  void *field = &system_class->static_fields[out_field->byte_offset];
-  *(obj_header **)field = args[0].handle->obj;
+  classdesc *system_class = cached_classes(thread->vm)->system;
+  StoreStaticFieldObject(system_class, "java/io/PrintStream", "err", args[0].handle->obj);
   return value_null();
 }
 
