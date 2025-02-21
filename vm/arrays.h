@@ -6,6 +6,7 @@
 #define ARRAYS_H
 
 #include "bjvm.h"
+#include <stdint.h>
 #include <types.h>
 
 #ifdef __cplusplus
@@ -18,7 +19,7 @@ static int constexpr kArrayLengthOffset = sizeof(obj_header);
 /// Array data starts after the length field -- aligning to the size of a
 /// pointer Not sure if it's worth the memory savings to align to the size of
 /// the element
-static int constexpr kArrayDataOffset = ALIGN_UP(sizeof(obj_header) + sizeof(int), _Alignof(max_align_t));
+static int constexpr kArrayDataOffset = ALIGN_UP(sizeof(obj_header) + sizeof(int), alignof(max_align_t));
 
 static int constexpr kArrayHeaderSize = kArrayDataOffset - sizeof(obj_header);
 
