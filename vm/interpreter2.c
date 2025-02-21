@@ -2931,17 +2931,18 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
   InstrumentMethodEntry(thread, frame_);
 
   object synchronized_on = get_sync_object(thread, frame_);
-  if (unlikely(synchronized_on) && frame_->attempted_synchronize < 2) {
-    char *store = thread->frame_buffer + thread->frame_buffer_used;
-    monitor_acquire_t ctx = frame_->attempted_synchronize ? *(monitor_acquire_t *)store
+  if (unlikely(synchronized_on) && thread->synchronized_state < 2) {
+    char *store = thread->synchronize_acquire_continuation;
+    monitor_acquire_t ctx = thread->synchronized_state == 1 ? *(monitor_acquire_t *)store // load in-progress ctx
                                                         : (monitor_acquire_t){.args = {thread, synchronized_on}};
-    frame_->attempted_synchronize = 1;
+
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
+      thread->synchronized_state = 1;
       return value_null();
     }
-    frame_->attempted_synchronize = 2;
+    thread->synchronized_state = 2;
   }
 
   stack_value result;
@@ -2964,6 +2965,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
     }
 
     InstrumentMethodReturn(thread, frame_);
+    thread->synchronized_state = 0;
   }
 
   return result;
