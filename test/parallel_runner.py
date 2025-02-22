@@ -49,5 +49,5 @@ if __name__ == '__main__':
         processes = [*p.map(worker, data)]
         for i in processes:
             if i != 0:
-                print("FAIL")
+                print("AT LEAST ONE TEST FAILED")
                 sys.exit(1)
