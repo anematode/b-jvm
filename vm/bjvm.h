@@ -154,7 +154,7 @@ mark_word_t *get_mark_word(header_word *data);
 monitor_data *inspect_monitor(header_word *data);
 // only call this if inspect_monitor returns nullptr
 // doesn't store this allocated data onto the object, because that should later be done atomically by someone else
-monitor_data *allocate_monitor(vm_thread *thread); // doesn't initialize any monitor data
+monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj); // doesn't initialize any monitor data
 
 void read_string(vm_thread *thread, obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of
@@ -168,8 +168,8 @@ typedef int (*poll_available_bytes)(void *param); // returns the number of bytes
 
 #define CARD_BYTES 4096
 
-typedef struct plain_frame plain_frame;
 typedef struct stack_frame stack_frame;
+typedef struct plain_frame plain_frame;
 typedef struct native_frame native_frame;
 
 // Continue execution of a thread.
@@ -491,8 +491,11 @@ typedef enum : u8 {
 typedef struct stack_frame {
   frame_kind is_native;
   u8 is_async_suspended;
-  // todo: enum 0- non 1- synchronize in progress, 2- synchronized, and done
-  u8 attempted_synchronize; // whether this frame method has been synchronized
+  enum : u8 {
+      SYNCHRONIZE_NONE = 0,
+      SYNCHRONIZE_IN_PROGRESS = 1,
+      SYNCHRONIZE_DONE = 2
+  } synchronized_state; // info about whether this frame method has been synchronized
   u16 num_locals;
 
   // The method associated with this frame

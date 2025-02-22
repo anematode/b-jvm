@@ -16,15 +16,15 @@ typedef struct gc_ctx {
   object *worklist;
 } gc_ctx;
 
-static int in_heap(gc_ctx *ctx, object field) {
-  return (u8*)field >= ctx->vm->heap && (u8*)field < ctx->vm->heap + ctx->vm->true_heap_capacity;
+int in_heap(vm *vm, object field) {
+  return (u8*)field >= vm->heap && (u8*)field < vm->heap + vm->true_heap_capacity;
 }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
 #define PUSH_ROOT(x)                                                                                                   \
   {                                                                                                                    \
     __typeof(x) v = (x);                                                                                               \
-    if (*v && in_heap(ctx, (void *)*v)) {                                                                              \
+    if (*v && in_heap(ctx->vm, (void *)*v)) {                                                                              \
       arrput(ctx->roots, (object *)v);                                                                            \
     }                                                                                                                  \
   }
@@ -211,7 +211,7 @@ static void mark_reachable(gc_ctx *ctx, object obj, int **bitset) {
     list_compressed_bitset_bits(bits, bitset);
     for (int i = 0; i < arrlen(*bitset); ++i) {
       object field_obj = *((object *)obj + (*bitset)[i]);
-      if (field_obj && !(*get_flags(field_obj) & IS_REACHABLE) && in_heap(ctx, field_obj)) {
+      if (field_obj && !(*get_flags(field_obj) & IS_REACHABLE) && in_heap(ctx->vm, field_obj)) {
         *get_flags(field_obj) |= IS_REACHABLE;
         arrput(ctx->worklist, field_obj);
       }
@@ -221,7 +221,7 @@ static void mark_reachable(gc_ctx *ctx, object obj, int **bitset) {
     int arr_len = ArrayLength(obj);
     for (int i = 0; i < arr_len; ++i) {
       object arr_element = ReferenceArrayLoad(obj, i);
-      if (arr_element && !(*get_flags(arr_element) & IS_REACHABLE) && in_heap(ctx, arr_element)) {
+      if (arr_element && !(*get_flags(arr_element) & IS_REACHABLE) && in_heap(ctx->vm, arr_element)) {
         *get_flags(arr_element) |= IS_REACHABLE;
         arrput(ctx->worklist, arr_element);
       }

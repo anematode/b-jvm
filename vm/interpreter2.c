@@ -1582,7 +1582,6 @@ static s64 monitorexit_impl_int(ARGS_INT) {
 
   obj_header *obj = (obj_header *)tos;
   int result = monitor_release(thread, obj);
-  assert(!thread->current_exception && "monitor_release raised an exception");
 
   if (unlikely(result)) {
     SPILL_VOID
@@ -2931,18 +2930,18 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
   InstrumentMethodEntry(thread, frame_);
 
   object synchronized_on = get_sync_object(thread, frame_);
-  if (unlikely(synchronized_on) && frame_->attempted_synchronize < 2) {
-    char *store = thread->stack.synchronize_acquire_continuation;
-    monitor_acquire_t ctx = frame_->attempted_synchronize ? *(monitor_acquire_t *)store
+  if (unlikely(synchronized_on) && frame_->synchronized_state < SYNCHRONIZE_DONE) {
+    monitor_acquire_t *store = (monitor_acquire_t *) thread->stack.synchronize_acquire_continuation;
+    monitor_acquire_t ctx = frame_->synchronized_state ? *store
                                                         : (monitor_acquire_t){.args = {thread, synchronized_on}};
-    frame_->attempted_synchronize = 1;
+    frame_->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
       static_assert(sizeof(ctx) <= sizeof(thread->stack.synchronize_acquire_continuation), "context can not be stored within thread cache");
       return value_null();
     }
-    frame_->attempted_synchronize = 2;
+    frame_->synchronized_state = SYNCHRONIZE_DONE;
   }
 
   stack_value result;
@@ -2954,7 +2953,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
 
   if (likely(fut->status == FUTURE_READY)) {
     synchronized_on = get_sync_object(thread, frame_); // re-compute in case of intervening GC
-    if (unlikely(synchronized_on)) {
+    if (unlikely(synchronized_on)) { // monitor release at the end of synchronized
       int err = monitor_release(thread, synchronized_on);
       if (err) {
         // the current exception is replaced with an IllegalMonitorStateException

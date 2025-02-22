@@ -92,7 +92,13 @@ monitor_data *inspect_monitor(header_word *data) {
   return has_expanded_data(data) ? data->expanded_data : nullptr;
 }
 
-monitor_data *allocate_monitor(vm_thread *thread) {
+monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
+  if (unlikely(!in_heap(thread->vm, obj))) {
+    // this object is not heap-allocated, so it should not heap allocate its monitor
+    // monitor_data *data = malloc(sizeof(monitor_data)); // todo: this leaks memory, never freed
+    UNREACHABLE("Monitor allocated for an off-heap object"); // todo: should this just throw an illegal monitor exception instead
+    // return data;
+  }
   monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
   return data;
 }
@@ -267,7 +273,7 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   frame->native.method_shape = descriptor;
   frame->native.state = 0;
   frame->is_async_suspended = false;
-  frame->attempted_synchronize = false;
+  frame->synchronized_state = SYNCHRONIZE_NONE;
 
   // Now wrap arguments in handles and copy them into the frame
   make_handles_array(thread, descriptor, method->access_flags & ACCESS_STATIC, args, locals);
@@ -303,7 +309,7 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
   frame->plain.max_stack = code->max_stack;
   frame->method = method;
   frame->is_async_suspended = false;
-  frame->attempted_synchronize = false;
+  frame->synchronized_state = SYNCHRONIZE_NONE;
 
   memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));
 
@@ -773,6 +779,7 @@ thread_options default_thread_options() {
 /// to suspend.
 stack_value call_interpreter_synchronous(vm_thread *thread, cp_method *method, stack_value *args) {
   if (args == nullptr) {
+    assert(method->descriptor->args_count == 0 && "No arguments provided for method with arguments");
     args = (stack_value[]){};
   }
 
