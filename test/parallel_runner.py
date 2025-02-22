@@ -14,15 +14,18 @@ if len(sys.argv) < 2:
 # get the number of tests in the doctest executable
 num_tests = 0
 
-program_with_args = [sys.argv[1], "--count"]
-for i in range(2, len(sys.argv)):
-    program_with_args.append(sys.argv[i])
+program_with_args = [*sys.argv[1:], "--count"]
 
 result = subprocess.Popen(program_with_args, stdout = subprocess.PIPE).communicate()[0]
 result = result.splitlines(True)
 for line in result:
-    if line.startswith(b"[doctest] unskipped test cases passing the current filters:"):
-        num_tests = int(re.search(b"(\\d+)", line).group(1))
+    # check if contains
+    if b"test cases passing the current filters:" in line:
+        num_tests = int(re.findall(b"(\\d+)", line)[-1])
+
+if num_tests == 0:
+    print("could not determine the number of tests!")
+    sys.exit(1)
 
 # calculate the ranges
 cores = multiprocessing.cpu_count()
@@ -37,11 +40,10 @@ data = tuple([[x[0], x[-1]] for x in data])
 # the worker callback that runs the executable for the given range of tests
 def worker(pair):
     first, last = pair
-    program_with_args = [sys.argv[1], "--dt-first=" + str(first), "--dt-last=" + str(last)]
+    program_with_args = [*sys.argv[1:], "--dt-first=" + str(first), "--dt-last=" + str(last)]
     process = subprocess.Popen(program_with_args)
     process.wait()
     return process.returncode
-
 
 # run the tasks on a pool
 if __name__ == '__main__':
