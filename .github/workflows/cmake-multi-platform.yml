@@ -112,6 +112,6 @@ jobs:
           nvm use --lts
           nvm alias default 'lts/*'
           node -v
-          python3 ./parallel_runner.py ${{ github.workspace }}/build/test/tests.js
+          python3 ./parallel_runner.py node ${{ github.workspace }}/build/test/tests.js --
         env:
           BOOT_CLASSPATH: ${{ github.workspace }}/test/jdk23.jar
