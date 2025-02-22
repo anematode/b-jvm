@@ -480,6 +480,7 @@ class Thread {
     }
 
     private async _runConstructor(method: MethodInfo, ...args: any[]): Promise<any> {
+        console.log(method.methodPointer);
         const this_ = module._ffi_allocate_object(this.ptr, method.methodPointer);
         if (!this_) {
             this.throwThreadException();

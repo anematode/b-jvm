@@ -114,9 +114,12 @@ static obj_header *create_1d_primitive_array(vm_thread *thread, type_kind array_
   classdesc *array_desc = make_array_classdesc(thread, primitive_classdesc(thread, array_type));
   DCHECK(array_desc);
 
-  obj_header *array = AllocateObject(thread, array_desc, kArrayHeaderSize + count * size);
+  size_t allocation_size = kArrayDataOffset + count * size;
+  obj_header *array = AllocateObject(thread, array_desc, allocation_size);
   if (array)
     *(int *)((char *)array + kArrayLengthOffset) = count;
+
+  DCHECK(size_of_object(array) == allocation_size);
 
   return array;
 }
@@ -128,9 +131,12 @@ static obj_header *create_1d_object_array(vm_thread *thread, classdesc *cd, int 
   classdesc *array_desc = make_array_classdesc(thread, cd);
   DCHECK(array_desc);
 
-  obj_header *array = AllocateObject(thread, array_desc, kArrayHeaderSize + count * sizeof(obj_header *));
+  size_t allocation_size = kArrayDataOffset + count * sizeof(obj_header *);
+  obj_header *array = AllocateObject(thread, array_desc, allocation_size);
   if (array)
     *(int *)((char *)array + kArrayLengthOffset) = count;
+
+  DCHECK(!array || size_of_object(array) == allocation_size);
 
   return array;
 }
@@ -168,4 +174,17 @@ oom:
 obj_header *CreateObjectArray1D(vm_thread *thread, classdesc *inner_type, int size) {
   auto desc = make_array_classdesc(thread, inner_type);
   return CreateArray(thread, desc, &size, 1);
+}
+
+obj_header * CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count){
+  auto desc = make_array_classdesc(thread, primitive_classdesc(thread, inner_type));
+  return CreateArray(thread, desc, &count, 1);
+}
+
+obj_header * CreateByteArray(vm_thread *thread, u8 *data, int length){
+  obj_header *result = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, length);
+  if (!result)
+    return nullptr;
+  memcpy(ArrayData(result), data, length);
+  return result;
 }

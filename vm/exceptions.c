@@ -49,7 +49,8 @@ int raise_vm_exception(vm_thread *thread, const slice exception_name, slice msg_
     call_interpreter_synchronous(thread, method, (stack_value[]){{.obj = handle->obj}});
   }
 
-  raise_exception_object(thread, handle->obj);
+  if (!thread->current_exception)
+    raise_exception_object(thread, handle->obj);
   drop_handle(thread, handle);
   return 0;
 }

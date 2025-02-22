@@ -1,6 +1,8 @@
 #include "bjvm.h"
 #include "cached_classdescs.h"
 
+#include <gc.h>
+
 #ifndef OBJECTS_H
 #define OBJECTS_H
 
@@ -30,13 +32,14 @@ static inline obj_header *RawStringData([[maybe_unused]] vm_thread const *thread
   return ((struct native_String *)string)->value;
 }
 
-static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, size_t data_size) {
+static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, size_t allocation_size) {
   DCHECK(descriptor);
   DCHECK(descriptor->state >= CD_STATE_LINKED); // important to know the size
-  object obj = (object)bump_allocate(thread, sizeof(obj_header) + data_size);
+  object obj = (object)bump_allocate(thread, allocation_size);
   if (obj) {
     obj->header_word.expanded_data = (monitor_data *)(uintptr_t)IS_MARK_WORD;
     obj->descriptor = descriptor;
+    DCHECK(size_of_object(obj) <= allocation_size);
   }
   return obj;
 }

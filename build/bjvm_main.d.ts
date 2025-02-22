@@ -260,7 +260,6 @@ interface WasmModule {
   _Object_getClass_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_notifyAll_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_notify_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Object_wait_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Runtime_availableProcessors_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Runtime_maxMemory_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _String_intern_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -277,7 +276,6 @@ interface WasmModule {
   _Thread_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Thread_currentThread_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Thread_setPriority0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Thread_isAlive_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Thread_holdsLock_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Thread_start0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Thread_ensureMaterializedForStackWalk_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -332,7 +330,6 @@ interface WasmModule {
   _Unsafe_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_arrayBaseOffset0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_shouldBeInitialized0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Unsafe_ensureClassInitialized0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_objectFieldOffset0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_objectFieldOffset1_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_staticFieldOffset0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -353,7 +350,12 @@ interface WasmModule {
   _Unsafe_freeMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putLong_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putLong_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putLongVolatile_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_park_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_unpark_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putLongVolatile_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_putIntVolatile_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putShort_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putShort_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putDouble_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
@@ -373,6 +375,7 @@ interface WasmModule {
   _Unsafe_copyMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_setMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _VM_initialize_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _PreviewFeatures_isPreviewEnabled_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Perf_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Perf_createLong_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _ConstantPool_getUTF8At0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

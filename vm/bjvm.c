@@ -939,6 +939,8 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
       CHECK(read_string_to_utf8(thr, &java_home, ret.obj) == 0);
       free_heap_str(java_home);
     }
+
+    vm->vm_initialized = true;
   }
 
   thr->current_exception = nullptr;
@@ -1564,6 +1566,7 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
   vm *vm = thread->vm;
+  DCHECK(vm->heap_used % 8 == 0);
   if (vm->heap_used + bytes > vm->heap_capacity) {
     major_gc(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {

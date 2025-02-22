@@ -91,18 +91,9 @@ obj_header *CreateArray(vm_thread *thread, classdesc *desc, int const *dim_sizes
 
 __attribute__((noinline)) obj_header *CreateObjectArray1D(vm_thread *thread, classdesc *inner_type, int size);
 
-static inline obj_header *CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count) {
-  auto desc = make_array_classdesc(thread, primitive_classdesc(thread, inner_type));
-  return CreateArray(thread, desc, &count, 1);
-}
+obj_header *CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count) ;
 
-static inline obj_header *CreateByteArray(vm_thread *thread, u8 *data, int length) {
-  obj_header *result = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, length);
-  if (!result)
-    return nullptr;
-  memcpy(ArrayData(result), data, length);
-  return result;
-}
+obj_header *CreateByteArray(vm_thread *thread, u8 *data, int length) ;
 
 #ifdef __cplusplus
 }
