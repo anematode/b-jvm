@@ -96,8 +96,8 @@ jobs:
           
       - name: Test
         if: matrix.compiler != 'emscripten'
-        working-directory: ${{ github.workspace }}/build
-        run: ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+        working-directory: ${{ github.workspace }}/test
+        run: python3 ./parallel_runner.py ${{ github.workspace }}/build/test/tests
         env:
           BOOT_CLASSPATH: ${{ github.workspace }}/test/jdk23.jar
           
@@ -112,6 +112,6 @@ jobs:
           nvm use --lts
           nvm alias default 'lts/*'
           node -v
-          node ${{ github.workspace }}/build/test/tests.js --skip-benchmarks
+          python3 ./parallel_runner.py ${{ github.workspace }}/build/test/tests.js
         env:
           BOOT_CLASSPATH: ${{ github.workspace }}/test/jdk23.jar
