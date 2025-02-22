@@ -889,7 +889,8 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   thr->thread_obj = java_thr;
 
   java_thr->eetop = (intptr_t)thr;
-  java_thr->name = MakeJStringFromCString(thr, "main", true);
+  object name = MakeJStringFromCString(thr, "main", true);
+  java_thr->name = name;
 
   // Call (Ljava/lang/ThreadGroup;Ljava/lang/String;)V
   cp_method *make_thread = method_lookup(cached_classes(vm)->thread, STR("<init>"),
@@ -987,7 +988,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
   thr->out_of_mem_error = new_object(thr, cached_classes(vm)->oom_error);
   thr->stack_overflow_error = new_object(thr, cached_classes(vm)->stack_overflow_error);
 
-  thr->thread_obj = ((struct native_Thread *) java_thread->obj);
+  thr->thread_obj = (struct native_Thread *) java_thread->obj;
   drop_handle(creator_thread, java_thread);
 
   if (initializing) {
@@ -1076,7 +1077,8 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
 
     if (!arg_desc)
       return nullptr;
-    *((struct native_Class **)ArrayData(ptypes->obj) + i) = get_class_mirror(thread, arg_desc);
+    object mirror = (void*)get_class_mirror(thread, arg_desc);
+    *((struct native_Class **)ArrayData(ptypes->obj) + i) = (void*)mirror;
   }
 
   classdesc *ret_desc = load_class_of_field_descriptor(thread, method->return_type.unparsed);
@@ -1197,13 +1199,15 @@ DEFINE_ASYNC(resolve_mh_mt) {
   self->ptypes_array = make_handle(
       args->thread, CreateObjectArray1D(args->thread, cached_classes(args->thread->vm)->klass, info.ptypes_count));
   for (u32 i = 0; i < info.ptypes_count; ++i) {
-    *((obj_header **)ArrayData(self->ptypes_array->obj) + i) = (void *)get_class_mirror(args->thread, info.ptypes[i]);
+    object mirror = (void *)get_class_mirror(args->thread, info.ptypes[i]);
+    *((obj_header **)ArrayData(self->ptypes_array->obj) + i) = mirror;
   }
   arrfree(info.ptypes);
 
+  object mirror = (void *)get_class_mirror(args->thread, info.rtype);
   AWAIT(call_interpreter, args->thread, make,
         (stack_value[]){
-            {.obj = (void *)get_class_mirror(args->thread, info.rtype)}, {.obj = self->ptypes_array->obj}, {.i = 0}});
+            {.obj = mirror}, {.obj = self->ptypes_array->obj}, {.i = 0}});
   stack_value result = get_async_result(call_interpreter);
   drop_handle(args->thread, self->ptypes_array);
 
@@ -2071,7 +2075,8 @@ struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
     class_mirror->reflected_class = cd;
     if (cd->module)
       class_mirror->module = cd->module->reflection_object;
-    class_mirror->componentType = cd->one_fewer_dim ? (void *)get_class_mirror(thread, cd->one_fewer_dim) : nullptr;
+    object componentType = cd->one_fewer_dim ? (void *)get_class_mirror(thread, cd->one_fewer_dim) : nullptr;
+    class_mirror->componentType = componentType;
   }
   struct native_Class *result = class_mirror;
   drop_handle(thread, cm_handle);

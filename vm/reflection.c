@@ -18,22 +18,31 @@ void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field)
   field->reflection_field = (void *)F;
 
   F->reflected_field = field;
-  F->name = MakeJStringFromModifiedUTF8(thread, field->name, true);
-  F->clazz = (void *)get_class_mirror(thread, cd);
-  F->type = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, field->descriptor));
+  object name = MakeJStringFromModifiedUTF8(thread, field->name, true);
+  if (!name)
+    goto oom;
+  F->name = name;
+  object mirror = (void *)get_class_mirror(thread, cd);
+  if (!mirror)
+    goto oom;
+  F->clazz = mirror;
+  mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, field->descriptor));
+  F->type = mirror;
   F->modifiers = field->access_flags;
 
   // Find runtimevisibleannotations attribute
   for (int i = 0; i < field->attributes_count; ++i) {
     if (field->attributes[i].kind == ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
       const attribute_runtime_visible_annotations a = field->attributes[i].annotations;
-      F->annotations = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, a.length);
+      object annotations = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, a.length);
+      F->annotations = annotations;
       memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
       break;
     }
   }
 #undef F
 
+oom:
   drop_handle(thread, field_mirror);
 }
 
@@ -46,9 +55,11 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   handle *result = make_handle(thread, (void *)method->reflection_ctor);
 #define C ((struct native_Constructor *)result->obj)
   C->reflected_ctor = method;
-  C->clazz = (void *)get_class_mirror(thread, cd);
+  object mirror = (void *)get_class_mirror(thread, cd);
+  C->clazz = mirror;
   C->modifiers = method->access_flags;
-  C->parameterTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
+  object parameterTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
+  C->parameterTypes = parameterTypes;
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
@@ -71,46 +82,56 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
   M->reflected_method = method;
   M->modifiers = method->access_flags;
 
-  if (!((M->name = MakeJStringFromModifiedUTF8(thread, method->name, true))))
+  object name = MakeJStringFromModifiedUTF8(thread, method->name, true);
+  if (!name)
     goto oom;
-  if (!((M->clazz = (void *)get_class_mirror(thread, cd))))
+  M->name = name;
+  object mirror = (void *)get_class_mirror(thread, cd);
+  if (!mirror)
     goto oom;
-  if (!((M->signature = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, false))))
+  M->clazz = mirror;
+  object signature = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, false);
+  if (!signature)
     goto oom;
+  M->signature = signature;
 
   for (int i = 0; i < method->attributes_count; ++i) {
     const attribute *attr = method->attributes + i;
+    object obj = (void*)8 /* just something non-null */;
     switch (attr->kind) {
     case ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
-      if (!((M->annotations = CreateByteArray(thread, attr->annotations.data, attr->annotations.length))))
-        goto oom;
+      obj = CreateByteArray(thread, attr->annotations.data, attr->annotations.length);
+      M->annotations = obj;
       break;
     case ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
-      if (!((M->parameterAnnotations =
-                 CreateByteArray(thread, attr->parameter_annotations.data, attr->parameter_annotations.length))))
-        goto oom;
+      obj = CreateByteArray(thread, attr->parameter_annotations.data, attr->parameter_annotations.length);
+      M->parameterAnnotations = obj;
       break;
     case ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
-      if (!((M->annotationDefault =
-                 CreateByteArray(thread, attr->annotation_default.data, attr->annotation_default.length))))
-        goto oom;
+      obj = CreateByteArray(thread, attr->annotation_default.data, attr->annotation_default.length);
+      M->annotationDefault = obj;
       break;
     default:
       break;
     }
+    if (!obj)
+      goto oom;
   }
 
-  M->parameterTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
+  object parameterTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
                                           method->descriptor->args_count);
+  M->parameterTypes = parameterTypes;
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
-    ((void **)ArrayData(M->parameterTypes))[i] =
-        (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
+    object mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
+    ((void **)ArrayData(M->parameterTypes))[i] = mirror;
   }
 
   slice ret_desc = method->descriptor->return_type.unparsed;
-  M->returnType = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, ret_desc));
-  M->exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
+  mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, ret_desc));
+  M->returnType = mirror;
+  object exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
+  M->exceptionTypes = exceptionTypes;
   // TODO parse these ^^
 
   method->reflection_method = (void *)M;
@@ -136,7 +157,8 @@ static obj_header *get_method_parameters_impl(vm_thread *thread, cp_method *meth
 
     if (!P)
       goto oom;
-    P->name = MakeJStringFromModifiedUTF8(thread, mparams.params[j].name, true);
+    object name = MakeJStringFromModifiedUTF8(thread, mparams.params[j].name, true);
+    P->name = name;
     if (!P->name)
       goto oom;
     P->executable = method->reflection_method ? (void *)method->reflection_method : (void *)method->reflection_ctor;

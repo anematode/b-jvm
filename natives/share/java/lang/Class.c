@@ -82,8 +82,10 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;")
   CHECK(!error);
   data[0] = (void *)enclosing_method.class_info->classdesc->mirror;
   if (enclosing_method.nat != nullptr) {
-    data[1] = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->name, true);
-    data[2] = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->descriptor, true);
+    object name = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->name, true); // todo oom
+    data[1] = name;
+    name = MakeJStringFromModifiedUTF8(thread, enclosing_method.nat->descriptor, true);
+    data[2] = name;
   }
 #undef data
   stack_value result = (stack_value){.obj = array->obj};

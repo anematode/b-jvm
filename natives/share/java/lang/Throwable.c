@@ -51,11 +51,23 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
 
 #define E ((struct native_StackTraceElement *)e->obj)
     int line = is_frame_native(frame) ? -1 : get_line_number(method->code, frame->plain.program_counter);
-    E->declaringClassObject = (void *)get_class_mirror(thread, method->my_class);
-    E->declaringClass = MakeJStringFromModifiedUTF8(thread, method->my_class->name, true);
-    E->methodName = MakeJStringFromModifiedUTF8(thread, method->name, true);
+    object o = (void *)get_class_mirror(thread, method->my_class);
+    if (!o)
+      goto oom;
+    E->declaringClassObject = o;
+    o = MakeJStringFromModifiedUTF8(thread, method->my_class->name, true);
+    if (!o)
+      goto oom;
+    E->declaringClass = o;
+    o = MakeJStringFromModifiedUTF8(thread, method->name, true);
+    if (!o)
+      goto oom;
+    E->methodName = o;
     attribute_source_file *sf = method->my_class->source_file;
-    E->fileName = sf ? MakeJStringFromModifiedUTF8(thread, sf->name, true) : nullptr;
+    o = sf ? MakeJStringFromModifiedUTF8(thread, sf->name, true) : nullptr;
+    if (!o)
+      goto oom;
+    E->fileName = o;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
 #undef E
@@ -64,8 +76,8 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
 
 cleanup:
   *backtrace_object(obj->obj) = stack_trace->obj;
+oom:
   drop_handle(thread, stack_trace);
-
   return (stack_value){.obj = obj->obj};
 }
 

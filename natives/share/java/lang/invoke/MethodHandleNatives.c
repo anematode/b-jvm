@@ -73,8 +73,10 @@ void fill_mn_with_field(vm_thread *thread, handle *mn, cp_field *field) {
   M->flags |= MN_IS_FIELD;
   classdesc *field_cd = load_class_of_field_descriptor(thread, field->descriptor);
   M->vmtarget = field;
-  M->type = (void *)get_class_mirror(thread, field_cd);
-  M->clazz = (void *)get_class_mirror(thread, search_on);
+  object mirror = (void *)get_class_mirror(thread, field_cd);
+  M->type = mirror;
+  mirror = (void *)get_class_mirror(thread, search_on);
+  M->clazz = mirror;
 }
 
 void fill_mn_with_method(vm_thread *thread, handle *mn, cp_method *method, bool dynamic_dispatch) {
@@ -91,9 +93,12 @@ void fill_mn_with_method(vm_thread *thread, handle *mn, cp_method *method, bool 
   M->vmtarget = method;
   M->vmindex = dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
   M->flags |= method->access_flags;
-  if (!method->is_signature_polymorphic)
-    M->type = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, true);
-  M->clazz = (void *)get_class_mirror(thread, search_on);
+  if (!method->is_signature_polymorphic) {
+    object string = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, true);
+    M->type = string;
+  }
+  object mirror = (void *)get_class_mirror(thread, search_on);
+  M->clazz = mirror;
 }
 
 typedef enum { METHOD_RESOLVE_OK, METHOD_RESOLVE_NOT_FOUND, METHOD_RESOLVE_EXCEPTION } method_resolve_result;

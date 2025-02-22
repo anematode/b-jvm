@@ -113,7 +113,8 @@ object make_jstring_cstr(vm_thread *thread, char const *cstr) {
   DCHECK(len_ < INT32_MAX);
   s32 len = (s32)len_;
 
-  S->value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  object value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  S->value = value;
   if (!S->value)
     goto oom;
   ByteArrayStoreBlock(S->value, 0, len, (u8 *)cstr);
@@ -184,7 +185,8 @@ obj_header *MakeJStringFromData(vm_thread *thread, slice data, string_coder_kind
   DCHECK(data.len < INT32_MAX);
   s32 len = (s32)data.len;
 
-  S->value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  object value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  S->value = value;
   if (!S->value)
     goto oom;
   ByteArrayStoreBlock(S->value, 0, len, (u8 const *)data.chars);
