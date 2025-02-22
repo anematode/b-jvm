@@ -48,11 +48,14 @@
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
+[[maybe_unused]] int cow = 0;
+
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
+  if (cow++ > 25000000) { \
   SPILL_VOID    \
   cp_method *m = frame->method;                                                                                        \
   printf("Calling method %.*s, descriptor %.*s, on class %.*s; %d\n", fmt_slice(m->name),                              \
@@ -60,7 +63,8 @@
   heap_string s = insn_to_string(insn, pc);                                                                            \
   printf("Insn kind: %.*s\n", fmt_slice(s));                                                                           \
   free_heap_str(s);                                                                                                    \
-  dump_frame(stdout, frame);
+  dump_frame(stdout, frame); \
+  }
 #endif
 
 // If true, use a sequence of tail calls rather than computed goto. We try to make the code reasonably generic to handle

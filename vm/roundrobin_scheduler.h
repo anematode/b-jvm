@@ -57,6 +57,7 @@ typedef struct {
 
 execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t call);
 void free_execution_record(execution_record *record);
+void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vector);
 
 #ifdef __cplusplus
 }

@@ -221,6 +221,29 @@ scheduler_status_t rr_scheduler_execute_immediately(execution_record *record) {
   return SCHEDULER_RESULT_DONE;
 }
 
+bool is_nth_arg_reference(cp_method * method, int i) {
+  if (method->access_flags & ACCESS_STATIC) {
+    return field_to_kind(&method->descriptor->args[i]) == TYPE_KIND_REFERENCE;
+  }
+  return i == 0 || field_to_kind(&method->descriptor->args[i - 1]) == TYPE_KIND_REFERENCE;
+}
+
+void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vector) {
+  // Iterate through all pending_calls and add object arguments as roots
+  impl *I = scheduler->_impl;
+  for (int i = 0; i < arrlen(I->round_robin); i++) {
+    thread_info *info = I->round_robin[i];
+    for (int j = 0; j < arrlen(info->call_queue); j++) {
+      pending_call *call = &info->call_queue[j];
+      for (int k = 0; k < method_argc(call->call.args.method); k++) {
+        if (is_nth_arg_reference(call->call.args.method, k)) {
+          arrput(stbds_vector, &call->call.args.args[k].obj);
+        }
+      }
+    }
+  }
+}
+
 execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t call) {
   vm_thread *thread = call.args.thread;
   thread_info *info = get_or_create_thread_info(scheduler->_impl, thread);
