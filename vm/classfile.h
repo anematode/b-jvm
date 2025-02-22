@@ -760,9 +760,9 @@ typedef struct cp_method {
   // This method overrides a method in a superclass
   bool overrides;
 
-  void *jit_entry;  // if NULL, there's no way to call this function from JITed code D:
-  void *trampoline;  // if NULL, there's no way to call this function from the interpreter D:
-  bool jit_available;  // whether jit_entry is NOT the interpreter entry but rather a JITed result
+  void *jit_entry;    // if NULL, there's no way to call this function from JITed code D:
+  void *trampoline;   // if NULL, there's no way to call this function from the interpreter D:
+  bool jit_available; // whether jit_entry is NOT the interpreter entry but rather a JITed result
   void *jit_info;
 } cp_method;
 

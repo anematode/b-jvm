@@ -17,8 +17,8 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, shouldBeInitialized0, "(Ljava/lang/C
   return (stack_value){.i = desc->state != CD_STATE_INITIALIZED};
 }
 
-DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, ensureClassInitialized0, "(Ljava/lang/Class;)V",
-  locals(), invoked_methods(invoked_method(initialize_class))) {
+DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, ensureClassInitialized0, "(Ljava/lang/Class;)V", locals(),
+                     invoked_methods(invoked_method(initialize_class))) {
   classdesc *desc = unmirror_class(args[0].handle->obj);
   if (desc->state != CD_STATE_INITIALIZED) {
     AWAIT(initialize_class, thread, desc);
@@ -185,20 +185,15 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLong, "(Ljava/lang/Obj
   return value_null();
 }
 
-
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(JJ)V", 1) {
   DCHECK(argc == 2);
   *(s64 *)args[0].l = args[1].l;
   return value_null();
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V") {
-  return value_null();
-}
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V") { return value_null(); }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") {
-  return value_null();
-}
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") { return value_null(); }
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(Ljava/lang/Object;JJ)V", 2) {
   DCHECK(argc == 3);
@@ -356,6 +351,6 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, copyMemory0, "(Ljava/lang/Object;JLj
 // setMemory0(Object o, long offset, long bytes, byte value);
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, setMemory0, "(Ljava/lang/Object;JJB)V") {
   assert(argc == 4);
-  memset((void*)((uintptr_t)args[0].handle->obj + args[1].l), args[3].i, args[2].l);
+  memset((void *)((uintptr_t)args[0].handle->obj + args[1].l), args[3].i, args[2].l);
   return value_null();
 }

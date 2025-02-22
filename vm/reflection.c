@@ -58,7 +58,8 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   object mirror = (void *)get_class_mirror(thread, cd);
   C->clazz = mirror;
   C->modifiers = method->access_flags;
-  object parameterTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
+  object parameterTypes =
+      CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
   C->parameterTypes = parameterTypes;
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
@@ -97,7 +98,7 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
 
   for (int i = 0; i < method->attributes_count; ++i) {
     const attribute *attr = method->attributes + i;
-    object obj = (void*)8 /* just something non-null */;
+    object obj = (void *)8 /* just something non-null */;
     switch (attr->kind) {
     case ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
       obj = CreateByteArray(thread, attr->annotations.data, attr->annotations.length);
@@ -119,7 +120,7 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
   }
 
   object parameterTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
-                                          method->descriptor->args_count);
+                                              method->descriptor->args_count);
   M->parameterTypes = parameterTypes;
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;

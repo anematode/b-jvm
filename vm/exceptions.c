@@ -4,8 +4,8 @@
 void raise_exception_object(vm_thread *thread, object obj) {
   DCHECK(!thread->current_exception && "Exception is already raised");
   DCHECK(obj && "Exception object must be non-null");
-  DCHECK(instanceof(obj->descriptor, cached_classes(thread->vm)->throwable)
-    && "Exception is not subclass of Throwable");
+  DCHECK(instanceof(obj->descriptor, cached_classes(thread->vm)->throwable) &&
+         "Exception is not subclass of Throwable");
 
   thread->current_exception = obj;
 
@@ -55,7 +55,7 @@ int raise_vm_exception(vm_thread *thread, const slice exception_name, slice msg_
   return 0;
 }
 
-int raise_vm_exception_no_msg(vm_thread *thread, const slice exception_name){
+int raise_vm_exception_no_msg(vm_thread *thread, const slice exception_name) {
   return raise_vm_exception(thread, exception_name, null_str());
 }
 

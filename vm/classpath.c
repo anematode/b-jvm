@@ -106,15 +106,15 @@ struct central_directory_record {
   u16 comment_len;
   u16 disk_start;
   u16 internal_attr;
-  u16 external_attr[2]; // bc padding gets inserted above
-  u8 local_header_offset[4];  // unaligned >:(
+  u16 external_attr[2];      // bc padding gets inserted above
+  u8 local_header_offset[4]; // unaligned >:(
 };
 
 #define CDR_SIZE_BYTES 46
 #define CDR_HEADER 0x02014b50
 
 char *parse_central_directory(mapped_jar *jar, u64 cd_offset, u32 expected) {
-  hash_table_reserve(&jar->entries, expected);  // helps performance a lot as we know the exact table size
+  hash_table_reserve(&jar->entries, expected); // helps performance a lot as we know the exact table size
   struct central_directory_record cdr = {0};
   char error[256];
   for (u32 i = 0; i < expected; i++) {
@@ -177,7 +177,7 @@ static void free_jar(mapped_jar *jar) {
 // Attempt to instantiate the contents of mapped_jar by reading it as a ZIP file.
 static char *load_filesystem_jar(const char *filename, mapped_jar *jar) {
   char *error;
-  bool error_needs_free = false;  // whether the error is heap allocated
+  bool error_needs_free = false; // whether the error is heap allocated
   char *map_err = map_jar(filename, jar);
   if (map_err) {
     return map_err;
@@ -212,7 +212,7 @@ inval:
   return strdup(s);
 }
 
-static char *add_classpath_jar(classpath * cp, slice entry) {
+static char *add_classpath_jar(classpath *cp, slice entry) {
   mapped_jar *jar = calloc(1, sizeof(mapped_jar));
   jar->entries = make_hash_table(free, 0.75, 1);
 
@@ -247,7 +247,7 @@ char *init_classpath(classpath *cp, slice path) {
   cp->entries = nullptr;
   cp->as_colon_separated = make_heap_str_from(path);
   int start = 0;
-  for (u32 i = 0; i <= path.len; i++) {  // iterate over colon separated entries
+  for (u32 i = 0; i <= path.len; i++) { // iterate over colon separated entries
     if (i == path.len || path.chars[i] == ':') {
       slice entry = subslice_to(path, start, i);
       if (entry.len == 0) // empty entry, ignore (e.g. ::)
@@ -272,7 +272,7 @@ void free_classpath(classpath *cp) {
   }
   arrfree(cp->entries);
   free_heap_str(cp->as_colon_separated);
-  memset(cp, 0, sizeof(*cp));  // for good measure
+  memset(cp, 0, sizeof(*cp)); // for good measure
 }
 
 enum jar_lookup_result { NOT_FOUND, FOUND, CORRUPT /* e.g. if INFLATE fails */ };

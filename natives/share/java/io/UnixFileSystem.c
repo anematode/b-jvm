@@ -8,10 +8,10 @@
 
 DECLARE_NATIVE("java/io", UnixFileSystem, initIDs, "()V") { return value_null(); }
 
-DECLARE_NATIVE("java/io", UnixFileSystem, checkAccess0, "(Ljava/io/File;I)Z") { return (stack_value) { .i = 1 }; }
+DECLARE_NATIVE("java/io", UnixFileSystem, checkAccess0, "(Ljava/io/File;I)Z") { return (stack_value){.i = 1}; }
 
-DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
-"(Ljava/io/File;)I", locals(), invoked_methods()) {
+DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0, "(Ljava/io/File;)I", locals(),
+                     invoked_methods()) {
   obj_header *file_obj = args[0].handle->obj;
   obj_header *path = LoadFieldObject(file_obj, "java/lang/String", "path");
 
@@ -21,9 +21,9 @@ DECLARE_ASYNC_NATIVE("java/io", UnixFileSystem, getBooleanAttributes0,
   int result = stat(path_str.chars, &st) != 0 ? 0 : BA_EXISTS | (S_ISDIR(st.st_mode) ? BA_DIRECTORY : BA_REGULAR);
   free_heap_str(path_str);
 
-  ASYNC_RETURN((stack_value) {.i = result});
+  ASYNC_RETURN((stack_value){.i = result});
 
-  on_oom:
+on_oom:
   ASYNC_END(value_null());
 }
 

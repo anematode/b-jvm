@@ -514,12 +514,13 @@ TEST_CASE("Sudoku solver") {
 
   auto result = run_test_case("test_files/sudoku/", true, "Main");
   // last puzzle
-  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
+          std::string::npos);
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
   std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  std::cout << "That's " << (double)elapsed / num_puzzles << " ms per puzzle!" << std::endl;
 }
 
 TEST_CASE("Scheduled sudoku solver") {
@@ -530,14 +531,15 @@ TEST_CASE("Scheduled sudoku solver") {
 
   auto result = run_scheduled_test_case("test_files/sudoku/", true, "Main");
   // last puzzle
-  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
+          std::string::npos);
   REQUIRE(result.sleep_count == 0); // chop chop
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
   std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
   std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  std::cout << "That's " << (double)elapsed / num_puzzles << " ms per puzzle!" << std::endl;
 }
 
 TEST_CASE("Scheduled worker sudoku solver") {
@@ -548,31 +550,33 @@ TEST_CASE("Scheduled worker sudoku solver") {
 
   auto result = run_scheduled_test_case("test_files/sudoku/", true, "UnsafeWorkerThreadSudoku");
   // last puzzle
-  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") != std::string::npos);
+  REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
+          std::string::npos);
   REQUIRE(result.sleep_count == 0); // chop chop
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
   std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
   std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_puzzles << " ms per puzzle!" << std::endl;
+  std::cout << "That's " << (double)elapsed / num_puzzles << " ms per puzzle!" << std::endl;
 }
 
 TEST_CASE("Autodiff") {
   int num_derivatives = 10000 * 10 + 3;
   std::cout << "Testing Autodiff" << std::endl;
-  std::cout << "Hang on tight, automatically differentiating " << num_derivatives << " simple expressions..." << std::endl;
+  std::cout << "Hang on tight, automatically differentiating " << num_derivatives << " simple expressions..."
+            << std::endl;
   auto now = std::chrono::system_clock::now();
 
   auto result = run_test_case("test_files/autodiff/", true, "Main");
   // last test
-  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+sin((x*y))))) = -3209354.522523045 == -3209354.522523045")
-          != std::string::npos);
+  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+"
+                              "sin((x*y))))) = -3209354.522523045 == -3209354.522523045") != std::string::npos);
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
   std::cout << "Done in " << elapsed << " ms!" << std::endl;
-  std::cout << "That's " << (double) elapsed / num_derivatives << " ms per evaluation!" << std::endl;
+  std::cout << "That's " << (double)elapsed / num_derivatives << " ms per evaluation!" << std::endl;
 }
 
 #endif
@@ -770,11 +774,10 @@ TEST_CASE("frem and drem") {
 TEST_CASE("Manually thrown exception") {
   // Tests that frames associated with fillInStackTrace are correctly skipped
   auto result = run_test_case("test_files/manually_thrown", true, "ManuallyThrown");
-  REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat ManuallyThrown.main(ManuallyThrown.java:4)\n");
+  REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat "
+                            "ManuallyThrown.main(ManuallyThrown.java:4)\n");
 }
 
 #if 1
-TEST_CASE("Print useful trampolines") {
-  print_method_sigs();
-}
+TEST_CASE("Print useful trampolines") { print_method_sigs(); }
 #endif

@@ -7,25 +7,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #ifdef __APPLE__
 #include <mach/mach.h>
-#include <stdint.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <sys/mman.h>
 
-void *jit_arena;  // initialized with mmap
+void *jit_arena; // initialized with mmap
 constexpr int JIT_SIZE = 1 << 24;
 
 struct jit_function {
-  void *addr;  // callable function pointer, using native calling convention
-  void (*free)(struct jit_function *self);  // release resources
+  void *addr;                              // callable function pointer, using native calling convention
+  void (*free)(struct jit_function *self); // release resources
 };
 
 struct jit_context {
   char *insts;
   size_t insts_bytes;
-  size_t write_offset;  // where to put it in the arena.
+  size_t write_offset; // where to put it in the arena.
 };
 
 int jit_writing_callback(void *context) {
@@ -48,8 +47,8 @@ void initialize_jit_arena() {
 
   struct jit_context ctx;
   char shellcode[] = {
-    0x00, 0x00, 0x01, 0x0b, // add w0, w0, w1
-    0xc0, 0x03, 0x5f, 0xd6  // ret
+      0x00, 0x00, 0x01, 0x0b, // add w0, w0, w1
+      0xc0, 0x03, 0x5f, 0xd6  // ret
   };
   ctx.insts = shellcode;
   ctx.insts_bytes = sizeof(shellcode);

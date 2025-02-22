@@ -28,7 +28,7 @@ typedef struct standard_debugger {
 } standard_debugger;
 
 // Get a list of potential breakpoints corresponding to the given file name and line number.
-debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line) ;
+debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line);
 
 int create_and_attach_debugger(vm *vm, standard_debugger **debugger);
 int debugger_add_breakpoint(standard_debugger *debugger, cp_method *method, int pc);
@@ -37,4 +37,4 @@ int debugger_remove_breakpoint(standard_debugger *debugger, cp_method *method, i
 void debugger_resume(standard_debugger *debugger, vm_thread *thread);
 void free_debugger(standard_debugger *debugger);
 
-#endif //DEBUGGER_H
+#endif // DEBUGGER_H

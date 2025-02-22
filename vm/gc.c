@@ -16,16 +16,14 @@ typedef struct gc_ctx {
   object *worklist;
 } gc_ctx;
 
-int in_heap(vm *vm, object field) {
-  return (u8*)field >= vm->heap && (u8*)field < vm->heap + vm->true_heap_capacity;
-}
+int in_heap(vm *vm, object field) { return (u8 *)field >= vm->heap && (u8 *)field < vm->heap + vm->true_heap_capacity; }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
 #define PUSH_ROOT(x)                                                                                                   \
   {                                                                                                                    \
     __typeof(x) v = (x);                                                                                               \
-    if (*v && in_heap(ctx->vm, (void *)*v)) {                                                                              \
-      arrput(ctx->roots, (object *)v);                                                                            \
+    if (*v && in_heap(ctx->vm, (void *)*v)) {                                                                          \
+      arrput(ctx->roots, (object *)v);                                                                                 \
     }                                                                                                                  \
   }
 
@@ -246,7 +244,7 @@ static void relocate_object(const gc_ctx *ctx, object *obj) {
     return;
 
   // Binary search for obj in ctx->roots
-  object *found = (object *)bsearch(obj, ctx->objs, arrlen(ctx->objs), sizeof(object ), comparator);
+  object *found = (object *)bsearch(obj, ctx->objs, arrlen(ctx->objs), sizeof(object), comparator);
   if (found) {
     *obj = ctx->new_location[found - ctx->objs];
   }
@@ -310,13 +308,13 @@ void major_gc(vm *vm) {
   // Mark phase
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object root = *ctx.roots[i];
-    if (*get_flags(root) & IS_REACHABLE)  // already visited
+    if (*get_flags(root) & IS_REACHABLE) // already visited
       continue;
     *get_flags(root) |= IS_REACHABLE;
     arrput(ctx.worklist, root);
   }
 
-  int *bitset[1] = { nullptr };
+  int *bitset[1] = {nullptr};
   while (arrlen(ctx.worklist) > 0) {
     object obj = arrpop(ctx.worklist);
     *get_flags(obj) |= IS_REACHABLE;
@@ -331,8 +329,7 @@ void major_gc(vm *vm) {
 
   // Create a new heap of the same size so ASAN can enjoy itself
 #if DCHECKS_ENABLED
-  u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
-    *end = new_heap + vm->true_heap_capacity;
+  u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity), *end = new_heap + vm->true_heap_capacity;
 #else
   u8 *new_heap = vm->heap_swap, *end = vm->heap_swap + vm->true_heap_capacity;
 #endif
@@ -349,7 +346,7 @@ void major_gc(vm *vm) {
     DCHECK(write_ptr + sz <= end);
 
     *get_flags(obj) &= ~IS_REACHABLE; // clear the reachable flag
-    memmove(write_ptr, obj, sz);  // not memcpy because the heap is the same
+    memmove(write_ptr, obj, sz);      // not memcpy because the heap is the same
 
     object new_obj = (object)write_ptr;
     new_location[i] = new_obj;

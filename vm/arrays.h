@@ -66,12 +66,12 @@ static inline void ByteArrayStoreBlock(object array, s32 offset, s32 length, u8 
 #define MAKE_PRIMITIVE_LOAD_STORE(name, type)                                                                          \
   static inline type name##ArrayLoad(obj_header *array, int index) {                                                   \
     DCHECK(Is1DPrimitiveArray(array));                                                                                 \
-    DCHECK(index >= 0 && index < ArrayLength(array));                                                                 \
+    DCHECK(index >= 0 && index < ArrayLength(array));                                                                  \
     return *((type *)ArrayData(array) + index);                                                                        \
   }                                                                                                                    \
   static inline void name##ArrayStore(obj_header *array, int index, type val) {                                        \
     DCHECK(Is1DPrimitiveArray(array));                                                                                 \
-    DCHECK(index >= 0 && index < ArrayLength(array));                                                                 \
+    DCHECK(index >= 0 && index < ArrayLength(array));                                                                  \
     *((type *)ArrayData(array) + index) = val;                                                                         \
   }
 
@@ -91,9 +91,9 @@ obj_header *CreateArray(vm_thread *thread, classdesc *desc, int const *dim_sizes
 
 __attribute__((noinline)) obj_header *CreateObjectArray1D(vm_thread *thread, classdesc *inner_type, int size);
 
-obj_header *CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count) ;
+obj_header *CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count);
 
-obj_header *CreateByteArray(vm_thread *thread, u8 *data, int length) ;
+obj_header *CreateByteArray(vm_thread *thread, u8 *data, int length);
 
 #ifdef __cplusplus
 }

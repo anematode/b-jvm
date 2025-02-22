@@ -1,5 +1,5 @@
-#include <natives-dsl.h>
 #include <monitors.h>
+#include <natives-dsl.h>
 #include <roundrobin_scheduler.h>
 
 DECLARE_NATIVE("java/lang", Object, hashCode, "()I") { return (stack_value){.i = (s32)get_object_hash_code(obj->obj)}; }
@@ -7,9 +7,7 @@ DECLARE_NATIVE("java/lang", Object, hashCode, "()I") { return (stack_value){.i =
 DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") { return value_null(); }
 
 // Check whether the class is cloneable.
-static bool cloneable(vm *vm, classdesc *cd) {
-  return instanceof(cd, cached_classes(vm)->cloneable);
-}
+static bool cloneable(vm *vm, classdesc *cd) { return instanceof(cd, cached_classes(vm)->cloneable); }
 
 DECLARE_NATIVE("java/lang", Object, clone, "()Ljava/lang/Object;") {
   switch (obj->obj->descriptor->kind) {
@@ -60,12 +58,13 @@ DECLARE_NATIVE("java/lang", Object, notify, "()V") {
   return value_null(); // TODO: no-op, since wait always returns spuriously rn
 }
 
-DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; rr_wakeup_info wakeup_info), invoked_methods(invoked_method(monitor_reacquire_hold_count))) {
+DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; rr_wakeup_info wakeup_info),
+                     invoked_methods(invoked_method(monitor_reacquire_hold_count))) {
   assert(argc == 1);
   s64 timeoutMillis = args[0].l;
   assert(timeoutMillis >= 0); // this is always checked before calling this private method
 
-  (void) timeoutMillis; // cope with unused var
+  (void)timeoutMillis; // cope with unused var
 
   if (thread->thread_obj->interrupted) {
     thread->thread_obj->interrupted = false; // throw and reset flag
@@ -75,13 +74,14 @@ DECLARE_ASYNC_NATIVE("java/lang", Object, wait0, "(J)V", locals(u32 holdCount; r
 
   self->holdCount = monitor_release_all_hold_count(thread, obj->obj);
   if (self->holdCount == 0) {
-        raise_vm_exception(thread, STR("java/lang/IllegalMonitorStateException"), STR("Thread does not hold monitor before waiting"));
-        ASYNC_RETURN_VOID();
+    raise_vm_exception(thread, STR("java/lang/IllegalMonitorStateException"),
+                       STR("Thread does not hold monitor before waiting"));
+    ASYNC_RETURN_VOID();
   }
 
   // todo: we always just yield once and return; always "spuriously" wake up (very inefficient, lazy)
   self->wakeup_info.kind = RR_WAKEUP_YIELDING;
-  ASYNC_YIELD((void *) &self->wakeup_info);
+  ASYNC_YIELD((void *)&self->wakeup_info);
 
   // wake up: re-acquire the monitor
   AWAIT(monitor_reacquire_hold_count, thread, obj->obj, self->holdCount);

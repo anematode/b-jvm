@@ -32,7 +32,7 @@ DECLARE_NATIVE("java/util/zip", Inflater, init, "(Z)J") {
  * if ((result >>> 62 & 1) != 0) {
  *   finished = true;
  * }
-*/
+ */
 
 // todo: What is the function of needDict?
 static s64 make_return_value(int read, int written, bool finished, bool needDict) {

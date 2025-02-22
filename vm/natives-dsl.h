@@ -55,20 +55,21 @@ static void __StoreStaticFieldObject(classdesc *clazz, slice desc, slice name, o
   cp_field *field = field_lookup(clazz, name, desc);
   DCHECK(field);
   DCHECK(field->access_flags & ACCESS_STATIC);
-  set_static_field(field, (stack_value) { .obj = value });
+  set_static_field(field, (stack_value){.obj = value});
 }
 
 #define StoreFieldObject(obj, type, name, value) __StoreFieldObject(obj, STR("L" type ";"), STR(name), value)
-#define StoreStaticFieldObject(obj, type, name, value) __StoreStaticFieldObject(obj, STR("L" type ";"), STR(name), value)
+#define StoreStaticFieldObject(obj, type, name, value)                                                                 \
+  __StoreStaticFieldObject(obj, STR("L" type ";"), STR(name), value)
 #define LoadFieldObject(obj, type, name) __LoadFieldObject(obj, STR("L" type ";"), STR(name))
 
 #define GeneratePrimitiveStoreField(type_cap, type, stack_field, desc, modifier)                                       \
-  static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                               \
+  static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                                      \
     __obj_store_field(thing, name, (stack_value){.stack_field = value modifier}, STR(#desc));                          \
   }
 
 #define GeneratePrimitiveLoadField(type_cap, type, stack_field, desc)                                                  \
-  static type __LoadField##type_cap(obj_header *thing, slice name) {                                            \
+  static type __LoadField##type_cap(obj_header *thing, slice name) {                                                   \
     return __obj_load_field(thing, name, STR(#desc)).stack_field;                                                      \
   }
 

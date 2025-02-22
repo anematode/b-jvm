@@ -1,8 +1,8 @@
 #include "util.h"
 
 #include <stdlib.h>
-#include <types.h>
 #include <sys/time.h>
+#include <types.h>
 
 bool utf8_equals(const slice entry, const char *str) {
   size_t str_len = strlen(str);

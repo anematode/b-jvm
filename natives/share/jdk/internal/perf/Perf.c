@@ -1,7 +1,7 @@
 
 #include <natives-dsl.h>
 
-DECLARE_NATIVE("jdk/internal/perf", Perf, registerNatives, "()V") { return (stack_value) { .i = 0 }; }
+DECLARE_NATIVE("jdk/internal/perf", Perf, registerNatives, "()V") { return (stack_value){.i = 0}; }
 DECLARE_NATIVE("jdk/internal/perf", Perf, createLong, "(Ljava/lang/String;IIJ)Ljava/nio/ByteBuffer;") {
   // Call ByteBuffer.allocateDirect
   classdesc *ByteBuffer = bootstrap_lookup_class(thread, STR("java/nio/ByteBuffer"));
@@ -13,5 +13,5 @@ DECLARE_NATIVE("jdk/internal/perf", Perf, createLong, "(Ljava/lang/String;IIJ)Lj
     return value_null();
   CHECK(result.obj);
 
-  return (stack_value) { .obj = result.obj };
+  return (stack_value){.obj = result.obj};
 }

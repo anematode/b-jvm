@@ -97,7 +97,7 @@ static int link_array_class(vm_thread *thread, classdesc *cd) {
 static int *reorder_fields_for_compactness(cp_field *fields, int fields_count) {
   int *order = malloc(sizeof(int) * fields_count);
   // Because there's only a few values (1, 2, 4, 8), we can just use buckets
-  int *buckets[4] = { nullptr };
+  int *buckets[4] = {nullptr};
   for (int i = 0; i < fields_count; ++i) {
     cp_field *field = fields + i;
     int size = sizeof_type_kind(field_to_kind(&field->parsed_descriptor));

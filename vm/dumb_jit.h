@@ -5,8 +5,8 @@
 #ifndef DUMB_JIT_H
 #define DUMB_JIT_H
 
-#include "util.h"
 #include "bjvm.h"
+#include "util.h"
 
 #include <wasm/wasm_utils.h>
 
@@ -17,7 +17,7 @@ typedef struct {
 
 typedef struct {
   pc_to_oop_count pc_to_oops;
-  void *entry;  // (vm_thread *, cp_method *, arg1, arg2 ...) -> double
+  void *entry; // (vm_thread *, cp_method *, arg1, arg2 ...) -> double
   wasm_instantiation_result *instantiation;
 } dumb_jit_result;
 
@@ -34,12 +34,8 @@ void free_dumb_jit_result(dumb_jit_result *result);
 
 // Create an adapter which converts a method call of the form (thread *, method *, arg1, arg2 ...) into an appropriate
 // call to bjvm_interpret.
-void *create_adapter_to_interpreter(cp_method *method) {
-  return nullptr;
-}
+void *create_adapter_to_interpreter(cp_method *method) { return nullptr; }
 
-jit_adapter_t *create_adapter_to_jit(cp_method *method) {
-  return nullptr;
-}
+jit_adapter_t *create_adapter_to_jit(cp_method *method) { return nullptr; }
 
-#endif //DUMB_JIT_H
+#endif // DUMB_JIT_H

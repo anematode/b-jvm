@@ -9,4 +9,4 @@
 
 void initialize_jit_arena();
 
-#endif //JIT_ALLOCATOR_H
+#endif // JIT_ALLOCATOR_H

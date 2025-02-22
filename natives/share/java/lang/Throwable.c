@@ -5,7 +5,7 @@
 
 // Returns true if the frame is currently constructing the given object.
 static bool is_frame_part_of_throwable_construction(stack_frame *frame, object obj) {
-  if (utf8_equals(frame->method->name, "fillInStackTrace")) {  // hack for now
+  if (utf8_equals(frame->method->name, "fillInStackTrace")) { // hack for now
     return true;
   }
   if (!frame->method->is_ctor || is_frame_native(frame) || frame->num_locals < 1) {

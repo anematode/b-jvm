@@ -96,14 +96,12 @@ DECLARE_NATIVE("java/io", RandomAccessFile, readBytes0, "([BII)I") {
   assert(fd);
   FILE *file = (FILE *)*get_native_handle(fd);
   if (!file) {
-    raise_vm_exception(thread, STR("java/io/IOException"),
-                         STR("File not open"));
+    raise_vm_exception(thread, STR("java/io/IOException"), STR("File not open"));
     return value_null();
   }
   object buf = args[0].handle->obj;
   s32 off = args[1].i;
   s32 len = args[2].i;
-  s32 read = fread((char*)ArrayData(buf) + off, 1, len, file);
+  s32 read = fread((char *)ArrayData(buf) + off, 1, len, file);
   return (stack_value){.i = read};
 }
-

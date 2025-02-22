@@ -4,7 +4,7 @@
 
 #include "debugger.h"
 
-debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line){
+debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line) {
   debugger_bkpt *lst = nullptr;
   classdesc *C;
   hash_table_iterator it = hash_table_get_iterator(&vm->classes);
@@ -12,7 +12,7 @@ debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line){
   size_t len;
   while (hash_table_iterator_has_next(it, &key, &len, (void **)&C)) {
     hash_table_iterator_next(&it);
-    if (is_builtin_class((slice) { .chars = key, .len = len })) {
+    if (is_builtin_class((slice){.chars = key, .len = len})) {
       // don't allow breakpoints in built-in classes -> less filename confusion
       continue;
     }
@@ -34,7 +34,7 @@ debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line){
           debugger_bkpt *bkpt = arraddnptr(lst, 1);
           bkpt->method = method;
           bkpt->pc = lnt->entries[j].start_pc;
-          bkpt->replaced_kind = 0;   // not used here
+          bkpt->replaced_kind = 0; // not used here
           break;
         }
       }

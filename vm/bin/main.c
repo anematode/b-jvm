@@ -124,9 +124,7 @@ scheduler_status_t ffi_execute_immediately(execution_record *record) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-void ffi_free_execution_record(execution_record *record) {
-  free_execution_record(record);
-}
+void ffi_free_execution_record(execution_record *record) { free_execution_record(record); }
 
 enum ArrayClassification : s32 {
   NOT_AN_ARRAY = -1,
@@ -185,7 +183,7 @@ uintptr_t ffi_get_element_ptr(vm_thread *thread, object obj, int index) {
     return 0;
   }
   if (obj->descriptor->kind == CD_KIND_ORDINARY_ARRAY) {
-    return (uintptr_t)((object*)ArrayData(obj) + index);
+    return (uintptr_t)((object *)ArrayData(obj) + index);
   }
   return (uintptr_t)ArrayData(obj) + index * sizeof_type_kind(obj->descriptor->primitive_component);
 }
@@ -215,13 +213,11 @@ object ffi_allocate_object(vm_thread *thr, cp_method *method) {
 
 EMSCRIPTEN_KEEPALIVE
 object ffi_create_string(vm_thread *thread, const char *str, size_t len) {
-  return MakeJStringFromModifiedUTF8(thread, (slice) { .chars = (char*)str, .len = len }, false);
+  return MakeJStringFromModifiedUTF8(thread, (slice){.chars = (char *)str, .len = len}, false);
 }
 
 EMSCRIPTEN_KEEPALIVE
-bool ffi_is_string(object obj) {
-  return obj && utf8_equals(obj->descriptor->name, "java/lang/String");
-}
+bool ffi_is_string(object obj) { return obj && utf8_equals(obj->descriptor->name, "java/lang/String"); }
 
 EMSCRIPTEN_KEEPALIVE
 uint8_t *ffi_get_string_data(object str) {
@@ -247,9 +243,7 @@ u8 ffi_get_string_coder(object str) {
 }
 
 EMSCRIPTEN_KEEPALIVE
-bool ffi_instanceof(object obj, classdesc *target) {
-  return !obj || instanceof(obj->descriptor, target);
-}
+bool ffi_instanceof(object obj, classdesc *target) { return !obj || instanceof(obj->descriptor, target); }
 
 EMSCRIPTEN_KEEPALIVE
 bool ffi_run_step(call_interpreter_t *ctx, stack_value *result) {

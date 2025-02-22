@@ -7,7 +7,7 @@ static string_hash_table interpreter_trampolines;
 #define MUSTTAIL
 
 // To store/look up in the hash table
-static slice encode_as_slice(slice s, wasm_value_type return_type, wasm_value_type* stbds_args) {
+static slice encode_as_slice(slice s, wasm_value_type return_type, wasm_value_type *stbds_args) {
   CHECK(1 + arrlenu(stbds_args) < s.len);
   int i = 0;
   s.chars[i++] = return_type;
@@ -17,7 +17,7 @@ static slice encode_as_slice(slice s, wasm_value_type return_type, wasm_value_ty
   return subslice_to(s, 0, i);
 }
 
-jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_type* stbds_args) {
+jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_type *stbds_args) {
   INIT_STACK_STRING(key, 257);
   key = encode_as_slice(key, return_type, stbds_args);
   jit_trampoline existing = (jit_trampoline)hash_table_lookup(&jit_trampolines, key.chars, (int)key.len);
@@ -26,7 +26,7 @@ jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_t
   return nullptr;
 }
 
-interpreter_trampoline get_wasm_interpreter_trampoline(wasm_value_type return_type, wasm_value_type* stbds_args) {
+interpreter_trampoline get_wasm_interpreter_trampoline(wasm_value_type return_type, wasm_value_type *stbds_args) {
   INIT_STACK_STRING(key, 257);
   key = encode_as_slice(key, return_type, stbds_args);
   jit_trampoline existing = (jit_trampoline)hash_table_lookup(&interpreter_trampolines, key.chars, (int)key.len);

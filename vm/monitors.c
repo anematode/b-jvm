@@ -48,14 +48,14 @@ DEFINE_ASYNC(monitor_acquire) {
 
   // now, a monitor is guaranteed to exist
   for (;;) {
-    monitor_data *lock =
-        __atomic_load_n(shared_header.expanded_data, __ATOMIC_ACQUIRE); // must refetch
-    assert(!((u64) lock & IS_MARK_WORD) && "Monitor data does not exist"); // weird, because we just set it up above
+    monitor_data *lock = __atomic_load_n(shared_header.expanded_data, __ATOMIC_ACQUIRE); // must refetch
+    assert(!((u64)lock & IS_MARK_WORD) && "Monitor data does not exist"); // weird, because we just set it up above
     assert(lock);
     s32 read_tid = NOT_HELD_TID;
 
     // try to acquire mutex- loop again if CAS fails
-    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL,
+                                    __ATOMIC_ACQUIRE)) {
       lock->hold_count = 1;
       break; // success
     }
@@ -97,7 +97,8 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
 
     // try to acquire mutex- loop again if CAS fails
     // todo: are these memory semantics even correct
-    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+    if (__atomic_compare_exchange_n(&lock->tid, &read_tid, args->thread->tid, false, __ATOMIC_ACQ_REL,
+                                    __ATOMIC_ACQUIRE)) {
       lock->hold_count = args->hold_count;
       break; // success
     }

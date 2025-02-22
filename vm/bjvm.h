@@ -384,7 +384,7 @@ typedef struct vm {
   obj_header **js_handles;
 
   /// Struct containing cached classdescs
-  void *_cached_classdescs;  // struct cached_classdescs* -- type erased to discourage unsafe accesses
+  void *_cached_classdescs; // struct cached_classdescs* -- type erased to discourage unsafe accesses
 
   s64 next_thread_id; // MUST BE 64 BITS
 
@@ -396,7 +396,7 @@ typedef struct vm {
   mmap_allocation *mmap_allocations;
 
   // Vector of z_streams, to be freed
-  void **z_streams;  // z_stream **
+  void **z_streams; // z_stream **
 
   // Latest TID
   s32 next_tid;
@@ -480,11 +480,7 @@ typedef struct {
   object oops[];
 } compiled_frame;
 
-typedef enum : u8 {
-  FRAME_KIND_INTERPRETER,
-  FRAME_KIND_NATIVE,
-  FRAME_KIND_COMPILED
-} frame_kind;
+typedef enum : u8 { FRAME_KIND_INTERPRETER, FRAME_KIND_NATIVE, FRAME_KIND_COMPILED } frame_kind;
 
 // A frame is either a native frame or a plain frame. They may be distinguished
 // with is_native.
@@ -495,9 +491,9 @@ typedef struct stack_frame {
   frame_kind is_native;
   u8 is_async_suspended;
   enum : u8 {
-      SYNCHRONIZE_NONE = 0,
-      SYNCHRONIZE_IN_PROGRESS = 1,
-      SYNCHRONIZE_DONE = 2
+    SYNCHRONIZE_NONE = 0,
+    SYNCHRONIZE_IN_PROGRESS = 1,
+    SYNCHRONIZE_DONE = 2
   } synchronized_state; // info about whether this frame method has been synchronized
   u16 num_locals;
 
@@ -606,7 +602,7 @@ typedef struct vm_thread {
   bool paused_in_debugger;
 } vm_thread;
 
-handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char* file, int line_no);
+handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file, int line_no);
 // Create a handle to the given object. Should always be paired with drop_handle.
 #define make_handle(thread, obj) make_handle_impl(thread, obj, __FILE__, __LINE__)
 
@@ -649,7 +645,8 @@ typedef struct {
 
 thread_options default_thread_options();
 vm_thread *create_main_thread(vm *vm, thread_options options);
-vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thread *thread_obj, thread_options options); // wraps a Thread obj
+vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thread *thread_obj,
+                            thread_options options); // wraps a Thread obj
 void free_thread(vm_thread *thread);
 
 /**

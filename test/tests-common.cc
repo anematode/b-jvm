@@ -161,9 +161,8 @@ void print_method_sigs() {
     method_sigs_vec.emplace_back(sig.first, sig.second);
   }
   // Sort so most common are first
-  std::sort(method_sigs_vec.begin(), method_sigs_vec.end(), [](const auto &a, const auto &b) {
-    return a.second > b.second;
-  });
+  std::sort(method_sigs_vec.begin(), method_sigs_vec.end(),
+            [](const auto &a, const auto &b) { return a.second > b.second; });
   // Print
   for (const auto &sig : method_sigs_vec) {
     printf("%s\t%d\n", sig.first.c_str(), sig.second);
@@ -248,12 +247,11 @@ TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::str
   // Iterate through all classes and methods and accumulate the signatures
   hash_table_iterator it;
   classdesc *value;
-  for (it = hash_table_get_iterator(&vm->classes);
-    hash_table_iterator_has_next(it, nullptr, nullptr, (void**) &value);
-    hash_table_iterator_next(&it)) {
+  for (it = hash_table_get_iterator(&vm->classes); hash_table_iterator_has_next(it, nullptr, nullptr, (void **)&value);
+       hash_table_iterator_next(&it)) {
     for (int i = 0; i < value->methods_count; i++) {
       cp_method *method = value->methods + i;
-      std::string sig { (char)field_to_kind(&method->descriptor->return_type) };
+      std::string sig{(char)field_to_kind(&method->descriptor->return_type)};
       if (!(method->access_flags & ACCESS_STATIC)) {
         sig += "L";
       }

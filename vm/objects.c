@@ -60,8 +60,8 @@ inval:
 
 obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
   // This function is called very early at VM boot, so we can't necessarily use the cache.
-  classdesc *String = thread->vm->_cached_classdescs ? cached_classes(thread->vm)->string :
-    bootstrap_lookup_class(thread, STR("java/lang/String"));
+  classdesc *String = thread->vm->_cached_classdescs ? cached_classes(thread->vm)->string
+                                                     : bootstrap_lookup_class(thread, STR("java/lang/String"));
   handle *str = make_handle(thread, new_object(thread, String));
 
 #define S ((struct native_String *)str->obj)
