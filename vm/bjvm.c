@@ -626,15 +626,9 @@ static slice get_default_boot_cp() {
 
 vm_options default_vm_options() {
   vm_options options = {0};
-  options.heap_size = 1 << 22;
+  options.heap_size = 1 << 21;
   options.runtime_classpath = get_default_boot_cp();
 
-  return options;
-}
-
-vm_options *default_vm_options_ptr() {
-  vm_options *options = malloc(sizeof(vm_options));
-  *options = default_vm_options();
   return options;
 }
 
@@ -2223,7 +2217,7 @@ enum {
 
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
 #define target (args->target)
-#define provider_mt (args->provider_mt)
+#define provider_mt (*args->provider_mt)
 #define thread (args->thread)
 
   DCHECK(args->method);

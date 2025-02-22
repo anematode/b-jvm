@@ -116,8 +116,10 @@ static obj_header *create_1d_primitive_array(vm_thread *thread, type_kind array_
 
   size_t allocation_size = kArrayDataOffset + count * size;
   obj_header *array = AllocateObject(thread, array_desc, allocation_size);
-  if (array)
+  if (array) {
     *(int *)((char *)array + kArrayLengthOffset) = count;
+    memset(ArrayData(array), 0, count * size);
+  }
 
   DCHECK(size_of_object(array) == allocation_size);
 
@@ -131,10 +133,12 @@ static obj_header *create_1d_object_array(vm_thread *thread, classdesc *cd, int 
   classdesc *array_desc = make_array_classdesc(thread, cd);
   DCHECK(array_desc);
 
-  size_t allocation_size = kArrayDataOffset + count * sizeof(obj_header *);
+  size_t allocation_size = kArrayDataOffset + count * sizeof(object);
   obj_header *array = AllocateObject(thread, array_desc, allocation_size);
-  if (array)
+  if (array) {
     *(int *)((char *)array + kArrayLengthOffset) = count;
+    memset(ArrayData(array), 0, count * sizeof(object));
+  }
 
   DCHECK(!array || size_of_object(array) == allocation_size);
 

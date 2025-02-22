@@ -8,12 +8,11 @@
 typedef struct gc_ctx {
   vm *vm;
 
-  // Vector of pointer to pointer to things to rewrite
+  // Vector of pointer to things to rewrite
   object **roots;
   object *objs;
   object *new_location;
-
-  object *worklist;
+  object *worklist;  // should contain a reachable object exactly once over its lifetime
 } gc_ctx;
 
 int in_heap(vm *vm, object field) { return (u8 *)field >= vm->heap && (u8 *)field < vm->heap + vm->true_heap_capacity; }
@@ -160,6 +159,11 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
       object *root = ((object *)desc->static_fields) + bitset_list[i];
       PUSH_ROOT(root);
     }
+    classdesc *array = desc;
+    while (array) {
+      PUSH_ROOT(&array->mirror);
+      array = array->array_type;
+    }
 
     // Also, push things like Class, Method and Constructors
     enumerate_reflection_roots(ctx, desc);
@@ -250,31 +254,6 @@ static void relocate_object(const gc_ctx *ctx, object *obj) {
   }
 }
 
-static void relocate_static_fields(gc_ctx *ctx) {
-  vm *vm = ctx->vm;
-
-  // Static fields of bootstrap-loaded classes
-  hash_table_iterator it = hash_table_get_iterator(&vm->classes);
-  char *key;
-  size_t key_len;
-  classdesc *desc;
-  int *bitset_list = NULL;
-  while (hash_table_iterator_has_next(it, &key, &key_len, (void **)&desc)) {
-    list_compressed_bitset_bits(desc->static_references, &bitset_list);
-    for (int i = 0; i < arrlen(bitset_list); ++i) {
-      relocate_object(ctx, ((object *)desc->static_fields) + bitset_list[i]);
-    }
-    // Push the mirrors of this base class and all of its array types
-    classdesc *array = desc;
-    while (array) {
-      relocate_object(ctx, (object *)&array->mirror);
-      array = array->array_type;
-    }
-    hash_table_iterator_next(&it);
-  }
-  arrfree(bitset_list);
-}
-
 void relocate_instance_fields(gc_ctx *ctx) {
   int *bitset = nullptr;
   for (int i = 0; i < arrlen(ctx->objs); ++i) {
@@ -298,6 +277,12 @@ void relocate_instance_fields(gc_ctx *ctx) {
   }
   arrfree(bitset);
 }
+
+#if DCHECKS_ENABLED
+#define NEW_HEAP_EACH_GC 1
+#else
+#define NEW_HEAP_EACH_GC 0
+#endif
 
 void major_gc(vm *vm) {
   // TODO wait for all threads to get ready (for now we'll just call this from
@@ -328,7 +313,7 @@ void major_gc(vm *vm) {
   object *new_location = ctx.new_location = malloc(arrlen(ctx.objs) * sizeof(object));
 
   // Create a new heap of the same size so ASAN can enjoy itself
-#if DCHECKS_ENABLED
+#if NEW_HEAP_EACH_GC
   u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity), *end = new_heap + vm->true_heap_capacity;
 #else
   u8 *new_heap = vm->heap_swap, *end = vm->heap_swap + vm->true_heap_capacity;
@@ -366,7 +351,6 @@ void major_gc(vm *vm) {
 
   // Go through all static and instance fields and rewrite in place
   relocate_instance_fields(&ctx);
-  relocate_static_fields(&ctx);
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object *obj = ctx.roots[i];
     relocate_object(&ctx, obj);
@@ -376,10 +360,10 @@ void major_gc(vm *vm) {
   free(ctx.new_location);
   arrfree(ctx.roots);
 
-#if !DCHECKS_ENABLED
-  vm->heap_swap = vm->heap;
-#else
+#if NEW_HEAP_EACH_GC
   free(vm->heap);
+#else
+  vm->heap_swap = vm->heap;
 #endif
 
   vm->heap = new_heap;

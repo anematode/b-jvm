@@ -277,7 +277,7 @@ DECLARE_ASYNC_VOID(invokevirtual_signature_polymorphic,
                     vm_thread *thread;
                     stack_value *sp_;
                     cp_method *method;
-                    struct native_MethodType *provider_mt;
+                    struct native_MethodType **provider_mt;  // pointer to GC root
                     obj_header *target;
                   ),
                   invoked_methods(
@@ -633,8 +633,6 @@ void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference);
 vm_options default_vm_options();
 
 vm *create_vm(vm_options options);
-
-vm_options *default_vm_options_ptr();
 
 typedef struct {
   u32 stack_space;

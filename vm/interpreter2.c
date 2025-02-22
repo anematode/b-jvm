@@ -53,7 +53,7 @@
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  SPILL_VOID                                                                                                           \
+  SPILL_VOID    \
   cp_method *m = frame->method;                                                                                        \
   printf("Calling method %.*s, descriptor %.*s, on class %.*s; %d\n", fmt_slice(m->name),                              \
          fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), __LINE__);                                   \
@@ -2021,7 +2021,9 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
 
   invokevirtual_signature_polymorphic_t ctx = {
       .args = {
-          .thread = thread, .method = insn->ic, .provider_mt = insn->ic2, .sp_ = sp - insn->args, .target = target}};
+          .thread = thread, .method = insn->ic,
+        .provider_mt = (struct native_MethodType**) &insn->ic2, // GC root
+        .sp_ = sp - insn->args, .target = target}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
