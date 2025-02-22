@@ -351,7 +351,6 @@ interface WasmModule {
   _Unsafe_putLong_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putLong_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putLongVolatile_cb1(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Unsafe_park_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_unpark_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putLongVolatile_cb2(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_putInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

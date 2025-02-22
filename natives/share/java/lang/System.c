@@ -140,7 +140,7 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
-  return (stack_value){.i = get_object_hash_code(args[0].handle->obj)};
+  return (stack_value){.i = get_object_hash_code(thread->vm, args[0].handle->obj)};
 }
 
 s64 micros() {
@@ -157,4 +157,7 @@ s64 micros() {
 
 DECLARE_NATIVE("java/lang", System, currentTimeMillis, "()J") { return (stack_value){.l = micros() / 1000}; }
 
-DECLARE_NATIVE("java/lang", System, nanoTime, "()J") { return (stack_value){.l = micros() * 1000}; }
+int calls = 0;
+DECLARE_NATIVE("java/lang", System, nanoTime, "()J") {
+  return (stack_value){.l = micros() * 1000};
+}

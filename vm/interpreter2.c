@@ -2301,10 +2301,14 @@ static s64 ldc_impl_void(ARGS_VOID) {
     // Initialize the class, then get its Java mirror
     if (!ent->class_info.vm_object) {
       SPILL_VOID
-      if (resolve_class(thread, &ent->class_info))
+      if (resolve_class(thread, &ent->class_info)) {
+        DCHECK(thread->current_exception);
         return 0;
-      if (link_class(thread, ent->class_info.classdesc))
+      }
+      if (link_class(thread, ent->class_info.classdesc)) {
+        DCHECK(thread->current_exception);
         return 0;
+      }
       obj_header *obj = (void *)get_class_mirror(thread, ent->class_info.classdesc);
       ent->class_info.vm_object = obj;
     }
@@ -2317,8 +2321,10 @@ static s64 ldc_impl_void(ARGS_VOID) {
     slice s = ent->string.chars;
     SPILL_VOID
     obj_header *obj = MakeJStringFromModifiedUTF8(thread, s, true);
-    if (!obj) // oom
+    if (!obj) {
+      DCHECK(thread->current_exception);
       return 0;
+    }
     ent->string.interned = obj;
     NEXT_INT(obj);
   }
@@ -2666,7 +2672,13 @@ static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn
     case 0: // special value in case of exception or suspend (theoretically also nop_impl_void, but javac doesn't use
             // that)
 
-      DCHECK(thread->current_exception || frame->is_async_suspended);
+      if (!(thread->current_exception || frame->is_async_suspended)) {
+#if DCHECKS_ENABLED
+        INIT_STACK_STRING(s, 1000);
+        s = bprintf(s, "Interpreter not in an exception or in a suspended state (insn kind: %d)", code[pc_].kind);
+        raise_vm_exception(thread, STR("java/lang/InternalError"), s);
+#endif
+      }
       return 0;
     default: {
       // outlined case

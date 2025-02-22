@@ -82,8 +82,21 @@ DEFINE_ASYNC(init_cached_classdescs) {
 
 bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
-mark_word_t *get_mark_word(header_word *data) {
-  return has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
+mark_word_t *get_mark_word(vm *vm, header_word *data) {
+  mark_word_t *word = has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
+#if DCHECKS_ENABLED
+  if (!in_heap(vm, (void*) word)) {
+    // Data got corrupted. Print out information
+    fprintf(stderr, "Corrupted mark word: %p at %p (expanded data: %d)\n", word, data, has_expanded_data(data));
+    fprintf(stderr, "Surrounding bytes (-16 to +16): ");
+    for (int i = -16; i < 16; i++) {
+      fprintf(stderr, "%02x ", ((u8 *)data)[i]);
+    }
+    fprintf(stderr, "\n");
+    abort();
+  }
+#endif
+  return word;
 }
 
 monitor_data *inspect_monitor(header_word *data) { return has_expanded_data(data) ? data->expanded_data : nullptr; }

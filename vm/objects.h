@@ -45,6 +45,6 @@ static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, si
 }
 
 // Get the hash code of the object, computing it if it is not already computed.
-s32 get_object_hash_code(object o);
+s32 get_object_hash_code(vm *vm, object o);
 
 #endif

@@ -1,4 +1,5 @@
 #include "objects.h"
+#include "roundrobin_scheduler.h"
 
 #include <natives-dsl.h>
 
@@ -191,9 +192,17 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(JJ)V",
   return value_null();
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V") { return value_null(); }
+DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeup_info wakeup_info), invoked_methods()) {
+  self->wakeup_info.kind = RR_WAKEUP_SLEEP;
+  self->wakeup_info.wakeup_us = get_unix_us() + 500000;
+  ASYNC_YIELD((void *)&self->wakeup_info);
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") { return value_null(); }
+  ASYNC_END(value_null());
+}
+
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") {
+  return value_null();
+}
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(Ljava/lang/Object;JJ)V", 2) {
   DCHECK(argc == 3);

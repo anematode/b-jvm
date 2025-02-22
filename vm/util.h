@@ -26,7 +26,7 @@ extern "C" {
 #define nullptr ((void *)0)
 #endif
 
-#ifdef NDEBUG
+#if !DCHECKS_ENABLED
 #define UNREACHABLE(_) __builtin_unreachable()
 #else
 #define UNREACHABLE(optional_msg)                                                                                      \

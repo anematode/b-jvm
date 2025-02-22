@@ -148,8 +148,10 @@ typedef enum : u32 {
   IS_REACHABLE = 1 << 1,
 } mark_word_flags;
 
+struct vm;
+
 bool has_expanded_data(header_word *data);
-mark_word_t *get_mark_word(header_word *data);
+mark_word_t *get_mark_word(struct vm *vm, header_word *data);
 // nullptr if the object has never been locked, otherwise a pointer to a lock_record.
 monitor_data *inspect_monitor(header_word *data);
 // only call this if inspect_monitor returns nullptr

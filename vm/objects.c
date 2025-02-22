@@ -87,7 +87,7 @@ obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
     result = (void *)S;
   } else {
     object value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, 2 * len);
-    if (!S->value)
+    if (!value)
       goto oom;
     S->value = value;
     memcpy(ArrayData(S->value), chars, len * sizeof(short));
@@ -146,8 +146,10 @@ static void insert_interned_jstring(vm_thread *thread, object s) {
 
 object MakeJStringFromModifiedUTF8(vm_thread *thread, slice data, bool intern) {
   object obj = make_jstring_modified_utf8(thread, data);
-  if (!obj)
+  if (!obj) {
+    DCHECK(thread->current_exception);
     return nullptr;
+  }
 
   object interned = lookup_interned_jstring(thread, obj);
   if (interned)
@@ -214,8 +216,8 @@ obj_header *InternJString(vm_thread *thread, object s) {
 
 u64 hash_code_rng = 0;
 
-s32 get_object_hash_code(object o) {
-  u32 *hc = &get_mark_word(&o->header_word)->data[1];
+s32 get_object_hash_code(vm* vm, object o) {
+  u32 *hc = &get_mark_word(vm, &o->header_word)->data[1];
   if (*hc == 0) {
     // Hash not yet computed -- make it always nonzero
     while (!((*hc = ObjNextHashCode())))

@@ -70,6 +70,11 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
     E->fileName = o;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;
+
+#if 0
+    fprintf(stderr, "Stack trace element %d: %.*s.%.*s (%s:%d)\n", j, fmt_slice(method->my_class->name), fmt_slice(method->name),
+            sf ? sf->name.chars : "unknown", line);
+#endif
 #undef E
     drop_handle(thread, e);
   }

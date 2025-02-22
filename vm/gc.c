@@ -194,9 +194,9 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
   }
 }
 
-static u32 *get_flags(object o) {
+static u32 *get_flags(vm *vm, object o) {
   assert(o != nullptr);
-  return &get_mark_word(&o->header_word)->data[0];
+  return &get_mark_word(vm, &o->header_word)->data[0];
 }
 
 static void mark_reachable(gc_ctx *ctx, object obj, int **bitset) {
@@ -209,8 +209,8 @@ static void mark_reachable(gc_ctx *ctx, object obj, int **bitset) {
     list_compressed_bitset_bits(bits, bitset);
     for (int i = 0; i < arrlen(*bitset); ++i) {
       object field_obj = *((object *)obj + (*bitset)[i]);
-      if (field_obj && !(*get_flags(field_obj) & IS_REACHABLE) && in_heap(ctx->vm, field_obj)) {
-        *get_flags(field_obj) |= IS_REACHABLE;
+      if (field_obj && in_heap(ctx->vm, field_obj) && !(*get_flags(ctx->vm, field_obj) & IS_REACHABLE)) {
+        *get_flags(ctx->vm,field_obj) |= IS_REACHABLE;
         arrput(ctx->worklist, field_obj);
       }
     }
@@ -219,8 +219,8 @@ static void mark_reachable(gc_ctx *ctx, object obj, int **bitset) {
     int arr_len = ArrayLength(obj);
     for (int i = 0; i < arr_len; ++i) {
       object arr_element = ReferenceArrayLoad(obj, i);
-      if (arr_element && !(*get_flags(arr_element) & IS_REACHABLE) && in_heap(ctx->vm, arr_element)) {
-        *get_flags(arr_element) |= IS_REACHABLE;
+      if (arr_element && in_heap(ctx->vm, arr_element) && !(*get_flags(ctx->vm,arr_element) & IS_REACHABLE)) {
+        *get_flags(ctx->vm,arr_element) |= IS_REACHABLE;
         arrput(ctx->worklist, arr_element);
       }
     }
@@ -308,16 +308,16 @@ void major_gc(vm *vm) {
   // Mark phase
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object root = *ctx.roots[i];
-    if (*get_flags(root) & IS_REACHABLE) // already visited
+    if (!in_heap(vm, root) || *get_flags(vm,root) & IS_REACHABLE) // already visited
       continue;
-    *get_flags(root) |= IS_REACHABLE;
+    *get_flags(vm,root) |= IS_REACHABLE;
     arrput(ctx.worklist, root);
   }
 
   int *bitset[1] = {nullptr};
   while (arrlen(ctx.worklist) > 0) {
     object obj = arrpop(ctx.worklist);
-    *get_flags(obj) |= IS_REACHABLE;
+    *get_flags(vm,obj) |= IS_REACHABLE;
     mark_reachable(&ctx, obj, bitset);
   }
   arrfree(ctx.worklist);
@@ -345,7 +345,7 @@ void major_gc(vm *vm) {
 
     DCHECK(write_ptr + sz <= end);
 
-    *get_flags(obj) &= ~IS_REACHABLE; // clear the reachable flag
+    *get_flags(vm,obj) &= ~IS_REACHABLE; // clear the reachable flag
     memmove(write_ptr, obj, sz);      // not memcpy because the heap is the same
 
     object new_obj = (object)write_ptr;

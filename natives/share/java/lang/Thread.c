@@ -71,10 +71,7 @@ DECLARE_ASYNC_NATIVE("java/lang", Thread, sleepNanos0, "(J)V", locals(rr_wakeup_
     ASYNC_RETURN_VOID();
   }
 
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  u64 time = tv.tv_sec * 1000000 + tv.tv_usec;
-  u64 end = time + nanos / 1000;
+  u64 end = get_unix_us() + nanos / 1000;
 
   self->wakeup_info.kind = RR_WAKEUP_SLEEP;
   self->wakeup_info.wakeup_us = end;
