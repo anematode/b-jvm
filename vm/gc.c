@@ -412,6 +412,7 @@ void major_gc(vm *vm) {
   arrfree(ctx.objs);
   free(ctx.new_location);
   arrfree(ctx.roots);
+  arrfree(ctx.relocations);
 
 #if NEW_HEAP_EACH_GC
   free(vm->heap);
