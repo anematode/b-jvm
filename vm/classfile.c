@@ -181,7 +181,7 @@ cp_entry *check_cp_entry(cp_entry *entry, cp_kind expected_kinds, const char *re
                            "Unexpected constant pool entry kind %d at index "
                            "%d (expected one of: [ ",
                            entry->kind, entry->my_index);
-  for (int i = 0; 1 << i <= CP_KIND_LAST; ++i)
+  for (size_t i = 0; (1 << i) <= CP_KIND_LAST; ++i)
     if (expected_kinds & 1 << i)
       write += snprintf(write, end - write, "%s ", cp_kind_to_string(1 << i));
   write += snprintf(write, end - write, "]) while reading %s", reason);
