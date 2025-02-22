@@ -65,6 +65,8 @@ obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
   handle *str = make_handle(thread, new_object(thread, String));
 
 #define S ((struct native_String *)str->obj)
+  if (!S)
+    return nullptr; // oom
 
   obj_header *result = nullptr;
 
@@ -74,18 +76,20 @@ obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
     goto error;
 
   if (do_latin1(chars, len)) {
-    S->value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
-    if (!S->value)
+    object value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+    if (!value)
       goto oom;
+    S->value = value;
     for (int i = 0; i < len; ++i) {
       ByteArrayStore(S->value, i, (s8)chars[i]);
     }
     S->coder = STRING_CODER_LATIN1; // LATIN1
     result = (void *)S;
   } else {
-    S->value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, 2 * len);
+    object value = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, 2 * len);
     if (!S->value)
       goto oom;
+    S->value = value;
     memcpy(ArrayData(S->value), chars, len * sizeof(short));
     S->coder = STRING_CODER_UTF16; // UTF-16
     result = (void *)S;
