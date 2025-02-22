@@ -366,7 +366,10 @@ typedef struct vm {
   // available (even if it isn't running anything)
   vm_thread *primordial_thread;
 
+  // Swaps between these two heaps. Long term we'll have only one for memory efficiency.
   u8 *heap;
+  u8 *heap_swap;
+
   // Next object should be allocated here. Should always be 8-byte aligned
   // which is the alignment of BJVM objects.
   size_t heap_used;

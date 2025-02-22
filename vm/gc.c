@@ -329,8 +329,14 @@ void major_gc(vm *vm) {
   qsort(ctx.objs, arrlen(ctx.objs), sizeof(object), comparator);
   object *new_location = ctx.new_location = malloc(arrlen(ctx.objs) * sizeof(object));
 
-  // For now, create a new heap of the same size
-  [[maybe_unused]] u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity), *end = new_heap + vm->true_heap_capacity;
+  // Create a new heap of the same size so ASAN can enjoy itself
+#if DCHECKS_ENABLED
+  u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity),
+    *end = new_heap + vm->true_heap_capacity;
+#else
+  u8 *new_heap = vm->heap_swap, *end = vm->heap_swap + vm->true_heap_capacity;
+#endif
+
   u8 *write_ptr = new_heap;
 
   // Copy object by object
@@ -343,7 +349,7 @@ void major_gc(vm *vm) {
     DCHECK(write_ptr + sz <= end);
 
     *get_flags(obj) &= ~IS_REACHABLE; // clear the reachable flag
-    memcpy(write_ptr, obj, sz);
+    memmove(write_ptr, obj, sz);  // not memcpy because the heap is the same
 
     object new_obj = (object)write_ptr;
     new_location[i] = new_obj;
@@ -351,11 +357,11 @@ void major_gc(vm *vm) {
 
     if (has_expanded_data(&obj->header_word)) {
       // Copy the expanded data (align to 8 bytes for atomic ops to be happy)
-      //write_ptr = (u8 *)align_up((uintptr_t)write_ptr, 8);
+      write_ptr = (u8 *)align_up((uintptr_t)write_ptr, 8);
       constexpr size_t monitor_data_size = sizeof(monitor_data);
       DCHECK(write_ptr + monitor_data_size <= end);
 
-      memcpy(write_ptr, obj->header_word.expanded_data, monitor_data_size);
+      memmove(write_ptr, obj->header_word.expanded_data, monitor_data_size);
       new_obj->header_word.expanded_data = (monitor_data *)write_ptr;
       write_ptr += monitor_data_size;
     }
@@ -373,7 +379,11 @@ void major_gc(vm *vm) {
   free(ctx.new_location);
   arrfree(ctx.roots);
 
+#if !DCHECKS_ENABLED
+  vm->heap_swap = vm->heap;
+#else
   free(vm->heap);
+#endif
 
   vm->heap = new_heap;
   vm->heap_used = align_up(write_ptr - new_heap, 8);

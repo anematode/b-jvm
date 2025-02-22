@@ -694,6 +694,7 @@ vm *create_vm(const vm_options options) {
   vm->main_thread_group = nullptr;
 
   vm->heap = aligned_alloc(4096, options.heap_size);
+  vm->heap_swap = aligned_alloc(4096, options.heap_size);
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
   vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
@@ -761,6 +762,7 @@ void free_vm(vm *vm) {
   }
   arrfree(vm->active_threads);
   free(vm->heap);
+  free(vm->heap_swap);
   free_unsafe_allocations(vm);
   free_zstreams(vm);
 
