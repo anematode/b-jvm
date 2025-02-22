@@ -97,6 +97,8 @@ bool hash_table_iterator_next(hash_table_iterator *iter);
 
 void hash_table_reserve(string_hash_table *tbl, size_t new_capacity);
 
+bool hash_table_contains(string_hash_table *tbl, const char *key, int len);
+
 /**
  * Insert the key/value pair into the hash table and return the old value, if
  * any. Ownership of the key is passed into the function.

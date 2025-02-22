@@ -12,8 +12,6 @@
 
 #include "analysis.h"
 #include "arrays.h"
-#include "bjvm.h"
-#include "classloader.h"
 #include "objects.h"
 #include "util.h"
 #include <config.h>

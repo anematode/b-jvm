@@ -176,10 +176,9 @@ int main(int argc, char **argv) {
   printf("static inline void register_native_padding(vm *vm) {\n");
 
   for (int i = 0; i < class_count; ++i) {
-    if (classes[i].imp_padding)
-      printf("  (void)hash_table_insert(&vm->class_padding, \"%s\", -1, "
-             "(void*) (%d * sizeof(void*)));\n",
-             classes[i].name, classes[i].imp_padding);
+    printf("  (void)hash_table_insert(&vm->class_padding, \"%s\", -1, "
+           "(void*) (%d * sizeof(void*)));\n",
+           classes[i].name, classes[i].imp_padding);
   }
 
   printf("}\n");

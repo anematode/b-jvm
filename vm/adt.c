@@ -347,6 +347,14 @@ void *hash_table_lookup(string_hash_table *tbl, const char *key, int len) {
   return equal ? entry->data : nullptr;
 }
 
+bool hash_table_contains(string_hash_table *tbl, const char *key, int len) {
+  bool equal, on_chain;
+  len = len == -1 ? (int)strlen(key) : len;
+  hash_table_entry *_prev;
+  find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
+  return equal;
+}
+
 void free_hash_table(string_hash_table tbl) {
   hash_table_iterator it = hash_table_get_iterator(&tbl);
   char *key;

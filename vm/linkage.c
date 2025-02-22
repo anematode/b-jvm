@@ -93,6 +93,27 @@ static int link_array_class(vm_thread *thread, classdesc *cd) {
   return status;
 }
 
+// Reorder fields in a class so that bigger fields are placed first.
+static int *reorder_fields_for_compactness(cp_field *fields, int fields_count) {
+  int *order = malloc(sizeof(int) * fields_count);
+  // Because there's only a few values (1, 2, 4, 8), we can just use buckets
+  int *buckets[4] = { nullptr };
+  for (int i = 0; i < fields_count; ++i) {
+    cp_field *field = fields + i;
+    int size = sizeof_type_kind(field_to_kind(&field->parsed_descriptor));
+    DCHECK(size == 1 || size == 2 || size == 4 || size == 8);
+    arrput(buckets[__builtin_ctz(size)], i);
+  }
+  int j = 0;
+  for (int i = 3; i >= 0; --i) {
+    for (int k = 0; k < arrlen(buckets[i]); ++k)
+      order[j++] = buckets[i][k];
+    arrfree(buckets[i]);
+  }
+  DCHECK(j == fields_count);
+  return order;
+}
+
 // Link the class.
 int link_class(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
@@ -152,8 +173,12 @@ int link_class(vm_thread *thread, classdesc *cd) {
   classdesc *super = cd->super_class ? cd->super_class->classdesc : NULL;
   size_t static_offset = 0, nonstatic_offset = super ? super->instance_bytes : sizeof(obj_header);
   nonstatic_offset += padding;
+
+  bool must_have_C_layout = hash_table_contains(&thread->vm->class_padding, cd->name.chars, cd->name.len);
+  int *order = reorder_fields_for_compactness(cd->fields, cd->fields_count);
+
   for (int field_i = 0; field_i < cd->fields_count; ++field_i) {
-    cp_field *field = cd->fields + field_i;
+    cp_field *field = cd->fields + (must_have_C_layout ? field_i : order[field_i]);
     type_kind kind = field_to_kind(&field->parsed_descriptor);
     field->byte_offset = field->access_flags & ACCESS_STATIC ? allocate_field(&static_offset, kind)
                                                              : allocate_field(&nonstatic_offset, kind);
@@ -163,6 +188,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
            field->byte_offset);
 #endif
   }
+  free(order);
 
   init_compressed_bitset(&cd->static_references, static_offset / sizeof(void *));
   init_compressed_bitset(&cd->instance_references, nonstatic_offset / sizeof(void *));
