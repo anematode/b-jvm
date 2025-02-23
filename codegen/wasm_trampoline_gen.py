@@ -7,12 +7,18 @@
 reads = open("desired_trampolines.txt").read().split("\n")
 desired = []
 
+def replace_L_with_I(s):
+    return s.replace("L", "I")
+
 for read in reads:
     if len(read) == 0:
         continue
-    return_type = read[0]
-    args = read[1:].split("\t")[0]
+    return_type = replace_L_with_I(read[0])
+    args = replace_L_with_I(read[1:].split("\t")[0])
     frequency = int(read.split("\t")[1])
+
+    if any(x[0] == return_type and x[1] == args for x in desired):
+        continue
 
     desired.append((return_type, args, frequency))
 
@@ -50,16 +56,16 @@ def gen_trampoline(return_type, arguments, _freq):
     the_args = ""
     if len(arguments):
         the_args = ", "
-    print(f"static {c_types[return_type]} jit_tramp_{name}({c_types[return_type]} (*f)(vm_thread *, cp_method *{the_args} {arguments}), vm_thread *thread, cp_method *method, stack_value *args) {{")
+    print(f"static void jit_tramp_{name}({c_types[return_type]} (*f)(vm_thread *, cp_method *{the_args} {arguments}), vm_thread *thread, cp_method *method, stack_value *args) {{")
 
-    maybe_return = "return" if return_type != "V" else ""
-    print(f"  MUSTTAIL {maybe_return} f(thread, method{the_args}{', '.join([f"args[{i}].{union_types[arg]}" for i, arg in enumerate(old_args)])});")
+    maybe_write = "" if return_type == "V" else "args[0]." + union_types[return_type] + " = "
+    print(f"  {maybe_write} f(thread, method{the_args}{', '.join([f"args[{i}].{union_types[arg]}" for i, arg in enumerate(old_args)])});")
     print("}")
 
     blah = ", ".join([f"{c_types[arg]} arg{i}" for i, arg in enumerate(old_args)])
 
     print(f"static {c_types[return_type]} interpreter_tramp_{name}(vm_thread *thread, cp_method *method{the_args} {blah}) {{")
-    print(f"  stack_value values[{len(arguments)}];")
+    print(f"  stack_value values[{len(old_args)}];")
     for i, arg in enumerate(old_args):
         print(f"  values[{i}].{union_types[arg]} = arg{i};")
     print(f"  [[maybe_unused]] stack_value result = call_interpreter_synchronous(thread, method, values);")
