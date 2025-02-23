@@ -100,8 +100,6 @@ static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
 }
 
 static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
-  int *bitset_list = NULL;
-
   PUSH_ROOT(&thr->thread_obj);
   PUSH_ROOT(&thr->current_exception);
 
@@ -116,16 +114,15 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
       continue;
     plain_frame *frame = get_plain_frame(raw_frame);
     code_analysis *analy = raw_frame->method->code_analysis;
-    compressed_bitset refs = analy->insn_index_to_references[frame->program_counter];
     // List of stack and local values which are references
-    // In particular, 0 through max_stack - 1 refer to the stack, and max_stack through max_stack + max_locals - 1
+    // In particular, 0 through stack - 1 refer to the stack, and stack through stack + locals - 1
     // refer to the locals array
-    list_compressed_bitset_bits(refs, &bitset_list);
-    // Scan the stack
+    stack_summary *ss = analy->stack_states[frame->program_counter];
     int i = 0;
-    int max_stack = raw_frame->plain.max_stack;
-    for (; i < arrlen(bitset_list) && bitset_list[i] < max_stack; ++i) {
-      object *val = &frame->stack[bitset_list[i]].obj;
+    for (; i < ss->stack; ++i) {
+      if (ss->entries[i] != TYPE_KIND_REFERENCE)
+        continue;
+      object *val = &frame->stack[i].obj;
       if ((uintptr_t)val >= min_frame_addr_scanned) {
         // We already processed this part of the stack as part of the inner frame's locals
         continue;
@@ -134,8 +131,10 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
     }
 
     // Scan the locals
-    for (; i < arrlen(bitset_list); ++i) {
-      PUSH_ROOT(&frame_locals(raw_frame)[bitset_list[i] - max_stack].obj);
+    for (int local_i = 0; i < ss->locals + ss->stack; ++i, ++local_i) {
+      if (ss->entries[i] != TYPE_KIND_REFERENCE)
+        continue;
+      PUSH_ROOT(&frame_locals(raw_frame)[local_i].obj);
     }
 
     min_frame_addr_scanned = (uintptr_t)frame_locals(raw_frame);
@@ -146,11 +145,9 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
     PUSH_ROOT(&thr->handles[i].obj);
   }
 
-  // Pred exceptions
+  // Preallocated exceptions
   PUSH_ROOT(&thr->out_of_mem_error);
   PUSH_ROOT(&thr->stack_overflow_error);
-
-  arrfree(bitset_list);
 }
 
 static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {

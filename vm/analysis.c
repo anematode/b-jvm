@@ -22,432 +22,34 @@ typedef struct {
 // index swizzling (which occurs very early in our processing)
 typedef struct {
   analy_stack_entry *entries;
-  int entries_count;
+  int count;
   int entries_cap;
 } analy_stack_state;
 
-#define CASE(K)                                                                                                        \
-  case insn_##K:                                                                                                       \
-    return #K;
-
-const char *insn_code_name(insn_code_kind code) {
-  switch (code) {
-    CASE(aaload)
-    CASE(aastore)
-    CASE(aconst_null)
-    CASE(areturn)
-    CASE(arraylength)
-    CASE(athrow)
-    CASE(baload)
-    CASE(bastore)
-    CASE(caload)
-    CASE(castore)
-    CASE(d2f)
-    CASE(d2i)
-    CASE(d2l)
-    CASE(dadd)
-    CASE(daload)
-    CASE(dastore)
-    CASE(dcmpg)
-    CASE(dcmpl)
-    CASE(ddiv)
-    CASE(dmul)
-    CASE(dneg)
-    CASE(drem)
-    CASE(dreturn)
-    CASE(dsub)
-    CASE(dup)
-    CASE(dup_x1)
-    CASE(dup_x2)
-    CASE(dup2)
-    CASE(dup2_x1)
-    CASE(dup2_x2)
-    CASE(f2d)
-    CASE(f2i)
-    CASE(f2l)
-    CASE(fadd)
-    CASE(faload)
-    CASE(fastore)
-    CASE(fcmpg)
-    CASE(fcmpl)
-    CASE(fdiv)
-    CASE(fmul)
-    CASE(fneg)
-    CASE(frem)
-    CASE(freturn)
-    CASE(fsub)
-    CASE(i2b)
-    CASE(i2c)
-    CASE(i2d)
-    CASE(i2f)
-    CASE(i2l)
-    CASE(i2s)
-    CASE(iadd)
-    CASE(iaload)
-    CASE(iand)
-    CASE(iastore)
-    CASE(idiv)
-    CASE(imul)
-    CASE(ineg)
-    CASE(ior)
-    CASE(irem)
-    CASE(ireturn)
-    CASE(ishl)
-    CASE(ishr)
-    CASE(isub)
-    CASE(iushr)
-    CASE(ixor)
-    CASE(l2d)
-    CASE(l2f)
-    CASE(l2i)
-    CASE(ladd)
-    CASE(laload)
-    CASE(land)
-    CASE(lastore)
-    CASE(lcmp)
-    CASE(ldc)
-    CASE(ldc2_w)
-    CASE(ldiv)
-    CASE(lmul)
-    CASE(lneg)
-    CASE(lor)
-    CASE(lrem)
-    CASE(lreturn)
-    CASE(lshl)
-    CASE(lshr)
-    CASE(lsub)
-    CASE(lushr)
-    CASE(lxor)
-    CASE(monitorenter)
-    CASE(monitorexit)
-    CASE(nop)
-    CASE(pop)
-    CASE(pop2)
-    CASE(return)
-    CASE(saload)
-    CASE(sastore)
-    CASE(swap)
-    CASE(dload)
-    CASE(fload)
-    CASE(iload)
-    CASE(lload)
-    CASE(dstore)
-    CASE(fstore)
-    CASE(istore)
-    CASE(lstore)
-    CASE(aload)
-    CASE(astore)
-    CASE(anewarray)
-    CASE(anewarray_resolved)
-    CASE(checkcast)
-    CASE(checkcast_resolved)
-    CASE(getfield)
-    CASE(getstatic)
-    CASE(instanceof)
-    CASE(instanceof_resolved)
-    CASE(invokedynamic)
-    CASE(new)
-    CASE(new_resolved)
-    CASE(putfield)
-    CASE(putstatic)
-    CASE(invokevirtual)
-    CASE(invokespecial)
-    CASE(invokestatic)
-    CASE(goto)
-    CASE(jsr)
-    CASE(ret)
-    CASE(if_acmpeq)
-    CASE(if_acmpne)
-    CASE(if_icmpeq)
-    CASE(if_icmpne)
-    CASE(if_icmplt)
-    CASE(if_icmpge)
-    CASE(if_icmpgt)
-    CASE(if_icmple)
-    CASE(ifeq)
-    CASE(ifne)
-    CASE(iflt)
-    CASE(ifge)
-    CASE(ifgt)
-    CASE(ifle)
-    CASE(ifnonnull)
-    CASE(ifnull)
-    CASE(iconst)
-    CASE(dconst)
-    CASE(fconst)
-    CASE(lconst)
-    CASE(iinc)
-    CASE(invokeinterface)
-    CASE(multianewarray)
-    CASE(newarray)
-    CASE(tableswitch)
-    CASE(lookupswitch)
-    CASE(invokevtable_monomorphic)
-    CASE(invokevtable_polymorphic)
-    CASE(invokeitable_monomorphic)
-    CASE(invokeitable_polymorphic)
-    CASE(invokespecial_resolved)
-    CASE(invokestatic_resolved)
-    CASE(invokecallsite)
-    CASE(getfield_B)
-    CASE(getfield_C)
-    CASE(getfield_S)
-    CASE(getfield_I)
-    CASE(getfield_J)
-    CASE(getfield_F)
-    CASE(getfield_D)
-    CASE(getfield_L)
-    CASE(getfield_Z)
-    CASE(putfield_B)
-    CASE(putfield_C)
-    CASE(putfield_S)
-    CASE(putfield_I)
-    CASE(putfield_J)
-    CASE(putfield_F)
-    CASE(putfield_D)
-    CASE(putfield_L)
-    CASE(putfield_Z)
-    CASE(getstatic_B)
-    CASE(getstatic_C)
-    CASE(getstatic_S)
-    CASE(getstatic_I)
-    CASE(getstatic_J)
-    CASE(getstatic_F)
-    CASE(getstatic_D)
-    CASE(getstatic_L)
-    CASE(getstatic_Z)
-    CASE(putstatic_B)
-    CASE(putstatic_C)
-    CASE(putstatic_S)
-    CASE(putstatic_I)
-    CASE(putstatic_J)
-    CASE(putstatic_F)
-    CASE(putstatic_D)
-    CASE(putstatic_L)
-    CASE(putstatic_Z)
-    CASE(invokesigpoly)
-    CASE(sqrt)
-  }
-  printf("Unknown code: %d\n", code);
-  UNREACHABLE();
-}
-
-const char *type_kind_to_string(type_kind kind) {
-  switch (kind) {
-  case TYPE_KIND_BOOLEAN:
-    return "boolean";
-  case TYPE_KIND_BYTE:
-    return "byte";
-  case TYPE_KIND_CHAR:
-    return "char";
-  case TYPE_KIND_SHORT:
-    return "short";
-  case TYPE_KIND_INT:
-    return "int";
-  case TYPE_KIND_LONG:
-    return "long";
-  case TYPE_KIND_FLOAT:
-    return "float";
-  case TYPE_KIND_DOUBLE:
-    return "double";
-  case TYPE_KIND_VOID:
-    return "void";
-  case TYPE_KIND_REFERENCE:
-    return "<reference>";
-  }
-  UNREACHABLE();
-}
-
-char *class_info_entry_to_string(cp_kind kind, const cp_class_info *ent) {
-  char const *start;
-  switch (kind) {
-  case CP_KIND_CLASS:
-    start = "Class: ";
-    break;
-  case CP_KIND_MODULE:
-    start = "Module: ";
-    break;
-  case CP_KIND_PACKAGE:
-    start = "Package: ";
-    break;
-  default:
-    UNREACHABLE();
-  }
-
-  char result[1000];
-  snprintf(result, sizeof(result), "%s%.*s", start, ent->name.len, ent->name.chars);
-  return strdup(result);
-}
-
-char *name_and_type_entry_to_string(const cp_name_and_type *name_and_type) {
-  char result[1000];
-  snprintf(result, sizeof(result), "NameAndType: %.*s:%.*s", name_and_type->name.len, name_and_type->name.chars,
-           name_and_type->descriptor.len, name_and_type->descriptor.chars);
-  return strdup(result);
-}
-
-char *indy_entry_to_string(const cp_indy_info *indy_info) {
-  char *name_and_type = name_and_type_entry_to_string(indy_info->name_and_type); // TODO add bootstrap method
-  return name_and_type;
-}
-
-/**
- * Convert the constant pool entry to an owned string.
- */
-char *constant_pool_entry_to_string(const cp_entry *ent) {
-  char result[200];
-  switch (ent->kind) {
-  case CP_KIND_INVALID:
-    return strdup("<invalid>");
-  case CP_KIND_UTF8:
-    return strndup(ent->utf8.chars, ent->utf8.len);
-  case CP_KIND_INTEGER:
-    snprintf(result, sizeof(result), "%" PRId64, ent->integral.value);
-    break;
-  case CP_KIND_FLOAT:
-    snprintf(result, sizeof(result), "%.9gf", (float)ent->floating.value);
-    break;
-  case CP_KIND_LONG:
-    snprintf(result, sizeof(result), "%" PRId64 "L", ent->integral.value);
-    break;
-  case CP_KIND_DOUBLE:
-    snprintf(result, sizeof(result), "%.15gd", (float)ent->floating.value);
-    break;
-  case CP_KIND_MODULE:
-    [[fallthrough]];
-  case CP_KIND_PACKAGE:
-    [[fallthrough]];
-  case CP_KIND_CLASS:
-    return class_info_entry_to_string(ent->kind, &ent->class_info);
-  case CP_KIND_STRING: {
-    snprintf(result, sizeof(result), "String: '%.*s'", ent->string.chars.len, ent->string.chars.chars);
-    break;
-  }
-  case CP_KIND_FIELD_REF: {
-    char *class_name = class_info_entry_to_string(CP_KIND_CLASS, ent->field.class_info);
-    char *field_name = name_and_type_entry_to_string(ent->field.nat);
-
-    snprintf(result, sizeof(result), "FieldRef: %s.%s", class_name, field_name);
-    free(class_name);
-    free(field_name);
-    break;
-  }
-  case CP_KIND_METHOD_REF:
-  case CP_KIND_INTERFACE_METHOD_REF: {
-    char *class_name = class_info_entry_to_string(CP_KIND_CLASS, ent->field.class_info);
-    char *field_name = name_and_type_entry_to_string(ent->field.nat);
-    snprintf(result, sizeof(result), "%s: %s; %s", ent->kind == CP_KIND_METHOD_REF ? "MethodRef" : "InterfaceMethodRef",
-             class_name, field_name);
-    free(class_name);
-    free(field_name);
-    break;
-  }
-  case CP_KIND_NAME_AND_TYPE: {
-    return name_and_type_entry_to_string(&ent->name_and_type);
-  }
-  case CP_KIND_METHOD_HANDLE: {
-    return strdup("<method handle>"); // TODO
-  }
-  case CP_KIND_METHOD_TYPE: {
-    return strdup("<method type>"); // TODO
-  }
-  case CP_KIND_INVOKE_DYNAMIC:
-    return indy_entry_to_string(&ent->indy_info);
-  case CP_KIND_DYNAMIC_CONSTANT:
-    return indy_entry_to_string(&ent->indy_info);
-  }
-  return strdup(result);
-}
-
-int method_argc(const cp_method *method) {
-  bool nonstatic = !(method->access_flags & ACCESS_STATIC);
-  return method->descriptor->args_count + (nonstatic ? 1 : 0);
-}
-
-heap_string insn_to_string(const bytecode_insn *insn, int insn_index) {
-  heap_string result = make_heap_str(10);
-  int write = 0;
-  write = build_str(&result, write, "%04d = pc %04d: ", insn_index, insn->original_pc);
-  write = build_str(&result, write, "%s ", insn_code_name(insn->kind));
-  if (insn->kind <= insn_swap) {
-    // no operands
-  } else if (insn->kind <= insn_ldc2_w) {
-    // indexes into constant pool
-    char *cp_str = constant_pool_entry_to_string(insn->cp);
-    write = build_str(&result, write, "%s", cp_str);
-    free(cp_str);
-  } else if (insn->kind <= insn_astore) {
-    // indexes into local variables
-    write = build_str(&result, write, "#%d", insn->index);
-  } else if (insn->kind <= insn_ifnull) {
-    // indexes into the instruction array
-    write = build_str(&result, write, "inst %d", insn->index);
-  } else if (insn->kind == insn_lconst || insn->kind == insn_iconst) {
-    write = build_str(&result, write, "%" PRId64, insn->integer_imm);
-  } else if (insn->kind == insn_dconst || insn->kind == insn_fconst) {
-    write = build_str(&result, write, "%.15g", insn->f_imm);
-  } else if (insn->kind == insn_tableswitch) {
-    write = build_str(&result, write, "[ default -> %d", insn->tableswitch->default_target);
-    for (int i = 0, j = insn->tableswitch->low; i < insn->tableswitch->targets_count; ++i, ++j) {
-      write = build_str(&result, write, ", %d -> %d", j, insn->tableswitch->targets[i]);
-    }
-    write = build_str(&result, write, " ]");
-  } else if (insn->kind == insn_lookupswitch) {
-    write = build_str(&result, write, "[ default -> %d", insn->lookupswitch->default_target);
-    for (int i = 0; i < insn->lookupswitch->targets_count; ++i) {
-      write = build_str(&result, write, ", %d -> %d", insn->lookupswitch->keys[i], insn->lookupswitch->targets[i]);
-    }
-    write = build_str(&result, write, " ]");
-  } else {
-    // TODO
-  }
-  return result;
-}
-
-heap_string code_attribute_to_string(const attribute_code *attrib) {
-  heap_string result = make_heap_str(1000);
-  int write = 0;
-  for (int i = 0; i < attrib->insn_count; ++i) {
-    heap_string insn_str = insn_to_string(attrib->code + i, i);
-    write = build_str(&result, write, "%.*s\n", fmt_slice(insn_str));
-  }
-  return result;
-}
-
-char *print_analy_stack_state(const analy_stack_state *state) {
+// Print the stack state in a human-readable format.
+static char *print_analy_stack_state(const analy_stack_state *state) {
   char buf[1000], *end = buf + 1000;
   char *write = buf;
   write = stpncpy(write, "[ ", end - write);
-  for (int i = 0; i < state->entries_count; ++i) {
+  for (int i = 0; i < state->count; ++i) {
     write = stpncpy(write, type_kind_to_string(state->entries[i].type), end - write);
-    if (i + 1 < state->entries_count)
+    if (i + 1 < state->count)
       write = stpncpy(write, ", ", end - write);
   }
   write = stpncpy(write, " ]", end - write);
   return strdup(buf);
 }
 
-/**
- * Copy the stack state in st to the (possibly already allocated) stack state in
- * out.
- */
-void copy_analy_stack_state(analy_stack_state st, analy_stack_state *out) {
-  if (out->entries_cap < st.entries_count || !out->entries) {
-    out->entries_cap = st.entries_count + 2 /* we'll probably push more */;
-    out->entries = realloc(out->entries, out->entries_cap * sizeof(analy_stack_entry));
-    DCHECK(out->entries);
-  }
-  memcpy(out->entries, st.entries, st.entries_count * sizeof(analy_stack_entry));
-  out->entries_count = st.entries_count;
-}
+// Whether the type kind takes up two formal slots.
+static bool is_kind_wide(type_kind kind) { return kind == TYPE_KIND_LONG || kind == TYPE_KIND_DOUBLE; }
 
-bool is_kind_wide(type_kind kind) { return kind == TYPE_KIND_LONG || kind == TYPE_KIND_DOUBLE; }
+// Whether the field takes up two formal slots.
+static bool is_field_wide(field_descriptor desc) { return is_kind_wide(desc.base_kind) && !desc.dimensions; }
 
-bool is_field_wide(field_descriptor desc) { return is_kind_wide(desc.base_kind) && !desc.dimensions; }
-
+// Write matching stack entries into the compressed bitset.
 void write_kinds_to_bitset(const analy_stack_state *inferred_stack, int offset, compressed_bitset *compressed_bitset,
                            type_kind test) {
-  for (int i = 0; i < inferred_stack->entries_count; ++i) {
+  for (int i = 0; i < inferred_stack->count; ++i) {
     if (inferred_stack->entries[i].type == test)
       test_set_compressed_bitset(compressed_bitset, offset + i);
   }
@@ -488,7 +90,7 @@ int locals_on_method_entry(const cp_method *method, analy_stack_state *locals, i
     (*locals_swizzle)[0] = 0; // map 0 -> 0
     locals->entries[j++] = this_source();
   }
-  locals->entries_cap = locals->entries_count = max_locals;
+  locals->entries_cap = locals->count = max_locals;
   for (; i < desc->args_count && j < max_locals; ++i, ++j) {
     field_descriptor arg = desc->args[i];
     int swizzled = i + !is_static;
@@ -532,9 +134,9 @@ struct method_analysis_ctx {
 // Pop a value from the analysis stack and return it.
 #define POP_VAL                                                                                                        \
   ({                                                                                                                   \
-    if (ctx->stack.entries_count == 0)                                                                                 \
+    if (ctx->stack.count == 0)                                                                                 \
       goto stack_underflow;                                                                                            \
-    ctx->stack.entries[--ctx->stack.entries_count];                                                                    \
+    ctx->stack.entries[--ctx->stack.count];                                                                    \
   })
 // Pop a value from the analysis stack and assert its kind.
 #define POP_KIND(kind)                                                                                                 \
@@ -547,10 +149,10 @@ struct method_analysis_ctx {
 // Push a kind to the analysis stack.
 #define PUSH_ENTRY(kind)                                                                                               \
   {                                                                                                                    \
-    if (ctx->stack.entries_count == ctx->stack.entries_cap)                                                            \
+    if (ctx->stack.count == ctx->stack.entries_cap)                                                            \
       goto stack_overflow;                                                                                             \
     if (kind.type != TYPE_KIND_VOID) {                                                                                 \
-      ctx->stack.entries[ctx->stack.entries_count++] = kind;                                                           \
+      ctx->stack.entries[ctx->stack.count++] = kind;                                                           \
       if (kind.type == 0)                                                                                              \
         UNREACHABLE();                                                                                                 \
     }                                                                                                                  \
@@ -586,17 +188,11 @@ int push_branch_target(struct method_analysis_ctx *ctx, u32 curr, u32 target) {
 }
 
 void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind *reduced) {
-  if (ctx->stack.entries_count == 0) {
+  if (ctx->stack.count == 0) {
     *reduced = TOS_VOID;
   } else {
-    switch (ctx->stack.entries[ctx->stack.entries_count - 1].type) {
-    case TYPE_KIND_BOOLEAN:
-    case TYPE_KIND_CHAR:
-    case TYPE_KIND_BYTE:
-    case TYPE_KIND_SHORT:
-    case TYPE_KIND_INT:
-    case TYPE_KIND_LONG:
-    case TYPE_KIND_REFERENCE:
+    switch (ctx->stack.entries[ctx->stack.count - 1].type) {
+    default:
       *reduced = TOS_INT;
       break;
     case TYPE_KIND_FLOAT:
@@ -671,14 +267,14 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     ctx->stack_terminated = true;
     break;
   case insn_dup: {
-    if (ctx->stack.entries_count == 0)
+    if (ctx->stack.count == 0)
       goto stack_underflow;
-    analy_stack_entry kind = ctx->stack.entries[ctx->stack.entries_count - 1];
+    analy_stack_entry kind = ctx->stack.entries[ctx->stack.count - 1];
     PUSH_ENTRY(kind)
     break;
   }
   case insn_dup_x1: {
-    if (ctx->stack.entries_count <= 1)
+    if (ctx->stack.count <= 1)
       goto stack_underflow;
     analy_stack_entry kind1 = POP_VAL, kind2 = POP_VAL;
     if (is_kind_wide(kind1.type) || is_kind_wide(kind2.type))
@@ -1208,12 +804,12 @@ static type_kind validation_type_kind_to_representation(stack_map_frame_validati
 }
 
 void use_stack_map_frame(struct method_analysis_ctx *ctx, const stack_map_frame_iterator *iter) {
-  ctx->stack.entries_count = iter->stack_size;
+  ctx->stack.count = iter->stack_size;
   for (int i = 0; i < iter->stack_size; ++i) {
     ctx->stack.entries[i].type = validation_type_kind_to_representation(iter->stack[i].kind);
   }
   // First set all locals to void
-  for (int i = 0; i < ctx->locals.entries_count; ++i) {
+  for (int i = 0; i < ctx->locals.count; ++i) {
     ctx->locals.entries[i].type = TYPE_KIND_VOID;
   }
   // Then use iterator locals, but don't forget to swizzle
@@ -1222,6 +818,53 @@ void use_stack_map_frame(struct method_analysis_ctx *ctx, const stack_map_frame_
   }
 }
 
+void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack, stack_variable_source *a, stack_variable_source *b) {
+  int sd = stack->count;
+  switch (insn->kind) {
+  case insn_putfield:
+  case insn_aaload:
+  case insn_baload:
+  case insn_caload:
+  case insn_faload:
+  case insn_iaload:
+  case insn_daload:
+  case insn_laload:
+  case insn_saload: {
+    *a = stack->entries[sd - 2].source;
+    *b = stack->entries[sd - 1].source;
+    break;
+  }
+  case insn_aastore:
+  case insn_bastore:
+  case insn_castore:
+  case insn_fastore:
+  case insn_dastore:
+  case insn_iastore:
+  case insn_lastore:
+  case insn_sastore: {
+    *a = stack->entries[sd - 3].source; // trying to store into a null array
+    *b = stack->entries[sd - 2].source;
+    break;
+  }
+  case insn_invokevirtual:
+  case insn_invokeinterface:
+  case insn_invokespecial: { // Trying to invoke on an object
+    int argc = insn->cp->methodref.descriptor->args_count;
+    *a = stack->entries[sd - argc].source;
+    break;
+  }
+  case insn_arraylength:
+  case insn_athrow:
+  case insn_monitorenter:
+  case insn_monitorexit:
+  case insn_getfield: {
+    *a = stack->entries[sd - 1].source;
+    break;
+  }
+  default:
+    break;
+  }
+}
 /**
  * Analyze the method's code attribute if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
@@ -1229,6 +872,7 @@ void use_stack_map_frame(struct method_analysis_ctx *ctx, const stack_map_frame_
  */
 int analyze_method_code(cp_method *method, heap_string *error) {
   attribute_code *code = method->code;
+  arena *arena = &method->my_class->arena;
   if (!code || method->code_analysis) {
     return 0;
   }
@@ -1245,14 +889,15 @@ int analyze_method_code(cp_method *method, heap_string *error) {
   ctx.stack.entries_cap = code->max_stack + 1;
 
   // After jumps, we can infer the stack and locals at these points
-  u16 *insn_index_to_stack_depth = calloc(code->insn_count, sizeof(u16));
+  u16 *insn_index_to_stack_depth = arena_alloc(arena, code->insn_count, sizeof(u16));
 
-  if (code->local_variable_table) {
-    for (int i = 0; i < code->local_variable_table->entries_count; ++i) {
-      attribute_lvt_entry *ent = &code->local_variable_table->entries[i];
+  auto lvt = code->local_variable_table;
+  if (lvt) {
+    for (int i = 0; i < lvt->entries_count; ++i) {
+      attribute_lvt_entry *ent = &lvt->entries[i];
       if (ent->index >= code->max_locals) {
         result = -1;
-        goto invalid_vt;
+        goto inval;
       }
       ent->index = ctx.locals_swizzle[ent->index];
     }
@@ -1267,12 +912,10 @@ int analyze_method_code(cp_method *method, heap_string *error) {
 
   analy->insn_count = code->insn_count;
   analy->dominator_tree_computed = false;
-  for (int i = 0; i < 5; ++i) {
-    analy->insn_index_to_kinds[i] = calloc(code->insn_count, sizeof(compressed_bitset));
-  }
   analy->blocks = nullptr;
-  analy->insn_index_to_stack_depth = insn_index_to_stack_depth;
-  analy->sources = calloc(code->insn_count, sizeof(*analy->sources));
+  analy->insn_index_to_sd = insn_index_to_stack_depth;
+  analy->sources = arena_alloc(arena, code->insn_count, sizeof(*analy->sources));
+  analy->stack_states = arena_alloc(arena, code->insn_count, sizeof(stack_summary *));
 
   for (int i = 0; i < code->insn_count; ++i) {
     bytecode_insn *insn = &code->code[i];
@@ -1284,92 +927,35 @@ int analyze_method_code(cp_method *method, heap_string *error) {
           *error = make_heap_str(strlen(c_str_error));
           strncpy(error->chars, c_str_error, error->len);
           result = -1;
-          goto invalid_vt;
+          goto inval;
         }
       }
     }
 
-    stack_variable_source a = {}, b = {};
     analy_stack_state *stack = &ctx.stack;
-    int sd = stack->entries_count;
 
     // Instructions that can intrinsically raise NPE
-    switch (insn->kind) {
-    case insn_aload:
-    case insn_iload:
-    case insn_lload:
-    case insn_fload:
-    case insn_dload:
-    case insn_astore:
-    case insn_istore:
-    case insn_lstore:
-    case insn_fstore:
-    case insn_dstore:
-      break;
-    case insn_putfield:
-    case insn_aaload:
-    case insn_baload:
-    case insn_caload:
-    case insn_faload:
-    case insn_iaload:
-    case insn_daload:
-    case insn_laload:
-    case insn_saload: {
-      a = stack->entries[sd - 2].source;
-      b = stack->entries[sd - 1].source;
-      break;
-    }
-    case insn_aastore:
-    case insn_bastore:
-    case insn_castore:
-    case insn_fastore:
-    case insn_dastore:
-    case insn_iastore:
-    case insn_lastore:
-    case insn_sastore: {
-      a = stack->entries[sd - 3].source; // trying to store into a null array
-      b = stack->entries[sd - 2].source;
-      break;
-    }
-    case insn_invokevirtual:
-    case insn_invokeinterface:
-    case insn_invokespecial: { // Trying to invoke on an object
-      int argc = insn->cp->methodref.descriptor->args_count;
-      a = stack->entries[sd - argc].source;
-      break;
-    }
-    case insn_arraylength:
-    case insn_athrow:
-    case insn_monitorenter:
-    case insn_monitorexit:
-    case insn_getfield: {
-      a = stack->entries[sd - 1].source;
-      break;
-    }
-    default:
-      break;
-    }
-    analy->sources[i].a = a;
-    analy->sources[i].b = b;
+    write_npe_sources(insn, stack, &analy->sources[i].a, &analy->sources[i].b);
 
-    insn_index_to_stack_depth[i] = stack->entries_count;
-
-    for (int j = 0; j < 5; ++j) {
-      type_kind order[5] = {TYPE_KIND_REFERENCE, TYPE_KIND_INT, TYPE_KIND_FLOAT, TYPE_KIND_DOUBLE, TYPE_KIND_LONG};
-      compressed_bitset *bitset = analy->insn_index_to_kinds[j] + i;
-      init_compressed_bitset(bitset, code->max_stack + code->max_locals);
-
-      write_kinds_to_bitset(&ctx.stack, 0, bitset, order[j]);
-      write_kinds_to_bitset(&ctx.locals, code->max_stack, bitset, order[j]);
-    }
+    insn_index_to_stack_depth[i] = stack->count;
+    size_t summary_size = sizeof(stack_summary) + (stack->count + ctx.locals.count) * sizeof(type_kind);
+    stack_summary *summary = arena_alloc(arena, 1, summary_size);
+    analy->stack_states[i] = summary;
+    
+    summary->locals = ctx.locals.count;
+    summary->stack = stack->count;
+    for (int summary_i = 0; summary_i < stack->count; ++summary_i)
+      summary->entries[summary_i] = stack->entries[summary_i].type;
+    for (int j = 0; j < ctx.locals.count; ++j)
+      summary->entries[stack->count + j] = ctx.locals.entries[j].type;
 
     if (analyze_instruction(insn, i, &ctx)) {
       result = -1;
-      goto invalid_vt;
+      goto inval;
     }
   }
 
-invalid_vt:
+inval:
   stack_map_frame_iterator_uninit(&iter);
   free(ctx.stack.entries);
   free(ctx.locals.entries);
@@ -1382,13 +968,6 @@ invalid_vt:
 void free_code_analysis(code_analysis *analy) {
   if (!analy)
     return;
-  if (analy->insn_index_to_references) {
-    for (int j = 0; j < 5; ++j) {
-      for (int i = 0; i < analy->insn_count; ++i)
-        free_compressed_bitset(analy->insn_index_to_kinds[j][i]);
-      free(analy->insn_index_to_kinds[j]);
-    }
-  }
   if (analy->blocks) {
     for (int i = 0; i < analy->block_count; ++i) {
       arrfree(analy->blocks[i].next);
@@ -1398,8 +977,6 @@ void free_code_analysis(code_analysis *analy) {
     }
     free(analy->blocks);
   }
-  free(analy->sources);
-  free(analy->insn_index_to_stack_depth);
   free(analy);
 }
 
@@ -1780,15 +1357,7 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       break;
     }
     case insn_getfield:
-    case insn_getfield_B:
-    case insn_getfield_C:
-    case insn_getfield_S:
-    case insn_getfield_I:
-    case insn_getfield_J:
-    case insn_getfield_F:
-    case insn_getfield_D:
-    case insn_getfield_Z:
-    case insn_getfield_L: {
+    case insn_getfield_B ... insn_getfield_L: {
       // <a>.name or just "name" if a can't be resolved
       int err = extended_npe_phase2(method, &analy->sources[index].a, index, builder, false);
       if (!err) {
@@ -1797,15 +1366,7 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       string_builder_append(builder, "%.*s", fmt_slice(insn->cp->field.nat->name));
       break;
     case insn_getstatic:
-    case insn_getstatic_B:
-    case insn_getstatic_C:
-    case insn_getstatic_S:
-    case insn_getstatic_I:
-    case insn_getstatic_J:
-    case insn_getstatic_F:
-    case insn_getstatic_D:
-    case insn_getstatic_Z:
-    case insn_getstatic_L: {
+    case insn_getstatic_B ... insn_getstatic_L: {
       // Class.name
       string_builder_append(builder, "%.*s.%.*s", fmt_slice(insn->cp->field.class_info->name),
                             fmt_slice(insn->cp->field.nat->name));
@@ -1891,27 +1452,11 @@ int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result) {
     CASE(insn_monitorenter, "Cannot enter synchronized block")
     CASE(insn_monitorexit, "Cannot exit synchronized block")
   case insn_getfield:
-  case insn_getfield_B:
-  case insn_getfield_C:
-  case insn_getfield_S:
-  case insn_getfield_I:
-  case insn_getfield_J:
-  case insn_getfield_F:
-  case insn_getfield_D:
-  case insn_getfield_Z:
-  case insn_getfield_L:
+  case insn_getfield_B ... insn_getfield_L:
     string_builder_append(&builder, "Cannot read field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
     break;
   case insn_putfield:
-  case insn_putfield_B:
-  case insn_putfield_C:
-  case insn_putfield_S:
-  case insn_putfield_I:
-  case insn_putfield_J:
-  case insn_putfield_F:
-  case insn_putfield_D:
-  case insn_putfield_Z:
-  case insn_putfield_L:
+  case insn_putfield_B ... insn_putfield_L:
     string_builder_append(&builder, "Cannot assign field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
     break;
   case insn_invokevirtual:

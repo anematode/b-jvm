@@ -124,7 +124,7 @@ u16 stack_depth(const stack_frame *frame) {
     return 0;
   code_analysis *analy = frame->method->code_analysis;
   DCHECK(pc < analy->insn_count);
-  return analy->insn_index_to_stack_depth[pc];
+  return analy->insn_index_to_sd[pc];
 }
 
 value *get_native_args(const stack_frame *frame) {
@@ -355,20 +355,7 @@ stack_frame *push_frame(vm_thread *thread, cp_method *method, stack_value *args,
 }
 
 const char *infer_type(code_analysis *analysis, int insn, int index) {
-  compressed_bitset refs = analysis->insn_index_to_references[insn], ints = analysis->insn_index_to_ints[insn],
-                    floats = analysis->insn_index_to_floats[insn], doubles = analysis->insn_index_to_doubles[insn],
-                    longs = analysis->insn_index_to_longs[insn];
-  if (test_compressed_bitset(refs, index))
-    return "ref";
-  if (test_compressed_bitset(ints, index))
-    return "int";
-  if (test_compressed_bitset(floats, index))
-    return "float";
-  if (test_compressed_bitset(doubles, index))
-    return "double";
-  if (test_compressed_bitset(longs, index))
-    return "long";
-  return "void";
+  return type_kind_to_string(analysis->stack_states[insn]->entries[index]);
 }
 
 void dump_frame(FILE *stream, const stack_frame *frame) {

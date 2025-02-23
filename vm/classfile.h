@@ -264,6 +264,8 @@ typedef enum : u8 {
 
 #define MAX_INSN_KIND (insn_sqrt + 1)
 
+// The four top-of-stack kinds considered by the interpreter. (All integer types, including long and reference, are
+// merged into one.)
 typedef enum : u8 {
   TOS_VOID = 0,
   TOS_DOUBLE = 1,
@@ -626,7 +628,7 @@ typedef struct bytecode_insn {
     classdesc *classdesc;
   };
 
-  // Per-instruction inline cache data
+  // Per-instruction inline cache data (various uses depending on the instruction)
   void *ic;
   void *ic2;
 } bytecode_insn;
@@ -872,6 +874,17 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @param error Where to write the error string. If nullptr, error is ignored.
  */
 parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, heap_string *error);
+
+
+// Implemented in pretty_print.c
+
+const char *insn_code_to_string(insn_code_kind code);
+const char *type_kind_to_string(type_kind kind);
+char *cp_class_info_to_string(cp_kind kind, const cp_class_info *ent);
+char *cp_name_and_type_to_string(const cp_name_and_type *name_and_type);
+char *cp_indy_info_to_string(const cp_indy_info *indy_info);
+char *cp_entry_to_string(const cp_entry *ent);
+heap_string code_attribute_to_string(const attribute_code *attrib);
 
 #ifdef __cplusplus
 }

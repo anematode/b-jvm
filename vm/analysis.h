@@ -65,6 +65,13 @@ typedef struct {
   variable_source_kind kind;
 } stack_variable_source;
 
+// Summary of the state of the stack and locals at a given PC. Used by the GC.
+typedef struct {
+  u16 stack;
+  u16 locals;
+  type_kind entries[];  // first 'stack' entries, then 'locals' entries
+} stack_summary;
+
 // Result of the analysis of a code segment. During analysis, stack operations
 // on longs/doubles are simplified as if they only took up one stack slot (e.g.,
 // pop2 on a double becomes a pop, while pop2 on two ints stays as a pop2).
@@ -72,18 +79,11 @@ typedef struct {
 // table at each program counter, and store a bitset of which stack/local
 // variables are references, so that the GC can follow them.
 typedef struct code_analysis {
-  union {
-    // For each of these, the first max_stack bits are stack, and the rest are locals.
-    compressed_bitset *insn_index_to_references;
-    compressed_bitset *insn_index_to_ints;
-    compressed_bitset *insn_index_to_floats;
-    compressed_bitset *insn_index_to_doubles;
-    compressed_bitset *insn_index_to_longs;
+  // For each instruction, the simplified state of the stack and local variables at that instruction
+  stack_summary **stack_states;
 
-    compressed_bitset *insn_index_to_kinds[5];
-  };
-
-  u16 *insn_index_to_stack_depth;
+  // For each instruction, the stack depth at that instruction
+  u16 *insn_index_to_sd;
   int insn_count;
 
   // For each instruction that might participate in extended NPE message resolution,
@@ -115,8 +115,6 @@ void dump_cfg_to_graphviz(FILE *out, const code_analysis *analysis);
 bool query_dominance(const basic_block *dominator, const basic_block *dominated);
 // Try to reduce the CFG and mark the edges/blocks accordingly.
 int attempt_reduce_cfg(code_analysis *analy);
-const char *insn_code_name(insn_code_kind code);
-
 int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result);
 
 #ifdef __cplusplus

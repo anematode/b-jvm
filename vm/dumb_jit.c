@@ -148,22 +148,7 @@ static int _get_stack_slot(int stack_i, wasm_value_type type) {
 }
 
 static wasm_value_type type_at(int slot) {
-  if (test_compressed_bitset(ctx->analysis->insn_index_to_ints[ctx->curr_pc], slot)) {
-    return WASM_TYPE_KIND_INT32;
-  }
-  if (test_compressed_bitset(ctx->analysis->insn_index_to_references[ctx->curr_pc], slot)) {
-    return WASM_TYPE_KIND_INT32;
-  }
-  if (test_compressed_bitset(ctx->analysis->insn_index_to_floats[ctx->curr_pc], slot)) {
-    return WASM_TYPE_KIND_FLOAT32;
-  }
-  if (test_compressed_bitset(ctx->analysis->insn_index_to_doubles[ctx->curr_pc], slot)) {
-    return WASM_TYPE_KIND_FLOAT64;
-  }
-  if (test_compressed_bitset(ctx->analysis->insn_index_to_longs[ctx->curr_pc], slot)) {
-    return WASM_TYPE_KIND_INT64;
-  }
-  return WASM_TYPE_KIND_VOID;
+  return to_wasm_type(ctx->analysis->stack_states[ctx->curr_pc]->entries[slot]);
 }
 
 static int get_frame_local() {
@@ -268,7 +253,7 @@ static void emit(expression expr) { arrput(ctx->building, expr); }
 
 static expression thread_param() { return wasm_local_get(ctx->module, 0, wasm_int32()); }
 
-static expression set_pc() {
+[[maybe_unused]] static expression set_pc() {
   return nullptr;
   /*
   return wasm_store(ctx->module, WASM_OP_KIND_I32_STORE, get_frame(),
@@ -276,6 +261,7 @@ static expression set_pc() {
 }
 
 static expression spill_or_reload_oops(int max_stack_i, bool is_reload) {
+#if 0
   int spill_i = 0;
   compressed_bitset bs = ctx->analysis->insn_index_to_references[ctx->curr_pc];
   int *vec = nullptr;
@@ -303,6 +289,8 @@ static expression spill_or_reload_oops(int max_stack_i, bool is_reload) {
   arrfree(vec);
   ctx->pc_to_oops->count[ctx->curr_pc] = spill_i;
   return block;
+#endif
+  return nullptr;
 }
 
 static expression spill_oops(int max_stack_i) { return spill_or_reload_oops(max_stack_i, false); }
@@ -1703,7 +1691,7 @@ expression compile_bb(basic_block *bb) {
   // Go instruction by instruction, if an instruction returns -1 then we're done
   ctx->building = nullptr;
   ctx->curr_pc = bb->start_index;
-  ctx->curr_sd = ctx->analysis->insn_index_to_stack_depth[ctx->curr_pc];
+  ctx->curr_sd = ctx->analysis->insn_index_to_sd[ctx->curr_pc];
   CHECK(bb->insn_count > 0);
   for (int i = 0; i < bb->insn_count; ++i) {
     const bytecode_insn *insn = bb->start + i;
