@@ -579,7 +579,6 @@ typedef struct vm_thread {
   // TODO make this a linked list to accommodate arbitrary # of handles
   handle *handles;
   int handles_capacity;
-
   // Handle for null
   handle null_handle;
 
@@ -588,19 +587,18 @@ typedef struct vm_thread {
   u32 fuel;
   // ... if the current time is past this value
   u64 yield_at_time;
-
   s32 tid;
 
   // Allocation for the refuel_check wakeup info
   void *refuel_wakeup_info;
-
-  // Thread-local allocation buffer (objects are first created here)
 
   // Whether this thread is currently being debugged, AND the debugger should be consulted after the execution of
   // every bytecode instruction.
   bool is_single_stepping;
   // Whether this thread is currently paused in the debugger
   bool paused_in_debugger;
+
+  void *profiler;  // active profiler, if any. Before thread exit, the profiler is terminated.
 } vm_thread;
 
 handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file, int line_no);

@@ -24,8 +24,6 @@ add_library(vm OBJECT ${bjvm_SRC})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(vm PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 
-target_compile_options(vm PRIVATE -fno-strict-aliasing)
-
 set_source_files_properties(
         interpreter2.c
         PROPERTIES
@@ -41,7 +39,7 @@ if (NOT EMSCRIPTEN)
 else ()
     # DO NOT USE -O3 FOR EMSCRIPTEN. IT BREAKS THE POST-PROCESSOR BECAUSE IT MANGLES NAMES. IT ALSO BLOATS
     # THE BINARY.
-    target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-mtail-call" "-O2")
+    target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-mtail-call" "-O2" "-pthread" "-matomics")
     target_link_options(vm PUBLIC "-sUSE_ZLIB" "-Wl,--whole-archive")
 endif ()
 

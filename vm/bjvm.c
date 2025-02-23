@@ -24,6 +24,7 @@
 #include <jit_allocator.h>
 #include <linkage.h>
 #include <monitors.h>
+#include <profiler.h>
 #include <sys/mman.h>
 
 /// Looks up a class and initializes it if it needs to be initialized.
@@ -858,6 +859,8 @@ static void init_unsafe_constants(vm_thread *thread) {
   set_static_field(unaligned_access, (stack_value){.i = 1});
 }
 
+#define PROFILE_STARTUP 0  // if 1, prints out profiler data for startup
+
 vm_thread *create_main_thread(vm *vm, thread_options options) {
   vm_thread *thr = calloc(1, sizeof(vm_thread));
   arrput(vm->active_threads, thr);
@@ -873,6 +876,10 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
   thr->tid = vm->next_tid++;
 
   bool initializing = !vm->vm_initialized;
+
+#if PROFILE_STARTUP
+  profiler *prof = launch_profiler(thr);
+#endif
 
   if (initializing) {
     vm->vm_initialized = true;
@@ -956,6 +963,14 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
     vm->vm_initialized = true;
   }
 
+#if PROFILE_STARTUP
+  char *profiler_data = read_profiler(prof);
+  if (profiler_data) {
+    printf("Profiler data: %s\n", profiler_data);
+    free(profiler_data);
+  }
+#endif
+
   thr->current_exception = nullptr;
   return thr;
 }
@@ -1004,6 +1019,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
     cp_method *method;
     stack_value ret;
     for (uint_fast8_t i = 0; i < sizeof(phases) / sizeof(*phases); i++) {
+      if (i == 1) continue;
       method = method_lookup(cached_classes(vm)->system, phases[i], signatures[i], false, false);
       assert(method);
       stack_value args[2] = {{.i = 1}, {.i = 1}};
@@ -1053,6 +1069,8 @@ static void remove_thread_from_vm_list(vm_thread *thread) {
 
 void free_thread(vm_thread *thread) {
   // TODO remove from the VM
+
+  finish_profiler(thread->profiler); // no-op if no profiler is active
 
   free(thread->stack.async_call_stack);
   arrfree(thread->stack.frames);

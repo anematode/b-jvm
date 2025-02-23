@@ -299,8 +299,10 @@ extern int64_t __interpreter_intrinsic_next_double(ARGS_DOUBLE);
 extern int64_t __interpreter_intrinsic_next_float(ARGS_FLOAT);
 
 // Call the bytecode implementation through a funcref table. This prevents inlining by the runtime and regalloc from
-// dying.
-extern int64_t __interpreter_intrinsic_notco_call_outlined(ARGS_VOID, int index);
+// dying. TODO reimplement
+int64_t __interpreter_intrinsic_notco_call_outlined(ARGS_VOID, int index) {
+  return bytecode_tables[index & 3][index >> 2](thread, frame, insns, pc_, sp_, arg_1, arg_2, arg_3);
+}
 
 // These point into .rodata and are used to recover the function pointers for the funcref jump tables.
 EMSCRIPTEN_KEEPALIVE

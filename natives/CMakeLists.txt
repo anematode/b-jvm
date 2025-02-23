@@ -11,6 +11,7 @@ add_classes_root("share")
 
 if (EMSCRIPTEN)
     add_classes_root("emscripten")
+    target_compile_options(natives PRIVATE "-matomics")
 endif ()
 
 if (UNIX)

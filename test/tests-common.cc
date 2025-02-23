@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <profiler.h>
 #include <string>
 #include <vector>
 
