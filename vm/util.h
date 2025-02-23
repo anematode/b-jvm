@@ -55,7 +55,7 @@ extern "C" {
 
 /// Checks the condition is true;  if not, optionally prints a message and aborts.
 /// This check is removed in release builds.
-#if DCHECKS_ENABLED
+#if 1
 #define DCHECK(condition, ...)                                                                                         \
   do {                                                                                                                 \
     if (!(condition)) {                                                                                                \

@@ -41,7 +41,7 @@ void init_function_builder(wasm_module *module, function_builder *builder, const
 [[maybe_unused]] static int fb_new_local(function_builder *builder, wasm_value_type local) {
   int local_i = builder->next_local++;
   arrput(builder->locals, local);
-  DCHECK(arrlen(builder->locals) + arrlen(builder->params) == local_i);
+  DCHECK(arrlen(builder->locals) + arrlen(builder->params) == builder->next_local);
   return local_i;
 }
 
@@ -176,7 +176,11 @@ static int get_frame_local() {
 
 static expression get_frame() { return wasm_local_get(ctx->module, get_frame_local(), wasm_int32()); }
 
-static expression get_local(int local_i) { return nullptr; }
+static expression get_local(int local_i) {
+  wasm_value_type type = type_at(local_i + ctx->method->code->max_stack);
+  int slot = _get_local_slot(local_i, type);
+  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+}
 
 [[maybe_unused]] static wasm_store_op_kind simple_store_op(wasm_value_type ty) {
   switch (ty) {
@@ -235,9 +239,18 @@ static expression get_stack_slot_of_type(int stack_i, wasm_value_type tk) {
   return nullptr;
 }
 
-static expression get_stack(int stack_i) { return nullptr; }
+static expression get_stack(int stack_i) {
+  wasm_value_type type = type_at(stack_i);
+  int slot = _get_stack_slot(stack_i, type);
+  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+}
 
-static expression get_stack_assert(int stack_i, wasm_value_type type) { return nullptr; }
+static expression get_stack_assert(int stack_i, wasm_value_type expected) {
+  wasm_value_type type = type_at(stack_i);
+  CHECK(type == expected);
+  int slot = _get_stack_slot(stack_i, type);
+  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+}
 
 static expression npe_and_exit() { return nullptr; }
 
@@ -1707,12 +1720,17 @@ expression compile_bb(basic_block *bb) {
 }
 
 dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options) {
+#ifndef EMSCRIPTEN
+  return nullptr;
+#endif
+
   attribute_code *code = method->code;
   code_analysis *analy = method->code_analysis;
 
-  DCHECK(code, "Method has no code");
-  DCHECK(analy, "Method has no code analysis");
+  if (!code || !analy)
+    return nullptr;
 
+  scan_basic_blocks(code, analy);
   compute_dominator_tree(analy);
   int fail = attempt_reduce_cfg(analy);
   if (fail) {

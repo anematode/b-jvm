@@ -32,10 +32,4 @@ typedef struct {
 dumb_jit_result *dumb_jit_compile(cp_method *method, dumb_jit_options options);
 void free_dumb_jit_result(dumb_jit_result *result);
 
-// Create an adapter which converts a method call of the form (thread *, method *, arg1, arg2 ...) into an appropriate
-// call to bjvm_interpret.
-void *create_adapter_to_interpreter(cp_method *method) { return nullptr; }
-
-jit_adapter_t *create_adapter_to_jit(cp_method *method) { return nullptr; }
-
 #endif // DUMB_JIT_H
