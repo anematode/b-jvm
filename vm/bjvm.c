@@ -102,8 +102,9 @@ mark_word_t *get_mark_word(vm *vm, header_word *data) {
 monitor_data *inspect_monitor(header_word *data) { return has_expanded_data(data) ? data->expanded_data : nullptr; }
 
 monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
-  CHECK(!in_heap(thread->vm, obj)); // if you're synchronizing on staticFieldBase, you deserve the chair
-  return bump_allocate(thread, sizeof(monitor_data));
+  CHECK(in_heap(thread->vm, obj)); // if you're synchronizing on staticFieldBase, you deserve the chair
+  monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
+  return data;
 }
 
 #define MAX_CF_NAME_LENGTH 1000
