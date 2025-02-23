@@ -2,6 +2,7 @@
 #include "wasm_trampolines.h"
 #include "doctest/doctest.h"
 #include <wasm/wasm_utils.h>
+#include <array>
 
 TEST_SUITE_BEGIN("[wasm]");
 
