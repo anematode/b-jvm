@@ -44,8 +44,6 @@ if (EMSCRIPTEN)
             -sFORCE_FILESYSTEM=1
             -sALLOW_MEMORY_GROWTH=1 -sALLOW_TABLE_GROWTH=1
             -sWARN_ON_UNDEFINED_SYMBOLS=0
-            -pthread
-            -s PTHREAD_POOL_SIZE=4
             -sEXPORTED_RUNTIME_METHODS=ccall,wasmMemory,cwrap,addFunction,removeFunction,wasmTable,FS,UTF8ToString,getValue,setValue
             )
 
@@ -53,5 +51,5 @@ if (EMSCRIPTEN)
     run_emscripten_postprocess(bjvm_main)
 
     target_link_libraries(bjvm_main PRIVATE bjvm_static)
-    target_link_options(bjvm_main PUBLIC -sWASMFS -sENVIRONMENT=web -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
+    target_link_options(bjvm_main PUBLIC -sWASMFS -sENVIRONMENT=web,worker -sMODULARIZE -sEXPORT_ES6=1 --emit-tsd bjvm_main.d.ts)
 endif ()

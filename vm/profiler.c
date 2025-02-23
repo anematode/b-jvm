@@ -22,7 +22,9 @@ typedef struct profiler_s {
   volatile bool initialized;
   volatile bool finished;
 
+#ifdef PTHREADS_SUPPORTED
   pthread_t pthread;
+#endif
 } profiler;
 
 // The profiler continuously scans the thread->frames and records the methods that are currently being executed.
@@ -168,7 +170,10 @@ void finish_profiler(profiler* prof) {
   }
   prof->thread->profiler = nullptr;
   __atomic_store_n(&prof->waiting_for_exit, 1, __ATOMIC_SEQ_CST);
+
+#ifdef PTHREADS_SUPPORTED
   pthread_join(prof->pthread, nullptr);
+#endif
 }
 
 char *read_profiler(profiler* prof) {
