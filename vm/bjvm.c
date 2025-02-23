@@ -69,9 +69,8 @@ DEFINE_ASYNC(init_cached_classdescs) {
 
     AWAIT(initialize_class, args->thread, self->cached_classdescs[self->i]);
     int result = get_async_result(initialize_class);
-
     if (result != 0) {
-      free(self->cached_classdescs);
+      free(self->cached_classdescs);  // TODO this is not at all safe
       ASYNC_RETURN(result);
     }
   }
@@ -103,15 +102,8 @@ mark_word_t *get_mark_word(vm *vm, header_word *data) {
 monitor_data *inspect_monitor(header_word *data) { return has_expanded_data(data) ? data->expanded_data : nullptr; }
 
 monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
-  if (unlikely(!in_heap(thread->vm, obj))) {
-    // this object is not heap-allocated, so it should not heap allocate its monitor
-    // monitor_data *data = malloc(sizeof(monitor_data)); // todo: this leaks memory, never freed
-    UNREACHABLE("Monitor allocated for an off-heap object"); // todo: should this just throw an illegal monitor
-                                                             // exception instead
-    // return data;
-  }
-  monitor_data *data = bump_allocate(thread, sizeof(monitor_data));
-  return data;
+  CHECK(!in_heap(thread->vm, obj)); // if you're synchronizing on staticFieldBase, you deserve the chair
+  return bump_allocate(thread, sizeof(monitor_data));
 }
 
 #define MAX_CF_NAME_LENGTH 1000

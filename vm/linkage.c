@@ -175,7 +175,9 @@ int link_class(vm_thread *thread, classdesc *cd) {
   nonstatic_offset += padding;
 
   bool must_have_C_layout = hash_table_contains(&thread->vm->class_padding, cd->name.chars, cd->name.len);
-  int *order = reorder_fields_for_compactness(cd->fields, cd->fields_count);
+  int *order = nullptr;
+  if (must_have_C_layout)
+    order = reorder_fields_for_compactness(cd->fields, cd->fields_count);
 
   for (int field_i = 0; field_i < cd->fields_count; ++field_i) {
     cp_field *field = cd->fields + (must_have_C_layout ? field_i : order[field_i]);
