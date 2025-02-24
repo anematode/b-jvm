@@ -6,6 +6,10 @@
 #define ADT_H
 
 #include "util.h"
+
+#include "../vendor/stb_ds.h"
+#include <limits.h>
+#include <stdalign.h>
 #include <stddef.h>
 #include <types.h>
 
