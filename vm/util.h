@@ -160,7 +160,7 @@ static inline void heap_str_truncate(heap_string str, u32 len) {
 /// Exchange / and . in the class name.
 static inline void exchange_slashes_and_dots(slice *dst, slice src) {
   DCHECK(dst->len >= src.len);
-  memcpy(dst->chars, src.chars, src.len);
+  memmove(dst->chars, src.chars, src.len);
   for (size_t i = 0; i < src.len; ++i) {
     if (dst->chars[i] == '/') {
       dst->chars[i] = '.';

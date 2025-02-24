@@ -33,6 +33,9 @@ __attribute__((noinline)) void raise_negative_array_size_exception(vm_thread *th
 // Raise a NullPointerException.
 __attribute__((noinline)) void raise_null_pointer_exception(vm_thread *thread);
 
+// Raise a VerifyError with the given message.
+__attribute__((noinline)) void raise_verify_error(vm_thread *thread, slice message);
+
 // Raise an ArrayStoreException.
 __attribute__((noinline)) void raise_array_store_exception(vm_thread *thread, slice class_name);
 

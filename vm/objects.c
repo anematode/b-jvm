@@ -14,13 +14,13 @@ static bool do_latin1(const u16 *chars, size_t len) {
   return true;
 }
 
-static int convert_modified_utf8_to_chars(const char *bytes, int len, u16 **result, int *result_len, bool sloppy) {
+static int convert_modified_utf8_to_chars(const char *bytes, int len, u16 **result, int *result_len) {
   *result = malloc(len * sizeof(short)); // conservatively large
   int i = 0, j = 0;
 
   u16 idxs[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  for (int i = 0; i < 16; ++i)
-    idxs[i] += (u16)-256;
+  for (int k = 0; k < 16; ++k)
+    idxs[k] += (u16)-256;
 
   for (; i < len; ++i) {
     // "Code points in the range '\u0001' to '\u007F' are represented by a
@@ -42,7 +42,7 @@ static int convert_modified_utf8_to_chars(const char *bytes, int len, u16 **resu
         goto inval;
       (*result)[j++] = (short)((byte & 0x0F) << 12) | ((bytes[i + 1] & 0x3F) << 6) | (bytes[i + 2] & 0x3F);
       i += 2;
-    } else if (sloppy && byte == 0) {
+    } else if (byte == 0) { // TODO: check this during classfile parsing
       break;
     } else {
       // "No byte may have the value (byte)0 or lie in the range (byte)0xf0 -
@@ -72,7 +72,7 @@ obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string) {
 
   u16 *chars = nullptr;
   int len;
-  if (convert_modified_utf8_to_chars(string.chars, string.len, &chars, &len, true) == -1)
+  if (convert_modified_utf8_to_chars(string.chars, (int)string.len, &chars, &len) == -1)
     goto error;
 
   if (do_latin1(chars, len)) {

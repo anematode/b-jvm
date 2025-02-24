@@ -89,6 +89,10 @@ void raise_null_pointer_exception(vm_thread *thread) {
   raise_vm_exception(thread, STR("java/lang/NullPointerException"), null_str());
 }
 
+void raise_verify_error(vm_thread *thread, slice message) {
+  raise_vm_exception(thread, STR("java/lang/VerifyError"), message);
+}
+
 void raise_array_store_exception(vm_thread *thread, const slice class_name) {
   raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), class_name);
 }

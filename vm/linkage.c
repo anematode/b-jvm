@@ -1,3 +1,6 @@
+#include "exceptions.h"
+
+
 #include <linkage.h>
 
 #include <analysis.h>
@@ -5,6 +8,9 @@
 #include <vtable.h>
 
 #include <bjvm.h>
+
+// Credit: https://stackoverflow.com/a/77159291/13458117
+#define SIZEOF_POINTER (UINTPTR_MAX / 255 % 255)
 
 static size_t allocate_field(size_t *current, type_kind kind) {
   size_t result;
@@ -24,7 +30,7 @@ static size_t allocate_field(size_t *current, type_kind kind) {
   }
   case TYPE_KIND_FLOAT:
   case TYPE_KIND_INT:
-#ifdef EMSCRIPTEN
+#if SIZEOF_POINTER == 4
   case TYPE_KIND_REFERENCE:
 #endif
     *current = (*current + 3) & ~3;
@@ -33,7 +39,7 @@ static size_t allocate_field(size_t *current, type_kind kind) {
     break;
   case TYPE_KIND_DOUBLE:
   case TYPE_KIND_LONG:
-#ifndef EMSCRIPTEN
+#if SIZEOF_POINTER == 8
   case TYPE_KIND_REFERENCE:
 #endif
     *current = (*current + 7) & ~7;
@@ -42,7 +48,6 @@ static size_t allocate_field(size_t *current, type_kind kind) {
     break;
 
   case TYPE_KIND_VOID:
-    [[fallthrough]];
   default:
     UNREACHABLE();
   }
@@ -60,6 +65,7 @@ void setup_super_hierarchy(classdesc *cd) {
     cd->hierarchy = arena_alloc(&cd->arena, super->hierarchy_len + 1, sizeof(classdesc *));
     memcpy(cd->hierarchy, super->hierarchy, super->hierarchy_len * sizeof(classdesc *));
   } else {
+    DCHECK(utf8_equals(cd->name, "java/lang/Object"));
     // java/lang/Object has a superclass hierarchy of length 1, containing only itself
     cd->hierarchy_len = 1;
     cd->hierarchy = arena_alloc(&cd->arena, 1, sizeof(classdesc *));
@@ -127,8 +133,6 @@ int link_class(vm_thread *thread, classdesc *cd) {
       cd->state = CD_STATE_LINKAGE_ERROR;
       return status;
     }
-  } else {
-    assert(utf8_equals(cd->name, "java/lang/Object"));
   }
 
   setup_super_hierarchy(cd);
@@ -158,10 +162,9 @@ int link_class(vm_thread *thread, classdesc *cd) {
       int result = analyze_method_code(method, &error_str);
       if (result != 0) {
         cd->state = CD_STATE_LINKAGE_ERROR;
-        printf("Error analyzing method %.*s: %.*s\n", method->name.len, method->name.chars, error_str.len,
-               error_str.chars);
-        // TODO raise VerifyError
-        UNREACHABLE();
+        raise_verify_error(thread, hslc(error_str));
+        free_heap_str(error_str);
+        return -1;
       }
     }
   }

@@ -36,6 +36,7 @@
   X(clone_not_supported_exception, "java/lang/CloneNotSupportedException")                                             \
   X(illegal_monitor_state_exception, "java/lang/IllegalMonitorStateException")                                         \
   X(internal_error, "java/lang/InternalError")                                         \
+  X(verify_error, "java/lang/VerifyError")                                                                            \
   X(illegal_state_exception, "java/lang/IllegalStateException")
 
 #define __CACHED_REFLECTION_CLASSES(X)                                                                                 \

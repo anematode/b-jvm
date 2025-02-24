@@ -4,6 +4,7 @@
 
 #include "adt.h"
 #include "util.h"
+#include "../vendor/stb_ds.h"
 
 #include <stdarg.h>
 #include <stdlib.h>
@@ -49,7 +50,8 @@ void list_compressed_bitset_bits(compressed_bitset bits, int **stbds_vector) {
 
 void arena_init(arena *a) { a->begin = nullptr; }
 
-const size_t ARENA_REGION_BYTES = 1 << 12;
+constexpr size_t ARENA_REGION_BYTES = 1 << 12;
+// NOLINTNEXTLINE(misc-no-recursion)
 void *arena_alloc(arena *a, size_t count, size_t bytes) {
   size_t allocate = align_up(count * bytes, 8);
   if (allocate > ARENA_REGION_BYTES) {
@@ -175,7 +177,7 @@ string_hash_table make_hash_table(void (*free_fn)(void *), double load_factor, s
   return table;
 }
 
-hash_table_iterator hash_table_get_iterator(string_hash_table *tbl) {
+hash_table_iterator hash_table_get_iterator(const string_hash_table *tbl) {
   hash_table_iterator iter;
   iter.current_base = tbl->entries;
   hash_table_entry *end = tbl->entries + tbl->entries_cap;
@@ -215,7 +217,7 @@ bool hash_table_iterator_next(hash_table_iterator *iter) {
 }
 
 static u32 fxhash_string(const char *key, size_t len) {
-  const u64 FXHASH_CONST = 0x517cc1b727220a95ULL;
+  constexpr u64 FXHASH_CONST = 0x517cc1b727220a95ULL;
   u64 hash = 0;
   for (size_t i = 0; i + 7 < len; i += 8) {
     u64 word;
@@ -231,7 +233,7 @@ static u32 fxhash_string(const char *key, size_t len) {
   return (u32)hash;
 }
 
-hash_table_entry *find_hash_table_entry(string_hash_table *tbl, const char *key, size_t len, bool *equal,
+hash_table_entry *find_hash_table_entry(const string_hash_table *tbl, const char *key, size_t len, bool *equal,
                                         bool *on_chain, hash_table_entry **prev_entry) {
   if (unlikely(tbl->entries_cap == 0))
     return nullptr;
@@ -281,6 +283,7 @@ void *hash_table_delete(string_hash_table *tbl, const char *key, int len) {
   return ret_val;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void hash_table_rehash(string_hash_table *tbl, size_t new_capacity) {
   string_hash_table new_table = make_hash_table(tbl->free, tbl->load_factor, new_capacity);
   hash_table_iterator iter = hash_table_get_iterator(tbl);
@@ -288,7 +291,7 @@ void hash_table_rehash(string_hash_table *tbl, size_t new_capacity) {
   size_t len;
   void *value;
   while (hash_table_iterator_has_next(iter, &key, &len, &value)) {
-    hash_table_insert_impl(&new_table, key, len, value, false /* don't copy key */);
+    hash_table_insert_impl(&new_table, key, (int)len, value, false /* don't copy key */);
     hash_table_entry *ent = iter.current;
     bool entry_on_chain = iter.current != iter.current_base;
     hash_table_iterator_next(&iter);
@@ -300,6 +303,7 @@ void hash_table_rehash(string_hash_table *tbl, size_t new_capacity) {
   *tbl = new_table;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 void *hash_table_insert_impl(string_hash_table *tbl, char *key, int len_, void *value, bool copy_key) {
   DCHECK(len_ >= -1);
   size_t len = len_ == -1 ? (int)strlen(key) : len_;
@@ -340,14 +344,14 @@ void *hash_table_insert(string_hash_table *tbl, const char *key, int len, void *
   return hash_table_insert_impl(tbl, (char *)key /* key copied */, len, value, true);
 }
 
-void *hash_table_lookup(string_hash_table *tbl, const char *key, int len) {
+void *hash_table_lookup(const string_hash_table *tbl, const char *key, int len) {
   bool equal, on_chain;
   len = len == -1 ? (int)strlen(key) : len;
   hash_table_entry *_prev, *entry = find_hash_table_entry(tbl, key, len, &equal, &on_chain, &_prev);
   return equal ? entry->data : nullptr;
 }
 
-bool hash_table_contains(string_hash_table *tbl, const char *key, int len) {
+bool hash_table_contains(const string_hash_table *tbl, const char *key, int len) {
   bool equal, on_chain;
   len = len == -1 ? (int)strlen(key) : len;
   hash_table_entry *_prev;

@@ -1,4 +1,4 @@
-
+// "pretty" printing for various VM classes, especially useful for debugging
 #include "classfile.h"
 
 #include <inttypes.h>
@@ -326,7 +326,6 @@ char *cp_entry_to_string(const cp_entry *ent) {
     return strdup("<method type>"); // TODO
   }
   case CP_KIND_INVOKE_DYNAMIC:
-    return cp_indy_info_to_string(&ent->indy_info);
   case CP_KIND_DYNAMIC_CONSTANT:
     return cp_indy_info_to_string(&ent->indy_info);
   }
@@ -348,32 +347,33 @@ heap_string insn_to_string(const bytecode_insn *insn, int insn_index) {
   } else if (insn->kind <= insn_ldc2_w) {
     // indexes into constant pool
     char *cp_str = cp_entry_to_string(insn->cp);
-    write = build_str(&result, write, "%s", cp_str);
+    build_str(&result, write, "%s", cp_str);
     free(cp_str);
   } else if (insn->kind <= insn_astore) {
     // indexes into local variables
-    write = build_str(&result, write, "#%d", insn->index);
+    build_str(&result, write, "#%d", insn->index);
   } else if (insn->kind <= insn_ifnull) {
     // indexes into the instruction array
-    write = build_str(&result, write, "inst %d", insn->index);
+    build_str(&result, write, "inst %d", insn->index);
   } else if (insn->kind == insn_lconst || insn->kind == insn_iconst) {
-    write = build_str(&result, write, "%" PRId64, insn->integer_imm);
+    build_str(&result, write, "%" PRId64, insn->integer_imm);
   } else if (insn->kind == insn_dconst || insn->kind == insn_fconst) {
-    write = build_str(&result, write, "%.15g", insn->f_imm);
+    build_str(&result, write, "%.15g", insn->f_imm);
   } else if (insn->kind == insn_tableswitch) {
     write = build_str(&result, write, "[ default -> %d", insn->tableswitch->default_target);
     for (int i = 0, j = insn->tableswitch->low; i < insn->tableswitch->targets_count; ++i, ++j) {
       write = build_str(&result, write, ", %d -> %d", j, insn->tableswitch->targets[i]);
     }
-    write = build_str(&result, write, " ]");
+    build_str(&result, write, " ]");
   } else if (insn->kind == insn_lookupswitch) {
     write = build_str(&result, write, "[ default -> %d", insn->lookupswitch->default_target);
     for (int i = 0; i < insn->lookupswitch->targets_count; ++i) {
       write = build_str(&result, write, ", %d -> %d", insn->lookupswitch->keys[i], insn->lookupswitch->targets[i]);
     }
-    write = build_str(&result, write, " ]");
+    build_str(&result, write, " ]");
   } else {
     // TODO
+    build_str(&result, write, "<unimplemented>");
   }
   return result;
 }

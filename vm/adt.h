@@ -6,10 +6,6 @@
 #define ADT_H
 
 #include "util.h"
-
-#include "../vendor/stb_ds.h"
-#include <limits.h>
-#include <stdalign.h>
 #include <stddef.h>
 #include <types.h>
 
@@ -89,7 +85,7 @@ void string_builder_free(string_builder *builder);
 
 string_hash_table make_hash_table(void (*free_fn)(void *), double load_factor, size_t initial_capacity);
 
-hash_table_iterator hash_table_get_iterator(string_hash_table *tbl);
+hash_table_iterator hash_table_get_iterator(const string_hash_table *tbl);
 
 bool hash_table_iterator_has_next(hash_table_iterator iter, char **key, size_t *key_len, void **value);
 
@@ -97,7 +93,7 @@ bool hash_table_iterator_next(hash_table_iterator *iter);
 
 void hash_table_reserve(string_hash_table *tbl, size_t new_capacity);
 
-bool hash_table_contains(string_hash_table *tbl, const char *key, int len);
+bool hash_table_contains(const string_hash_table *tbl, const char *key, int len);
 
 /**
  * Insert the key/value pair into the hash table and return the old value, if
@@ -122,7 +118,7 @@ void *hash_table_insert_impl(string_hash_table *tbl, char *key, int len, void *v
 /**
  * Look up the value in the hash table.
  */
-void *hash_table_lookup(string_hash_table *tbl, const char *key, int len);
+void *hash_table_lookup(const string_hash_table *tbl, const char *key, int len);
 
 void free_hash_table(string_hash_table tbl);
 
