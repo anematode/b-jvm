@@ -3,7 +3,7 @@ import re
 import sys
 
 def process_file(filename):
-    export_regex = r'DECLARE(?:_ASYNC)?_NATIVE(?:_OVERLOADED)?\(.*?,\s*([\w$]+),\s*([\w$]+).*?(\d+)?\)\s*{'  # Define the actual regex pattern
+    export_regex = r'DECLARE(?:_ASYNC)?_NATIVE2?(?:_OVERLOADED)?\(.*?,\s*([\w$]+),\s*([\w$]+).*?(\d+)?\)\s*{'  # Define the actual regex pattern
 
     with open(filename, 'r', encoding='utf-8') as file:
         contents = file.read()

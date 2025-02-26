@@ -98,14 +98,16 @@ typedef struct {
 } async_natives_args;
 
 typedef stack_value (*sync_native_callback)(vm_thread *vm, handle *obj, value *args, u8 argc);
+typedef void* new_sync_native_callback;
 typedef future_t (*async_native_callback)(void *args);
 
 typedef struct {
-  // Number of bytes needed for the context struct allocation (0 if sync)
+  // Number of bytes needed for the context struct allocation (0 if sync, 10000 if new-sync -- we'll unjank it later)
   size_t async_ctx_bytes;
   // either sync_native_callback or async_native_callback
   union {
     sync_native_callback sync;
+    new_sync_native_callback new_sync;
     async_native_callback async;
   };
 } native_callback;

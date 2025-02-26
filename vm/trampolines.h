@@ -17,12 +17,14 @@ extern "C" {
 // args is an inout arg: the values are read, and the return value is written. This matches the semantics of bytecode
 // invoke instructions, since the result is pushed back onto the operand stack.
 typedef void (*jit_trampoline)(void *to_call, vm_thread *thread, cp_method *method, stack_value *args);
-jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc);
+jit_trampoline get_jit_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc);
+jit_trampoline get_jit_trampoline_for_method(cp_method *method);
+
 
 typedef void* interpreter_trampoline;
 
 // (thread, method, arg1, arg2, ... argN) -> return value
-interpreter_trampoline get_wasm_interpreter_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc);
+interpreter_trampoline get_interpreter_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc);
 
 #ifdef __cplusplus
 }

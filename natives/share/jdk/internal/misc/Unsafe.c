@@ -144,13 +144,14 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, compareAndSetReference,
   return (stack_value){.l = ret};
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, addressSize, "()I") { return (stack_value){.i = sizeof(void *)}; }
+DECLARE_NATIVE2("jdk/internal/misc", Unsafe, addressSize, "()I", int, object this) {
+  return sizeof(void*);
+}
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
-  DCHECK(argc == 1);
-  void *l = malloc(args[0].l);
-  arrput(thread->vm->unsafe_allocations, l);
-  return (stack_value){.l = (s64)l};
+DECLARE_NATIVE2("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J", jlong, object this, jlong bytes) {
+  void *allocation = malloc(bytes);
+  arrput(thread->vm->unsafe_allocations, allocation);
+  return (jlong)allocation;
 }
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class;)Ljava/lang/Object;") {

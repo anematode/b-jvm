@@ -1,4 +1,5 @@
 #include "exceptions.h"
+#include "trampolines.h"
 
 
 #include <linkage.h>
@@ -8,9 +9,6 @@
 #include <vtable.h>
 
 #include <bjvm.h>
-
-// Credit: https://stackoverflow.com/a/77159291/13458117
-#define SIZEOF_POINTER (UINTPTR_MAX / 255 % 255)
 
 static size_t allocate_field(size_t *current, type_kind kind) {
   size_t result;
@@ -120,6 +118,10 @@ static int *reorder_fields_for_compactness(cp_field *fields, int fields_count) {
   return order;
 }
 
+static void make_trampoline(cp_method * method) {
+  method->trampoline = get_jit_trampoline_for_method(method);
+}
+
 // Link the class.
 int link_class(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
@@ -167,6 +169,8 @@ int link_class(vm_thread *thread, classdesc *cd) {
         return -1;
       }
     }
+
+    make_trampoline(method);
   }
 
   // Padding for VM fields (e.g., internal fields used for Reflection)

@@ -121,8 +121,12 @@ extern native_t *natives;
       [[maybe_unused]] vm_thread *thread, [[maybe_unused]] handle *obj, [[maybe_unused]] value *args,                  \
       [[maybe_unused]] u8 argc)
 
+#define DECLARE_NATIVE2_CALLBACK(class_name_, method_name_, modifier, return_ty, ...)                                                   \
+  __attribute__((used)) return_ty class_name_##_##method_name_##_cb##modifier(                                       \
+  [[maybe_unused]] vm_thread *thread, [[maybe_unused]] cp_method *method, __VA_ARGS__)
+
 #define create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, async_sz,       \
-                                variant)                                                                               \
+                                variant)                                                                            \
   __attribute__((used)) native_t NATIVE_INFO_##class_name_##_##method_name_##_##modifier =                             \
       (native_t){.class_path = STR(package_path "/" #class_name_),                                                     \
                  .method_name = STR(#method_name_),                                                                    \
@@ -140,6 +144,17 @@ extern native_t *natives;
 
 #define DECLARE_NATIVE_OVERLOADED(package_path, class_name_, method_name_, method_descriptor_, overload_idx)           \
   force_expand_args(DECLARE_NATIVE_, package_path, class_name_, method_name_, method_descriptor_, overload_idx)
+
+#define DECLARE_NATIVE2_(package_path, class_name_, method_name_, method_descriptor_, modifier, return_ty, ...)                         \
+  DECLARE_NATIVE2_CALLBACK(class_name_, method_name_, modifier, return_ty, __VA_ARGS__);                                                        \
+  create_init_constructor(package_path, class_name_, method_name_, method_descriptor_, modifier, -1, new_sync)              \
+  DECLARE_NATIVE2_CALLBACK(class_name_, method_name_, modifier, return_ty, __VA_ARGS__)
+
+#define DECLARE_NATIVE2(package_path, class_name_, method_name_, method_descriptor_, return_ty, ...)                                    \
+force_expand_args(DECLARE_NATIVE2_, package_path, class_name_, method_name_, method_descriptor_, 0, return_ty, __VA_ARGS__)
+
+#define DECLARE_NATIVE2_OVERLOADED(package_path, class_name_, method_name_, method_descriptor_, overload_idx)           \
+force_expand_args(DECLARE_NATIVE2_, package_path, class_name_, method_name_, method_descriptor_, overload_idx, return_ty, __VA_ARGS__)
 
 #ifdef __cplusplus
 #define check_field_offset(m_name, member_a, member_b)

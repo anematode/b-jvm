@@ -18,6 +18,8 @@
 #include <reflection.h>
 
 #include "cached_classdescs.h"
+#include "trampolines.h"
+
 #include <errno.h>
 #include <linkage.h>
 #include <monitors.h>
@@ -120,6 +122,11 @@ u16 stack_depth(const stack_frame *frame) {
 value *get_native_args(const stack_frame *frame) {
   DCHECK(is_frame_native(frame));
   return ((value *)frame) - frame->num_locals;
+}
+
+stack_value *get_unhandlized_native_args(const stack_frame *frame) {
+  DCHECK(is_frame_native(frame));
+  return ((stack_value *)frame) - frame->num_locals;
 }
 
 stack_value *frame_stack(stack_frame *frame) {
@@ -246,6 +253,7 @@ static void drop_handles_array(vm_thread *thread, const cp_method *method, const
 stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const method_descriptor *descriptor,
                                stack_value *args, u8 argc) {
   native_callback *native = method->native_handle;
+  bool should_handlize = native->async_ctx_bytes != (size_t)-1;
   if (!native) {
     raise_unsatisfied_link_error(thread, method);
     return nullptr;
@@ -260,7 +268,8 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
     return nullptr;
   }
 
-  value *locals = (value *)(args + argc); // reserve new memory on stack
+  // reserve new memory on stack for handles
+  value *locals = should_handlize ? (value *)(args + argc) : (value *) args;
   stack_frame *frame = (stack_frame *)(locals + argc);
 
   DCHECK((uintptr_t)frame % 8 == 0, "Frame is aligned");
@@ -277,7 +286,9 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   frame->synchronized_state = SYNCHRONIZE_NONE;
 
   // Now wrap arguments in handles and copy them into the frame
-  make_handles_array(thread, descriptor, method->access_flags & ACCESS_STATIC, args, locals);
+  if (should_handlize) {
+    make_handles_array(thread, descriptor, method->access_flags & ACCESS_STATIC, args, locals);
+  }
   return frame;
 }
 
@@ -394,7 +405,10 @@ void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   stack_frame *frame = arrpop(thr->stack.frames);
   DCHECK(reference == nullptr || reference == frame);
   if (is_frame_native(frame)) {
-    drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
+    bool should_handlize = ((native_callback*)frame->method->native_handle)->async_ctx_bytes != (size_t)-1;
+    if (should_handlize) {
+      drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
+    }
   }
   thr->stack.frame_buffer_used = compute_used(thr);
 }
@@ -2546,6 +2560,17 @@ DEFINE_ASYNC(run_native) {
 
   native_callback *hand = frame->method->native_handle;
   bool is_static = frame->method->access_flags & ACCESS_STATIC;
+
+  if (hand->async_ctx_bytes == (size_t)-1) {
+    void *entry = hand->new_sync;
+    DCHECK(entry);
+    jit_trampoline tramp = frame->method->trampoline;
+    DCHECK(tramp);
+    stack_value *inout = get_unhandlized_native_args(frame);
+    tramp(entry, thread, frame->method, inout);
+    ASYNC_RETURN(inout[0]);
+  }
+
   handle *target_handle = is_static ? nullptr : get_native_args(frame)[0].handle;
   value *native_args = get_native_args(frame) + (is_static ? 0 : 1);
   u16 argc = frame->num_locals - !is_static;

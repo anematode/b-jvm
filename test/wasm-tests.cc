@@ -1,5 +1,5 @@
 
-#include "wasm_trampolines.h"
+#include "trampolines.h"
 #include "doctest/doctest.h"
 #include <wasm/wasm_utils.h>
 #include <array>
@@ -69,7 +69,7 @@ TEST_CASE("Trampoline into function") {
   };
   std::array args = {WASM_TYPE_KIND_INT32, WASM_TYPE_KIND_INT64, WASM_TYPE_KIND_INT32,
                                          WASM_TYPE_KIND_FLOAT64, WASM_TYPE_KIND_INT32};
-  jit_trampoline tramp = get_wasm_jit_trampoline(WASM_TYPE_KIND_FLOAT64, args.data(), 5);
+  jit_trampoline tramp = get_jit_trampoline(WASM_TYPE_KIND_FLOAT64, args.data(), 5);
   REQUIRE(tramp != nullptr);
   object arg3 = nullptr;
   object arg5 = nullptr;

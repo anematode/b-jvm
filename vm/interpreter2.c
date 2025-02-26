@@ -36,7 +36,7 @@
 #include "classfile.h"
 #include "dumb_jit.h"
 #include "util.h"
-#include "wasm_trampolines.h"
+#include "trampolines.h"
 
 #include <analysis.h>
 #include <debugger.h>
@@ -2924,58 +2924,56 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
                                                                   stack_frame *frame_) {
   stack_value result;
 
-  do {
   interpret_begin:
-    plain_frame *frame = get_plain_frame(frame_);
-    stack_value *sp_ = &frame->stack[stack_depth(frame_)];
-    u16 pc_ = frame->program_counter;
-    bytecode_insn *insns = frame_->method->code->code;
-    [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
+  plain_frame *frame = get_plain_frame(frame_);
+  stack_value *sp_ = &frame->stack[stack_depth(frame_)];
+  u16 pc_ = frame->program_counter;
+  bytecode_insn *insns = frame_->method->code->code;
+  [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 
-    if (unlikely(frame_->is_async_suspended)) {
+  if (unlikely(frame_->is_async_suspended)) {
 #if DO_TAILS
-      result.l = async_resume_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+    result.l = async_resume_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
-      handler_i =
-          async_resume_impl_void(thread, frame_, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
+    handler_i =
+        async_resume_impl_void(thread, frame_, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
 #endif
-    }
+  }
 
 #if DO_TAILS
-    else {
-      result.l = entry_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
-    }
+  else {
+    result.l = entry_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+  }
 #else
-    if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
-      // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
-      if (thread->is_single_stepping) {
-        result.l = entry_notco_with_stepping(thread, frame_, insns, pc_, sp_, handler_i);
-      } else {
-        result.l = entry_notco_no_stepping(thread, frame_, insns, pc_, sp_, handler_i);
-      }
+  if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
+    // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
+    if (thread->is_single_stepping) {
+      result.l = entry_notco_with_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+    } else {
+      result.l = entry_notco_no_stepping(thread, frame_, insns, pc_, sp_, handler_i);
     }
+  }
 #endif
 
-    // we really should just have all the methods return a future_t via a pointer, but whatever
-    if (unlikely(frame_->is_async_suspended)) {
-      // reconstruct future to return
-      void *wk = async_stack_top(thread);
-      *fut = (future_t){FUTURE_NOT_READY, wk};
-      return (stack_value){0};
+  // we really should just have all the methods return a future_t via a pointer, but whatever
+  if (unlikely(frame_->is_async_suspended)) {
+    // reconstruct future to return
+    void *wk = async_stack_top(thread);
+    *fut = (future_t){FUTURE_NOT_READY, wk};
+    return (stack_value){0};
+  }
+
+  if (unlikely(thread->current_exception)) {
+    exception_table_entry *handler = find_exception_handler(thread, frame_, thread->current_exception->descriptor);
+
+    if (handler) {
+      frame->program_counter = handler->handler_insn;
+      frame->stack[0] = (stack_value){.obj = thread->current_exception};
+      thread->current_exception = nullptr;
+
+      goto interpret_begin;
     }
-
-    if (unlikely(thread->current_exception)) {
-      exception_table_entry *handler = find_exception_handler(thread, frame_, thread->current_exception->descriptor);
-
-      if (handler) {
-        frame->program_counter = handler->handler_insn;
-        frame->stack[0] = (stack_value){.obj = thread->current_exception};
-        thread->current_exception = nullptr;
-
-        goto interpret_begin;
-      }
-    }
-  } while (0);
+  }
 
   pop_frame(thread, frame_);
   *fut = (future_t){FUTURE_READY};

@@ -104,6 +104,21 @@ void wasm_writeint(bytevector *ctx, s64 value) {
   write_byte(ctx, byte);
 }
 
+wasm_value_type jvm_type_to_wasm(type_kind jvm_type){
+  switch (jvm_type) {
+  case TYPE_KIND_FLOAT:
+    return WASM_TYPE_KIND_FLOAT32;
+  case TYPE_KIND_DOUBLE:
+    return WASM_TYPE_KIND_FLOAT64;
+  case TYPE_KIND_REFERENCE:
+    return WASM_REF_TYPE;
+  default:
+    return WASM_TYPE_KIND_INT32;
+  case TYPE_KIND_LONG:
+    return WASM_TYPE_KIND_INT64;
+  }
+}
+
 wasm_module *wasm_module_create() {
   wasm_module *module = calloc(1, sizeof(wasm_module));
   arena_init(&module->arena);
@@ -822,26 +837,4 @@ wasm_expression *wasm_unop(wasm_module *module, wasm_unary_op_kind op, wasm_expr
       .arg = expr,
   };
   return result;
-}
-
-wasm_type jvm_type_to_wasm(type_kind kind) {
-  switch (kind) {
-  case TYPE_KIND_BOOLEAN:
-  case TYPE_KIND_CHAR:
-  case TYPE_KIND_BYTE:
-  case TYPE_KIND_SHORT:
-  case TYPE_KIND_INT:
-  case TYPE_KIND_REFERENCE:
-    return wasm_int32();
-  case TYPE_KIND_FLOAT:
-    return wasm_float32();
-  case TYPE_KIND_DOUBLE:
-    return wasm_float64();
-  case TYPE_KIND_LONG:
-    return wasm_int64();
-  case TYPE_KIND_VOID:
-    [[fallthrough]];
-  default:
-    UNREACHABLE();
-  }
 }

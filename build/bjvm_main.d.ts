@@ -334,7 +334,7 @@ interface WasmModule {
   _Unsafe_compareAndSetInt_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_compareAndSetLong_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_compareAndSetReference_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Unsafe_addressSize_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
+  _Unsafe_addressSize_cb0(_0: number, _1: number, _2: number): number;
   _Unsafe_allocateMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_allocateInstance_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Unsafe_freeMemory0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;

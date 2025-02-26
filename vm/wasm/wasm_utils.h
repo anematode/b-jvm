@@ -433,6 +433,14 @@ typedef struct {
 void wasm_writeuint(bytevector *ctx, u64 value);
 void wasm_writeint(bytevector *ctx, s64 value);
 
+wasm_value_type jvm_type_to_wasm(type_kind jvm_type);
+
+#if SIZEOF_POINTER == 8
+constexpr wasm_value_type WASM_REF_TYPE = WASM_TYPE_KIND_INT64;
+#else
+constexpr wasm_value_type WASM_REF_TYPE = WASM_TYPE_KIND_INT32;
+#endif
+
 wasm_module *wasm_module_create();
 // It is the caller's responsibility to free the returned bytevector.
 bytevector wasm_module_serialize(wasm_module *module);

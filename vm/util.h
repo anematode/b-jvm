@@ -215,6 +215,9 @@ static inline slice str_to_utf8(const char *str) {
 
 #define STR(literal) ((slice){.chars = (char *)(literal), .len = sizeof(literal) - 1})
 
+// Credit: https://stackoverflow.com/a/77159291/13458117
+#define SIZEOF_POINTER (UINTPTR_MAX / 255 % 255)
+
 bool utf8_equals(slice entry, const char *str);
 bool utf8_equals_utf8(slice left, slice right);
 bool utf8_ends_with(slice str, slice ending);

@@ -1,4 +1,4 @@
-#include "wasm_trampolines.h"
+#include "trampolines.h"
 #include "util.h"
 
 static string_hash_table jit_trampolines;
@@ -20,7 +20,7 @@ static slice encode_as_slice(slice s, wasm_value_type return_type, wasm_value_ty
   return subslice_to(s, 0, i);
 }
 
-jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc) {
+jit_trampoline get_jit_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc) {
   init_trampolines();
   INIT_STACK_STRING(key, 257);
   key = encode_as_slice(key, return_type, args, argc);
@@ -30,7 +30,20 @@ jit_trampoline get_wasm_jit_trampoline(wasm_value_type return_type, wasm_value_t
   return nullptr;
 }
 
-interpreter_trampoline get_wasm_interpreter_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc) {
+jit_trampoline get_jit_trampoline_for_method(cp_method *method) {
+  wasm_value_type returns = jvm_type_to_wasm(field_to_kind(&method->descriptor->return_type));
+  wasm_value_type args[256];
+  int arg_i = 0;
+  if (!(method->access_flags & ACCESS_STATIC)) {
+    args[arg_i++] = WASM_REF_TYPE;
+  }
+  for (int i = 0; i < method->descriptor->args_count; ++i) {
+    args[arg_i++] = jvm_type_to_wasm(field_to_kind(method->descriptor->args + i));
+  }
+  return get_jit_trampoline(returns, args, arg_i);
+}
+
+interpreter_trampoline get_interpreter_trampoline(wasm_value_type return_type, wasm_value_type *args, s32 argc) {
   init_trampolines();
   INIT_STACK_STRING(key, 257);
   key = encode_as_slice(key, return_type, args, argc);
