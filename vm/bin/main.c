@@ -3,6 +3,7 @@
 //
 
 #include "arrays.h"
+#include "objects.h"
 #include "exceptions.h"
 #include "reflection.h"
 
