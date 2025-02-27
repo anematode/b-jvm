@@ -251,8 +251,6 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   stack_value args[1] = {{.obj = string_args_as_object->obj}};
   drop_handle(thread, string_args_as_object);
 
-  profiler *prof = launch_profiler(thread);
-
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
@@ -275,13 +273,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
       usleep(sleep_for);
 #endif
     }
-
-    if (record->status != SCHEDULER_RESULT_MORE)
-      break;
   }
-
-  char *profiler_data = read_profiler(prof);
-  free(profiler_data);
 
   if (thread->current_exception) {
     method =

@@ -100,10 +100,8 @@ typedef struct code_analysis {
 } code_analysis;
 
 /**
- * Analyze the method's code segment if it exists, rewriting instructions in
- * place to make longs/doubles one stack value wide, writing the analysis into
- * analysis.
- * <br/>
+ * Analyze the method's code segment if it exists, rewriting instructions in place to make longs/doubles one stack
+ * value wide, writing the analysis into method->analysis.
  * Returns -1 if an error occurred, and writes the error message into error.
  */
 int analyze_method_code(cp_method *method, heap_string *error);

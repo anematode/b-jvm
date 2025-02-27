@@ -612,6 +612,7 @@ handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file, i
 void drop_handle(vm_thread *thread, handle *handle);
 bool is_builtin_class(slice chars);
 void dump_trace(vm_thread *thread);
+bool thread_is_daemon(vm_thread *thread);
 
 /**
  * Create an uninitialized frame with space sufficient for the given method.

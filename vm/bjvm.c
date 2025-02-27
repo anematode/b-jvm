@@ -1669,7 +1669,7 @@ DEFINE_ASYNC(initialize_class) {
                                    // awaits
 
   DCHECK(cd);
-  if (likely(cd->state == CD_STATE_INITIALIZED)) {
+  if (likely(cd->state == CD_STATE_INITIALIZED || cd->state == CD_STATE_LINKAGE_ERROR)) {
     // Class is already initialized
     ASYNC_RETURN(0);
   }
@@ -2654,4 +2654,13 @@ obj_header *get_main_thread_group(vm_thread *thread) {
     call_interpreter_synchronous(thread, init, args); // ThreadGroup constructor doesn't do much
   }
   return vm->main_thread_group;
+}
+
+bool thread_is_daemon(vm_thread *thread) {
+  struct native_Thread *thread_obj = thread->thread_obj;
+  DCHECK(thread_obj);
+
+  // The daemon field is stored in the "holder" of the Java Thread object.
+  object holder = thread_obj->holder;
+  return LoadFieldBoolean(holder, "daemon");
 }

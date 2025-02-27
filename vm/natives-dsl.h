@@ -3,6 +3,7 @@
 
 #include "arrays.h"
 #include "bjvm.h"
+#include <objects.h>
 #include <exceptions.h>
 #include <natives-dsl.h>
 #include <stddef.h>
@@ -13,20 +14,6 @@
 
 maybe_extern_begin;
 void push_native(slice class_name, slice method_name, slice signature, native_callback native);
-
-static void __obj_store_field(obj_header *thing, slice field_name, stack_value value, slice desc) {
-  cp_field *field = field_lookup(thing->descriptor, field_name, desc);
-  DCHECK(field);
-  DCHECK(!(field->access_flags & ACCESS_STATIC));
-  set_field(thing, field, value);
-}
-
-static stack_value __obj_load_field(obj_header *thing, slice field_name, slice desc) {
-  cp_field *field = field_lookup(thing->descriptor, field_name, desc);
-  DCHECK(field);
-  DCHECK(!(field->access_flags & ACCESS_STATIC));
-  return get_field(thing, field);
-}
 
 maybe_extern_end;
 
@@ -42,71 +29,6 @@ static obj_header *check_is_object(obj_header *thing) { return thing; }
     }                                                                                                                  \
     __hstr;                                                                                                            \
   })
-
-static object __LoadFieldObject(obj_header *thing, slice desc, slice name) {
-  return __obj_load_field(thing, name, desc).obj;
-}
-
-static void __StoreFieldObject(obj_header *thing, slice desc, slice name, object value) {
-  __obj_store_field(thing, name, (stack_value){.obj = value}, desc);
-}
-
-static void __StoreStaticFieldObject(classdesc *clazz, slice desc, slice name, object value) {
-  cp_field *field = field_lookup(clazz, name, desc);
-  DCHECK(field);
-  DCHECK(field->access_flags & ACCESS_STATIC);
-  set_static_field(field, (stack_value){.obj = value});
-}
-
-#define StoreFieldObject(obj, type, name, value) __StoreFieldObject(obj, STR("L" type ";"), STR(name), value)
-#define StoreStaticFieldObject(obj, type, name, value)                                                                 \
-  __StoreStaticFieldObject(obj, STR("L" type ";"), STR(name), value)
-#define LoadFieldObject(obj, type, name) __LoadFieldObject(obj, STR("L" type ";"), STR(name))
-
-#define GeneratePrimitiveStoreField(type_cap, type, stack_field, desc, modifier)                                       \
-  static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                                      \
-    __obj_store_field(thing, name, (stack_value){.stack_field = value modifier}, STR(#desc));                          \
-  }
-
-#define GeneratePrimitiveLoadField(type_cap, type, stack_field, desc)                                                  \
-  static type __LoadField##type_cap(obj_header *thing, slice name) {                                                   \
-    return __obj_load_field(thing, name, STR(#desc)).stack_field;                                                      \
-  }
-
-GeneratePrimitiveStoreField(Byte, jbyte, i, B, );
-GeneratePrimitiveStoreField(Char, jchar, i, C, );
-GeneratePrimitiveStoreField(Int, jint, i, I, );
-GeneratePrimitiveStoreField(Long, jlong, l, J, );
-GeneratePrimitiveStoreField(Float, jfloat, f, F, );
-GeneratePrimitiveStoreField(Double, jdouble, d, D, );
-GeneratePrimitiveStoreField(Boolean, jboolean, i, Z, &1);
-
-GeneratePrimitiveLoadField(Byte, jbyte, i, B);
-GeneratePrimitiveLoadField(Char, jchar, i, C);
-GeneratePrimitiveLoadField(Int, jint, i, I);
-GeneratePrimitiveLoadField(Long, jlong, l, J);
-GeneratePrimitiveLoadField(Float, jfloat, f, F);
-GeneratePrimitiveLoadField(Double, jdouble, d, D);
-GeneratePrimitiveLoadField(Boolean, jboolean, i, Z);
-
-#define StoreFieldByte(obj, name, value) __StoreFieldByte(obj, STR(name), value)
-#define StoreFieldChar(obj, name, value) __StoreFieldChar(obj, STR(name), value)
-#define StoreFieldInt(obj, name, value) __StoreFieldInt(obj, STR(name), value)
-#define StoreFieldLong(obj, name, value) __StoreFieldLong(obj, STR(name), value)
-#define StoreFieldFloat(obj, name, value) __StoreFieldFloat(obj, STR(name), value)
-#define StoreFieldDouble(obj, name, value) __StoreFieldDouble(obj, STR(name), value)
-#define StoreFieldBoolean(obj, name, value) __StoreFieldBoolean(obj, STR(name), value)
-
-#define LoadFieldByte(obj, name) __LoadFieldByte(obj, STR(name))
-#define LoadFieldChar(obj, name) __LoadFieldChar(obj, STR(name))
-#define LoadFieldInt(obj, name) __LoadFieldInt(obj, STR(name))
-#define LoadFieldLong(obj, name) __LoadFieldLong(obj, STR(name))
-#define LoadFieldFloat(obj, name) __LoadFieldFloat(obj, STR(name))
-#define LoadFieldDouble(obj, name) __LoadFieldDouble(obj, STR(name))
-#define LoadFieldBoolean(obj, name) __LoadFieldBoolean(obj, STR(name))
-
-#undef GenerateStoreField
-#undef GeneratePrimitiveLoadField
 
 #define HandleIsNull(expr) ((expr)->obj == nullptr)
 

@@ -121,6 +121,16 @@ void unshift(impl *I, thread_info *info) {
   }
 }
 
+bool only_daemons_running(thread_info ** thread_info) {
+  // Use thread_is_daemon to check
+  for (int i = 0; i < arrlen(thread_info); i++) {
+    if (!thread_is_daemon(thread_info[i]->thread)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
   impl *impl = scheduler->_impl;
 
@@ -131,6 +141,10 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
   thread_info *info = get_next_thr(impl);
   if (!info)
     return SCHEDULER_RESULT_DONE;
+
+  if (only_daemons_running(impl->round_robin)) {
+    return SCHEDULER_RESULT_DONE;
+  }
 
   vm_thread *thread = info->thread;
   const int MICROSECONDS_TO_RUN = 1 << 30;

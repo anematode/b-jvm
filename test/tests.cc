@@ -723,8 +723,7 @@ TEST_CASE("The algorithms") {
     "test_files/the_algorithms/Java-1.0-SNAPSHOT.jar:"
     "test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar", false, "org/junit/platform/console/ConsoleLauncher", "",
     {
-      "-cp=test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar",
-      "--scan-class-path"
+      "execute", "--scan-classpath"
     });
 }
 

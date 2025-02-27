@@ -105,7 +105,7 @@ static void merge_itable(itable *dst, const itable *src, string_hash_table poiso
 }
 
 static bool itable_include(const cp_method *method) {
-  return !method->is_ctor && !method->is_clinit && !(method->access_flags & (ACCESS_STATIC | ACCESS_PRIVATE));
+  return !method->is_ctor && !method->is_clinit && !(method->access_flags & ACCESS_STATIC);
 }
 
 static void setup_itables(classdesc *super, classdesc *cd) {

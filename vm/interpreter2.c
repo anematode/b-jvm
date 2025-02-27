@@ -48,6 +48,7 @@
 #include <monitors.h>
 
 #include <instrumentation.h>
+#include <objects.h>
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
@@ -88,7 +89,7 @@
 
 #define ARGS_BASE                                                                                                      \
   [[maybe_unused]] vm_thread *thread, [[maybe_unused]] stack_frame *frame, [[maybe_unused]] bytecode_insn *insns,      \
-      [[maybe_unused]] u16 pc_, [[maybe_unused]] stack_value *sp_
+      [[maybe_unused]] s32 pc_, [[maybe_unused]] stack_value *sp_
 
 #define ARGS_VOID ARGS_BASE, [[maybe_unused]] s64 arg_1, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
 #define ARGS_INT ARGS_BASE, [[maybe_unused]] s64 tos_, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
@@ -214,7 +215,7 @@
 
 #define ARGS_BASE                                                                                                      \
   [[maybe_unused]] vm_thread *thread, [[maybe_unused]] stack_frame *frame, [[maybe_unused]] bytecode_insn *insns,      \
-      [[maybe_unused]] u16 *pc_, [[maybe_unused]] stack_value **sp_
+      [[maybe_unused]] s32 *pc_, [[maybe_unused]] stack_value **sp_
 
 #define ARGS_VOID ARGS_BASE, [[maybe_unused]] s64 *arg_1, [[maybe_unused]] float *arg_2, [[maybe_unused]] double *arg_3
 #define ARGS_INT ARGS_BASE, [[maybe_unused]] s64 *tos_, [[maybe_unused]] float *arg_2, [[maybe_unused]] double *arg_3
@@ -1500,11 +1501,12 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
   static s64 which##_impl_int(ARGS_INT) {                                                                              \
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
-    u16 old_pc = pc;                                                                                                   \
-    pc = ((s32)tos op 0) ? insn->index : (u32)(pc + 1);                                                                \
-    insns += (s32)pc - (s32)old_pc;                                                                                    \
+    s32 old_pc = pc;                                                                                                   \
+    s32 one_before_next = ((s32)tos op 0) ? ((s32)insn->index - 1) : (s32)pc;                       \
+    insns += one_before_next - (s32)old_pc;                                                                                                      \
     sp--;                                                                                                              \
-    STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
+    pc = one_before_next; \
+    STACK_POLYMORPHIC_NEXT(*(sp - 1));                           \
   }
 
 MAKE_INT_BRANCH_AGAINST_0(ifeq, ==)
@@ -1521,11 +1523,11 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
     s64 a = (sp - 2)->i, b = (int)tos;                                                                                 \
-    u16 old_pc = pc;                                                                                                   \
-    pc = a op b ? insn->index : (u32)(pc + 1);                                                                         \
+    s32 old_pc = pc;                                                                                                   \
+    pc = a op b ? ((s32)insn->index - 1) : pc;                                                               \
     insns += (s32)pc - (s32)old_pc;                                                                                    \
     sp -= 2;                                                                                                           \
-    STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
+    STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                  \
   }
 
 MAKE_INT_BRANCH(if_icmpeq, ==)
@@ -2005,12 +2007,22 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
     insn->kind = insn_invokevirtual;
     JMP_VOID
   }
-  insn->ic = itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
-  insn->ic2 = target->descriptor;
-  if (!insn->ic) {
+  cp_method *method = itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
+  if (!method) {
     raise_abstract_method_error(thread, method_info->resolved);
     return 0;
   }
+
+  if (method_argc(method) != method_argc(method_info->resolved)) {
+    printf("Looking for method %.*s.%.*s, receiver is %.*s; found %.*s.%.*s\n",
+      fmt_slice(method_info->resolved->my_class->name),
+      fmt_slice(method_info->resolved->name),
+      fmt_slice(target->descriptor->name),
+      fmt_slice(method->my_class->name), fmt_slice(method->name));
+  }
+
+  insn->ic = method;
+  insn->ic2 = target->descriptor;
   insn->kind = insn_invokeitable_monomorphic;
   JMP_VOID
 }
@@ -2671,14 +2683,14 @@ __attribute__((noinline)) void debugger_pause(vm_thread *thread, stack_frame *fr
 #if DO_TAILS
 static s64 entry_impl_void(ARGS_VOID) { STACK_POLYMORPHIC_JMP(*(sp - 1)) }
 #else
-static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *code, u16 pc_, stack_value *sp_,
+static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *code, s32 pc_, stack_value *sp_,
                             unsigned handler_i, bool check_stepping) {
   struct {
     stack_value *temp_sp_;
     int64_t temp_int_tos;
     double temp_double_tos;
     float temp_float_tos;
-    u16 temp_pc;
+    s32 temp_pc;
   } spill;
 
   int64_t int_tos = (sp_ - 1)->l;
@@ -2771,13 +2783,13 @@ static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn
 }
 
 [[maybe_unused]] __attribute__((noinline)) static s64 entry_notco_no_stepping(vm_thread *thread, stack_frame *frame,
-                                                                              bytecode_insn *code, u16 pc_,
+                                                                              bytecode_insn *code, s32 pc_,
                                                                               stack_value *sp_, unsigned handler_i) {
   return entry_notco_impl(thread, frame, code, pc_, sp_, handler_i, false);
 }
 
 [[maybe_unused]] __attribute__((noinline)) static s64 entry_notco_with_stepping(vm_thread *thread, stack_frame *frame,
-                                                                                bytecode_insn *code, u16 pc_,
+                                                                                bytecode_insn *code, s32 pc_,
                                                                                 stack_value *sp_, unsigned handler_i) {
   return entry_notco_impl(thread, frame, code, pc_, sp_, handler_i, true);
 }
@@ -2930,7 +2942,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
   interpret_begin:
     plain_frame *frame = get_plain_frame(frame_);
     stack_value *sp_ = &frame->stack[stack_depth(frame_)];
-    u16 pc_ = frame->program_counter;
+    s32 pc_ = frame->program_counter;
     bytecode_insn *insns = frame_->method->code->code;
     [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 

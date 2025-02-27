@@ -150,7 +150,6 @@ DECLARE_NATIVE("java/lang", Class, forName0,
                "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
   obj_header *name_obj = args[0].handle->obj;
-
   obj_header *classloader = args[2].handle->obj;
 
   heap_string name_str = AsHeapString(name_obj, oom);

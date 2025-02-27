@@ -1,8 +1,6 @@
 #ifndef EXCEPTIONS_INL_H_
 #define EXCEPTIONS_INL_H_
 
-#include "objects.h"
-
 #include <bjvm.h>
 
 // Set thread->current_exception, and also record data about the origin of the exception.
