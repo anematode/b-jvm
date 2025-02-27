@@ -59,12 +59,12 @@
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 41000000) { \
+  if (tick++ > 0 && (strstr(frame->method->name.chars, "addUnmatched") != nullptr) || strstr(frame->method->name.chars, "Constraints") != nullptr) { \
   SPILL_VOID    \
   printf("Frame method: %p\n", frame->method); \
   cp_method *m = frame->method;                                                                                        \
-  printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d\n", fmt_slice(m->name),                              \
-         fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__);                                   \
+  printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %d\n", fmt_slice(m->name),                              \
+         fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__, tick);                                   \
   heap_string s = insn_to_string(insn, pc);                                                                            \
   printf("Insn kind: %.*s\n", fmt_slice(s));                                                                           \
   free_heap_str(s);                                                                                                    \

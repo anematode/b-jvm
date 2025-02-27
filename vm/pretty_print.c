@@ -381,7 +381,7 @@ heap_string insn_to_string(const bytecode_insn *insn, int insn_index) {
   write = build_str(&result, write, "%s ", insn_code_to_string(insn->kind));
   if (insn->kind <= insn_swap) {
     // no operands
-  } else if (insn->kind <= insn_ldc2_w) {
+  } else if (insn->kind <= insn_ldc2_w || insn->kind == insn_invokeinterface) {
     // indexes into constant pool
     char *cp_str = cp_entry_to_string(insn->cp);
     build_str(&result, write, "%s", cp_str);
