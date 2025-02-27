@@ -1731,6 +1731,8 @@ DEFINE_ASYNC(resolve_invokestatic) {
   self->args.insn_->ic = info->resolved;
   self->args.insn_->args = info->descriptor->args_count;
 
+  mark_insn_returns(self->args.insn_);
+
   ASYNC_END(0);
 }
 
@@ -1741,7 +1743,6 @@ __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
   if (thread->current_exception)
     return 0;
 
-  mark_insn_returns(insn);
   if (intrinsify(insn)) {
     STACK_POLYMORPHIC_JMP(*(sp - 1));
   }
@@ -2010,7 +2011,6 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   if (thread->current_exception)
     return 0;
 
-  mark_insn_returns(insn);
   method_info = &insn->cp->methodref;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
     insn->kind = insn_invokevirtual;
@@ -2033,6 +2033,7 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   insn->ic = method;
   insn->ic2 = target->descriptor;
   insn->kind = insn_invokeitable_monomorphic;
+  mark_insn_returns(insn);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokeinterface)
