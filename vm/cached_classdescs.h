@@ -7,6 +7,10 @@
 
 #include "bjvm.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define __CACHED_EXCEPTION_CLASSES(X)                                                                                  \
   X(string, "java/lang/String")                                                                                        \
   X(class_not_found_exception, "java/lang/ClassNotFoundException")                                                     \
@@ -37,7 +41,8 @@
   X(illegal_monitor_state_exception, "java/lang/IllegalMonitorStateException")                                         \
   X(internal_error, "java/lang/InternalError")                                         \
   X(verify_error, "java/lang/VerifyError")                                                                            \
-  X(illegal_state_exception, "java/lang/IllegalStateException")
+  X(illegal_state_exception, "java/lang/IllegalStateException") \
+  X(unix_exception, "sun/nio/fs/UnixException")
 
 #define __CACHED_REFLECTION_CLASSES(X)                                                                                 \
   X(klass, "java/lang/Class")                                                                                          \
@@ -89,6 +94,10 @@ struct cached_classdescs {
 
 // should be layout-compatible with an array of pointers
 static_assert(sizeof(struct cached_classdescs) == sizeof(struct cached_classdescs *[cached_classdesc_count]));
+
+#ifdef __cplusplus
+}
+#endif
 
 #undef __CACHED_EXCEPTION_CLASSES
 #undef __CACHED_REFLECTION_CLASSES

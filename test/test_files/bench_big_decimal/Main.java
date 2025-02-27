@@ -3,13 +3,13 @@ import java.math.RoundingMode;
 
 public class Main {
     public static void main(String[] args) {
-        BigDecimalTest.testBigDecimalOperations();
+        BigDecimalTest.testBigDecimalOperations(Integer.parseInt(args[0]));
     }
 }
 
 class BigDecimalTest {
-    static void testBigDecimalOperations() {
-        for (int i = 0; i < 1024; ++i) {
+    static void testBigDecimalOperations(int count) {
+        for (int i = 0; i < count; ++i) {
         BigDecimal a = new BigDecimal("10.5");
         BigDecimal b = new BigDecimal("2.3");
         BigDecimal result = a.add(b);

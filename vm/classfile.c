@@ -1746,6 +1746,13 @@ void link_bootstrap_methods(classdesc *cf) {
   }
 }
 
+int no_smt_found(attribute_code * code) {
+  for (int i = 0; i < code->attributes_count; i++)
+    if (code->attributes[i].kind == ATTRIBUTE_KIND_STACK_MAP_TABLE)
+      return 0;
+  return 1;
+}
+
 parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, heap_string *error) {
   cf_byteslice reader = {.bytes = bytes, .len = len};
   classdesc *cf = result;
@@ -1774,9 +1781,8 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   u16 minor = reader_next_u16(&reader, "minor version");
   u16 major = reader_next_u16(&reader, "major version");
 
-  // TODO check these
+  bool maybe_missing_smt = major < 50;
   (void)minor;
-  (void)major;
 
   cf->pool = parse_constant_pool(&reader, &ctx);
   cf->access_flags = reader_next_u16(&reader, "access flags");
@@ -1835,6 +1841,7 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
     cp_method *method = cf->methods + i;
     *method = parse_method(&reader, &ctx);
     method->my_class = result;
+    method->missing_smt = maybe_missing_smt && method->code && no_smt_found(method->code);
 
     // Mark signature polymorphic functions
     if (in_MethodHandle && method->access_flags & ACCESS_NATIVE) {

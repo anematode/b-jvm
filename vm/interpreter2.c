@@ -58,7 +58,7 @@
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (cow++ > 22000000) { \
+  if (cow++ > 41000000) { \
   SPILL_VOID    \
   printf("Frame method: %p\n", frame->method); \
   cp_method *m = frame->method;                                                                                        \
@@ -725,6 +725,8 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
       *cont = (continuation_frame){.pnt = CONT_RESOLVE, .ctx.resolve_insn = ctx};                                      \
       return 0;                                                                                                        \
     }                                                                                                                  \
+    if (thread->current_exception) \
+      return 0; \
   } while (0)
 
 __attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
@@ -1851,8 +1853,8 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   ctx.args.info = &insn->cp->methodref;
   thread->stack.synchronous_depth++; // TODO remove
   future_t fut = resolve_methodref(&ctx);
-  thread->stack.synchronous_depth--;
   CHECK(fut.status == FUTURE_READY);
+  thread->stack.synchronous_depth--;
   if (thread->current_exception) {
     return 0;
   }

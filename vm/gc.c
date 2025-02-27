@@ -34,8 +34,8 @@ int in_heap(const vm *vm, object field) {
     }                                                                                                                  \
   }
 
-void check_duplicate_root(gc_ctx *ctx, object *root) {
-#if DCHECKS_ENABLED
+void check_duplicate_root([[maybe_unused]] gc_ctx *ctx, [[maybe_unused]] object *root) {
+#if 0
   for (int i = 0; i < arrlen(ctx->roots); ++i) {
     if (ctx->roots[i] == root) {
       fprintf(stderr, "Duplicate root %p\n", root);
@@ -48,6 +48,7 @@ void check_duplicate_root(gc_ctx *ctx, object *root) {
 static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
   // Push the mirrors of this base class and all of its array types
   PUSH_ROOT(&desc->classloader);
+  PUSH_ROOT(&desc->linkage_error);
 
   classdesc *array = desc;
   while (array) {

@@ -742,6 +742,8 @@ typedef struct cp_method {
   attribute *attributes;
   attribute_code *code;
 
+  // Whether the method may be missing a StackMapTable because it's in an old class file
+  bool missing_smt;
   bool is_signature_polymorphic;
   // Whether the method is a constructor (i.e., its name is <init>)
   bool is_ctor;
@@ -851,6 +853,7 @@ typedef struct classdesc {
 
   module *module;
   void *classloader; // parent classloader (static-ish lifetime)
+  void *linkage_error;
 
   vtable vtable;
   itables itables;

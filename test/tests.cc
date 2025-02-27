@@ -159,7 +159,9 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
 
   for (int i = 0; i < 10; ++i)
     expected += expected; // repeat 1024 times
-  auto result = run_test_case("test_files/bench_big_decimal/");
+  auto result = run_test_case("test_files/bench_big_decimal/", true, "Main", "", {
+    "1024"
+  });
   REQUIRE(result.stdout_ == expected);
 }
 
@@ -713,9 +715,27 @@ Test
 )");
 }
 
+TEST_CASE("The algorithms") {
+  auto result = run_test_case("test_files/the_algorithms/assertj-core-3.26.3.jar:"
+    "test_files/the_algorithms/commons-collections4-4.4.jar:"
+    "test_files/the_algorithms/commons-lang3-3.17.0.jar:"
+    "test_files/the_algorithms/junit-platform-console-standalone-1.12.0.jar:"
+    "test_files/the_algorithms/Java-1.0-SNAPSHOT.jar:"
+    "test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar", false, "org/junit/platform/console/ConsoleLauncher", "",
+    {
+      "-cp=test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar",
+      "--scan-class-path"
+    });
+}
+
 TEST_CASE("URLClassLoader") {
   auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
   REQUIRE(result.stdout_ == "Hello, world!\n");
+}
+
+TEST_CASE("Name of array class") {
+  auto result = run_test_case("test_files/name_of_array_class/", true, "NameOfArrayClass");
+  REQUIRE(result.stdout_ == "[Ljava.lang.String;\n");
 }
 
 TEST_CASE("frem and drem") {
@@ -730,6 +750,13 @@ TEST_CASE("Manually thrown exception") {
   auto result = run_test_case("test_files/manually_thrown", true, "ManuallyThrown");
   REQUIRE(result.stderr_ == "java.lang.NullPointerException\n\tat ManuallyThrown.cow(ManuallyThrown.java:11)\n\tat "
                             "ManuallyThrown.main(ManuallyThrown.java:4)\n");
+}
+
+TEST_CASE("Fannkuch redux multithreaded") {
+  auto result = run_scheduled_test_case("test_files/fannkuch_multithreaded/", true, "fannkuchredux");
+  REQUIRE(result.stdout_ == R"(73196
+Pfannkuchen(10) = 38
+)");
 }
 
 #if 0

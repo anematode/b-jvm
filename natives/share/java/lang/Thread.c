@@ -91,6 +91,10 @@ DECLARE_NATIVE("java/lang", Thread, clearInterruptEvent, "()V") {
   return value_null(); // openjdk only does something here on Windows devices
 }
 
+DECLARE_NATIVE("java/lang", Thread, setNativeName, "(Ljava/lang/String;)V") {
+  return value_null();
+}
+
 DECLARE_ASYNC_NATIVE("java/lang", Thread, yield0, "()V", locals(rr_wakeup_info wakeup_info), invoked_methods()) {
   // Thread.yield has no synchronization semantics (JLS 17.9);
   // the JVM is free to implement it as a no-op or treat it as a scheduling hint.

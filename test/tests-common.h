@@ -44,10 +44,10 @@ struct ScheduledTestCaseResult : TestCaseResult {
 };
 
 void print_method_sigs();
-TestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main",
-                             std::string input = "");
+ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio = true, std::string main_class = "Main",
+                             std::string input = "", std::vector<std::string> args = {});
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio = true,
-                                                std::string main_class = "Main", std::string input = "");
+                                                std::string main_class = "Main", std::string input = "", std::vector<std::string> args = {});
 } // namespace Bjvm::Tests
 
 #endif // TESTS_COMMON_H

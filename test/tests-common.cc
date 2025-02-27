@@ -11,8 +11,11 @@
 #include "doctest/doctest.h"
 
 #include <algorithm>
+#include <arrays.h>
+#include <cached_classdescs.h>
 #include <fstream>
 #include <iostream>
+#include <objects.h>
 #include <optional>
 #include <profiler.h>
 #include <string>
@@ -171,8 +174,8 @@ void print_method_sigs() {
   }
 }
 
-TestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::string main_class, std::string input) {
-  return run_scheduled_test_case(std::move(classpath), capture_stdio, std::move(main_class), std::move(input));
+ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::string main_class, std::string input, std::vector<std::string> args) {
+  return run_scheduled_test_case(std::move(classpath), capture_stdio, std::move(main_class), std::move(input), std::move(args));
 }
 
 #ifdef EMSCRIPTEN
@@ -180,7 +183,7 @@ static void busy_wait(double us) { EM_ASM("const endAt = Date.now() + $0 / 1000;
 #endif
 
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio, std::string main_class,
-                                                std::string input) {
+                                                std::string input, std::vector<std::string> string_args) {
   printf("Classpath: %s\n", classpath.c_str());
   vm_options options = default_vm_options();
 
@@ -238,10 +241,20 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   rr_scheduler_init(&scheduler, vm);
   vm->scheduler = &scheduler;
 
-  stack_value args[1] = {{.obj = nullptr}};
+  handle *string_args_as_object = make_handle(thread,
+    CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
+  for (size_t i = 0; i < string_args.size(); i++) {
+    object str = MakeJStringFromCString(thread, string_args[i].c_str(), true);
+    ReferenceArrayStore(string_args_as_object->obj, (int)i, str);
+  }
+
+  stack_value args[1] = {{.obj = string_args_as_object->obj}};
+  drop_handle(thread, string_args_as_object);
+
+  profiler *prof = launch_profiler(thread);
 
   call_interpreter_t ctx = {{thread, method, args}};
-  rr_scheduler_run(&scheduler, ctx);
+  execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
   while (true) {
     auto status = rr_scheduler_step(&scheduler);
@@ -262,7 +275,13 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
       usleep(sleep_for);
 #endif
     }
+
+    if (record->status != SCHEDULER_RESULT_MORE)
+      break;
   }
+
+  char *profiler_data = read_profiler(prof);
+  free(profiler_data);
 
   if (thread->current_exception) {
     method =
@@ -284,9 +303,9 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
       std::cerr << result.stderr_;
   }
 
+  rr_scheduler_uninit(&scheduler);
   free_thread(thread);
   free_vm(vm);
-  rr_scheduler_uninit(&scheduler);
 
   return result;
 }

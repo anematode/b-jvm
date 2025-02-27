@@ -131,6 +131,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
     int status = link_class(thread, super);
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
+      cd->linkage_error = thread->current_exception;
       return status;
     }
   }
@@ -142,6 +143,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
     int status = link_class(thread, cd->interfaces[i]->classdesc);
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
+      cd->linkage_error = thread->current_exception;
       return status;
     }
   }
@@ -163,6 +165,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
       if (result != 0) {
         cd->state = CD_STATE_LINKAGE_ERROR;
         raise_verify_error(thread, hslc(error_str));
+        cd->linkage_error = thread->current_exception;
         free_heap_str(error_str);
         return -1;
       }

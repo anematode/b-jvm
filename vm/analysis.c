@@ -115,11 +115,14 @@ struct edge {
 struct method_analysis_ctx {
   const attribute_code *code;
   analy_stack_state stack, locals;
-  bool stack_terminated;
   int *locals_swizzle;
   char *insn_error;
   heap_string *error;
   struct edge *edges;
+
+  analy_stack_state **known_stacks;
+  analy_stack_state **known_locals;
+  bool changed;
 };
 
 // Pop a value from the analysis stack and return it.
@@ -171,10 +174,47 @@ struct method_analysis_ctx {
       goto local_type_mismatch;                                                                                        \
   }
 
+
+
+void copy_analy_stack_state(analy_stack_state * dst, const analy_stack_state * src) {
+  if (dst->entries_cap < src->count) {
+    void *reallocated = realloc(dst->entries, src->count * sizeof(analy_stack_entry));
+    CHECK(reallocated);
+    dst->entries = reallocated;
+  }
+  dst->count = src->count;
+  for (int i = 0; i < src->count; ++i) {
+    dst->entries[i] = src->entries[i];
+  }
+}
+
+void intersect_analy_stack_state(struct method_analysis_ctx *ctx, analy_stack_state **dst, const analy_stack_state *src) {
+  if (!*dst) {
+    *dst = calloc(1, sizeof(analy_stack_state));
+    copy_analy_stack_state(*dst, src);
+    ctx->changed = true;
+  } else {
+    // Take the minimum of the entries, then compare each type. For any differing type, set the dst type to VOID.
+    int min_entries = (*dst)->count < src->count ? (*dst)->count : src->count;
+    (*dst)->count = min_entries;
+    for (int i = 0; i < min_entries; ++i) {
+      type_kind *dst_type = &(*dst)->entries[i].type;
+      if (*dst_type != src->entries[i].type && *dst_type != TYPE_KIND_VOID) {
+        *dst_type = TYPE_KIND_VOID;
+        ctx->changed = true;
+      }
+    }
+  }
+}
+
 int push_branch_target(struct method_analysis_ctx *ctx, u32 curr, u32 target) {
   DCHECK((int)target < ctx->code->insn_count);
   struct edge e = (struct edge){.start = curr, .end = target};
   arrput(ctx->edges, e);
+  if (ctx->known_stacks) {
+    intersect_analy_stack_state(ctx, &ctx->known_stacks[target], &ctx->stack);
+    intersect_analy_stack_state(ctx, &ctx->known_locals[target], &ctx->locals);
+  }
   return 0;
 }
 
@@ -198,9 +238,11 @@ void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind *reduc
   }
 }
 
-int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analysis_ctx *ctx) {
+int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analysis_ctx *ctx, bool *state_terminated, bool do_rewrite) {
   // Add top of stack type before the instruction executes
   calculate_tos_type(ctx, &insn->tos_before);
+
+#define REWRITE(kind_) if (do_rewrite) insn->kind = kind_;
 
   switch (insn->kind) {
   case insn_nop:
@@ -214,13 +256,13 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     PUSH(REFERENCE) break;
   case insn_areturn:
     POP(REFERENCE)
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   case insn_arraylength:
     POP(REFERENCE) PUSH(INT) break;
   case insn_athrow:
     POP(REFERENCE)
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   case insn_baload:
   case insn_caload:
@@ -255,7 +297,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     POP(DOUBLE) PUSH(DOUBLE) break;
   case insn_dreturn:
     POP(DOUBLE)
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   case insn_dup: {
     if (ctx->stack.count == 0)
@@ -277,7 +319,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     if (is_kind_wide(to_dup.type))
       goto stack_type_mismatch;
     if (is_kind_wide(kind2.type)) {
-      PUSH_ENTRY(to_dup) PUSH_ENTRY(kind2) insn->kind = insn_dup_x1;
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(kind2) REWRITE(insn_dup_x1);
     } else {
       kind3 = POP_VAL;
       PUSH_ENTRY(to_dup) PUSH_ENTRY(kind3) PUSH_ENTRY(kind2)
@@ -288,7 +330,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_dup2: {
     analy_stack_entry to_dup = POP_VAL, kind2;
     if (is_kind_wide(to_dup.type)) {
-      PUSH_ENTRY(to_dup) PUSH_ENTRY(to_dup) insn->kind = insn_dup;
+      PUSH_ENTRY(to_dup) PUSH_ENTRY(to_dup) REWRITE(insn_dup);
     } else {
       kind2 = POP_VAL;
       if (is_kind_wide(kind2.type))
@@ -301,7 +343,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     analy_stack_entry to_dup = POP_VAL, kind2 = POP_VAL, kind3;
     if (is_kind_wide(to_dup.type)) {
       PUSH_ENTRY(to_dup)
-      PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = insn_dup_x1;
+      PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) REWRITE(insn_dup_x1);
     } else {
       kind3 = POP_VAL;
       if (is_kind_wide(kind3.type))
@@ -316,14 +358,14 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     if (is_kind_wide(to_dup.type)) {
       if (is_kind_wide(kind2.type)) {
         PUSH_ENTRY(to_dup)
-        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = insn_dup_x1;
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) REWRITE(insn_dup_x1);
       } else {
         kind3 = POP_VAL;
         if (is_kind_wide(kind3.type))
           goto stack_type_mismatch;
         PUSH_ENTRY(to_dup)
         PUSH_ENTRY(kind3)
-        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = insn_dup_x2;
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) REWRITE(insn_dup_x2);
       }
     } else {
       kind3 = POP_VAL;
@@ -331,7 +373,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
         PUSH_ENTRY(kind2)
         PUSH_ENTRY(to_dup)
         PUSH_ENTRY(kind3)
-        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) insn->kind = insn_dup2_x1;
+        PUSH_ENTRY(kind2) PUSH_ENTRY(to_dup) REWRITE(insn_dup2_x1);
       } else {
         kind4 = POP_VAL;
         if (is_kind_wide(kind4.type))
@@ -377,7 +419,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_freturn: {
     POP(FLOAT)
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   case insn_i2b:
@@ -413,6 +455,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     POP(INT) PUSH(INT) break;
   }
   case insn_ireturn: {
+    *state_terminated = true;
     POP(INT);
     break;
   }
@@ -454,7 +497,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_lreturn: {
     POP(LONG)
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   case insn_monitorenter: {
@@ -478,12 +521,12 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
       if (is_kind_wide(kind2.type))
         goto stack_type_mismatch;
     } else {
-      insn->kind = insn_pop;
+      REWRITE(insn_pop);
     }
     break;
   }
   case insn_return: {
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   case insn_swap: {
@@ -562,10 +605,10 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
                      : ent->kind == CP_KIND_FLOAT ? TYPE_KIND_FLOAT
                                                   : TYPE_KIND_REFERENCE;
     PUSH_ENTRY(insn_source(kind, insn_index))
-    if (ent->kind == CP_KIND_INTEGER) { // rewrite to iconst or lconst
+    if (ent->kind == CP_KIND_INTEGER && do_rewrite) { // rewrite to iconst or lconst
       insn->kind = insn_iconst;
       insn->integer_imm = (s32)ent->integral.value;
-    } else if (ent->kind == CP_KIND_FLOAT) {
+    } else if (ent->kind == CP_KIND_FLOAT && do_rewrite) {
       insn->kind = insn_fconst;
       insn->f_imm = (float)ent->floating.value;
     }
@@ -575,10 +618,10 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     cp_entry *ent = check_cp_entry(insn->cp, CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w argument");
     type_kind kind = ent->kind == CP_KIND_DOUBLE ? TYPE_KIND_DOUBLE : TYPE_KIND_LONG;
     PUSH_ENTRY(insn_source(kind, insn_index))
-    if (ent->kind == CP_KIND_LONG) {
+    if (ent->kind == CP_KIND_LONG && do_rewrite) {
       insn->kind = insn_lconst;
       insn->integer_imm = ent->integral.value;
-    } else {
+    } else if (do_rewrite) {
       insn->kind = insn_dconst;
       insn->d_imm = ent->floating.value;
     }
@@ -647,7 +690,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_goto: {
     if (push_branch_target(ctx, insn_index, insn->index))
       goto error;
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   case insn_jsr: {
@@ -717,7 +760,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     for (int i = 0; i < insn->tableswitch->targets_count; ++i)
       if (push_branch_target(ctx, insn_index, insn->tableswitch->targets[i]))
         goto error;
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   case insn_lookupswitch: {
@@ -727,7 +770,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     for (int i = 0; i < insn->lookupswitch->targets_count; ++i)
       if (push_branch_target(ctx, insn_index, insn->lookupswitch->targets[i]))
         goto error;
-    ctx->stack_terminated = true;
+    *state_terminated = true;
     break;
   }
   default: // instruction shouldn't come out of the parser
@@ -841,7 +884,7 @@ void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack, stac
   case insn_invokeinterface:
   case insn_invokespecial: { // Trying to invoke on an object
     int argc = insn->cp->methodref.descriptor->args_count;
-    *a = stack->entries[sd - argc].source;
+    *a = stack->entries[sd - argc - 1].source;
     break;
   }
   case insn_arraylength:
@@ -856,6 +899,43 @@ void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack, stac
     break;
   }
 }
+
+void free_analy_stack_state(analy_stack_state *st) {
+  if (!st)
+    return;
+  free(st->entries);
+  free(st);
+}
+
+static void fill_exception_handlers(struct method_analysis_ctx *ctx) {
+  attribute_exception_table *et = ctx->code->exception_table;
+  if (et) {
+    analy_stack_state state;
+    analy_stack_entry one_ref[1] = {
+      {.type = TYPE_KIND_REFERENCE}
+    };
+    state.entries = one_ref;
+    state.count = 1;
+    state.entries_cap = 1;
+    for (int i = 0; i < et->entries_count; ++i) {
+      exception_table_entry *entry = &et->entries[i];
+      intersect_analy_stack_state(ctx, &ctx->known_stacks[entry->handler_insn], &state);
+    }
+  }
+}
+
+static void intersect_exception_handlers(struct method_analysis_ctx *ctx, int insn_i) {
+  attribute_exception_table *et = ctx->code->exception_table;
+  if (!et)
+    return;
+  for (int i = 0; i < et->entries_count; ++i) {
+    exception_table_entry *entry = &et->entries[i];
+    if (entry->start_insn <= insn_i && insn_i < entry->end_insn) {
+      intersect_analy_stack_state(ctx, &ctx->known_locals[entry->handler_insn], &ctx->locals);
+    }
+  }
+}
+
 /**
  * Analyze the method's code attribute if it exists, rewriting instructions in
  * place to make longs/doubles one stack value wide, writing the analysis into
@@ -864,6 +944,7 @@ void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack, stac
 int analyze_method_code(cp_method *method, heap_string *error) {
   attribute_code *code = method->code;
   arena *arena = &method->my_class->arena;
+  bool missing_smt = method->missing_smt;  // smt = StackMapTable
   if (!code || method->code_analysis) {
     return 0;
   }
@@ -898,9 +979,6 @@ int analyze_method_code(cp_method *method, heap_string *error) {
 
   code_analysis *analy = method->code_analysis = malloc(sizeof(code_analysis));
 
-  stack_map_frame_iterator iter;
-  stack_map_frame_iterator_init(&iter, method);
-
   analy->insn_count = code->insn_count;
   analy->dominator_tree_computed = false;
   analy->blocks = nullptr;
@@ -908,6 +986,26 @@ int analyze_method_code(cp_method *method, heap_string *error) {
   analy->sources = arena_alloc(arena, code->insn_count, sizeof(*analy->sources));
   analy->stack_states = arena_alloc(arena, code->insn_count, sizeof(stack_summary *));
 
+  bool finished_filtration = !missing_smt;  // true if we have an SMT (and can do this in one pass)
+
+  // Only used if missing_smt is true
+  ctx.known_stacks = nullptr;
+  ctx.known_locals = nullptr;
+  if (missing_smt) {
+    ctx.known_stacks = calloc(code->insn_count, sizeof(analy_stack_state *));
+    ctx.known_locals = calloc(code->insn_count, sizeof(analy_stack_state *));
+    // Fill in known_stacks with Throwable exception handlers
+    fill_exception_handlers(&ctx);
+  }
+
+  stack_map_frame_iterator iter;
+  if (0) {
+    analyze:  // re-start analysis from the beginning, allowing us to filter locals/stack
+    stack_map_frame_iterator_uninit(&iter);
+  }
+  stack_map_frame_iterator_init(&iter, method);
+
+  bool state_terminated = true;  // we don't know the state of the stack or locals
   for (int i = 0; i < code->insn_count; ++i) {
     bytecode_insn *insn = &code->code[i];
     if (insn->original_pc == iter.pc) {
@@ -921,6 +1019,19 @@ int analyze_method_code(cp_method *method, heap_string *error) {
           goto inval;
         }
       }
+    } else if (missing_smt) {
+      if (state_terminated) {  // should be able to recover
+        CHECK(ctx.known_stacks[i]);
+        CHECK(ctx.known_locals[i]);
+        copy_analy_stack_state(&ctx.stack, ctx.known_stacks[i]);
+        copy_analy_stack_state(&ctx.locals, ctx.known_locals[i]);
+      } else {
+        // Intersect the current stack state with the known state
+        intersect_analy_stack_state(&ctx, &ctx.known_stacks[i], &ctx.stack);
+        intersect_analy_stack_state(&ctx, &ctx.known_locals[i], &ctx.locals);
+      }
+      // at each possibly relevant exception handler, also intersect the locals state
+      intersect_exception_handlers(&ctx, i);
     }
 
     analy_stack_state *stack = &ctx.stack;
@@ -929,21 +1040,33 @@ int analyze_method_code(cp_method *method, heap_string *error) {
     write_npe_sources(insn, stack, &analy->sources[i].a, &analy->sources[i].b);
 
     insn_index_to_stack_depth[i] = stack->count;
-    size_t summary_size = sizeof(stack_summary) + (stack->count + ctx.locals.count) * sizeof(type_kind);
-    stack_summary *summary = arena_alloc(arena, 1, summary_size);
-    analy->stack_states[i] = summary;
+    if (finished_filtration) {  // happens last in the missing_smt case
+      size_t summary_size = sizeof(stack_summary) + (stack->count + ctx.locals.count) * sizeof(type_kind);
+      stack_summary *summary = arena_alloc(arena, 1, summary_size);
+      analy->stack_states[i] = summary;
     
-    summary->locals = ctx.locals.count;
-    summary->stack = stack->count;
-    for (int summary_i = 0; summary_i < stack->count; ++summary_i)
-      summary->entries[summary_i] = stack->entries[summary_i].type;
-    for (int j = 0; j < ctx.locals.count; ++j)
-      summary->entries[stack->count + j] = ctx.locals.entries[j].type;
+      summary->locals = ctx.locals.count;
+      summary->stack = stack->count;
+      for (int summary_i = 0; summary_i < stack->count; ++summary_i)
+        summary->entries[summary_i] = stack->entries[summary_i].type;
+      for (int j = 0; j < ctx.locals.count; ++j)
+        summary->entries[stack->count + j] = ctx.locals.entries[j].type;
+    }
 
-    if (analyze_instruction(insn, i, &ctx)) {
+    state_terminated = false;
+    if (analyze_instruction(insn, i, &ctx, &state_terminated, finished_filtration)) {
       result = -1;
       goto inval;
     }
+  }
+
+  if (ctx.changed) {
+    ctx.changed = false;
+    goto analyze;
+  }
+  if (!finished_filtration) {
+    finished_filtration = true;
+    goto analyze;
   }
 
 inval:
@@ -951,6 +1074,14 @@ inval:
   free(ctx.stack.entries);
   free(ctx.locals.entries);
   free(ctx.locals_swizzle);
+
+  if (missing_smt) {
+    for (int i = 0; i < code->insn_count; ++i) {
+      free_analy_stack_state(ctx.known_stacks[i]);
+      free_analy_stack_state(ctx.known_locals[i]);
+    }
+  }
+
   arrfree(ctx.edges);
 
   return result;

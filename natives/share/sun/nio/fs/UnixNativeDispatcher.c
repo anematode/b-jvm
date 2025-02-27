@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 static obj_header *create_unix_exception(vm_thread *thread, int errno_code) {
-  classdesc *classdesc = bootstrap_lookup_class(thread, STR("sun/nio/fs/UnixException"));
+  classdesc *classdesc = cached_classes(thread->vm)->unix_exception;
   obj_header *obj = new_object(thread, classdesc);
 
   cp_method *method = method_lookup(classdesc, STR("<init>"), STR("(I)V"), true, false);
@@ -98,6 +98,15 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, open0, "(JII)I") {
   return value_null();
 }
 
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, access0, "(JI)I") {
+  int result = access((char const *)args[0].l, args[1].i);
+  if (result == 0)
+    return (stack_value){.i = 0};
+
+  thread->current_exception = create_unix_exception(thread, errno);
+  return value_null();
+}
+
 DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, size0, "(Ljava/io/FileDescriptor;)J") {
   DCHECK(args[0].handle->obj);
   int fd = LoadFieldInt(args[0].handle->obj, "fd");
@@ -144,5 +153,17 @@ DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, unmap0, "(JJ)V") {
   }
   return value_null();
 }
+
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, strerror, "(I)[B") {
+  char *msg = strerror(args[0].i);
+  size_t len = strlen(msg);
+  obj_header *array = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  if (!array) {
+    return value_null();
+  }
+  memcpy(ArrayData(array), msg, len);
+  return (stack_value){.obj = array};
+}
+
 
 DECLARE_NATIVE("sun/nio/ch", FileDispatcherImpl, init0, "()V") { return value_null(); }

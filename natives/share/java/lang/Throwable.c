@@ -64,9 +64,12 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
       goto oom;
     E->methodName = o;
     attribute_source_file *sf = method->my_class->source_file;
-    o = sf ? MakeJStringFromModifiedUTF8(thread, sf->name, true) : nullptr;
-    if (!o)
-      goto oom;
+    if (sf) {
+      o = MakeJStringFromModifiedUTF8(thread, sf->name, true);
+      if (!o)
+        goto oom;
+    }
+
     E->fileName = o;
     E->lineNumber = line;
     *((void **)ArrayData(stack_trace->obj) + j) = e->obj;

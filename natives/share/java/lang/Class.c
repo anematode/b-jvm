@@ -173,6 +173,9 @@ DECLARE_NATIVE("java/lang", Class, forName0,
     c = unmirror_class(result.obj);
   }
 
+  if (thread->current_exception)
+    return value_null();
+
   int error = link_class(thread, c);
   CHECK(!error);
 

@@ -6,6 +6,10 @@
 #ifndef OBJECTS_H
 #define OBJECTS_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 u64 ObjNextHashCode();
 
 typedef enum : s32 { STRING_CODER_LATIN1 = 0, STRING_CODER_UTF16 = 1 } string_coder_kind;
@@ -46,5 +50,9 @@ static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, si
 
 // Get the hash code of the object, computing it if it is not already computed.
 s32 get_object_hash_code(vm *vm, object o);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
