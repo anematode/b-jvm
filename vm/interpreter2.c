@@ -1542,7 +1542,7 @@ static s64 if_acmpeq_impl_int(ARGS_INT) {
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
   int old_pc = pc;
-  pc = a == b ? (insn->index - 1) : pc;
+  pc = a == b ? ((s32)insn->index - 1) : pc;
   insns += pc - old_pc;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1))
@@ -1553,7 +1553,7 @@ static s64 if_acmpne_impl_int(ARGS_INT) {
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
   int old_pc = pc;
-  pc = a != b ? (insn->index - 1) : pc;
+  pc = a != b ? ((s32)insn->index - 1) : pc;
   insns += pc - old_pc;
   sp -= 2;
   STACK_POLYMORPHIC_NEXT(*(sp - 1))
