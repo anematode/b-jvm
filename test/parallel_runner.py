@@ -37,19 +37,31 @@ data = tuple([[x[0], x[-1]] for x in data])
 # for 8 cores and 100 tests the ranges will look like this
 # ([1, 13], [14, 26], [27, 39], [40, 52], [53, 65], [66, 78], [79, 91], [92, 100])
 
+# https://stackoverflow.com/a/4417735/13458117
+def execute(cmd):
+    popen = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+    for stdout_line in iter(popen.stdout.readline, ""):
+        yield stdout_line
+    popen.stdout.close()
+    return_code = popen.wait()
+
 # the worker callback that runs the executable for the given range of tests
 def worker(pair):
     first, last = pair
     program_with_args = [*sys.argv[1:], "--dt-first=" + str(first), "--dt-last=" + str(last)]
-    process = subprocess.Popen(program_with_args)
-    process.wait()
-    return process.returncode
+    zero_failed = False
+    for line in execute(program_with_args):
+        print(line, end="")
+        if "0 failed" in line:
+            zero_failed = True
+    # Look for "0 failed" in stdout
+    return zero_failed
 
 # run the tasks on a pool
 if __name__ == '__main__':
     with multiprocessing.Pool(cores) as p:
         processes = [*p.map(worker, data)]
-        for j, i in enumerate(processes):
-            if i != 0:
-                print("AT LEAST ONE TEST FAILED! (process " + str(j) + " returned exit code " + str(i) + ")")
+        for j, zero_failed in enumerate(processes):
+            if not zero_failed:
+                print("AT LEAST ONE TEST FAILED! (process " + str(j) + " had at least one failure)")
                 sys.exit(1)

@@ -52,14 +52,14 @@
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
-[[maybe_unused]] int cow = 0;
+[[maybe_unused]] int tick = 0;  // for debugging
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (cow++ > 41000000) { \
+  if (tick++ > 41000000) { \
   SPILL_VOID    \
   printf("Frame method: %p\n", frame->method); \
   cp_method *m = frame->method;                                                                                        \
@@ -72,8 +72,8 @@
   }
 #endif
 
-// If true, use a sequence of tail calls rather than computed goto. We try to make the code reasonably generic to handle
-// both cases efficiently.
+// If DO_TAILS is true, use a sequence of tail calls rather than computed goto. We try to make the code reasonably
+// generic to handle both cases efficiently. The macros necessary for the code to be semi-readable are defined here.
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
@@ -87,10 +87,13 @@
 #define pc pc_
 #define tos tos_
 
+// Arguments common to all TOS kinds.
 #define ARGS_BASE                                                                                                      \
   [[maybe_unused]] vm_thread *thread, [[maybe_unused]] stack_frame *frame, [[maybe_unused]] bytecode_insn *insns,      \
       [[maybe_unused]] s32 pc_, [[maybe_unused]] stack_value *sp_
 
+// Arguments wherein the special TOS is called "tos", and the other arguments are named arg_1, arg_2, arg_3, where
+// arg_1 is the integer argument, arg_2 is the float argument, and arg_3 is the double argument.
 #define ARGS_VOID ARGS_BASE, [[maybe_unused]] s64 arg_1, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
 #define ARGS_INT ARGS_BASE, [[maybe_unused]] s64 tos_, [[maybe_unused]] float arg_2, [[maybe_unused]] double arg_3
 #define ARGS_DOUBLE ARGS_BASE, [[maybe_unused]] s64 arg_1, [[maybe_unused]] float arg_2, [[maybe_unused]] double tos_
