@@ -64,6 +64,10 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   object parameterTypes =
       CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
   C->parameterTypes = parameterTypes;
+  object exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
+  C->exceptionTypes = exceptionTypes;
+  C->slot = (s32)method->my_index;
+  // TODO parse these ^^
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
@@ -136,6 +140,7 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
   M->returnType = mirror;
   object exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
   M->exceptionTypes = exceptionTypes;
+  M->slot = (s32)method->my_index;
   // TODO parse these ^^
 
   method->reflection_method = (void *)M;

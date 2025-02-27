@@ -1840,6 +1840,7 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
     *method = parse_method(&reader, &ctx);
     method->my_class = result;
     method->missing_smt = maybe_missing_smt && method->code && no_smt_found(method->code);
+    method->my_index = i;
 
     // Mark signature polymorphic functions
     if (in_MethodHandle && method->access_flags & ACCESS_NATIVE) {

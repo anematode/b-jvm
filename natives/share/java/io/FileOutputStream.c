@@ -25,16 +25,20 @@ DECLARE_NATIVE("java/io", FileOutputStream, writeBytes, "([BIIZ)V") {
   } else if (unix_fd == 2 && thread->vm->write_stderr) {
     thread->vm->write_stderr(buf, length, thread->vm->stdio_override_param);
   } else { // do an actual syscall
-    while (length > 0) {
-      s32 written = (s32)write(unix_fd, buf, length);
+    if (unix_fd == 2) {  // for some reason stderr needs this??
+      fprintf(stderr, "%.*s", length, buf);
+    } else {
+      while (length > 0) {
+        s32 written = (s32)write(unix_fd, buf, length);
 
-      if (written < 0) {
-        raise_vm_exception(thread, STR("java/io/IOException"), STR("Error writing file"));
-        return value_null();
+        if (written < 0) {
+          raise_vm_exception(thread, STR("java/io/IOException"), STR("Error writing file"));
+          return value_null();
+        }
+
+        length -= written;
+        buf += written;
       }
-
-      length -= written;
-      buf += written;
     }
   }
   return value_null();

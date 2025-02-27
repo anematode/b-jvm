@@ -3,9 +3,13 @@
 #ifdef EMSCRIPTEN
 #include <errno.h>
 #include <fcntl.h>
+#include <dirent.h>
 #else
 #include <sys/errno.h>
 #include <sys/fcntl.h>
+#include <sys/types.h>
+#define _POSIX_C_SOURCE 200809L
+#include <dirent.h>
 #endif
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -39,7 +43,7 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, getcwd, "()[B") {
   return (stack_value){.obj = array};
 }
 
-DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, stat0, "(JLsun/nio/fs/UnixFileAttributes;)I") {
+stack_value stat_impl(value *args) {
   struct stat st;
 
   if (!args[1].handle)
@@ -64,29 +68,74 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, stat0, "(JLsun/nio/fs/UnixFil
   MapAttrLong(st_size, st.st_size);
 
 #ifdef __APPLE__
-#define suffix(x) x##espec
+  MapAttrLong(st_atime_sec, st.st_atime);
+  MapAttrLong(st_atime_nsec, st.st_atimensec);
+
+  MapAttrLong(st_mtime_sec, st.st_mtime);
+  MapAttrLong(st_mtime_nsec, st.st_mtimensec);
+
+  MapAttrLong(st_ctime_sec, st.st_ctime);
+  MapAttrLong(st_ctime_nsec, st.st_ctimensec);
 #else
-#define suffix(x) x
+  MapAttrLong(st_atime_sec, st.st_atim.tv_sec);
+  MapAttrLong(st_atime_nsec, st.st_atim.tv_nsec);
+
+  MapAttrLong(st_mtime_sec, st.st_mtim.tv_sec);
+  MapAttrLong(st_mtime_nsec, st.st_mtim.tv_nsec);
+
+  MapAttrLong(st_ctime_sec, st.st_ctim.tv_sec);
+  MapAttrLong(st_ctime_nsec, st.st_ctim.tv_nsec);
 #endif
 
-  MapAttrLong(st_atime_sec, st.suffix(st_atim).tv_sec);
-  MapAttrLong(st_atime_nsec, st.suffix(st_atim).tv_nsec);
-
-  MapAttrLong(st_mtime_sec, st.suffix(st_mtim).tv_sec);
-  MapAttrLong(st_mtime_nsec, st.suffix(st_mtim).tv_nsec);
-
-  MapAttrLong(st_ctime_sec, st.suffix(st_ctim).tv_sec);
-  MapAttrLong(st_ctime_nsec, st.suffix(st_ctim).tv_nsec);
 
 #ifdef __APPLE__
-  MapAttrLong(st_birthtime_sec, st.st_birthtimespec.tv_sec);
-  MapAttrLong(st_birthtime_nsec, st.st_birthtimespec.tv_nsec);
+  MapAttrLong(st_birthtime_sec, st.st_birthtime);
+  MapAttrLong(st_birthtime_nsec, st.st_birthtimensec);
 #endif
 
 #undef MapAttrLong
 #undef MapAttrInt
 
   return (stack_value){.i = 0};
+}
+
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, stat0, "(JLsun/nio/fs/UnixFileAttributes;)I") {
+  return stat_impl(args);
+}
+
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, lstat0, "(JLsun/nio/fs/UnixFileAttributes;)V") {
+  stat_impl(args);
+  return value_null();
+}
+
+// DIR *opendir(const char* dirname)
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, opendir0, "(J)J") {
+  DIR *dir = opendir((char const *)args[0].l);
+  if (!dir) {
+    thread->current_exception = create_unix_exception(thread, errno);
+    return value_null();
+  }
+  return (stack_value){.l = (s64)dir};
+}
+
+// struct dirent* readdir(DIR *dirp), return  dirent->d_name
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, readdir0, "(J)[B") {
+  struct dirent *entry = readdir((DIR *)args[0].l);
+  if (!entry) {
+    return value_null();
+  }
+  size_t len = strlen(entry->d_name);
+  obj_header *array = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, len);
+  if (!array) {
+    return value_null();
+  }
+  memcpy(ArrayData(array), entry->d_name, len);
+  return (stack_value){.obj = array};
+}
+
+DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, closedir, "(J)V") {
+  closedir((DIR *)args[0].l);
+  return value_null();
 }
 
 DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, open0, "(JII)I") {

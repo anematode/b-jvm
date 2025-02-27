@@ -52,19 +52,19 @@
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
-[[maybe_unused]] int tick = 0; // for debugging
+[[maybe_unused]] s64 tick = 0; // for debugging
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 0 && (strstr(frame->method->name.chars, "addUnmatched") != nullptr) ||                                  \
-      strstr(frame->method->name.chars, "Constraints") != nullptr) {                                                   \
+  if (tick % 10000000LL == 0) printf("Tick: %lld\n", tick); \
+  if (tick++ > 4001584000LL) {                                                  \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
-    printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %d\n", fmt_slice(m->name),              \
+    printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %lld\n", fmt_slice(m->name),              \
            fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__, tick);  \
     heap_string s = insn_to_string(insn, pc);                                                                          \
     printf("Insn kind: %.*s\n", fmt_slice(s));                                                                         \

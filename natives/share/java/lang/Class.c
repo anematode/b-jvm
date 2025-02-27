@@ -258,8 +258,9 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0, "(Z)[Ljava/lang/ref
   int j = 0;
   for (int i = 0; i < class->methods_count; ++i) {
     cp_method *method = class->methods + i;
-    if (include_ctor(method, public_only))
+    if (include_ctor(method, public_only)) {
       data[j++] = method->reflection_ctor;
+    }
   }
   return (stack_value){.obj = result};
 }
@@ -299,7 +300,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;") 
   classdesc *classdesc = unmirror_class(obj->obj);
   (void)classdesc;
 
-  printf("Calling incompletely implemented getDeclaredClasses0\n");
+  // printf("Calling incompletely implemented getDeclaredClasses0\n");
 
   int count = 0;
   stack_value ret;
@@ -407,7 +408,9 @@ DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
     *((obj_header **)ArrayData(array->obj) + i) = mirror;
   }
 
-  return (stack_value){.obj = array->obj};
+  stack_value result = (stack_value){.obj = array->obj};
+  drop_handle(thread, array);
+  return result;
 }
 
 DECLARE_NATIVE("java/lang", Class, getGenericSignature0, "()Ljava/lang/String;") {

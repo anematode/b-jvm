@@ -15,6 +15,7 @@ DECLARE_NATIVE("java/io", FileInputStream, open0, "(Ljava/lang/String;)V") {
     return value_null();
 
   heap_string filename = AsHeapString(args[0].handle->obj, on_oom);
+  printf("Opening file %s\n", filename.chars);
 
   // this method does no allocations or yielding, so we can use the same pointer
   obj_header *fd = LoadFieldObject(obj->obj, "java/io/FileDescriptor", "fd");

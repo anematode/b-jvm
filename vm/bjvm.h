@@ -577,6 +577,7 @@ typedef struct vm_thread {
 
   // Instance of java.lang.Thread
   struct native_Thread *thread_obj;
+  object putative_system_cl;
 
   // Array of handles, see handle (null entries are free for use)
   // TODO make this a linked list to accommodate arbitrary # of handles
@@ -671,10 +672,8 @@ obj_header *new_object(vm_thread *thread, classdesc *classdesc);
 classdesc *unmirror_class(obj_header *mirror);
 
 cp_field **unmirror_field(obj_header *mirror);
-
-cp_method **unmirror_method(obj_header *mirror);
-
-cp_method **unmirror_ctor(obj_header *mirror);
+cp_method *unmirror_method(obj_header *mirror);
+cp_method *unmirror_ctor(obj_header *mirror);
 
 void set_field(obj_header *obj, cp_field *field, stack_value stack_value);
 void set_static_field(cp_field *field, stack_value stack_value);

@@ -47,7 +47,6 @@ extern "C" {
       fprintf(stderr, "%s: %s%d: CHECK(%s) failed: ", __func__, __FILE__, __LINE__, #condition);                       \
       fprintf(stderr, " " __VA_ARGS__);                                                                                \
       fprintf(stderr, "\n");                                                                                           \
-      *(char *)1 = 0;                                                                                                  \
       abort();                                                                                                         \
     }                                                                                                                  \
   } while (0)

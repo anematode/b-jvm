@@ -1443,7 +1443,7 @@ void dump_trace(vm_thread *thread) {
     } else {
       int line = get_line_number(method->code, frame->plain.program_counter);
       printf("  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
-             fmt_slice(method->my_class->source_file->name), line);
+             fmt_slice(method->my_class->source_file ? method->my_class->source_file->name : null_str()), line);
     }
   }
 }
@@ -1860,14 +1860,32 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
   // with reflection n' shit)
   object loader = nullptr;
-  for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
-    void *candidate = thread->stack.frames[i]->method->my_class->classloader;
-    if (candidate) {
-      loader = candidate;
-      break;
+  if (thread->thread_obj && thread->thread_obj->contextClassLoader) {
+    if (!thread->putative_system_cl) {
+      // Temporarily until we switch over to system class loader
+      thread->putative_system_cl = thread->thread_obj->contextClassLoader;
+    } else {
+      if (thread->thread_obj->contextClassLoader != thread->putative_system_cl) {
+        loader = thread->thread_obj->contextClassLoader;
+      }
+    }
+  } else {
+    for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
+      void *candidate = thread->stack.frames[i]->method->my_class->classloader;
+      if (candidate) {
+        loader = candidate;
+        break;
+      }
     }
   }
 
+  classdesc *existing = bootstrap_lookup_class_impl(thread, info->name, false);
+  if (existing) {
+    info->classdesc = existing;
+    return 0;
+  }
+
+  thread->current_exception = nullptr;
   if (loader) {
     // First strip off [ so that we only call loadClass on the component type
     int i = 0;
@@ -2024,23 +2042,20 @@ cp_field **unmirror_field(obj_header *mirror) {
   return &((struct native_Field *)mirror)->reflected_field;
 }
 
-cp_method **unmirror_ctor(obj_header *mirror) {
+cp_method *unmirror_ctor(obj_header *mirror) {
   DCHECK(is_instanceof_name(mirror, STR("java/lang/reflect/Constructor")));
-  // Constructors get copied around, but all reference the "root" created by the
-  // VM
-  obj_header *root = ((struct native_Constructor *)mirror)->root;
-  if (root)
-    mirror = root;
-  return &((struct native_Constructor *)mirror)->reflected_ctor;
+  // Unmirror the class, then get the ->slot method
+  struct native_Constructor *m = (struct native_Constructor *)mirror;
+  classdesc *class = unmirror_class(m->clazz);
+  return class->methods + m->slot;
 }
 
-cp_method **unmirror_method(obj_header *mirror) {
+cp_method *unmirror_method(obj_header *mirror) {
   DCHECK(is_instanceof_name(mirror, STR("java/lang/reflect/Method")));
-  // Methods get copied around, but all reference the "root" created by the VM
-  obj_header *root = ((struct native_Method *)mirror)->root;
-  if (root)
-    mirror = root;
-  return &((struct native_Method *)mirror)->reflected_method;
+  // Unmirror the class, then get the ->slot method
+  struct native_Method *m = (struct native_Method *)mirror;
+  classdesc *class = unmirror_class(m->clazz);
+  return class->methods + m->slot;
 }
 
 struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdesc *cd) {
@@ -2302,6 +2317,8 @@ doit:
     stack_value arg[] = {{.obj = (void *)str}};
     AWAIT(call_interpreter, thread, valueFromMethodName, arg);
     if (thread->current_exception) {
+      drop_handle(thread, self->vh);
+      drop_handle(thread, self->result);
       ASYNC_RETURN_VOID();
     }
 
@@ -2319,6 +2336,8 @@ doit:
     stack_value arg2[] = {{.obj = (void *)self->vh->obj}, {.obj = self->result->obj}};
     AWAIT(call_interpreter, thread, accessModeType, arg2);
     if (thread->current_exception) {
+      drop_handle(thread, self->vh);
+      drop_handle(thread, self->result);
       ASYNC_RETURN_VOID();
     }
 
@@ -2337,10 +2356,13 @@ doit:
     DCHECK(varHandleExactInvoker);
     AWAIT(call_interpreter, thread, varHandleExactInvoker, arg3);
     if (thread->current_exception) {
+      drop_handle(thread, self->vh);
+      drop_handle(thread, self->result);
       ASYNC_RETURN_VOID();
     }
 
     mh = (void *)get_async_result(call_interpreter).obj;
+    drop_handle(thread, self->vh);
     drop_handle(thread, self->result);
     doing_var_handle = true;
 

@@ -232,11 +232,11 @@ DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init, "(Ljava/lang/invok
 
   slice s = target->descriptor->name;
   if (utf8_equals(s, "java/lang/reflect/Method")) {
-    cp_method *m = *unmirror_method(target);
+    cp_method *m = unmirror_method(target);
     fill_mn_with_method(thread, mn, m, true);
     M->flags |= (m->access_flags & ACCESS_STATIC) ? MH_KIND_INVOKE_STATIC << 24 : MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
-    fill_mn_with_method(thread, mn, *unmirror_ctor(target), true);
+    fill_mn_with_method(thread, mn, unmirror_ctor(target), true);
     M->flags |= MH_KIND_NEW_INVOKE_SPECIAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Field")) {
     cp_field *field = *unmirror_field(target);

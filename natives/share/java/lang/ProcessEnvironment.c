@@ -32,3 +32,5 @@ DECLARE_NATIVE("java/lang", ProcessHandleImpl, getCurrentPid0, "()J") { return (
 DECLARE_NATIVE("java/lang", ProcessHandleImpl, isAlive0, "(J)J") { return (stack_value){.i = 0}; }
 
 DECLARE_NATIVE("java/lang", ProcessHandleImpl, destroy0, "(JJZ)Z") { return (stack_value){.i = 1}; }
+
+DECLARE_NATIVE("java/lang", ProcessHandleImpl, waitForProcessExit0, "(JZ)I") { return (stack_value){.i = 0}; }

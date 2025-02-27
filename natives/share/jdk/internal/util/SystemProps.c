@@ -118,7 +118,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, platformProperties, "()[Lja
 }
 
 DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, vmProperties, "()[Ljava/lang/String;") {
-  handle *props = make_string_array(thread, 2);
+  handle *props = make_string_array(thread, 4);
 
   SET_PROP(0, "java.home");
   char cwd[1024] = {0};
@@ -128,6 +128,8 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, vmProperties, "()[Ljava/lan
   java_home = bprintf(java_home, "%s/jdk23", cwd);
 
   SET_PROP(1, java_home.chars);
+  SET_PROP(2, "java.class.path");
+  SET_PROP(3, thread->vm->classpath.as_colon_separated.chars);
 
   return (stack_value){.obj = props->obj};
 }
