@@ -49,7 +49,7 @@ def worker(pair):
 if __name__ == '__main__':
     with multiprocessing.Pool(cores) as p:
         processes = [*p.map(worker, data)]
-        for i in processes:
+        for j, i in enumerate(processes):
             if i != 0:
-                print("AT LEAST ONE TEST FAILED!")
+                print("AT LEAST ONE TEST FAILED! (process " + str(j) + ")")
                 sys.exit(1)
