@@ -192,7 +192,6 @@ static expression deopt() {
   dummy.method = ctx->method;
   s32 locals = dummy.num_locals = ctx->method->code->max_locals;
   s32 max_stack = dummy.plain.max_stack = ctx->method->code->max_stack;
-  dummy.plain.values_count = locals;
   dummy.plain.max_stack = max_stack;
   dummy.plain.program_counter = ctx->curr_pc;
 
