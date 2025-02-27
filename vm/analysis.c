@@ -242,7 +242,7 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
   {                                                                                                                    \
     if (index >= ctx->code->max_locals)                                                                                \
       goto local_overflow;                                                                                             \
-    ctx->locals.entries[do_rewrite ? index : ctx->locals_swizzle[index]] = local_source(TYPE_KIND_##kind, insn_index);                                           \
+    ctx->locals.entries[LOCAL_INDEX] = local_source(TYPE_KIND_##kind, insn_index);                                           \
   }
 // Remap the index to the new local variable index after unwidening.
 #define SWIZZLE_LOCAL(index)                                                                                           \
@@ -255,12 +255,14 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
 // Assert that the local at the given index has the appropriate kind.
 #define CHECK_LOCAL(index, kind)                                                                                       \
   {                                                                                                                    \
-    if (ctx->locals.entries[do_rewrite ? index : ctx->locals_swizzle[index]].type != TYPE_KIND_##kind)                                                           \
+    if (ctx->locals.entries[LOCAL_INDEX].type != TYPE_KIND_##kind)                                                           \
       goto local_type_mismatch;                                                                                        \
   }
 #define REWRITE(kind_)                                                                                                 \
   if (do_rewrite)                                                                                                      \
     insn->kind = kind_;
+
+#define LOCAL_INDEX do_rewrite ? (s32)insn->index : ctx->locals_swizzle[insn->index]
 
 /**
  * Analyze the instruction.
@@ -662,27 +664,25 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_dload: {
     SWIZZLE_LOCAL(insn->index)
-#define INDEX do_rewrite ? insn->index : ctx->locals_swizzle[insn->index]
-
-    PUSH_ENTRY(ctx->locals.entries[INDEX])
+    PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, DOUBLE)
     break;
   }
   case insn_fload: {
     SWIZZLE_LOCAL(insn->index)
-    PUSH_ENTRY(ctx->locals.entries[INDEX])
+    PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, FLOAT)
     break;
   }
   case insn_iload: {
     SWIZZLE_LOCAL(insn->index)
-    PUSH_ENTRY(ctx->locals.entries[INDEX])
+    PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, INT)
     break;
   }
   case insn_lload: {
     SWIZZLE_LOCAL(insn->index)
-    PUSH_ENTRY(ctx->locals.entries[INDEX])
+    PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, LONG)
     break;
   }
@@ -712,7 +712,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_aload: {
     SWIZZLE_LOCAL(insn->index)
-    PUSH_ENTRY(ctx->locals.entries[INDEX])
+    PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, REFERENCE)
     break;
   }
