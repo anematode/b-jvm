@@ -601,7 +601,7 @@ typedef struct vm_thread {
   // Whether this thread is currently paused in the debugger
   bool paused_in_debugger;
 
-  void *profiler;  // active profiler, if any. Before thread exit, the profiler is terminated.
+  void *profiler; // active profiler, if any. Before thread exit, the profiler is terminated.
 } vm_thread;
 
 handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file, int line_no);

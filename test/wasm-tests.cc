@@ -1,8 +1,8 @@
 
-#include "wasm_trampolines.h"
 #include "doctest/doctest.h"
-#include <wasm/wasm_utils.h>
+#include "wasm_trampolines.h"
 #include <array>
+#include <wasm/wasm_utils.h>
 
 TEST_SUITE_BEGIN("[wasm]");
 
@@ -53,29 +53,30 @@ TEST_CASE("Simple module") {
 }
 
 TEST_CASE("Trampoline into function") {
-  if (sizeof(void*) != 4)
+  if (sizeof(void *) != 4)
     return;
   // DJIDI -> D
   // f(thread, method, args[0].i, args[1].l, args[2].i, args[3].d, args[4].i);
-  auto example = [] (vm_thread *thread, cp_method *method, int arg1, s64 arg2, object arg3, double arg4, object arg5) -> double {
+  auto example = [](vm_thread *thread, cp_method *method, int arg1, s64 arg2, object arg3, double arg4,
+                    object arg5) -> double {
     REQUIRE(arg1 == 1);
     REQUIRE(arg2 == 2);
     REQUIRE(arg3 == nullptr);
     REQUIRE(arg4 == 4.0);
     REQUIRE(arg5 == nullptr);
-    REQUIRE(thread == (vm_thread*)8);
-    REQUIRE(method == (cp_method*)16);
+    REQUIRE(thread == (vm_thread *)8);
+    REQUIRE(method == (cp_method *)16);
     return arg4 * 2;
   };
-  std::array args = {WASM_TYPE_KIND_INT32, WASM_TYPE_KIND_INT64, WASM_TYPE_KIND_INT32,
-                                         WASM_TYPE_KIND_FLOAT64, WASM_TYPE_KIND_INT32};
+  std::array args = {WASM_TYPE_KIND_INT32, WASM_TYPE_KIND_INT64, WASM_TYPE_KIND_INT32, WASM_TYPE_KIND_FLOAT64,
+                     WASM_TYPE_KIND_INT32};
   jit_trampoline tramp = get_wasm_jit_trampoline(WASM_TYPE_KIND_FLOAT64, args.data(), 5);
   REQUIRE(tramp != nullptr);
   object arg3 = nullptr;
   object arg5 = nullptr;
-  stack_value stack[5] = {{.i = 1}, {.l = 2}, {.obj = arg3}, {.d = 4.0}, {.obj = arg5 }};
+  stack_value stack[5] = {{.i = 1}, {.l = 2}, {.obj = arg3}, {.d = 4.0}, {.obj = arg5}};
 
-  tramp((void*) +example, (vm_thread*)8, (cp_method*)16, stack);
+  tramp((void *)+example, (vm_thread *)8, (cp_method *)16, stack);
   REQUIRE(stack[0].d == 8.0);
 }
 

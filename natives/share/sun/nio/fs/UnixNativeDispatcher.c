@@ -165,5 +165,4 @@ DECLARE_NATIVE("sun/nio/fs", UnixNativeDispatcher, strerror, "(I)[B") {
   return (stack_value){.obj = array};
 }
 
-
 DECLARE_NATIVE("sun/nio/ch", FileDispatcherImpl, init0, "()V") { return value_null(); }

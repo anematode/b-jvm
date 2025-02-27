@@ -150,7 +150,8 @@ static void copy_analy_stack_state(analy_stack_state *dst, const analy_stack_sta
 // (which is represented by VOID in our system).
 //
 // This function is used during local refinement only if the StackMapTable is not present.
-static void intersect_analy_stack_state(struct method_analysis_ctx *ctx, analy_stack_state **dst, const analy_stack_state *src) {
+static void intersect_analy_stack_state(struct method_analysis_ctx *ctx, analy_stack_state **dst,
+                                        const analy_stack_state *src) {
   if (!*dst) {
     *dst = calloc(1, sizeof(analy_stack_state));
     copy_analy_stack_state(*dst, src);
@@ -211,9 +212,9 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
 // Pop a value from the analysis stack and return it.
 #define POP_VAL                                                                                                        \
   ({                                                                                                                   \
-    if (ctx->stack.count == 0)                                                                                 \
+    if (ctx->stack.count == 0)                                                                                         \
       goto stack_underflow;                                                                                            \
-    ctx->stack.entries[--ctx->stack.count];                                                                    \
+    ctx->stack.entries[--ctx->stack.count];                                                                            \
   })
 // Pop a value from the analysis stack and assert its kind.
 #define POP_KIND(kind)                                                                                                 \
@@ -226,10 +227,10 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
 // Push a kind to the analysis stack.
 #define PUSH_ENTRY(kind)                                                                                               \
   {                                                                                                                    \
-    if (ctx->stack.count == ctx->stack.entries_cap)                                                            \
+    if (ctx->stack.count == ctx->stack.entries_cap)                                                                    \
       goto stack_overflow;                                                                                             \
     if (kind.type != TYPE_KIND_VOID) {                                                                                 \
-      ctx->stack.entries[ctx->stack.count++] = kind;                                                           \
+      ctx->stack.entries[ctx->stack.count++] = kind;                                                                   \
       if (kind.type == 0)                                                                                              \
         UNREACHABLE();                                                                                                 \
     }                                                                                                                  \
@@ -248,8 +249,8 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
   {                                                                                                                    \
     if (index >= ctx->code->max_locals)                                                                                \
       goto local_overflow;                                                                                             \
-    if (do_rewrite) \
-      index = ctx->locals_swizzle[index];                                                                                \
+    if (do_rewrite)                                                                                                    \
+      index = ctx->locals_swizzle[index];                                                                              \
   }
 // Assert that the local at the given index has the appropriate kind.
 #define CHECK_LOCAL(index, kind)                                                                                       \
@@ -257,7 +258,9 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
     if (ctx->locals.entries[index].type != TYPE_KIND_##kind)                                                           \
       goto local_type_mismatch;                                                                                        \
   }
-#define REWRITE(kind_) if (do_rewrite) insn->kind = kind_;
+#define REWRITE(kind_)                                                                                                 \
+  if (do_rewrite)                                                                                                      \
+    insn->kind = kind_;
 
 /**
  * Analyze the instruction.
@@ -268,8 +271,8 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
  *  recomputed.
  * @param do_rewrite whether to rewrite the instruction in place (convert ldcs, swizzle locals, etc.)
  */
-int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analysis_ctx *ctx,
-  bool *state_terminated, bool do_rewrite) {
+int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analysis_ctx *ctx, bool *state_terminated,
+                        bool do_rewrite) {
 
   // Add top of stack type before the instruction executes
   calculate_tos_type(ctx, &insn->tos_before);
@@ -886,8 +889,8 @@ static void use_stack_map_frame(struct method_analysis_ctx *ctx, const stack_map
 }
 
 // Write the necessary information so that the cause of an NPE can be reconstructed.
-static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack,
-  stack_variable_source *a, stack_variable_source *b) {
+static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stack, stack_variable_source *a,
+                              stack_variable_source *b) {
   int sd = stack->count;
   switch (insn->kind) {
   case insn_putfield:
@@ -899,7 +902,7 @@ static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stac
   case insn_daload:
   case insn_laload:
   case insn_saload: {
-    *a = stack->entries[sd - 2].source;  // two sources: array and index
+    *a = stack->entries[sd - 2].source; // two sources: array and index
     *b = stack->entries[sd - 1].source;
     break;
   }
@@ -920,7 +923,7 @@ static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stac
   case insn_invokespecial: { // Trying to invoke on an object
     int argc = insn->cp->methodref.descriptor->args_count;
     DCHECK(argc + 1 <= sd);
-    *a = stack->entries[sd - argc - 1].source;  // just the one source, which is the object
+    *a = stack->entries[sd - argc - 1].source; // just the one source, which is the object
     break;
   }
   case insn_arraylength:
@@ -928,7 +931,7 @@ static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stac
   case insn_monitorenter:
   case insn_monitorexit:
   case insn_getfield: {
-    *a = stack->entries[sd - 1].source;  // just the one source, which is the object
+    *a = stack->entries[sd - 1].source; // just the one source, which is the object
     break;
   }
   default:
@@ -949,9 +952,7 @@ static void fill_exception_handlers(struct method_analysis_ctx *ctx) {
   attribute_exception_table *et = ctx->code->exception_table;
   if (et) {
     analy_stack_state state;
-    analy_stack_entry one_ref[1] = {
-      {.type = TYPE_KIND_REFERENCE}
-    };
+    analy_stack_entry one_ref[1] = {{.type = TYPE_KIND_REFERENCE}};
     state.entries = one_ref;
     state.count = 1;
     state.entries_cap = 1;
@@ -984,7 +985,7 @@ int analyze_method_code(cp_method *method, heap_string *error) {
   // This mode requires us to infer all types from the structure of the code, and is not very well tested -- it only
   // exists because occasional test cases have old classfiles.
   bool missing_smt = method->missing_smt;
-  if (!code || method->code_analysis) {  // no code, or already analyzed
+  if (!code || method->code_analysis) { // no code, or already analyzed
     return 0;
   }
   struct method_analysis_ctx ctx = {code};
@@ -1007,7 +1008,7 @@ int analyze_method_code(cp_method *method, heap_string *error) {
   if (lvt) {
     for (int i = 0; i < lvt->entries_count; ++i) {
       attribute_lvt_entry *ent = &lvt->entries[i];
-      if (ent->index >= code->max_locals) {  // Invalid LocalVariableTable index
+      if (ent->index >= code->max_locals) { // Invalid LocalVariableTable index
         result = -1;
         goto inval;
       }
@@ -1040,10 +1041,10 @@ int analyze_method_code(cp_method *method, heap_string *error) {
 
   stack_map_frame_iterator iter;
 
-  analyze:
+analyze:
   stack_map_frame_iterator_init(&iter, method);
 
-  bool state_terminated = true;  // we don't know the state of the stack or locals
+  bool state_terminated = true; // we don't know the state of the stack or locals
   for (int i = 0; i < code->insn_count; ++i) {
     bytecode_insn *insn = &code->code[i];
     if (insn->original_pc == iter.pc) {
@@ -1058,7 +1059,7 @@ int analyze_method_code(cp_method *method, heap_string *error) {
         }
       }
     } else if (missing_smt) {
-      if (state_terminated) {  // should be able to recover
+      if (state_terminated) { // should be able to recover
         CHECK(ctx.known_stacks[i]);
         CHECK(ctx.known_locals[i]);
         copy_analy_stack_state(&ctx.stack, ctx.known_stacks[i]);

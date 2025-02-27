@@ -34,7 +34,8 @@ interpreter_trampoline get_wasm_interpreter_trampoline(wasm_value_type return_ty
   init_trampolines();
   INIT_STACK_STRING(key, 257);
   key = encode_as_slice(key, return_type, args, argc);
-  interpreter_trampoline existing = (interpreter_trampoline)hash_table_lookup(&interpreter_trampolines, key.chars, (int)key.len);
+  interpreter_trampoline existing =
+      (interpreter_trampoline)hash_table_lookup(&interpreter_trampolines, key.chars, (int)key.len);
   if (existing)
     return existing;
   return nullptr;

@@ -158,6 +158,4 @@ s64 micros() {
 DECLARE_NATIVE("java/lang", System, currentTimeMillis, "()J") { return (stack_value){.l = micros() / 1000}; }
 
 int calls = 0;
-DECLARE_NATIVE("java/lang", System, nanoTime, "()J") {
-  return (stack_value){.l = micros() * 1000};
-}
+DECLARE_NATIVE("java/lang", System, nanoTime, "()J") { return (stack_value){.l = micros() * 1000}; }

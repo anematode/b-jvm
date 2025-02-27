@@ -39,9 +39,9 @@ extern "C" {
   X(class_format_error, "java/lang/ClassFormatError")                                                                  \
   X(clone_not_supported_exception, "java/lang/CloneNotSupportedException")                                             \
   X(illegal_monitor_state_exception, "java/lang/IllegalMonitorStateException")                                         \
-  X(internal_error, "java/lang/InternalError")                                         \
-  X(verify_error, "java/lang/VerifyError")                                                                            \
-  X(illegal_state_exception, "java/lang/IllegalStateException") \
+  X(internal_error, "java/lang/InternalError")                                                                         \
+  X(verify_error, "java/lang/VerifyError")                                                                             \
+  X(illegal_state_exception, "java/lang/IllegalStateException")                                                        \
   X(unix_exception, "sun/nio/fs/UnixException")
 
 #define __CACHED_REFLECTION_CLASSES(X)                                                                                 \

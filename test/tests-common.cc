@@ -174,8 +174,10 @@ void print_method_sigs() {
   }
 }
 
-ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::string main_class, std::string input, std::vector<std::string> args) {
-  return run_scheduled_test_case(std::move(classpath), capture_stdio, std::move(main_class), std::move(input), std::move(args));
+ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio, std::string main_class,
+                                      std::string input, std::vector<std::string> args) {
+  return run_scheduled_test_case(std::move(classpath), capture_stdio, std::move(main_class), std::move(input),
+                                 std::move(args));
 }
 
 #ifdef EMSCRIPTEN
@@ -241,8 +243,8 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   rr_scheduler_init(&scheduler, vm);
   vm->scheduler = &scheduler;
 
-  handle *string_args_as_object = make_handle(thread,
-    CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
+  handle *string_args_as_object =
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
   for (size_t i = 0; i < string_args.size(); i++) {
     object str = MakeJStringFromCString(thread, string_args[i].c_str(), true);
     ReferenceArrayStore(string_args_as_object->obj, (int)i, str);

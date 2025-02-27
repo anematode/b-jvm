@@ -51,9 +51,7 @@ type_kind read_type_kind_char(char c) {
   }
 }
 
-char type_kind_to_char(type_kind kind){
-  return "ZCFDBSIJVL"[kind];
-}
+char type_kind_to_char(type_kind kind) { return "ZCFDBSIJVL"[kind]; }
 
 type_kind field_to_kind(const field_descriptor *field) {
   if (field->dimensions)
@@ -1572,7 +1570,7 @@ void parse_attribute(cf_byteslice *reader, classfile_parse_ctx *ctx, attribute *
   }
 }
 
-attribute *find_attribute_by_kind(classdesc *desc, attribute_kind kind){
+attribute *find_attribute_by_kind(classdesc *desc, attribute_kind kind) {
   for (int i = 0; i < desc->attributes_count; ++i) {
     if (desc->attributes[i].kind == kind) {
       return desc->attributes + i;
@@ -1746,7 +1744,7 @@ void link_bootstrap_methods(classdesc *cf) {
   }
 }
 
-int no_smt_found(attribute_code * code) {
+int no_smt_found(attribute_code *code) {
   for (int i = 0; i < code->attributes_count; i++)
     if (code->attributes[i].kind == ATTRIBUTE_KIND_STACK_MAP_TABLE)
       return 0;

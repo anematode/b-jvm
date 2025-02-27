@@ -18,9 +18,7 @@ enum {
 #include <emscripten/emscripten.h>
 #endif
 
-static void *module_calloc(wasm_module *module, size_t size) {
-  return arena_alloc(&module->arena, 1, size);
-}
+static void *module_calloc(wasm_module *module, size_t size) { return arena_alloc(&module->arena, 1, size); }
 
 static void *module_copy(wasm_module *module, const void *src, int size) {
   void *dest = module_calloc(module, size);

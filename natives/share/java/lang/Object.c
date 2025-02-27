@@ -2,7 +2,9 @@
 #include <natives-dsl.h>
 #include <roundrobin_scheduler.h>
 
-DECLARE_NATIVE("java/lang", Object, hashCode, "()I") { return (stack_value){.i = (s32)get_object_hash_code(thread->vm, obj->obj)}; }
+DECLARE_NATIVE("java/lang", Object, hashCode, "()I") {
+  return (stack_value){.i = (s32)get_object_hash_code(thread->vm, obj->obj)};
+}
 
 DECLARE_NATIVE("java/lang", Object, registerNatives, "()V") { return value_null(); }
 

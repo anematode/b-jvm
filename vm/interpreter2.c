@@ -52,23 +52,24 @@
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
-[[maybe_unused]] int tick = 0;  // for debugging
+[[maybe_unused]] int tick = 0; // for debugging
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 0 && (strstr(frame->method->name.chars, "addUnmatched") != nullptr) || strstr(frame->method->name.chars, "Constraints") != nullptr) { \
-  SPILL_VOID    \
-  printf("Frame method: %p\n", frame->method); \
-  cp_method *m = frame->method;                                                                                        \
-  printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %d\n", fmt_slice(m->name),                              \
-         fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__, tick);                                   \
-  heap_string s = insn_to_string(insn, pc);                                                                            \
-  printf("Insn kind: %.*s\n", fmt_slice(s));                                                                           \
-  free_heap_str(s);                                                                                                    \
-  dump_frame(stdout, frame); \
+  if (tick++ > 0 && (strstr(frame->method->name.chars, "addUnmatched") != nullptr) ||                                  \
+      strstr(frame->method->name.chars, "Constraints") != nullptr) {                                                   \
+    SPILL_VOID                                                                                                         \
+    printf("Frame method: %p\n", frame->method);                                                                       \
+    cp_method *m = frame->method;                                                                                      \
+    printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %d\n", fmt_slice(m->name),              \
+           fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__, tick);  \
+    heap_string s = insn_to_string(insn, pc);                                                                          \
+    printf("Insn kind: %.*s\n", fmt_slice(s));                                                                         \
+    free_heap_str(s);                                                                                                  \
+    dump_frame(stdout, frame);                                                                                         \
   }
 #endif
 
@@ -628,10 +629,9 @@ static bool fuel_check_impl(vm_thread *thread) {
     SPILL_VOID return 0;                                                                                               \
   }
 
-static void mark_insn_returns(bytecode_insn * inst) {
+static void mark_insn_returns(bytecode_insn *inst) {
   inst->returns = inst->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
 }
-
 
 /** BYTECODE IMPLEMENTATIONS */
 
@@ -730,8 +730,8 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
       *cont = (continuation_frame){.pnt = CONT_RESOLVE, .ctx.resolve_insn = ctx};                                      \
       return 0;                                                                                                        \
     }                                                                                                                  \
-    if (thread->current_exception) \
-      return 0; \
+    if (thread->current_exception)                                                                                     \
+      return 0;                                                                                                        \
   } while (0)
 
 __attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
@@ -1517,11 +1517,11 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
     s32 old_pc = pc;                                                                                                   \
-    s32 one_before_next = ((s32)tos op 0) ? ((s32)insn->index - 1) : (s32)pc;                       \
-    insns += one_before_next - (s32)old_pc;                                                                                                      \
+    s32 one_before_next = ((s32)tos op 0) ? ((s32)insn->index - 1) : (s32)pc;                                          \
+    insns += one_before_next - (s32)old_pc;                                                                            \
     sp--;                                                                                                              \
-    pc = one_before_next; \
-    STACK_POLYMORPHIC_NEXT(*(sp - 1));                           \
+    pc = one_before_next;                                                                                              \
+    STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                 \
   }
 
 MAKE_INT_BRANCH_AGAINST_0(ifeq, ==)
@@ -1539,10 +1539,10 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     FUEL_CHECK                                                                                                         \
     s64 a = (sp - 2)->i, b = (int)tos;                                                                                 \
     s32 old_pc = pc;                                                                                                   \
-    pc = a op b ? ((s32)insn->index - 1) : pc;                                                               \
+    pc = a op b ? ((s32)insn->index - 1) : pc;                                                                         \
     insns += (s32)pc - (s32)old_pc;                                                                                    \
     sp -= 2;                                                                                                           \
-    STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                  \
+    STACK_POLYMORPHIC_NEXT(*(sp - 1));                                                                                 \
   }
 
 MAKE_INT_BRANCH(if_icmpeq, ==)
@@ -1806,20 +1806,22 @@ void attempt_jit(cp_method *method) {
 }
 
 // Expects sp and insn->args to be in scope
-#define ConsiderJitEntry(thread, method, argz) \
-  retry: \
-  if (method->jit_entry) {                      \
-    ((jit_trampoline)(method)->trampoline)((method)->jit_entry, thread, method, argz); \
-    if (thread->current_exception) {            \
-      return 0;                                  \
-    }                                            \
-    sp -= insn->args; \
-    sp += returns; \
-    return 0; \
-  } else if (method->call_count > JIT_THRESHOLD) {               \
-    attempt_jit(method); \
-    goto retry; \
-  } else { method->call_count += 15; }
+#define ConsiderJitEntry(thread, method, argz)                                                                         \
+  retry:                                                                                                               \
+  if (method->jit_entry) {                                                                                             \
+    ((jit_trampoline)(method)->trampoline)((method)->jit_entry, thread, method, argz);                                 \
+    if (thread->current_exception) {                                                                                   \
+      return 0;                                                                                                        \
+    }                                                                                                                  \
+    sp -= insn->args;                                                                                                  \
+    sp += returns;                                                                                                     \
+    return 0;                                                                                                          \
+  } else if (method->call_count > JIT_THRESHOLD) {                                                                     \
+    attempt_jit(method);                                                                                               \
+    goto retry;                                                                                                        \
+  } else {                                                                                                             \
+    method->call_count += 15;                                                                                          \
+  }
 
 static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
@@ -1832,7 +1834,7 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   } else {
     ConsiderJitEntry(thread, method, sp - insn->args)
 
-    invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
+        invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
   }
   if (unlikely(!invoked_frame)) {
     return 0;
@@ -2026,7 +2028,8 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
     insn->kind = insn_invokevirtual;
     JMP_VOID
   }
-  cp_method *method = itable_lookup(receiver->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
+  cp_method *method =
+      itable_lookup(receiver->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
   if (!method) {
     raise_abstract_method_error(thread, method_info->resolved);
     return 0;
@@ -2034,10 +2037,8 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
 
   if (method_argc(method) != method_argc(method_info->resolved)) {
     printf("Looking for method %.*s.%.*s, receiver is %.*s; found %.*s.%.*s\n",
-      fmt_slice(method_info->resolved->my_class->name),
-      fmt_slice(method_info->resolved->name),
-      fmt_slice(receiver->descriptor->name),
-      fmt_slice(method->my_class->name), fmt_slice(method->name));
+           fmt_slice(method_info->resolved->my_class->name), fmt_slice(method_info->resolved->name),
+           fmt_slice(receiver->descriptor->name), fmt_slice(method->my_class->name), fmt_slice(method->name));
   }
 
   insn->ic = method;
@@ -2077,7 +2078,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     JMP_VOID
   }
 
-  ConsiderJitEntry(thread, ((cp_method*)insn->ic), sp - insn->args);
+  ConsiderJitEntry(thread, ((cp_method *)insn->ic), sp - insn->args);
   stack_frame *invoked_frame = push_frame(thread, insn->ic, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
@@ -2104,10 +2105,11 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
   NPE_ON_NULL(receiver);
 
   invokevirtual_signature_polymorphic_t ctx = {
-      .args = {
-          .thread = thread, .method = insn->ic,
-        .provider_mt = (struct native_MethodType**) &insn->ic2, // GC root
-        .sp_ = sp - insn->args, .target = receiver}};
+      .args = {.thread = thread,
+               .method = insn->ic,
+               .provider_mt = (struct native_MethodType **)&insn->ic2, // GC root
+               .sp_ = sp - insn->args,
+               .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
@@ -2928,7 +2930,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 
   if (has_result) {
-    *(sp - 1) = result;  // sp has the correct value above, don't move it
+    *(sp - 1) = result; // sp has the correct value above, don't move it
   }
 
 #if !DO_TAILS

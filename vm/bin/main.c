@@ -3,8 +3,8 @@
 //
 
 #include "arrays.h"
-#include "objects.h"
 #include "exceptions.h"
+#include "objects.h"
 #include "reflection.h"
 
 #include "../bjvm.h"

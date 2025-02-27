@@ -15,7 +15,7 @@ typedef struct gc_ctx {
   // If lowest bit is a 1, it's a monitor_data*, otherwise it's an object.
   void **objs;
   object *new_location;
-  object *worklist;  // should contain a reachable object exactly once over its lifetime
+  object *worklist; // should contain a reachable object exactly once over its lifetime
 
   object **relocations;
 } gc_ctx;
@@ -222,7 +222,7 @@ static u32 *get_flags(vm *vm, object o) {
 static void mark_reachable(gc_ctx *ctx, object obj) {
   arrput(ctx->objs, obj);
   if (has_expanded_data(&obj->header_word)) {
-    arrput(ctx->objs, (void*)((uintptr_t)obj->header_word.expanded_data | 1));
+    arrput(ctx->objs, (void *)((uintptr_t)obj->header_word.expanded_data | 1));
   }
 
   // Visit all instance fields
@@ -232,7 +232,7 @@ static void mark_reachable(gc_ctx *ctx, object obj) {
     for (size_t i = 0; i < refs->count; ++i) {
       object field_obj = *((object *)obj + refs->slots_unscaled[i]);
       if (field_obj && in_heap(ctx->vm, field_obj) && !(*get_flags(ctx->vm, field_obj) & IS_REACHABLE)) {
-        *get_flags(ctx->vm,field_obj) |= IS_REACHABLE;
+        *get_flags(ctx->vm, field_obj) |= IS_REACHABLE;
         arrput(ctx->worklist, field_obj);
       }
     }
@@ -241,8 +241,8 @@ static void mark_reachable(gc_ctx *ctx, object obj) {
     int arr_len = ArrayLength(obj);
     for (size_t i = 0; i < (size_t)arr_len; ++i) {
       object arr_element = ReferenceArrayLoad(obj, i);
-      if (arr_element && in_heap(ctx->vm, arr_element) && !(*get_flags(ctx->vm,arr_element) & IS_REACHABLE)) {
-        *get_flags(ctx->vm,arr_element) |= IS_REACHABLE;
+      if (arr_element && in_heap(ctx->vm, arr_element) && !(*get_flags(ctx->vm, arr_element) & IS_REACHABLE)) {
+        *get_flags(ctx->vm, arr_element) |= IS_REACHABLE;
         arrput(ctx->worklist, arr_element);
       }
     }
@@ -295,7 +295,7 @@ static void relocate_object(gc_ctx *ctx, object *obj) {
 
 void relocate_instance_fields(gc_ctx *ctx) {
   for (int i = 0; i < arrlen(ctx->objs); ++i) {
-    if ((uintptr_t) ctx->objs[i] & 1) {  // monitor
+    if ((uintptr_t)ctx->objs[i] & 1) { // monitor
       continue;
     }
     object obj = ctx->new_location[i];
@@ -303,13 +303,13 @@ void relocate_instance_fields(gc_ctx *ctx) {
     // Re-map the monitor, if any
     if (has_expanded_data(&obj->header_word)) {
       monitor_data *monitor = obj->header_word.expanded_data;
-      void *key = (void*)((uintptr_t)monitor | 1);
+      void *key = (void *)((uintptr_t)monitor | 1);
       void **found = bsearch(&key, ctx->objs, arrlen(ctx->objs), sizeof(object), comparator);
       if (!found) {
         fprintf(stderr, "Can't find monitor %p!\n", monitor);
         abort();
       }
-      obj->header_word.expanded_data = (void*)ctx->new_location[found - ctx->objs];
+      obj->header_word.expanded_data = (void *)ctx->new_location[found - ctx->objs];
     }
 
     if (obj->descriptor->kind == CD_KIND_ORDINARY) {
@@ -345,16 +345,16 @@ void major_gc(vm *vm) {
   // Mark phase
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object root = *ctx.roots[i];
-    if (!in_heap(vm, root) || *get_flags(vm,root) & IS_REACHABLE) // already visited
+    if (!in_heap(vm, root) || *get_flags(vm, root) & IS_REACHABLE) // already visited
       continue;
-    *get_flags(vm,root) |= IS_REACHABLE;
+    *get_flags(vm, root) |= IS_REACHABLE;
     arrput(ctx.worklist, root);
   }
 
   int *bitset[1] = {nullptr};
   while (arrlen(ctx.worklist) > 0) {
     object obj = arrpop(ctx.worklist);
-    *get_flags(vm,obj) |= IS_REACHABLE;
+    *get_flags(vm, obj) |= IS_REACHABLE;
     mark_reachable(&ctx, obj);
   }
   arrfree(ctx.worklist);
@@ -386,12 +386,12 @@ void major_gc(vm *vm) {
     bool is_monitor = (uintptr_t)obj & 1;
     size_t sz = is_monitor ? sizeof(monitor_data) : size_of_object(obj);
     sz = align_up(sz, 8);
-    obj = (void*)((uintptr_t) obj & ~1ULL);  // get the actual underlying pointer
+    obj = (void *)((uintptr_t)obj & ~1ULL); // get the actual underlying pointer
     DCHECK(write_ptr + sz <= end);
     if (!is_monitor) {
       *get_flags(vm, obj) &= ~IS_REACHABLE; // clear the reachable flag
     }
-    memmove(write_ptr, obj, sz);      // not memcpy because the heap is the same; overlap is possible
+    memmove(write_ptr, obj, sz); // not memcpy because the heap is the same; overlap is possible
     object new_obj = (object)write_ptr;
     new_location[i] = new_obj;
     write_ptr += sz;

@@ -18,15 +18,15 @@ EMSCRIPTEN_KEEPALIVE
 profiler *launch_profiler(vm_thread *thread);
 
 EMSCRIPTEN_KEEPALIVE
-void finish_profiler(profiler* profiler);
+void finish_profiler(profiler *profiler);
 
 // Calls finish_profiler, then reads the profiler's data into a heap allocated string and frees the profiler. Should be
 // called from the main thread.
 EMSCRIPTEN_KEEPALIVE
-char *read_profiler(profiler* profiler);
+char *read_profiler(profiler *profiler);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif //PROFILER_H
+#endif // PROFILER_H

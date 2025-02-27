@@ -202,7 +202,8 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(JJ)V",
   return value_null();
 }
 
-DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeup_info wakeup_info), invoked_methods()) {
+DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeup_info wakeup_info),
+                     invoked_methods()) {
   self->wakeup_info.kind = RR_WAKEUP_SLEEP;
   self->wakeup_info.wakeup_us = get_unix_us() + 500000;
   ASYNC_YIELD((void *)&self->wakeup_info);
@@ -210,9 +211,7 @@ DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeu
   ASYNC_END(value_null());
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") {
-  return value_null();
-}
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") { return value_null(); }
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(Ljava/lang/Object;JJ)V", 2) {
   DCHECK(argc == 3);
@@ -272,7 +271,6 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, putBoolean, "(Ljava/lang/Object;JZ)V
   *(u8 *)((uintptr_t)args[0].handle->obj + args[1].l) = args[2].i;
   return value_null();
 }
-
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, getReference, "(Ljava/lang/Object;J)Ljava/lang/Object;") {
   DCHECK(argc == 2);

@@ -18,7 +18,7 @@ typedef struct profiler_s {
 
   int samples;
 
-  char * volatile result;
+  char *volatile result;
   volatile bool initialized;
   volatile bool finished;
 
@@ -38,7 +38,7 @@ void profiler_main(profiler *prof) {
   prof->initialized = true;
 
 #define MAX_DEPTH 300
-  char key[sizeof(cp_method*) * MAX_DEPTH];
+  char key[sizeof(cp_method *) * MAX_DEPTH];
   while (!__atomic_load_n(&prof->waiting_for_exit, __ATOMIC_SEQ_CST)) {
     prof->samples++;
     u32 count = arrlen(thread->stack.frames);
@@ -50,17 +50,18 @@ void profiler_main(profiler *prof) {
       stack_frame *frame = thread->stack.frames[depth];
       // Check whether the frame is in the bounds of the frame buffer
       if ((char *)frame < thread->stack.frame_buffer ||
-        (char *)frame >= thread->stack.frame_buffer + thread->stack.frame_buffer_used) {
-        break;  // corrupted entry
+          (char *)frame >= thread->stack.frame_buffer + thread->stack.frame_buffer_used) {
+        break; // corrupted entry
       }
       cp_method *method = get_frame_method(frame);
-      memcpy(key + sizeof(cp_method*) * depth, &method, sizeof(cp_method*));
+      memcpy(key + sizeof(cp_method *) * depth, &method, sizeof(cp_method *));
     }
 
     // Now hash and insert the key
     if (depth > 0) {
-      u32 new_count = (u32)(uintptr_t)hash_table_lookup(&prof->counts, key, (int)(depth * sizeof(cp_method*)));
-      (void)hash_table_insert(&prof->counts, key, (int)(depth * sizeof(cp_method*)), (void *)((uintptr_t)new_count + 1));
+      u32 new_count = (u32)(uintptr_t)hash_table_lookup(&prof->counts, key, (int)(depth * sizeof(cp_method *)));
+      (void)hash_table_insert(&prof->counts, key, (int)(depth * sizeof(cp_method *)),
+                              (void *)((uintptr_t)new_count + 1));
     }
 
     // Now sleep (or in Emscripten, busy wait) until the next sample
@@ -102,11 +103,11 @@ void profiler_main(profiler *prof) {
 
     while (hash_table_iterator_has_next(it, &key, &key_len, &count)) {
       // Check whether the key represents a sequence of valid methods, and discard if not
-      int depth = (int)(key_len / sizeof(cp_method*));
+      int depth = (int)(key_len / sizeof(cp_method *));
       for (int i = 0; i < depth; ++i) {
         cp_method *method;
-        memcpy(&method, key + i * sizeof(cp_method*), sizeof(cp_method*));
-        if (!hash_table_contains(&methods, (char *)&method, sizeof(cp_method*))) {
+        memcpy(&method, key + i * sizeof(cp_method *), sizeof(cp_method *));
+        if (!hash_table_contains(&methods, (char *)&method, sizeof(cp_method *))) {
           goto next;
         }
       }
@@ -115,11 +116,11 @@ void profiler_main(profiler *prof) {
       // java/lang/StringBuilder.append;java/lang/System.arraycopy 100
       for (int i = 0; i < depth; ++i) {
         cp_method *method;
-        memcpy(&method, key + i * sizeof(cp_method*), sizeof(cp_method*));
+        memcpy(&method, key + i * sizeof(cp_method *), sizeof(cp_method *));
 
         char *suffix = method->access_flags & ACCESS_NATIVE ? "_[k]" : "";
-        string_builder_append(&flamegraph, "%.*s:%.*s%s",
-          fmt_slice(method->my_class->name), fmt_slice(method->name), suffix);
+        string_builder_append(&flamegraph, "%.*s:%.*s%s", fmt_slice(method->my_class->name), fmt_slice(method->name),
+                              suffix);
         if (i == depth - 1) {
           string_builder_append(&flamegraph, " %d\n", (int)(uintptr_t)count);
         } else {
@@ -127,7 +128,7 @@ void profiler_main(profiler *prof) {
         }
       }
 
-      next:
+    next:
       hash_table_iterator_next(&it);
     }
   }
@@ -135,7 +136,7 @@ void profiler_main(profiler *prof) {
   free_hash_table(methods);
   free_hash_table(prof->counts);
   prof->finished = true;
-  prof->result = flamegraph.data;  // freed by the caller
+  prof->result = flamegraph.data; // freed by the caller
   __atomic_thread_fence(__ATOMIC_SEQ_CST);
 
   __atomic_store_n(&prof->waiting_for_exit, 0, __ATOMIC_SEQ_CST);
@@ -164,7 +165,7 @@ profiler *launch_profiler(vm_thread *thread) {
   return prof;
 }
 
-void finish_profiler(profiler* prof) {
+void finish_profiler(profiler *prof) {
   if (!prof || prof->finished) {
     return;
   }
@@ -176,7 +177,7 @@ void finish_profiler(profiler* prof) {
 #endif
 }
 
-char *read_profiler(profiler* prof) {
+char *read_profiler(profiler *prof) {
   if (!prof) {
     return nullptr;
   }

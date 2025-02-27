@@ -3,8 +3,8 @@
 //
 
 #include "adt.h"
-#include "util.h"
 #include "../vendor/stb_ds.h"
+#include "util.h"
 
 #include <stdarg.h>
 #include <stdlib.h>

@@ -288,7 +288,7 @@ typedef enum : char {
 } type_kind;
 
 type_kind read_type_kind_char(char c);
-char type_kind_to_char(type_kind kind) ;
+char type_kind_to_char(type_kind kind);
 
 type_kind field_to_kind(const field_descriptor *field);
 
@@ -605,7 +605,7 @@ typedef struct bytecode_insn {
   reduced_tos_kind tos_before; // the (reduced) top-of-stack type before this instruction executes
   reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
   u16 original_pc;
-  bool returns;  // whether the instruction returns a value
+  bool returns; // whether the instruction returns a value
 
   union {
     // for newarray
@@ -797,7 +797,7 @@ typedef struct module module;
 
 typedef struct {
   u32 count;
-  u16 slots_unscaled[];  // must be scaled up by 4
+  u16 slots_unscaled[]; // must be scaled up by 4
 } reference_list;
 
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
@@ -839,7 +839,7 @@ typedef struct classdesc {
   // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets correspond to references that need to be
   // followed. Only defined at linkage time.
   reference_list *static_references;
-  reference_list *instance_references;  // duplicates all superclass fields for convenience/locality
+  reference_list *instance_references; // duplicates all superclass fields for convenience/locality
 
   classdesc *one_fewer_dim; // NULL for non-array types
   classdesc *base_component;
@@ -869,7 +869,7 @@ typedef struct classdesc {
 } classdesc;
 
 heap_string insn_to_string(const bytecode_insn *insn, int insn_index);
-attribute *find_attribute_by_kind(classdesc *desc, attribute_kind kind) ;
+attribute *find_attribute_by_kind(classdesc *desc, attribute_kind kind);
 
 char *parse_field_descriptor(const char **chars, size_t len, field_descriptor *result, arena *arena);
 char *parse_method_descriptor(slice entry, method_descriptor *result, arena *arena);
@@ -888,7 +888,6 @@ typedef enum { PARSE_SUCCESS = 0, PARSE_ERR = 1 } parse_result_t;
  * @param error Where to write the error string. If nullptr, error is ignored.
  */
 parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, heap_string *error);
-
 
 // Implemented in pretty_print.c
 

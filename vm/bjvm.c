@@ -67,7 +67,7 @@ DEFINE_ASYNC(init_cached_classdescs) {
     AWAIT(initialize_class, args->thread, self->cached_classdescs[self->i]);
     int result = get_async_result(initialize_class);
     if (result != 0) {
-      free(self->cached_classdescs);  // TODO this is not at all safe
+      free(self->cached_classdescs); // TODO this is not at all safe
       ASYNC_RETURN(result);
     }
   }
@@ -82,7 +82,7 @@ bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_d
 mark_word_t *get_mark_word(vm *vm, header_word *data) {
   mark_word_t *word = has_expanded_data(data) ? &data->expanded_data->mark_word : &data->mark_word;
 #if DCHECKS_ENABLED
-  if (!in_heap(vm, (void*) word)) {
+  if (!in_heap(vm, (void *)word)) {
     // Data got corrupted. Print out information
     fprintf(stderr, "Corrupted mark word: %p at %p (expanded data: %d)\n", word, data, has_expanded_data(data));
     fprintf(stderr, "Surrounding bytes (-16 to +16): ");
@@ -363,8 +363,7 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
 
   for (int i = 0; i < frame->num_locals; ++i) {
     stack_value value = frame_locals(frame)[i];
-    const char *is_ref =
-        infer_type(frame->method->code_analysis, frame->plain.program_counter, i, true);
+    const char *is_ref = infer_type(frame->method->code_analysis, frame->plain.program_counter, i, true);
     write += snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n", i, value.obj, value.i, is_ref);
   }
 
@@ -485,9 +484,7 @@ int read_string_to_utf8(vm_thread *thread, heap_string *result, obj_header *obj)
   return 0;
 }
 
-int primitive_order(type_kind kind) {
-  return kind;
-}
+int primitive_order(type_kind kind) { return kind; }
 
 classdesc *load_class_of_field_descriptor(vm_thread *thread, slice name) {
   const char *chars = name.chars;
@@ -754,7 +751,7 @@ stack_value call_interpreter_synchronous(vm_thread *thread, cp_method *method, s
 
 // NOLINTNEXTLINE(misc-no-recursion)
 __attribute__((noinline)) cp_field *field_lookup(classdesc *classdesc, slice const name, slice const descriptor) {
-  if (!classdesc->super_class)  // java/lang/Object has no fields (this is commonly called due to (*) below)
+  if (!classdesc->super_class) // java/lang/Object has no fields (this is commonly called due to (*) below)
     return nullptr;
 
   for (int i = 0; i < classdesc->fields_count; ++i) {
@@ -812,7 +809,7 @@ static void init_unsafe_constants(vm_thread *thread) {
   set_static_field(unaligned_access, (stack_value){.i = 1});
 }
 
-#define PROFILE_STARTUP 0  // if 1, prints out profiler data for startup
+#define PROFILE_STARTUP 0 // if 1, prints out profiler data for startup
 
 vm_thread *create_main_thread(vm *vm, thread_options options) {
   vm_thread *thr = calloc(1, sizeof(vm_thread));
@@ -1445,8 +1442,8 @@ void dump_trace(vm_thread *thread) {
       printf("  at %.*s.%.*s(Native Method)\n", fmt_slice(method->my_class->name), fmt_slice(method->name));
     } else {
       int line = get_line_number(method->code, frame->plain.program_counter);
-      printf("  at %.*s.%.*s(%.*s:%d)\n",
-        fmt_slice(method->my_class->name), fmt_slice(method->name), fmt_slice(method->my_class->source_file->name), line);
+      printf("  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
+             fmt_slice(method->my_class->source_file->name), line);
     }
   }
 }
@@ -1665,8 +1662,8 @@ DEFINE_ASYNC(initialize_class) {
     ASYNC_RETURN(0);
   }
 
-  bool error;                      // this is a local, but it's ok because we don't use it between
-                                   // awaits
+  bool error; // this is a local, but it's ok because we don't use it between
+              // awaits
 
   DCHECK(cd);
   if (likely(cd->state == CD_STATE_INITIALIZED || cd->state == CD_STATE_LINKAGE_ERROR)) {

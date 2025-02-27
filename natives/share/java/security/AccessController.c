@@ -66,6 +66,7 @@ DECLARE_ASYNC_NATIVE_OVERLOADED("java/security", AccessController, doPrivileged,
   IMPL_RUN_ASYNC(thread, args[0].handle->obj, nullptr);
 }
 
-DECLARE_NATIVE("java/security", AccessController, getProtectionDomain, "(Ljava/lang/Class;)Ljava/security/ProtectionDomain;") {
+DECLARE_NATIVE("java/security", AccessController, getProtectionDomain,
+               "(Ljava/lang/Class;)Ljava/security/ProtectionDomain;") {
   return value_null();
 }

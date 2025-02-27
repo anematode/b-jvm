@@ -3,9 +3,9 @@
 
 #include "arrays.h"
 #include "bjvm.h"
-#include <objects.h>
 #include <exceptions.h>
 #include <natives-dsl.h>
+#include <objects.h>
 #include <stddef.h>
 
 #ifdef EMSCRIPTEN

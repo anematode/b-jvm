@@ -121,7 +121,7 @@ void unshift(impl *I, thread_info *info) {
   }
 }
 
-bool only_daemons_running(thread_info ** thread_info) {
+bool only_daemons_running(thread_info **thread_info) {
   // Use thread_is_daemon to check
   for (int i = 0; i < arrlen(thread_info); i++) {
     if (!thread_is_daemon(thread_info[i]->thread)) {
@@ -236,7 +236,7 @@ scheduler_status_t rr_scheduler_execute_immediately(execution_record *record) {
   return SCHEDULER_RESULT_DONE;
 }
 
-bool is_nth_arg_reference(cp_method * method, int i) {
+bool is_nth_arg_reference(cp_method *method, int i) {
   if (method->access_flags & ACCESS_STATIC) {
     return field_to_kind(&method->descriptor->args[i]) == TYPE_KIND_REFERENCE;
   }

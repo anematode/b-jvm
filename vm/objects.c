@@ -216,7 +216,7 @@ obj_header *InternJString(vm_thread *thread, object s) {
 
 u64 hash_code_rng = 0;
 
-s32 get_object_hash_code(vm* vm, object o) {
+s32 get_object_hash_code(vm *vm, object o) {
   u32 *hc = &get_mark_word(vm, &o->header_word)->data[1];
   if (*hc == 0) {
     // Hash not yet computed -- make it always nonzero

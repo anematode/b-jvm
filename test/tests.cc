@@ -159,9 +159,7 @@ pi * pi is 9.8696044010893586188344909998761511351995377040468477720717813373783
 
   for (int i = 0; i < 10; ++i)
     expected += expected; // repeat 1024 times
-  auto result = run_test_case("test_files/bench_big_decimal/", true, "Main", "", {
-    "1024"
-  });
+  auto result = run_test_case("test_files/bench_big_decimal/", true, "Main", "", {"1024"});
   REQUIRE(result.stdout_ == expected);
 }
 
@@ -717,14 +715,13 @@ Test
 
 TEST_CASE("The algorithms") {
   auto result = run_test_case("test_files/the_algorithms/assertj-core-3.26.3.jar:"
-    "test_files/the_algorithms/commons-collections4-4.4.jar:"
-    "test_files/the_algorithms/commons-lang3-3.17.0.jar:"
-    "test_files/the_algorithms/junit-platform-console-standalone-1.12.0.jar:"
-    "test_files/the_algorithms/Java-1.0-SNAPSHOT.jar:"
-    "test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar", false, "org/junit/platform/console/ConsoleLauncher", "",
-    {
-      "execute", "--list-engines", "--help", "--scan-classpath", "--scan-class-path"
-    });
+                              "test_files/the_algorithms/commons-collections4-4.4.jar:"
+                              "test_files/the_algorithms/commons-lang3-3.17.0.jar:"
+                              "test_files/the_algorithms/junit-platform-console-standalone-1.12.0.jar:"
+                              "test_files/the_algorithms/Java-1.0-SNAPSHOT.jar:"
+                              "test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar",
+                              false, "org/junit/platform/console/ConsoleLauncher", "",
+                              {"execute", "--list-engines", "--help", "--scan-classpath", "--scan-class-path"});
 }
 
 TEST_CASE("URLClassLoader") {

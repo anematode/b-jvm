@@ -87,12 +87,12 @@ s32 get_object_hash_code(vm *vm, object o);
 #define LoadFieldObject(obj, type, name) __LoadFieldObject(obj, STR("L" type ";"), STR(name))
 
 #define GeneratePrimitiveStoreField(type_cap, type, stack_field, desc, modifier)                                       \
-  [[maybe_unused]] static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                                      \
+  [[maybe_unused]] static void __StoreField##type_cap(obj_header *thing, slice name, type value) {                     \
     __obj_store_field(thing, name, (stack_value){.stack_field = value modifier}, STR(#desc));                          \
   }
 
 #define GeneratePrimitiveLoadField(type_cap, type, stack_field, desc)                                                  \
-  [[maybe_unused]] static type __LoadField##type_cap(obj_header *thing, slice name) {                                                   \
+  [[maybe_unused]] static type __LoadField##type_cap(obj_header *thing, slice name) {                                  \
     return __obj_load_field(thing, name, STR(#desc)).stack_field;                                                      \
   }
 

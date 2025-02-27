@@ -164,7 +164,7 @@ static expression get_frame() { return wasm_local_get(ctx->module, get_frame_loc
 static expression get_local(int local_i) {
   wasm_value_type type = type_at(local_i + ctx->method->code->max_stack);
   int slot = _get_local_slot(local_i, type);
-  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+  return wasm_local_get(ctx->module, slot, (wasm_type){.val = type});
 }
 
 [[maybe_unused]] static wasm_store_op_kind simple_store_op(wasm_value_type ty) {
@@ -226,14 +226,14 @@ static expression get_stack_slot_of_type(int stack_i, wasm_value_type tk) {
 static expression get_stack(int stack_i) {
   wasm_value_type type = type_at(stack_i);
   int slot = _get_stack_slot(stack_i, type);
-  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+  return wasm_local_get(ctx->module, slot, (wasm_type){.val = type});
 }
 
 static expression get_stack_assert(int stack_i, wasm_value_type expected) {
   wasm_value_type type = type_at(stack_i);
   CHECK(type == expected);
   int slot = _get_stack_slot(stack_i, type);
-  return wasm_local_get(ctx->module, slot, (wasm_type) { .val = type });
+  return wasm_local_get(ctx->module, slot, (wasm_type){.val = type});
 }
 
 static expression npe_and_exit() { return nullptr; }

@@ -248,8 +248,8 @@ const char *insn_code_to_string(insn_code_kind code) {
 }
 
 #undef CASE
-#define CASE(tk, name)                                                                                                        \
-  case TYPE_KIND_##tk:                                                                                                              \
+#define CASE(tk, name)                                                                                                 \
+  case TYPE_KIND_##tk:                                                                                                 \
     return #name;
 
 const char *type_kind_to_string(type_kind kind) {

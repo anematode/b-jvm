@@ -1,6 +1,5 @@
 #include "exceptions.h"
 
-
 #include <linkage.h>
 
 #include <analysis.h>
@@ -190,7 +189,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
     cp_field *field = cd->fields + (must_have_C_layout ? field_i : order[field_i]);
     type_kind kind = field_to_kind(&field->parsed_descriptor);
     field->byte_offset = field->access_flags & ACCESS_STATIC ? allocate_field(&static_offset, kind)
-      : allocate_field(&nonstatic_offset, kind);
+                                                             : allocate_field(&nonstatic_offset, kind);
     // printf("Allocating field %.*s for class %.*s at %zu\n", fmt_slice(field->name), fmt_slice(cd->name),
     //         field->byte_offset);
     if (kind == TYPE_KIND_REFERENCE) {

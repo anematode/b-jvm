@@ -69,7 +69,7 @@ typedef struct {
 typedef struct {
   u16 stack;
   u16 locals;
-  type_kind entries[];  // first 'stack' entries, then 'locals' entries
+  type_kind entries[]; // first 'stack' entries, then 'locals' entries
 } stack_summary;
 
 // Result of the analysis of a code segment. During analysis, stack operations
