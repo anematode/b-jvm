@@ -2852,7 +2852,8 @@ static s64 async_resume_impl_void(ARGS_VOID) {
     fut = resolve_insn(&cont.ctx.resolve_insn);
 
     bytecode_insn *in = cont.ctx.resolve_insn.args.inst;
-    if (in->kind == insn_invokestatic && fut.status == FUTURE_READY) {
+    int fail = cont.ctx.resolve_insn._result;
+    if (!fail && in->kind == insn_invokestatic && fut.status == FUTURE_READY) {
       needs_polymorphic_jump = intrinsify(in);
     }
     break;
