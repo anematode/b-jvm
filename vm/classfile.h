@@ -605,7 +605,6 @@ typedef struct bytecode_insn {
   reduced_tos_kind tos_before; // the (reduced) top-of-stack type before this instruction executes
   reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
   u16 original_pc;
-  bool returns;  // whether the instruction returns a value
 
   union {
     // for newarray

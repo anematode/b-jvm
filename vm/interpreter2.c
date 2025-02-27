@@ -629,11 +629,6 @@ static bool fuel_check_impl(vm_thread *thread) {
     SPILL_VOID return 0;                                                                                               \
   }
 
-static void mark_insn_returns(bytecode_insn * inst) {
-  inst->returns = inst->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
-}
-
-
 /** BYTECODE IMPLEMENTATIONS */
 
 /**
@@ -1814,7 +1809,7 @@ void attempt_jit(cp_method *method) {
 static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method *method = insn->ic;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   stack_frame *invoked_frame;
   SPILL_VOID
   if (method->is_signature_polymorphic) {
@@ -1868,7 +1863,6 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
     return 0;
   }
   method_info = &insn->cp->methodref;
-  mark_insn_returns(insn);
 
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
@@ -1958,7 +1952,6 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
     insn->kind = insn_invokespecial_resolved;
     insn->ic = candidate;
   }
-  mark_insn_returns(insn);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokespecial)
@@ -1966,7 +1959,7 @@ FORWARD_TO_NULLARY(invokespecial)
 static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
   NPE_ON_NULL(target);
 
@@ -2056,7 +2049,7 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
 static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
   NPE_ON_NULL(target);
   if (unlikely(target->descriptor != insn->ic2)) {
@@ -2068,6 +2061,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   }
 
   ConsiderJitEntry(thread, ((cp_method*)insn->ic), sp - insn->args);
+
   stack_frame *invoked_frame = push_frame(thread, insn->ic, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
@@ -2089,7 +2083,7 @@ FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
   NPE_ON_NULL(target);
 
@@ -2119,7 +2113,7 @@ FORWARD_TO_NULLARY(invokesigpoly)
 static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
   NPE_ON_NULL(target);
   cp_method *target_method = itable_lookup(target->descriptor, insn->ic, (size_t)insn->ic2);
@@ -2152,7 +2146,7 @@ FORWARD_TO_NULLARY(invokeitable_polymorphic)
 static s64 invokevtable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *target = (sp - insn->args)->obj;
-  bool returns = insn->returns;
+  bool returns = insn->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
   SPILL_VOID
   NPE_ON_NULL(target);
   cp_method *target_method = vtable_lookup(target->descriptor, (size_t)insn->ic2);

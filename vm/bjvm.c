@@ -194,7 +194,7 @@ handle *make_handle_impl(vm_thread *thread, obj_header *obj, const char *file_na
     }
   }
 
-#if DCHECKS_ENABLED
+#if 1
   // Print where the handles were allocated
   printf("Handle exhaustion: Locations ");
   for (int i = 0; i < thread->handles_capacity; ++i) {
@@ -294,25 +294,25 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
   size_t values_bytes = code->max_stack * sizeof(stack_value);
   size_t total = header_bytes + values_bytes;
 
-  if (unlikely(total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity)) {
+  if (total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return nullptr;
   }
 
+  //  stack_frame *frame = (stack_frame *)(thread->stack.frame_buffer + thread->stack.frame_buffer_used);
   stack_frame *frame = (stack_frame *)(args + code->max_locals);
 
   thread->stack.frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->stack.frame_buffer;
   arrput(thread->stack.frames, frame);
   frame->is_native = FRAME_KIND_INTERPRETER;
-  frame->is_async_suspended = false;
-  frame->synchronized_state = SYNCHRONIZE_NONE;
   frame->num_locals = code->max_locals;
   frame->plain.program_counter = 0;
   frame->plain.max_stack = code->max_stack;
   frame->method = method;
+  frame->is_async_suspended = false;
+  frame->synchronized_state = SYNCHRONIZE_NONE;
 
-  // Not necessary, but possibly helpful when looking at debug dumps
-  // memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));
+  memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));
 
   return frame;
 }
