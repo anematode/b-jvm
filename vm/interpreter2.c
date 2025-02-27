@@ -551,7 +551,6 @@ static s32 grow_async_stack(vm_thread *thread) {
     new_capacity = 4;
 
   stk = realloc(thread->stack.async_call_stack, sizeof(struct async_stack) + new_capacity * sizeof(continuation_frame));
-  ;
   if (unlikely(!stk)) {
     thread->current_exception = thread->stack_overflow_error;
     return -1;
@@ -565,12 +564,9 @@ static s32 grow_async_stack(vm_thread *thread) {
 static continuation_frame *async_stack_push(vm_thread *thread) {
 #define stk thread->stack.async_call_stack
 
-  if (unlikely(stk->height == stk->max_height)) {
-    if ((grow_async_stack(thread)) < 0) {
-      thread->current_exception = thread->stack_overflow_error;
+  if (unlikely(stk->height == stk->max_height))
+    if (grow_async_stack(thread) != 0)
       return nullptr;
-    }
-  }
 
   return &thread->stack.async_call_stack->frames[thread->stack.async_call_stack->height++];
 
@@ -839,6 +835,7 @@ FORWARD_TO_NULLARY(getstatic_Z)
 
 static s64 putstatic_B_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(s8 *)insn->ic = (s8)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -846,6 +843,7 @@ static s64 putstatic_B_impl_int(ARGS_INT) {
 
 static s64 putstatic_C_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(u16 *)insn->ic = (u16)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -853,6 +851,7 @@ static s64 putstatic_C_impl_int(ARGS_INT) {
 
 static s64 putstatic_S_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(s16 *)insn->ic = (s16)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -860,6 +859,7 @@ static s64 putstatic_S_impl_int(ARGS_INT) {
 
 static s64 putstatic_I_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(int *)insn->ic = (int)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -867,6 +867,7 @@ static s64 putstatic_I_impl_int(ARGS_INT) {
 
 static s64 putstatic_J_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(s64 *)insn->ic = tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -874,6 +875,7 @@ static s64 putstatic_J_impl_int(ARGS_INT) {
 
 static s64 putstatic_F_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(float *)insn->ic = tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -881,6 +883,7 @@ static s64 putstatic_F_impl_float(ARGS_FLOAT) {
 
 static s64 putstatic_D_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(double *)insn->ic = tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -888,6 +891,7 @@ static s64 putstatic_D_impl_double(ARGS_DOUBLE) {
 
 static s64 putstatic_L_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
   *(obj_header **)insn->ic = (obj_header *)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -895,6 +899,8 @@ static s64 putstatic_L_impl_int(ARGS_INT) {
 
 static s64 putstatic_Z_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(insn->ic, "Static field location not found");
+  DCHECK(tos == (bool)tos, "Illegal boolean value");
   *(s8 *)insn->ic = (s8)tos;
   --sp;
   STACK_POLYMORPHIC_NEXT(*(sp - 1));
@@ -1109,6 +1115,7 @@ static s64 putfield_L_impl_int(ARGS_INT) {
 
 static s64 putfield_Z_impl_int(ARGS_INT) {
   DEBUG_CHECK();
+  DCHECK(tos == (bool)tos, "Illegal boolean value");
   obj_header *obj = (sp - 2)->obj;
   NPE_ON_NULL(obj);
   s8 *field = (s8 *)((char *)obj + (size_t)insn->ic2);
@@ -1487,8 +1494,7 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
   s32 *offsets = data.targets;
   s32 n = data.keys_count;
   s32 default_target = data.default_target;
-  // TODO replace this with a binary search
-
+  // Look through keys one by one
   for (int i = 0; i < n; i++) {
     if (keys[i] == key) {
       int delta = (offsets[i] - 1) - pc;
@@ -1498,6 +1504,7 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
       STACK_POLYMORPHIC_NEXT(*(sp - 1));
     }
   }
+  // No key found, jump to default
   int delta = (default_target - 1) - pc;
   pc = default_target - 1;
   insns += delta;
@@ -1851,10 +1858,10 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
-  obj_header *target = (sp - argc)->obj;
+  obj_header *receiver = (sp - argc)->obj;
 
   SPILL_VOID
-  if (!target) {
+  if (!receiver) {
     raise_null_pointer_exception(thread);
     return 0;
   }
@@ -1896,8 +1903,8 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   }
 
   insn->kind = insn_invokevtable_monomorphic;
-  insn->ic = vtable_lookup(target->descriptor, method_info->resolved->vtable_index);
-  insn->ic2 = target->descriptor;
+  insn->ic = vtable_lookup(receiver->descriptor, method_info->resolved->vtable_index);
+  insn->ic2 = receiver->descriptor;
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokevirtual)
@@ -1906,9 +1913,9 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
-  obj_header *target = (sp - argc)->obj;
+  obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
-  if (!target) {
+  if (!receiver) {
     raise_null_pointer_exception(thread);
     return 0;
   }
@@ -1968,15 +1975,15 @@ FORWARD_TO_NULLARY(invokespecial)
 
 static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  obj_header *target = (sp - insn->args)->obj;
+  obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
-  NPE_ON_NULL(target);
+  NPE_ON_NULL(receiver);
 
-  cp_method *target_method = insn->ic;
-  ConsiderJitEntry(thread, target_method, sp - insn->args);
+  cp_method *receiver_method = insn->ic;
+  ConsiderJitEntry(thread, receiver_method, sp - insn->args);
 
-  stack_frame *invoked_frame = push_frame(thread, target_method, sp - insn->args, insn->args);
+  stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
 
@@ -1999,9 +2006,9 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
-  obj_header *target = (sp - argc)->obj;
+  obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
-  if (!target) {
+  if (!receiver) {
     raise_null_pointer_exception(thread);
     return 0;
   }
@@ -2019,7 +2026,7 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
     insn->kind = insn_invokevirtual;
     JMP_VOID
   }
-  cp_method *method = itable_lookup(target->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
+  cp_method *method = itable_lookup(receiver->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
   if (!method) {
     raise_abstract_method_error(thread, method_info->resolved);
     return 0;
@@ -2029,12 +2036,12 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
     printf("Looking for method %.*s.%.*s, receiver is %.*s; found %.*s.%.*s\n",
       fmt_slice(method_info->resolved->my_class->name),
       fmt_slice(method_info->resolved->name),
-      fmt_slice(target->descriptor->name),
+      fmt_slice(receiver->descriptor->name),
       fmt_slice(method->my_class->name), fmt_slice(method->name));
   }
 
   insn->ic = method;
-  insn->ic2 = target->descriptor;
+  insn->ic2 = receiver->descriptor;
   insn->kind = insn_invokeitable_monomorphic;
   mark_insn_returns(insn);
   JMP_VOID
@@ -2058,11 +2065,11 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
 
 static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  obj_header *target = (sp - insn->args)->obj;
+  obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
-  NPE_ON_NULL(target);
-  if (unlikely(target->descriptor != insn->ic2)) {
+  NPE_ON_NULL(receiver);
+  if (unlikely(receiver->descriptor != insn->ic2)) {
     if (insn->kind == insn_invokevtable_monomorphic)
       make_invokevtable_polymorphic_(insn);
     else
@@ -2091,16 +2098,16 @@ FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
 __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  obj_header *target = (sp - insn->args)->obj;
+  obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
-  NPE_ON_NULL(target);
+  NPE_ON_NULL(receiver);
 
   invokevirtual_signature_polymorphic_t ctx = {
       .args = {
           .thread = thread, .method = insn->ic,
         .provider_mt = (struct native_MethodType**) &insn->ic2, // GC root
-        .sp_ = sp - insn->args, .target = target}};
+        .sp_ = sp - insn->args, .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
@@ -2121,20 +2128,20 @@ FORWARD_TO_NULLARY(invokesigpoly)
 
 static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  obj_header *target = (sp - insn->args)->obj;
+  obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
-  NPE_ON_NULL(target);
-  cp_method *target_method = itable_lookup(target->descriptor, insn->ic, (size_t)insn->ic2);
-  if (unlikely(!target_method)) {
+  NPE_ON_NULL(receiver);
+  cp_method *receiver_method = itable_lookup(receiver->descriptor, insn->ic, (size_t)insn->ic2);
+  if (unlikely(!receiver_method)) {
     raise_abstract_method_error(thread, insn->cp->methodref.resolved);
     return 0;
   }
-  DCHECK(target_method);
+  DCHECK(receiver_method);
 
-  ConsiderJitEntry(thread, target_method, sp - insn->args);
+  ConsiderJitEntry(thread, receiver_method, sp - insn->args);
 
-  stack_frame *invoked_frame = push_frame(thread, target_method, sp - insn->args, insn->args);
+  stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
 
@@ -2154,16 +2161,16 @@ FORWARD_TO_NULLARY(invokeitable_polymorphic)
 
 static s64 invokevtable_polymorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  obj_header *target = (sp - insn->args)->obj;
+  obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
-  NPE_ON_NULL(target);
-  cp_method *target_method = vtable_lookup(target->descriptor, (size_t)insn->ic2);
-  DCHECK(target_method);
+  NPE_ON_NULL(receiver);
+  cp_method *receiver_method = vtable_lookup(receiver->descriptor, (size_t)insn->ic2);
+  DCHECK(receiver_method);
 
-  ConsiderJitEntry(thread, target_method, sp - insn->args);
+  ConsiderJitEntry(thread, receiver_method, sp - insn->args);
 
-  stack_frame *invoked_frame = push_frame(thread, target_method, sp - insn->args, insn->args);
+  stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - insn->args, insn->args);
   if (!invoked_frame)
     return 0;
 
@@ -2533,19 +2540,36 @@ static s64 dup_impl_double(ARGS_DOUBLE) {
   NEXT_DOUBLE(tos)
 }
 
+// dup2 is fairly common, so this is worth it (I think)
+static s64 dup2_impl_int(ARGS_INT) {
+  DEBUG_CHECK();
+  stack_value val2 = *(sp - 2);
+  (sp - 1)->l = tos;
+  *sp = val2;
+  sp += 2;
+  NEXT_INT(tos)
+}
+
+static s64 dup2_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  stack_value val2 = *(sp - 2);
+  (sp - 1)->f = tos;
+  *sp = val2;
+  sp += 2;
+  NEXT_INT(tos)
+}
+
+static s64 dup2_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  stack_value val2 = *(sp - 2);
+  (sp - 1)->d = tos;
+  *sp = val2;
+  sp += 2;
+  NEXT_INT(tos)
+}
+
 // Rare enough (especially after analysis phase) that we might as well just have the one implementation and forward
 // every TOS type to them.
-
-// ..., val2, val1 -> ..., val2, val1, val2, val1
-static s64 dup2_impl_void(ARGS_VOID) {
-  DEBUG_CHECK();
-  stack_value val1 = *(sp - 1), val2 = *(sp - 2);
-  *(sp) = val2;
-  *(sp + 1) = val1;
-  sp += 2;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
-}
-FORWARD_TO_NULLARY(dup2)
 
 // ..., val2, val1 -> ..., val1, val2, val1
 static s64 dup_x1_impl_void(ARGS_VOID) {
