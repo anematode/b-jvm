@@ -24,7 +24,8 @@ static inline int JavaStringLength(vm_thread *thread, obj_header *string) {
   DCHECK(utf8_equals(string->descriptor->name, "java/lang/String"));
 
   auto method = method_lookup(string->descriptor, STR("length"), STR("()I"), false, false);
-  stack_value result = call_interpreter_synchronous(thread, method, (stack_value[]){});
+  stack_value args[1];
+  stack_value result = call_interpreter_synchronous(thread, method, args);
 
   return result.i;
 }
