@@ -51,5 +51,5 @@ if __name__ == '__main__':
         processes = [*p.map(worker, data)]
         for j, i in enumerate(processes):
             if i != 0:
-                print("AT LEAST ONE TEST FAILED! (process " + str(j) + ")")
+                print("AT LEAST ONE TEST FAILED! (process " + str(j) + " returned exit code " + str(i) + ")")
                 sys.exit(1)
