@@ -266,6 +266,11 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
 // the rewrite until filtration is complete.
 #define LOCAL_INDEX do_rewrite ? (s32)insn->index : ctx->locals_swizzle[insn->index]
 
+// Set the ->returns field of an instruction based on
+static void mark_insn_returns(bytecode_insn *inst) {
+  inst->returns = inst->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
+}
+
 /**
  * Analyze the instruction.
  * @param insn the instruction to analyze
@@ -622,6 +627,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     method_descriptor *descriptor =
         check_cp_entry(insn->cp, CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF, "invoke* argument")
             ->methodref.descriptor;
+    mark_insn_returns(insn);
     for (int j = descriptor->args_count - 1; j >= 0; --j) {
       field_descriptor *field = descriptor->args + j;
       POP_KIND(field->repr_kind)

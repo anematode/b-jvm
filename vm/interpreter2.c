@@ -52,10 +52,11 @@
 #include <roundrobin_scheduler.h>
 #include <sys/time.h>
 
-[[maybe_unused]] s64 tick = 0; // for debugging
+// for debugging only; lets you print out interpreter instructions after a certain number have executed
+[[maybe_unused]] s64 tick = 0;
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
-#define DEBUG_CHECK() ;
+#define DEBUG_CHECK()
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
@@ -362,7 +363,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
     MUSTTAIL return which##_impl_void(thread, frame, insns, pc_, sp_, arg_1, arg_2, tos_);                             \
   }
 
-// Emit a null pointer exception when the given expression is null.
+// Emit a null pointer exception when the given expression is null. Very common, so we make it a macro :)
 #define NPE_ON_NULL(expr)                                                                                              \
   if (unlikely(!expr)) {                                                                                               \
     SPILL_VOID                                                                                                         \
@@ -460,17 +461,20 @@ DECLARE_ASYNC(int, resolve_getfield_putfield,
   arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
   invoked_methods(invoked_method(initialize_class)));
 
+// Convert invokestatic instructions into the resolved form -- or throw a linkage error.
 DECLARE_ASYNC(int, resolve_invokestatic,
               locals(),
               arguments(vm_thread *thread; bytecode_insn *insn_),
               invoked_method(resolve_methodref)
 );
 
+// Convert new instructions into the resolved form -- or throw a linkage error.
 DECLARE_ASYNC(int, resolve_new_inst,
   locals(classdesc *classdesc),
   arguments(vm_thread *thread; bytecode_insn *inst;),
   invoked_methods(invoked_method(initialize_class)));
 
+// Resolve any instruction that may need asynchronous resolution.
 DECLARE_ASYNC(int, resolve_insn,
               locals(),
               arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
@@ -509,7 +513,6 @@ DEFINE_ASYNC(resolve_insn) {
 /// the top of the async stack contains (a) the state index and (b) a pointer to a malloc'd
 /// context struct.
 start_counter(state_index, 1);
-typedef enum { STATE_DONE, STATE_FAILED, STATE_YIELD } async_task_status;
 
 typedef enum {
   CONT_RESOLVE,
@@ -628,10 +631,6 @@ static bool fuel_check_impl(vm_thread *thread) {
   if (fuel_check_impl(thread)) {                                                                                       \
     SPILL_VOID return 0;                                                                                               \
   }
-
-static void mark_insn_returns(bytecode_insn *inst) {
-  inst->returns = inst->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
-}
 
 /** BYTECODE IMPLEMENTATIONS */
 
@@ -1740,8 +1739,6 @@ DEFINE_ASYNC(resolve_invokestatic) {
   self->args.insn_->ic = info->resolved;
   self->args.insn_->args = info->descriptor->args_count;
 
-  mark_insn_returns(self->args.insn_);
-
   ASYNC_END(0);
 }
 
@@ -1878,7 +1875,6 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
     return 0;
   }
   method_info = &insn->cp->methodref;
-  mark_insn_returns(insn);
 
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
@@ -1968,7 +1964,6 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
     insn->kind = insn_invokespecial_resolved;
     insn->ic = candidate;
   }
-  mark_insn_returns(insn);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokespecial)
@@ -2033,16 +2028,9 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
     return 0;
   }
 
-  if (method_argc(method) != method_argc(method_info->resolved)) {
-    printf("Looking for method %.*s.%.*s, receiver is %.*s; found %.*s.%.*s\n",
-           fmt_slice(method_info->resolved->my_class->name), fmt_slice(method_info->resolved->name),
-           fmt_slice(receiver->descriptor->name), fmt_slice(method->my_class->name), fmt_slice(method->name));
-  }
-
   insn->ic = method;
   insn->ic2 = receiver->descriptor;
   insn->kind = insn_invokeitable_monomorphic;
-  mark_insn_returns(insn);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokeinterface)
