@@ -714,10 +714,10 @@ Test
 }
 
 TEST_CASE("The algorithms") {
-  auto result = run_test_case("test_files/the_algorithms/assertj-core-3.26.3.jar:"
-                              "test_files/the_algorithms/commons-collections4-4.4.jar:"
-                              "test_files/the_algorithms/commons-lang3-3.17.0.jar:"
-                              "test_files/the_algorithms/junit-platform-console-standalone-1.12.0.jar:"
+  auto result = run_test_case("test_files/share/assertj-core-3.26.3.jar:"
+                              "test_files/share/commons-collections4-4.4.jar:"
+                              "test_files/share/commons-lang3-3.17.0.jar:"
+                              "test_files/share/junit-platform-console-standalone-1.12.0.jar:"
                               "test_files/the_algorithms/Java-1.0-SNAPSHOT.jar:"
                               "test_files/the_algorithms/Java-1.0-SNAPSHOT-tests.jar",
                               false, "org/junit/platform/console/ConsoleLauncher", "",
