@@ -129,7 +129,7 @@ stack_value *frame_stack(stack_frame *frame) {
 
 native_frame *get_native_frame_data(stack_frame *frame) {
   DCHECK(is_frame_native(frame));
-  return &frame->native;
+  return (native_frame*) (frame + 1);
 }
 
 cp_method *get_frame_method(stack_frame *frame) { return frame->method; }
@@ -261,10 +261,10 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
 
   frame->kind = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
-  frame->max_stack = 0;
+  // this many additional slots are used for the native info
+  frame->max_stack = align_up(sizeof(native_frame), sizeof(stack_value));
   frame->method = method;
-  frame->native.method_shape = descriptor;
-  frame->native.state = 0;
+  get_native_frame_data(frame)->method_shape = descriptor;
   frame->is_async_suspended = false;
   frame->synchronized_state = SYNCHRONIZE_NONE;
 
@@ -364,7 +364,7 @@ void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
   DCHECK(frame);
   DCHECK(reference == nullptr || reference == frame);
   if (is_frame_native(frame)) {
-    drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
+    drop_handles_array(thr, frame->method, get_native_frame_data(frame)->method_shape, get_native_args(frame));
   }
   thr->stack.top = frame->prev;
 }

@@ -439,13 +439,8 @@ typedef struct {
   slice classpath;
 } vm_options;
 
-// Stack frame associated with a native method. Note that this is stored
-// separately from the (inaccessible) WebAssembly stack, and merely contains
-// data necessary for correct stack trace recovery and resumption after
-// interrupts.
+// Extra data associated with a native method. Placed just ahead of the corresponding stack frame.
 typedef struct native_frame {
-  // Used by async native methods for their state machines
-  int state;
   // Descriptor on the instruction itself. Unequal to method->descriptor only
   // in the situation of signature-polymorphic methods.
   const method_descriptor *method_shape;
@@ -492,11 +487,7 @@ typedef struct stack_frame {
   u16 max_stack;
   u16 num_locals;
 
-  union {
-    stack_value stack[];  // interpreter frame
-    native_frame native;
-    object oops[];  // compiled frame
-  };
+  stack_value stack[];  // interpreter frame or compiled frame. In the native case a "native_frame" lives here
 } stack_frame;
 
 // Get the current stack depth of the interpreted frame, based on the program
