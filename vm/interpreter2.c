@@ -457,7 +457,7 @@ DECLARE_ASYNC(int, resolve_getstatic_putstatic,
 // appropriate. The stack should be made consistent before this function is called, as it may interrupt.
 DECLARE_ASYNC(int, resolve_getfield_putfield,
   locals(cp_field_info *field_info; cp_class_info *class),
-  arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
+  arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
   invoked_methods(invoked_method(initialize_class)));
 
 DECLARE_ASYNC(int, resolve_invokestatic,
@@ -473,7 +473,7 @@ DECLARE_ASYNC(int, resolve_new_inst,
 
 DECLARE_ASYNC(int, resolve_insn,
               locals(),
-              arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
+              arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
               invoked_methods(
                 invoked_method(resolve_getstatic_putstatic)
                 invoked_method(resolve_getfield_putfield)
@@ -738,7 +738,7 @@ __attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
 
   if (unlikely(thread->current_exception)) {
     return 0;
@@ -753,7 +753,7 @@ FORWARD_TO_NULLARY(getstatic)
 __attribute__((noinline)) static s64 putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   if (thread->current_exception) {
     return 0;
   }
@@ -976,7 +976,7 @@ static s64 getfield_impl_int(ARGS_INT) {
   SPILL(tos)
   DEBUG_CHECK();
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
 
   RELOAD(tos)
   JMP_INT(tos)
@@ -985,7 +985,7 @@ static s64 getfield_impl_int(ARGS_INT) {
 static s64 putfield_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
 FORWARD_TO_NULLARY(putfield)
@@ -1641,7 +1641,7 @@ static s64 new_impl_void(ARGS_VOID) {
   if (error)
     return 0;
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(new)
@@ -1709,7 +1709,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL(tos)
   u16 temp_sp = sp - frame_stack(frame);
-  if (multianewarray(thread, &frame->plain, insn->multianewarray, &temp_sp))
+  if (multianewarray(thread, frame, insn->multianewarray, &temp_sp))
     return 0;
 
   sp = frame_stack(frame) + temp_sp;
@@ -1748,7 +1748,7 @@ DEFINE_ASYNC(resolve_invokestatic) {
 __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   if (thread->current_exception)
     return 0;
 
@@ -2920,7 +2920,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 
   // Now calculate sp correctly depending on whether we're advancing an instruction or not
-  sp = frame->plain.stack + frame->method->code_analysis->insn_index_to_sd[pc + advance_pc]; // correct sp
+  sp = frame->stack + frame->method->code_analysis->insn_index_to_sd[pc + advance_pc]; // correct sp
 
   frame->is_async_suspended = false;
   if (unlikely(thread->current_exception)) {
@@ -2972,20 +2972,19 @@ static inline stack_value interpret_native_frame(future_t *fut, vm_thread *threa
 }
 
 __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut, vm_thread *thread,
-                                                                  stack_frame *frame_) {
+                                                                  stack_frame *frame) {
   stack_value result;
 
   do {
   interpret_begin:
-    plain_frame *frame = get_plain_frame(frame_);
-    s32 pc_ = frame_->program_counter;
-    stack_value *sp_ = &frame->stack[stack_depth(frame_)];
-    bytecode_insn *insns = frame_->method->code->code;
+    s32 pc_ = frame->program_counter;
+    stack_value *sp_ = &frame->stack[stack_depth(frame)];
+    bytecode_insn *insns = frame->method->code->code;
     [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 
-    if (unlikely(frame_->is_async_suspended)) {
+    if (unlikely(frame->is_async_suspended)) {
 #if DO_TAILS
-      result.l = async_resume_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+      result.l = async_resume_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
       handler_i =
           async_resume_impl_void(thread, frame_, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
@@ -2994,7 +2993,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
 
 #if DO_TAILS
     else {
-      result.l = entry_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+      result.l = entry_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
     }
 #else
     if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
@@ -3008,7 +3007,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
 #endif
 
     // we really should just have all the methods return a future_t via a pointer, but whatever
-    if (unlikely(frame_->is_async_suspended)) {
+    if (unlikely(frame->is_async_suspended)) {
       // reconstruct future to return
       void *wk = async_stack_top(thread);
       *fut = (future_t){FUTURE_NOT_READY, wk};
@@ -3016,10 +3015,10 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
     }
 
     if (unlikely(thread->current_exception)) {
-      exception_table_entry *handler = find_exception_handler(thread, frame_, thread->current_exception->descriptor);
+      exception_table_entry *handler = find_exception_handler(thread, frame, thread->current_exception->descriptor);
 
       if (handler) {
-        frame_->program_counter = handler->handler_insn;
+        frame->program_counter = handler->handler_insn;
         frame->stack[0] = (stack_value){.obj = thread->current_exception};
         thread->current_exception = nullptr;
 
@@ -3028,7 +3027,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
     }
   } while (0);
 
-  pop_frame(thread, frame_);
+  pop_frame(thread, frame);
   *fut = (future_t){FUTURE_READY};
 
   return result;
