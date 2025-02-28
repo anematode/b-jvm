@@ -2124,14 +2124,27 @@ bool instanceof(const classdesc *o, const classdesc *target) {
     if (o->kind == CD_KIND_ORDINARY)
       return false;
     if (o->kind == CD_KIND_ORDINARY_ARRAY) {
-      return target->dimensions == o->dimensions && o->primitive_component == target->primitive_component &&
-             (!o->base_component || !target->base_component || instanceof(o->base_component, target->base_component));
+      // First remove target_dims from o. If we run out of dimensions, then it's not compatible. Then we perform a
+      // normal check.
+      int target_dims = target->dimensions;
+      while (target_dims--) {
+        o = o->one_fewer_dim;
+        target = target->one_fewer_dim;
+        DCHECK(target);
+        if (!o) {
+          return false;
+        }
+      }
+      if (o->kind == CD_KIND_PRIMITIVE) {
+        return false;  // handled earlier
+      }
+    } else {
+      // o is 1D primitive array, equality check suffices
+      return target->dimensions == o->dimensions && target->primitive_component == o->primitive_component;
     }
-    // o is 1D primitive array, equality check suffices
-    return target->dimensions == o->dimensions && target->primitive_component == o->primitive_component;
   }
 
-  // o is normal object
+  // o can be compared as a normal object
   const classdesc *desc = o;
   return target->access_flags & ACCESS_INTERFACE ? instanceof_interface(desc, target) : instanceof_super(desc, target);
 }

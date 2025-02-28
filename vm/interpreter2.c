@@ -1954,12 +1954,10 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
       candidate = itable_lookup(lookup_on, method_info->resolved->my_class, method_info->resolved->itable_index);
     }
     if (!candidate) {
-      printf("Wtf\n");
       raise_abstract_method_error(thread, method_info->resolved);
       return 0;
     }
   } else if (candidate->access_flags & ACCESS_ABSTRACT) {
-    printf("Wtf\n");
     raise_abstract_method_error(thread, candidate);
     return 0;
   }
@@ -2032,7 +2030,6 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   cp_method *method =
       itable_lookup(receiver->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
   if (!method) {
-    printf("Wtf\n");
     raise_abstract_method_error(thread, method_info->resolved);
     return 0;
   }

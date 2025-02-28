@@ -140,6 +140,9 @@ DECLARE_NATIVE("java/lang", System, setErr0, "(Ljava/io/PrintStream;)V") {
 
 DECLARE_NATIVE("java/lang", System, identityHashCode, "(Ljava/lang/Object;)I") {
   assert(argc == 1);
+  if (args[0].handle->obj == nullptr) {
+    return (stack_value){.i = 0};
+  }
   return (stack_value){.i = get_object_hash_code(thread->vm, args[0].handle->obj)};
 }
 
