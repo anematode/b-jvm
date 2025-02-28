@@ -724,6 +724,17 @@ TEST_CASE("The algorithms") {
                               {"--scan-classpath=./test_files/the_algorithms"});
 }
 
+TEST_CASE("Simple sea of nodes") {
+  auto result = run_test_case("test_files/share/assertj-core-3.26.3.jar:"
+                              "test_files/share/commons-collections4-4.4.jar:"
+                              "test_files/share/commons-lang3-3.17.0.jar:"
+                              "test_files/share/junit-platform-console-standalone-1.12.0.jar:"
+                              "test_files/simple/simple.jar:"
+                              "test_files/simple",
+                              false, "org/junit/platform/console/ConsoleLauncher", "",
+                              {"--scan-classpath=./test_files/simple"});
+}
+
 TEST_CASE("URLClassLoader") {
   auto result = run_test_case("test_files/url-classloader/", true, "LoaderTest");
   REQUIRE(result.stdout_ == "Hello, world!\n");
