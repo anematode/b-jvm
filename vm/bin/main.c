@@ -327,8 +327,8 @@ char *ffi_get_class_json(classdesc *desc) {
     cp_field *f = fields[i];
     if (i > 0)
       string_builder_append(&out, ",");
-    string_builder_append(&out, R"({"name":"%s","type":"%s","accessFlags":%d,"byteOffset":%d,"index":%d})",
-                          f->name.chars, f->parsed_descriptor.repr_kind, f->access_flags, f->byte_offset,
+    string_builder_append(&out, R"({"name":"%s","type":"%.*s","accessFlags":%d,"byteOffset":%d,"index":%d})",
+                          f->name.chars, fmt_slice(f->parsed_descriptor.unparsed), f->access_flags, f->byte_offset,
                           field_index++);
   }
 

@@ -1860,22 +1860,11 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
   // with reflection n' shit)
   object loader = nullptr;
-  if (thread->thread_obj && thread->thread_obj->contextClassLoader) {
-    if (!thread->putative_system_cl) {
-      // Temporarily until we switch over to system class loader
-      thread->putative_system_cl = thread->thread_obj->contextClassLoader;
-    } else {
-      if (thread->thread_obj->contextClassLoader != thread->putative_system_cl) {
-        loader = thread->thread_obj->contextClassLoader;
-      }
-    }
-  } else {
-    for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
-      void *candidate = thread->stack.frames[i]->method->my_class->classloader;
-      if (candidate) {
-        loader = candidate;
-        break;
-      }
+  for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
+    void *candidate = thread->stack.frames[i]->method->my_class->classloader;
+    if (candidate) {
+      loader = candidate;
+      break;
     }
   }
 
