@@ -1832,8 +1832,7 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
     invoked_frame = push_native_frame(thread, method, insn->cp->methodref.descriptor, sp - insn->args, insn->args);
   } else {
     ConsiderJitEntry(thread, method, sp - insn->args)
-
-        invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
+    invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
   }
   if (unlikely(!invoked_frame)) {
     return 0;

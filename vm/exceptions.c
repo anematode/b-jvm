@@ -68,14 +68,16 @@ void raise_unsatisfied_link_error(vm_thread *thread, const cp_method *method) {
   printf("Unsatisfied link error %.*s on %.*s\n", fmt_slice(method->name), fmt_slice(method->my_class->name));
 
   INIT_STACK_STRING(err, 1000);
+  INIT_STACK_STRING(class_name, 1000);
+  exchange_slashes_and_dots(&class_name, method->my_class->name);
   bprintf(err, "Method %.*s on class %.*s with descriptor %.*s", fmt_slice(method->name),
-          fmt_slice(method->my_class->name), fmt_slice(method->unparsed_descriptor));
+          fmt_slice(class_name), fmt_slice(method->unparsed_descriptor));
   raise_vm_exception(thread, STR("java/lang/UnsatisfiedLinkError"), err);
 }
 
 void raise_abstract_method_error(vm_thread *thread, const cp_method *method) {
   INIT_STACK_STRING(err, 1000);
-  bprintf(err, "Found no concrete implementation of %.*s", fmt_slice(method->name), fmt_slice(method->my_class->name));
+  bprintf(err, "Found no concrete implementation of %.*s", fmt_slice(method->name));
   raise_vm_exception(thread, STR("java/lang/AbstractMethodError"), err);
 }
 
@@ -94,7 +96,9 @@ void raise_verify_error(vm_thread *thread, slice message) {
 }
 
 void raise_array_store_exception(vm_thread *thread, const slice class_name) {
-  raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), class_name);
+  INIT_STACK_STRING(name, 1024);
+  exchange_slashes_and_dots(&name, class_name);
+  raise_vm_exception(thread, STR("java/lang/ArrayStoreException"), name);
 }
 
 void raise_incompatible_class_change_error(vm_thread *thread, const slice complaint) {

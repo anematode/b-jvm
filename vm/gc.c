@@ -342,8 +342,6 @@ void major_gc(vm *vm) {
   gc_ctx ctx = {.vm = vm};
   major_gc_enumerate_gc_roots(&ctx);
 
-  printf("GC!\n");
-
   // Mark phase
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object root = *ctx.roots[i];
