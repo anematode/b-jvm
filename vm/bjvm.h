@@ -171,6 +171,7 @@ typedef int (*poll_available_bytes)(void *param); // returns the number of bytes
 #define CARD_BYTES 4096
 
 typedef struct stack_frame stack_frame;
+typedef struct plain_frame plain_frame;
 typedef struct native_frame native_frame;
 
 // Continue execution of a thread.
@@ -439,28 +440,8 @@ typedef struct {
   slice classpath;
 } vm_options;
 
-// Stack frame associated with a native method. Note that this is stored
-// separately from the (inaccessible) WebAssembly stack, and merely contains
-// data necessary for correct stack trace recovery and resumption after
-// interrupts.
-typedef struct native_frame {
-  // Used by async native methods for their state machines
-  int state;
-  // Descriptor on the instruction itself. Unequal to method->descriptor only
-  // in the situation of signature-polymorphic methods.
-  const method_descriptor *method_shape;
-} native_frame;
-
-typedef enum : u8 { FRAME_KIND_INTERPRETER, FRAME_KIND_NATIVE, FRAME_KIND_COMPILED } frame_kind;
-
-typedef enum : u8 { SYNCHRONIZE_NONE = 0, SYNCHRONIZE_IN_PROGRESS = 1, SYNCHRONIZE_DONE = 2 } synchronized_state;
-
-// A frame is either a native frame or a plain frame. They may be distinguished
-// with is_native.
+// Stack frame associated with a Java method.
 //
-// Native frames may be consecutive: for example, a native method might invoke
-// another native method, which itself raises an interrupt.
-// INTERPRETER FRAME
 // Frames are aligned to 8 bytes, the natural alignment of a stack value.
 // in native frames, locals are of type value
 // in plain frames,  locals are of type stack_value
@@ -474,6 +455,35 @@ typedef enum : u8 { SYNCHRONIZE_NONE = 0, SYNCHRONIZE_IN_PROGRESS = 1, SYNCHRONI
 //
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
+typedef struct plain_frame {
+  stack_value stack[];
+} plain_frame;
+
+// Stack frame associated with a native method. Note that this is stored
+// separately from the (inaccessible) WebAssembly stack, and merely contains
+// data necessary for correct stack trace recovery and resumption after
+// interrupts.
+typedef struct native_frame {
+  // Used by async native methods for their state machines
+  int state;
+  // Descriptor on the instruction itself. Unequal to method->descriptor only
+  // in the situation of signature-polymorphic methods.
+  const method_descriptor *method_shape;
+} native_frame;
+
+typedef struct {
+  object oops[];
+} compiled_frame;
+
+typedef enum : u8 { FRAME_KIND_INTERPRETER, FRAME_KIND_NATIVE, FRAME_KIND_COMPILED } frame_kind;
+
+typedef enum : u8 { SYNCHRONIZE_NONE = 0, SYNCHRONIZE_IN_PROGRESS = 1, SYNCHRONIZE_DONE = 2 } synchronized_state;
+
+// A frame is either a native frame or a plain frame. They may be distinguished
+// with is_native.
+//
+// Native frames may be consecutive: for example, a native method might invoke
+// another native method, which itself raises an interrupt.
 typedef struct stack_frame {
   // The method associated with this frame
   cp_method *method;
@@ -493,9 +503,9 @@ typedef struct stack_frame {
   u16 num_locals;
 
   union {
-    stack_value stack[];  // interpreter frame
+    plain_frame plain;
     native_frame native;
-    object oops[];  // compiled frame
+    compiled_frame compiled;
   };
 } stack_frame;
 
@@ -511,6 +521,7 @@ stack_value *frame_stack(stack_frame *frame);
 stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame);
 
 native_frame *get_native_frame_data(stack_frame *frame);
+plain_frame *get_plain_frame(stack_frame *frame);
 cp_method *get_frame_method(stack_frame *frame);
 
 EMSCRIPTEN_KEEPALIVE
@@ -668,7 +679,7 @@ int resolve_field(vm_thread *thread, cp_field_info *info);
 stack_value get_field(obj_header *obj, cp_field *field);
 // Look up a (possibly inherited) field on the class.
 cp_field *field_lookup(classdesc *classdesc, slice name, slice descriptor);
-int multianewarray(vm_thread *thread, stack_frame *frame, struct multianewarray_data *multianewarray, u16 *sd);
+int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_data *multianewarray, u16 *sd);
 void dump_frame(FILE *stream, const stack_frame *frame);
 
 // e.g. int.class

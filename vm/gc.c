@@ -109,18 +109,19 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
 
   uintptr_t min_frame_addr_scanned = UINTPTR_MAX;
 
-  stack_frame *frame = thr->stack.top;
-  while (frame) {
-    if (is_frame_native(frame)) {
-      frame = frame->prev;
+  stack_frame *raw_frame = thr->stack.top;
+  while (raw_frame) {
+    if (is_frame_native(raw_frame)) {
+      raw_frame = raw_frame->prev;
       continue;
     }
 
-    code_analysis *analy = frame->method->code_analysis;
+    plain_frame *frame = get_plain_frame(raw_frame);
+    code_analysis *analy = raw_frame->method->code_analysis;
     // List of stack and local values which are references
     // In particular, 0 through stack - 1 refer to the stack, and stack through stack + locals - 1
     // refer to the locals array
-    stack_summary *ss = analy->stack_states[frame->program_counter];
+    stack_summary *ss = analy->stack_states[raw_frame->program_counter];
     int i = 0;
     for (; i < ss->stack; ++i) {
       if (ss->entries[i] != TYPE_KIND_REFERENCE)
@@ -137,11 +138,11 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
     for (int local_i = 0; i < ss->locals + ss->stack; ++i, ++local_i) {
       if (ss->entries[i] != TYPE_KIND_REFERENCE)
         continue;
-      PUSH_ROOT(&frame_locals(frame)[local_i].obj);
+      PUSH_ROOT(&frame_locals(raw_frame)[local_i].obj);
     }
 
-    min_frame_addr_scanned = (uintptr_t)frame_locals(frame);
-    frame = frame->prev;
+    min_frame_addr_scanned = (uintptr_t)frame_locals(raw_frame);
+    raw_frame = raw_frame->prev;
   }
 
   // Non-null local handles
