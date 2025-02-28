@@ -1,11 +1,15 @@
 #include "natives-dsl.h"
 
 DECLARE_NATIVE("jdk/internal/reflect", Reflection, getCallerClass, "()Ljava/lang/Class;") {
-  // Look at frame before latest frame
-  if (arrlen(thread->stack.frames) < 3) {
-    return value_null();
+  // Look a couple frames before the current frame
+  int i = 2;
+  stack_frame *frame = thread->stack.top;
+  while (frame && i > 0) {
+    frame = frame->prev;
+    --i;
   }
-  stack_frame *frame = thread->stack.frames[arrlen(thread->stack.frames) - 3];
+  if (frame == nullptr)
+    return value_null();
   return (stack_value){.obj = (void *)get_class_mirror(thread, get_frame_method(frame)->my_class)};
 }
 

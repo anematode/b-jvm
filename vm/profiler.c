@@ -41,13 +41,13 @@ void profiler_main(profiler *prof) {
   char key[sizeof(cp_method *) * MAX_DEPTH];
   while (!__atomic_load_n(&prof->waiting_for_exit, __ATOMIC_SEQ_CST)) {
     prof->samples++;
-    u32 count = arrlen(thread->stack.frames);
+    u32 count = 0; // arrlen(thread->stack.frames);
     if (count > MAX_DEPTH) {
       count = MAX_DEPTH;
     }
     u32 depth = 0;
     for (; depth < count; ++depth) {
-      stack_frame *frame = thread->stack.frames[depth];
+      /*stack_frame *frame = thread->stack.frames[depth];
       // Check whether the frame is in the bounds of the frame buffer
       if ((char *)frame < thread->stack.frame_buffer ||
           (char *)frame >= thread->stack.frame_buffer + thread->stack.frame_buffer_used) {
@@ -55,6 +55,7 @@ void profiler_main(profiler *prof) {
       }
       cp_method *method = get_frame_method(frame);
       memcpy(key + sizeof(cp_method *) * depth, &method, sizeof(cp_method *));
+      */
     }
 
     // Now hash and insert the key

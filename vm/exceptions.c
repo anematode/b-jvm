@@ -11,8 +11,8 @@ void raise_exception_object(vm_thread *thread, object obj) {
 
 #define T ((struct native_Throwable *)obj)
 
-  if (arrlen(thread->stack.frames) > 0) {
-    stack_frame *frame = arrlast(thread->stack.frames);
+  stack_frame *frame = thread->stack.top;
+  if (frame) {
     if (!is_frame_native(frame)) {
       T->faulting_insn = frame->program_counter;
       T->method = frame->method;

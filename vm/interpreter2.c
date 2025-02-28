@@ -598,7 +598,7 @@ __attribute__((noinline)) static bool refuel_check(vm_thread *thread) {
   gettimeofday(&tv, NULL);
   u64 now = tv.tv_sec * 1000000 + tv.tv_usec;
   if (thread->yield_at_time != 0 && now >= thread->yield_at_time) {
-    arrlast(thread->stack.frames)->is_async_suspended = true;
+    thread->stack.top->is_async_suspended = true;
 
     continuation_frame *cont = async_stack_push(thread);
     // Provide a way for us to free the wakeup info. There will never be multiple refuel checks in flight within a
@@ -2978,8 +2978,8 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
   do {
   interpret_begin:
     plain_frame *frame = get_plain_frame(frame_);
-    stack_value *sp_ = &frame->stack[stack_depth(frame_)];
     s32 pc_ = frame_->program_counter;
+    stack_value *sp_ = &frame->stack[stack_depth(frame_)];
     bytecode_insn *insns = frame_->method->code->code;
     [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 

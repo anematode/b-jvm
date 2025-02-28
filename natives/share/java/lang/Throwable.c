@@ -25,23 +25,34 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
   link_class(thread, StackTraceElement);
 
   // Find the first frame which is not an initializer of the current exception
-  int i = (int)arrlen(thread->stack.frames) - 1;
-  for (; i >= 0; --i) {
-    stack_frame *frame = thread->stack.frames[i];
+  stack_frame *frame = thread->stack.top;
+  while (frame) {
     if (!is_frame_part_of_throwable_construction(frame, obj->obj)) {
       break;
     }
+    frame = frame->prev;
   }
 
+  // Count frames until base
+  stack_frame *tmp = frame;
+  int n_frames = 0;
+  while (tmp) {
+    tmp = tmp->prev;
+    ++n_frames;
+  }
+
+  // Now n_frames is the number of frames in [ frame, frame->prev, ..., first frame ]
+
   // Create stack trace of the appropriate height
-  handle *stack_trace = make_handle(thread, CreateObjectArray1D(thread, StackTraceElement, i + 1));
+  handle *stack_trace = make_handle(thread, CreateObjectArray1D(thread, StackTraceElement, n_frames));
   if (!stack_trace->obj) // Failed to allocate
     return value_null();
 
-  ((struct native_Throwable *)obj->obj)->depth = i + 1;
+  ((struct native_Throwable *)obj->obj)->depth = n_frames;
 
-  for (int j = 0; i >= 0; --i, ++j) {
-    stack_frame *frame = thread->stack.frames[i];
+  for (int j = 0; n_frames > 0; --n_frames, ++j) {
+    DCHECK(frame);
+
     // Create the stack trace element
     handle *e = make_handle(thread, new_object(thread, StackTraceElement));
     if (!e->obj) // Failed to allocate StackTraceElement
@@ -80,6 +91,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
 #endif
 #undef E
     drop_handle(thread, e);
+    frame = frame->prev;
   }
 
 cleanup:

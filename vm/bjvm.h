@@ -497,10 +497,10 @@ typedef struct stack_frame {
     synchronized_state synchronized_state : 2;
   };
 
+  u16 program_counter; // In instruction indices. Unused by native frames.
   // 0 for native frames. End of the stack frame is at frame_base + sizeof(stack_frame) + max_stack * sizeof(stack_value)
   u16 max_stack;
   u16 num_locals;
-  u16 program_counter; // In instruction indices. Unused by native frames.
 
   union {
     plain_frame plain;
@@ -542,12 +542,10 @@ typedef struct vm_thread {
   struct {
     // a contiguous buffer which stores stack_frames and intermediate data
     char *frame_buffer;
+    char *frame_buffer_end;
     u32 frame_buffer_capacity;
-    // index of one past the end of the last stack frame
-    u32 frame_buffer_used;
-
-    // Pointers into the frame_buffer
-    stack_frame **frames;
+    // Pointer to the top frame
+    stack_frame *top;
 
     /// Secondary stack for async calls from the interpreter
     async_stack_t *async_call_stack;
