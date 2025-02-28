@@ -2135,7 +2135,7 @@ bool instanceof(const classdesc *o, const classdesc *target) {
           return false;
         }
       }
-      if (o->kind == CD_KIND_PRIMITIVE) {
+      if (o->kind == CD_KIND_PRIMITIVE || target->kind == CD_KIND_PRIMITIVE) {
         return false;  // handled earlier
       }
     } else {
