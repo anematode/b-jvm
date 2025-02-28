@@ -456,6 +456,7 @@ typedef struct {
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
 typedef struct plain_frame {
+  stack_value slot;  // to shut up the compiler
   stack_value stack[];
 } plain_frame;
 
@@ -472,6 +473,7 @@ typedef struct native_frame {
 } native_frame;
 
 typedef struct {
+  object slot;   // to shut up the compiler
   object oops[];
 } compiled_frame;
 
