@@ -2946,11 +2946,11 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 }
 
-static inline stack_value interpret_native_frame(future_t *fut, vm_thread *thread, stack_frame *frame_) {
+static inline stack_value interpret_native_frame(future_t *fut, vm_thread *thread, stack_frame *frame) {
   run_native_t ctx;
 
-  if (!frame_->is_async_suspended) {
-    ctx = (run_native_t){.args = {.thread = thread, .frame = frame_}};
+  if (!frame->is_async_suspended) {
+    ctx = (run_native_t){.args = {.thread = thread, .frame = frame}};
   } else {
     continuation_frame *cont = async_stack_pop(thread);
     DCHECK(cont->pnt == CONT_RUN_NATIVE);
@@ -2960,13 +2960,13 @@ static inline stack_value interpret_native_frame(future_t *fut, vm_thread *threa
   *fut = run_native(&ctx);
 
   if (likely(fut->status == FUTURE_READY)) {
-    frame_->is_async_suspended = false;
-    pop_frame(thread, frame_);
+    frame->is_async_suspended = false;
+    pop_frame(thread, frame);
     return ctx._result;
   } else {
     continuation_frame *cont = async_stack_push(thread);
     *cont = (continuation_frame){.pnt = CONT_RUN_NATIVE, .ctx.run_native = ctx};
-    frame_->is_async_suspended = true;
+    frame->is_async_suspended = true;
     return (stack_value){0};
   }
 }
@@ -2987,7 +2987,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
       result.l = async_resume_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
       handler_i =
-          async_resume_impl_void(thread, frame_, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
+          async_resume_impl_void(thread, frame, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
 #endif
     }
 
@@ -2996,12 +2996,12 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
       result.l = entry_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
     }
 #else
-    if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
+    if (likely(!frame->is_async_suspended && !thread->current_exception)) {
       // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
       if (thread->is_single_stepping) {
-        result.l = entry_notco_with_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+        result.l = entry_notco_with_stepping(thread, frame, insns, pc_, sp_, handler_i);
       } else {
-        result.l = entry_notco_no_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+        result.l = entry_notco_no_stepping(thread, frame, insns, pc_, sp_, handler_i);
       }
     }
 #endif
@@ -3048,15 +3048,15 @@ object get_sync_object(vm_thread *thread, stack_frame *frame) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
-  InstrumentMethodEntry(thread, frame_);
+stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame) {
+  InstrumentMethodEntry(thread, frame);
 
-  object synchronized_on = get_sync_object(thread, frame_);
-  if (unlikely(synchronized_on) && frame_->synchronized_state < SYNCHRONIZE_DONE) {
+  object synchronized_on = get_sync_object(thread, frame);
+  if (unlikely(synchronized_on) && frame->synchronized_state < SYNCHRONIZE_DONE) {
     monitor_acquire_t *store = (monitor_acquire_t *)thread->stack.synchronize_acquire_continuation;
     monitor_acquire_t ctx =
-        frame_->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
-    frame_->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
+        frame->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
+    frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
@@ -3064,18 +3064,18 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
                     "context can not be stored within thread cache");
       return value_null();
     }
-    frame_->synchronized_state = SYNCHRONIZE_DONE;
+    frame->synchronized_state = SYNCHRONIZE_DONE;
   }
 
   stack_value result;
-  if (unlikely(is_frame_native(frame_))) {
-    result = interpret_native_frame(fut, thread, frame_);
+  if (unlikely(is_frame_native(frame))) {
+    result = interpret_native_frame(fut, thread, frame);
   } else {
-    result = interpret_java_frame(fut, thread, frame_);
+    result = interpret_java_frame(fut, thread, frame);
   }
 
   if (likely(fut->status == FUTURE_READY)) {
-    synchronized_on = get_sync_object(thread, frame_); // re-compute in case of intervening GC
+    synchronized_on = get_sync_object(thread, frame); // re-compute in case of intervening GC
     if (unlikely(synchronized_on)) {                   // monitor release at the end of synchronized
       int err = monitor_release(thread, synchronized_on);
       if (err) {
@@ -3086,7 +3086,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
       }
     }
 
-    InstrumentMethodReturn(thread, frame_);
+    InstrumentMethodReturn(thread, frame);
   }
 
   return result;
