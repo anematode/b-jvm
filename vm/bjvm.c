@@ -109,7 +109,7 @@ monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
 u16 stack_depth(const stack_frame *frame) {
   DCHECK(!is_frame_native(frame), "Can't get stack depth of native frame");
   DCHECK(frame->method, "Can't get stack depth of fake frame");
-  int pc = frame->plain.program_counter;
+  int pc = frame->program_counter;
   if (pc == 0) // stack is always 0 at method entry, common case
     return 0;
   code_analysis *analy = frame->method->code_analysis;
@@ -268,8 +268,9 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
 
   thread->stack.frame_buffer_used = (char *)frame + sizeof(*frame) - thread->stack.frame_buffer;
 
-  frame->is_native = FRAME_KIND_NATIVE;
+  frame->kind = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
+  frame->max_stack = 0;
   frame->method = method;
   frame->native.method_shape = descriptor;
   frame->native.state = 0;
@@ -303,12 +304,12 @@ stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value 
 
   thread->stack.frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->stack.frame_buffer;
   arrput(thread->stack.frames, frame);
-  frame->is_native = FRAME_KIND_INTERPRETER;
+  frame->kind = FRAME_KIND_INTERPRETER;
   frame->is_async_suspended = false;
   frame->synchronized_state = SYNCHRONIZE_NONE;
   frame->num_locals = code->max_locals;
-  frame->plain.program_counter = 0;
-  frame->plain.max_stack = code->max_stack;
+  frame->max_stack = code->max_stack;
+  frame->program_counter = 0;
   frame->method = method;
 
   // Not necessary, but possibly helpful when looking at debug dumps
@@ -357,13 +358,13 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
 
   for (int i = 0; i < sd; ++i) {
     stack_value value = frame_stack((void *)frame)[i];
-    const char *is_ref = infer_type(frame->method->code_analysis, frame->plain.program_counter, i, false);
+    const char *is_ref = infer_type(frame->method->code_analysis, frame->program_counter, i, false);
     write += snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n", i, value.obj, value.i, is_ref);
   }
 
   for (int i = 0; i < frame->num_locals; ++i) {
     stack_value value = frame_locals(frame)[i];
-    const char *is_ref = infer_type(frame->method->code_analysis, frame->plain.program_counter, i, true);
+    const char *is_ref = infer_type(frame->method->code_analysis, frame->program_counter, i, true);
     write += snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n", i, value.obj, value.i, is_ref);
   }
 
@@ -376,16 +377,8 @@ u32 compute_used(vm_thread *thread) {
   }
   stack_frame *frame = arrlast(thread->stack.frames);
   DCHECK(frame);
-  switch (frame->is_native) {
-  case FRAME_KIND_INTERPRETER:
-    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) -
+  return (char *)frame + sizeof(stack_frame) + frame->max_stack * sizeof(stack_value) -
            thread->stack.frame_buffer;
-  case FRAME_KIND_NATIVE:
-    return (char *)frame + sizeof(stack_frame) - thread->stack.frame_buffer;
-  case FRAME_KIND_COMPILED:
-  default:
-    UNREACHABLE();
-  }
 }
 
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
@@ -1441,7 +1434,7 @@ void dump_trace(vm_thread *thread) {
     if (is_frame_native(frame)) {
       printf("  at %.*s.%.*s(Native Method)\n", fmt_slice(method->my_class->name), fmt_slice(method->name));
     } else {
-      int line = get_line_number(method->code, frame->plain.program_counter);
+      int line = get_line_number(method->code, frame->program_counter);
       printf("  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
              fmt_slice(method->my_class->source_file ? method->my_class->source_file->name : null_str()), line);
     }
@@ -1812,9 +1805,9 @@ static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_metho
   stack_value *stack_top = (stack_value *)(thread->stack.frame_buffer + thread->stack.frame_buffer_used);
   if (arrlen(thread->stack.frames)) {
     stack_frame *last = arrlast(thread->stack.frames);
-    if (last->is_native == FRAME_KIND_INTERPRETER) {
+    if (last->kind == FRAME_KIND_INTERPRETER) {
       // Make sure we're not trampling over the previous interpreter frame
-      DCHECK((uintptr_t)last->plain.stack + last->plain.max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
+      DCHECK((uintptr_t)last->plain.stack + last->max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
     }
   }
   size_t args_size = sizeof(stack_value) * argc;

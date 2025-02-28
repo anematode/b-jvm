@@ -187,13 +187,13 @@ static expression get_local(int local_i) {
 static expression deopt() {
   // We need to construct an equivalent frame in place, then side-exit to the interpreter.
   stack_frame dummy;
-  dummy.is_native = FRAME_KIND_INTERPRETER;
+  dummy.kind = FRAME_KIND_INTERPRETER;
   dummy.is_async_suspended = false;
   dummy.method = ctx->method;
   s32 locals = dummy.num_locals = ctx->method->code->max_locals;
-  s32 max_stack = dummy.plain.max_stack = ctx->method->code->max_stack;
-  dummy.plain.max_stack = max_stack;
-  dummy.plain.program_counter = ctx->curr_pc;
+  s32 max_stack = dummy.max_stack = ctx->method->code->max_stack;
+  dummy.max_stack = max_stack;
+  dummy.program_counter = ctx->curr_pc;
 
   // Tantamount to performing two i64 stores, beginning at the frame base
   expression *exprs = nullptr;

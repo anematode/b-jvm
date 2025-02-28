@@ -14,7 +14,7 @@ void raise_exception_object(vm_thread *thread, object obj) {
   if (arrlen(thread->stack.frames) > 0) {
     stack_frame *frame = arrlast(thread->stack.frames);
     if (!is_frame_native(frame)) {
-      T->faulting_insn = frame->plain.program_counter;
+      T->faulting_insn = frame->program_counter;
       T->method = frame->method;
     }
   }

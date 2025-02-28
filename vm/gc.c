@@ -118,7 +118,7 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
     // List of stack and local values which are references
     // In particular, 0 through stack - 1 refer to the stack, and stack through stack + locals - 1
     // refer to the locals array
-    stack_summary *ss = analy->stack_states[frame->program_counter];
+    stack_summary *ss = analy->stack_states[raw_frame->program_counter];
     int i = 0;
     for (; i < ss->stack; ++i) {
       if (ss->entries[i] != TYPE_KIND_REFERENCE)

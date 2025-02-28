@@ -50,7 +50,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
     cp_method *method = get_frame_method(frame);
 
 #define E ((struct native_StackTraceElement *)e->obj)
-    int line = is_frame_native(frame) ? -1 : get_line_number(method->code, frame->plain.program_counter);
+    int line = is_frame_native(frame) ? -1 : get_line_number(method->code, frame->program_counter);
     object o = (void *)get_class_mirror(thread, method->my_class);
     if (!o)
       goto oom;

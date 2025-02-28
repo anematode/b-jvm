@@ -456,9 +456,6 @@ typedef struct {
 // The stack depth should be inferred from the program counter: In particular,
 // the method contains an analysis of the stack depth at each instruction.
 typedef struct plain_frame {
-  u16 program_counter; // in instruction indices
-  u16 max_stack;
-
   stack_value stack[];
 } plain_frame;
 
@@ -467,22 +464,20 @@ typedef struct plain_frame {
 // data necessary for correct stack trace recovery and resumption after
 // interrupts.
 typedef struct native_frame {
-  u16 values_count; // number of args passed into the native method
-
   // Used by async native methods for their state machines
   int state;
-
   // Descriptor on the instruction itself. Unequal to method->descriptor only
   // in the situation of signature-polymorphic methods.
   const method_descriptor *method_shape;
 } native_frame;
 
 typedef struct {
-  int pc;
   object oops[];
 } compiled_frame;
 
 typedef enum : u8 { FRAME_KIND_INTERPRETER, FRAME_KIND_NATIVE, FRAME_KIND_COMPILED } frame_kind;
+
+typedef enum : u8 { SYNCHRONIZE_NONE = 0, SYNCHRONIZE_IN_PROGRESS = 1, SYNCHRONIZE_DONE = 2 } synchronized_state;
 
 // A frame is either a native frame or a plain frame. They may be distinguished
 // with is_native.
@@ -490,17 +485,22 @@ typedef enum : u8 { FRAME_KIND_INTERPRETER, FRAME_KIND_NATIVE, FRAME_KIND_COMPIL
 // Native frames may be consecutive: for example, a native method might invoke
 // another native method, which itself raises an interrupt.
 typedef struct stack_frame {
-  frame_kind is_native;
-  u8 is_async_suspended;
-  enum : u8 {
-    SYNCHRONIZE_NONE = 0,
-    SYNCHRONIZE_IN_PROGRESS = 1,
-    SYNCHRONIZE_DONE = 2
-  } synchronized_state; // info about whether this frame method has been synchronized
-  u16 num_locals;
-
   // The method associated with this frame
   cp_method *method;
+  // Pointer to the previous frame (null for the first frame on a thread's call stack)
+  stack_frame *prev;
+
+  frame_kind kind;
+  struct {
+    u8 is_async_suspended : 1;
+    // info about whether this frame method has been synchronized
+    synchronized_state synchronized_state : 2;
+  };
+
+  // 0 for native frames. End of the stack frame is at frame_base + sizeof(stack_frame) + max_stack * sizeof(stack_value)
+  u16 max_stack;
+  u16 num_locals;
+  u16 program_counter; // In instruction indices. Unused by native frames.
 
   union {
     plain_frame plain;
@@ -513,8 +513,8 @@ typedef struct stack_frame {
 // counter.
 u16 stack_depth(const stack_frame *frame);
 
-static inline bool is_frame_native(const stack_frame *frame) { return frame->is_native == FRAME_KIND_NATIVE; }
-static inline bool is_interpreter_frame(const stack_frame *frame) { return frame->is_native == FRAME_KIND_INTERPRETER; }
+static inline bool is_frame_native(const stack_frame *frame) { return frame->kind == FRAME_KIND_NATIVE; }
+static inline bool is_interpreter_frame(const stack_frame *frame) { return frame->kind == FRAME_KIND_INTERPRETER; }
 value *get_native_args(const stack_frame *frame); // same as locals, just called args for native
 
 stack_value *frame_stack(stack_frame *frame);

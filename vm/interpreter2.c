@@ -329,7 +329,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
 // Spill all the information currently in locals/registers to the frame (required at safepoints and when interrupting)
 #define SPILL(tos)                                                                                                     \
-  frame->plain.program_counter = pc;                                                                                   \
+  frame->program_counter = pc;                                                                                   \
   *(sp - 1) = _Generic((tos),                                                                                          \
       s64: (stack_value){.l = (s64)tos},                                                                               \
       float: (stack_value){.f = (float)tos},                                                                           \
@@ -337,7 +337,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
       obj_header *: (stack_value){.obj = (obj_header *)(uintptr_t)tos} /* shut up float branch */                      \
   );
 // Same as SPILL(tos), but when no top-of-stack value is available
-#define SPILL_VOID frame->plain.program_counter = pc;
+#define SPILL_VOID frame->program_counter = pc;
 
 // Reload the top of stack type -- used after an instruction which may have instigated a GC. RELOAD_VOID is not
 // required.
@@ -2737,7 +2737,7 @@ static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn
     if (check_stepping && unlikely(thread->is_single_stepping)) {
       standard_debugger *dbg = get_active_debugger(thread->vm);
       DCHECK(dbg && "Debugger not active");
-      frame->plain.program_counter = pc_;
+      frame->program_counter = pc_;
       bool should_pause = dbg->should_pause(dbg, thread, frame);
       if (should_pause) {
         debugger_pause(thread, frame);
@@ -2838,7 +2838,7 @@ static exception_table_entry *find_exception_handler(vm_thread *thread, stack_fr
   if (!table)
     return nullptr;
 
-  int const pc_ = frame->plain.program_counter;
+  int const pc_ = frame->program_counter;
 
   for (int i = 0; i < table->entries_count; ++i) {
     exception_table_entry *ent = &table->entries[i];
@@ -2979,7 +2979,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
   interpret_begin:
     plain_frame *frame = get_plain_frame(frame_);
     stack_value *sp_ = &frame->stack[stack_depth(frame_)];
-    s32 pc_ = frame->program_counter;
+    s32 pc_ = frame_->program_counter;
     bytecode_insn *insns = frame_->method->code->code;
     [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 
@@ -3019,7 +3019,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
       exception_table_entry *handler = find_exception_handler(thread, frame_, thread->current_exception->descriptor);
 
       if (handler) {
-        frame->program_counter = handler->handler_insn;
+        frame_->program_counter = handler->handler_insn;
         frame->stack[0] = (stack_value){.obj = thread->current_exception};
         thread->current_exception = nullptr;
 
