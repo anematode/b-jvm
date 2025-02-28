@@ -147,9 +147,9 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
   }
 
   vm_thread *thread = info->thread;
-  const int MICROSECONDS_TO_RUN = 30000;
+  const int MICROSECONDS_TO_RUN = 10000;
 
-  thread->fuel = 50000;
+  thread->fuel = 10000;
 
   // If the thread is sleeping, check if it's time to wake up
   if (is_sleeping(info, (s64)time)) {

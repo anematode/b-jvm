@@ -8,3 +8,9 @@ test/jre8
 website
 test/jdk23-exploded
 test/tmp
+
+node_modules
+js/pages/src/bjvm.ts
+js/pages/dist/assets/*.java
+js/pages/public/assets/*.class
+js/pages/public/assets/*.jar

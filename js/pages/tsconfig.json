@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "lib": ["es2021", "dom", "dom.iterable", "es2021.weakref"],
+    "target": "es2021",
+    "useDefineForClassFields": true,
+    "module": "esnext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src"]
+}

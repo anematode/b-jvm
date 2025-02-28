@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Credit: https://github.com/doctest/doctest/blob/master/examples/range_based_execution.py
 
 import sys

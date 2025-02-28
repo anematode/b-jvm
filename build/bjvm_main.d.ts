@@ -13,7 +13,7 @@ declare namespace RuntimeExports {
         function createDataFile(parent: any, name: any, fileData: any, canRead: any, canWrite: any, canOwn: any): void;
         function createPath(parent: any, path: any, canRead: any, canWrite: any): any;
         function createPreloadedFile(parent: any, name: any, url: any, canRead: any, canWrite: any, onload: any, onerror: any, dontCreateFile: any, canOwn: any, preFinish: any): any;
-        function readFile(path: any, opts?: {}): Uint8Array;
+        function readFile(path: any, opts?: {}): Uint8Array<any>;
         function cwd(): any;
         function analyzePath(path: any): {
             exists: boolean;

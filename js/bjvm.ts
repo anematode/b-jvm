@@ -780,11 +780,11 @@ class VM {
     }
 }
 
-const runtimeFilesList = `./jdk23/lib/modules
-./jdk23/lib/security/default.policy
-./jdk23/conf/security/java.security
-./jdk23/conf/security/java.policy
-./jdk23.jar`.split('\n');
+const runtimeFilesList = `jdk23/lib/modules
+jdk23/lib/security/default.policy
+jdk23/conf/security/java.security
+jdk23/conf/security/java.policy
+jdk23.jar`.split('\n');
 
 export function appendRuntimeFiles(files: string[]) {
     runtimeFilesList.push(...files);
@@ -807,7 +807,7 @@ export function setWasmLocation(location: string) {
     });
 }
 
-async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, total: number) => void) {
+async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, total: number) => void, fetchParams?: RequestInit) {
     let totalLoaded = 0;
 
     // Spawn fetch requests
@@ -821,12 +821,13 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
             return {file, data: cached.data};
         }*/
 
-        const response = await fetch(`${baseUrl}/${file}`, {
+        const response = await fetch(`${baseUrl}/${file}`, fetchParams ?? {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/octet-stream',
             }
         });
+
         const contentLength = response.headers.get('Content-Length');
         const total = contentLength ? parseInt(contentLength) : 0;
 
@@ -837,7 +838,11 @@ async function installRuntimeFiles(baseUrl: string, progress?: (loaded: number, 
             const {done, value} = await reader.read();
             if (done)
                 break;
-            data.set(value, loaded);
+            try {
+              data.set(value, loaded);
+            } catch (e) {
+              console.log(`failed to load ${file}`)
+            }
             loaded += value.length;
             totalLoaded += value.length;
             progress?.(totalLoaded, TOTAL_BYTES);

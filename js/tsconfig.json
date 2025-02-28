@@ -1,16 +1,3 @@
 {
-  "compilerOptions": {
-    "lib": [
-      "es2021",
-      "dom",
-      "es2021.weakref"
-    ],
-    "target": "es2021",
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
-    "strictPropertyInitialization": true,
-    "noImplicitAny": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
-  }
+  "extends": "./pages/tsconfig.json"
 }
