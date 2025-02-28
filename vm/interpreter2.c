@@ -2134,7 +2134,6 @@ static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   NPE_ON_NULL(receiver);
   cp_method *receiver_method = itable_lookup(receiver->descriptor, insn->ic, (size_t)insn->ic2);
   if (unlikely(!receiver_method)) {
-    printf("Could not find! Receiver: %p, tick: %llu\n", receiver, tick);
     raise_abstract_method_error(thread, insn->cp->methodref.resolved);
     return 0;
   }
