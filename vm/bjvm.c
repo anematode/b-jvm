@@ -124,17 +124,12 @@ value *get_native_args(const stack_frame *frame) {
 
 stack_value *frame_stack(stack_frame *frame) {
   DCHECK(!is_frame_native(frame));
-  return frame->plain.stack;
+  return frame->stack;
 }
 
 native_frame *get_native_frame_data(stack_frame *frame) {
   DCHECK(is_frame_native(frame));
   return &frame->native;
-}
-
-plain_frame *get_plain_frame(stack_frame *frame) {
-  DCHECK(!is_frame_native(frame));
-  return &frame->plain;
 }
 
 cp_method *get_frame_method(stack_frame *frame) { return frame->method; }
@@ -2394,7 +2389,7 @@ DEFINE_ASYNC(resolve_methodref) {
 #undef thread
 }
 
-int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_data *multianewarray, u16 *sd) {
+int multianewarray(vm_thread *thread, stack_frame *frame, struct multianewarray_data *multianewarray, u16 *sd) {
   int dims = multianewarray->dimensions;
   DCHECK(*sd >= dims);
   // DCHECK(stack_depth(frame) >= dims);
