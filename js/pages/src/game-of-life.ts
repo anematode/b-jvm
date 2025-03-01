@@ -1,10 +1,11 @@
 import { loadJar } from "./util";
+import {BovineOS} from "../../bjvm2.ts";
 
 /**
  * Cellular automaton example featuring Conway's Game of Life
  */
-export const caExample = async (app: HTMLElement) => {
-  const CellularAutomaton = await loadJar("Conway2D");
+export const caExample = async (os: BovineOS, app: HTMLElement) => {
+  const CellularAutomaton = await loadJar(os, "Conway2D");
 
   const canvas = document.createElement("canvas");
   app.appendChild(canvas);

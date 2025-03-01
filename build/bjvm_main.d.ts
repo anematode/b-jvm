@@ -13,7 +13,7 @@ declare namespace RuntimeExports {
         function createDataFile(parent: any, name: any, fileData: any, canRead: any, canWrite: any, canOwn: any): void;
         function createPath(parent: any, path: any, canRead: any, canWrite: any): any;
         function createPreloadedFile(parent: any, name: any, url: any, canRead: any, canWrite: any, onload: any, onerror: any, dontCreateFile: any, canOwn: any, preFinish: any): any;
-        function readFile(path: any, opts?: {}): Uint8Array<any>;
+        function readFile(path: any, opts?: {}): Uint8Array;
         function cwd(): any;
         function analyzePath(path: any): {
             exists: boolean;
@@ -248,7 +248,6 @@ interface WasmModule {
   _Module_addExports0_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _NullPointerException_getExtendedNPEMessage_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_hashCode_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
-  _Object_registerNatives_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_clone_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_getClass_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
   _Object_notifyAll_cb0(_0: number, _1: number, _2: number, _3: number, _4: number): void;
