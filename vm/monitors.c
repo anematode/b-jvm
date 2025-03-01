@@ -3,6 +3,7 @@
 //
 
 #include "monitors.h"
+#include <roundrobin_scheduler.h>
 
 #define NOT_HELD_TID (-1)
 
@@ -67,7 +68,9 @@ DEFINE_ASYNC(monitor_acquire) {
     }
 
     // since the strong CAS failed, we need to wait on the read_tid
-    self->wakeup_info.kind = RR_WAKEUP_YIELDING;
+    self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
+    self->wakeup_info.wakeup_us = 0;
+    self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
   }
 
@@ -90,8 +93,7 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
 
   // a monitor should be guaranteed to exist
   for (;;) {
-    monitor_data *lock =
-        __atomic_load_n((monitor_data **)&self->handle->obj->header_word, __ATOMIC_ACQUIRE); // must refetch
+    monitor_data *lock = __atomic_load_n(shared_header.expanded_data, __ATOMIC_ACQUIRE); // must refetch
     assert(lock);
     s32 read_tid = NOT_HELD_TID;
 
@@ -110,7 +112,9 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
     }
 
     // since the strong CAS failed, we need to wait on the read_tid
-    self->wakeup_info.kind = RR_WAKEUP_YIELDING;
+    self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
+    self->wakeup_info.wakeup_us = 0;
+    self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
   }
 
@@ -152,6 +156,11 @@ u32 monitor_release_all_hold_count(vm_thread *thread, obj_header *obj) {
   u32 hold_count = lock->hold_count;
   lock->hold_count = 0;
   __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
+
+  // todo: this only works if the scheduler is synchronized/single-threaded
+  rr_scheduler *scheduler = thread->vm->scheduler;
+  assert(scheduler && "Cannot synchronize without a scheduler!");
+  monitor_exit_handler(scheduler, obj);
   return hold_count;
 }
 
@@ -174,6 +183,12 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
 
   if (new_hold_count == 0) {
     __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
+
+    // todo: this only works if the scheduler is synchronized/single-threaded
+    rr_scheduler *scheduler = thread->vm->scheduler;
+    assert(scheduler && "Cannot synchronize without a scheduler!");
+    monitor_exit_handler(scheduler, obj);
   }
+
   return 0;
 }

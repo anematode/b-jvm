@@ -202,16 +202,44 @@ DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(JJ)V",
   return value_null();
 }
 
-DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeup_info wakeup_info),
-                     invoked_methods()) {
-  self->wakeup_info.kind = RR_WAKEUP_SLEEP;
-  self->wakeup_info.wakeup_us = get_unix_us() + 500000;
+DECLARE_ASYNC_NATIVE("jdk/internal/misc", Unsafe, park, "(ZJ)V", locals(rr_wakeup_info wakeup_info), invoked_methods()) {
+  DCHECK(argc == 2);
+  bool isAbsolute = args[0].i;
+  s64 time = args[1].l; // elapsed nanos if !absolute, else epoch millis deadline
+
+  u64 start_us = get_unix_us();
+  u64 deadline_us;
+
+  if (isAbsolute) {
+    if (time < 0) ASYNC_RETURN_VOID(); // negative epoch time
+    deadline_us = (u64)time * 1000; // epoch millis to micros
+    if (deadline_us < start_us) ASYNC_RETURN_VOID(); // already happened
+  } else {
+    if (time < 0) ASYNC_RETURN_VOID(); // negative duration nanos, already elapsed
+    deadline_us = time == 0 ? 0 : start_us + (time / 1000); // 0 duration means no timeout
+  }
+
+  rr_scheduler *scheduler = thread->vm->scheduler;
+  assert(scheduler && "Cannot park thread without a scheduler!");
+
+  self->wakeup_info.kind = RR_THREAD_PARK;
+  self->wakeup_info.wakeup_us = deadline_us;
   ASYNC_YIELD((void *)&self->wakeup_info);
 
   ASYNC_END(value_null());
 }
 
-DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") { return value_null(); }
+DECLARE_NATIVE("jdk/internal/misc", Unsafe, unpark, "(Ljava/lang/Object;)V") {
+  // todo: add checks that this is actually a thread object
+
+  rr_scheduler *scheduler = thread->vm->scheduler;
+  assert(scheduler && "Cannot park thread without a scheduler!");
+  struct native_Thread *thr = (struct native_Thread *) args[0].handle->obj;
+
+  [[maybe_unused]] int err = set_unpark_permit((vm_thread *) thr->eetop);
+  assert(!err && "Tried to unpark a non-alive thread");
+  return value_null();
+}
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLongVolatile, "(Ljava/lang/Object;JJ)V", 2) {
   DCHECK(argc == 3);

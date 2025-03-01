@@ -11,6 +11,7 @@
 
 #include "doctest/doctest.h"
 
+#include "roundrobin_scheduler.h"
 #include "tests-common.h"
 
 struct async_wakeup_info {
@@ -58,6 +59,9 @@ TEST_CASE("Async natives") {
   vm_options.stdio_override_param = &out;
 
   vm *vm = create_vm(vm_options);
+  rr_scheduler scheduler;
+  rr_scheduler_init(&scheduler, vm);
+  vm->scheduler = &scheduler;
 
   native_t *native_ptr = &NATIVE_INFO_AsyncNative_myYield_0;
   register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
@@ -94,6 +98,7 @@ TEST_CASE("Async natives") {
   out.push_back(0);
   REQUIRE(string{(char const *)out.data()} == "2\n4\n");
 
+  rr_scheduler_uninit(&scheduler);
   free_thread(thread);
   free_vm(vm);
 }

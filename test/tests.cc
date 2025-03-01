@@ -649,8 +649,8 @@ slept for at least 1000 ms? false
 )");
 
   REQUIRE(result.sleep_count == 1);
-  REQUIRE(result.ms_slept <= 1000000);          // 1 second
-  REQUIRE(1000000 - result.ms_slept <= 100000); // give or take 0.1 seconds
+  REQUIRE(result.us_slept <= 1000000);          // 1 second
+  REQUIRE(1000000 - result.us_slept <= 100000); // give or take 0.1 seconds
 }
 
 TEST_CASE("IllegalMonitorStateException") {
@@ -699,6 +699,15 @@ TEST_CASE("Synchronized wait/notify") {
 Countdown value: 0
 )");
   std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
+}
+
+TEST_CASE("Thread park/unpark") {
+  // run_scheduled_test_case("test_files/park_unpark/", false, "Main"); // for fun
+  auto result = run_scheduled_test_case("test_files/park_unpark/", true, "Main");
+  auto expected = ReadFileAsString("test_files/park_unpark/desired_output.txt");
+  REQUIRE(result.stdout_ == expected);
+  std::cout << "Scheduler yielded " << result.yield_count << " times!" << std::endl;
+  std::cout << "and slept for " << result.us_slept << " µs!" << std::endl;
 }
 
 TEST_CASE("Random UUID") {

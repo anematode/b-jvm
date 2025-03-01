@@ -30,6 +30,7 @@ std::vector<std::string> ListDirectory(const std::string &path, bool recursive);
 bool EndsWith(const std::string &s, const std::string &suffix);
 
 std::optional<std::vector<u8>> ReadFile(const std::string &file);
+std::string ReadFileAsString(const std::string &file);
 
 struct TestCaseResult {
   std::string_view stdin_;
@@ -40,7 +41,7 @@ struct TestCaseResult {
 struct ScheduledTestCaseResult : TestCaseResult {
   int yield_count;
   int sleep_count;
-  u64 ms_slept;
+  u64 us_slept;
 };
 
 void print_method_sigs();

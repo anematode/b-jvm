@@ -329,7 +329,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
 // Spill all the information currently in locals/registers to the frame (required at safepoints and when interrupting)
 #define SPILL(tos)                                                                                                     \
-  frame->plain.program_counter = pc;                                                                                   \
+  frame->program_counter = pc;                                                                                   \
   *(sp - 1) = _Generic((tos),                                                                                          \
       s64: (stack_value){.l = (s64)tos},                                                                               \
       float: (stack_value){.f = (float)tos},                                                                           \
@@ -337,7 +337,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
       obj_header *: (stack_value){.obj = (obj_header *)(uintptr_t)tos} /* shut up float branch */                      \
   );
 // Same as SPILL(tos), but when no top-of-stack value is available
-#define SPILL_VOID frame->plain.program_counter = pc;
+#define SPILL_VOID frame->program_counter = pc;
 
 // Reload the top of stack type -- used after an instruction which may have instigated a GC. RELOAD_VOID is not
 // required.
@@ -457,7 +457,7 @@ DECLARE_ASYNC(int, resolve_getstatic_putstatic,
 // appropriate. The stack should be made consistent before this function is called, as it may interrupt.
 DECLARE_ASYNC(int, resolve_getfield_putfield,
   locals(cp_field_info *field_info; cp_class_info *class),
-  arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
+  arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
   invoked_methods(invoked_method(initialize_class)));
 
 DECLARE_ASYNC(int, resolve_invokestatic,
@@ -473,7 +473,7 @@ DECLARE_ASYNC(int, resolve_new_inst,
 
 DECLARE_ASYNC(int, resolve_insn,
               locals(),
-              arguments(vm_thread *thread; bytecode_insn *inst; plain_frame *frame; stack_value *sp_;),
+              arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
               invoked_methods(
                 invoked_method(resolve_getstatic_putstatic)
                 invoked_method(resolve_getfield_putfield)
@@ -598,7 +598,7 @@ __attribute__((noinline)) static bool refuel_check(vm_thread *thread) {
   gettimeofday(&tv, NULL);
   u64 now = tv.tv_sec * 1000000 + tv.tv_usec;
   if (thread->yield_at_time != 0 && now >= thread->yield_at_time) {
-    arrlast(thread->stack.frames)->is_async_suspended = true;
+    thread->stack.top->is_async_suspended = true;
 
     continuation_frame *cont = async_stack_push(thread);
     // Provide a way for us to free the wakeup info. There will never be multiple refuel checks in flight within a
@@ -738,7 +738,7 @@ __attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
 
   if (unlikely(thread->current_exception)) {
     return 0;
@@ -753,7 +753,7 @@ FORWARD_TO_NULLARY(getstatic)
 __attribute__((noinline)) static s64 putstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   if (thread->current_exception) {
     return 0;
   }
@@ -976,7 +976,7 @@ static s64 getfield_impl_int(ARGS_INT) {
   SPILL(tos)
   DEBUG_CHECK();
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
 
   RELOAD(tos)
   JMP_INT(tos)
@@ -985,7 +985,7 @@ static s64 getfield_impl_int(ARGS_INT) {
 static s64 putfield_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
 FORWARD_TO_NULLARY(putfield)
@@ -1641,7 +1641,7 @@ static s64 new_impl_void(ARGS_VOID) {
   if (error)
     return 0;
 
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   JMP_VOID
 }
 FORWARD_TO_NULLARY(new)
@@ -1709,7 +1709,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL(tos)
   u16 temp_sp = sp - frame_stack(frame);
-  if (multianewarray(thread, &frame->plain, insn->multianewarray, &temp_sp))
+  if (multianewarray(thread, frame, insn->multianewarray, &temp_sp))
     return 0;
 
   sp = frame_stack(frame) + temp_sp;
@@ -1748,7 +1748,7 @@ DEFINE_ASYNC(resolve_invokestatic) {
 __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  TryResolve(thread, insn, &frame->plain, sp);
+  TryResolve(thread, insn, frame, sp);
   if (thread->current_exception)
     return 0;
 
@@ -2737,7 +2737,7 @@ static s64 entry_notco_impl(vm_thread *thread, stack_frame *frame, bytecode_insn
     if (check_stepping && unlikely(thread->is_single_stepping)) {
       standard_debugger *dbg = get_active_debugger(thread->vm);
       DCHECK(dbg && "Debugger not active");
-      frame->plain.program_counter = pc_;
+      frame->program_counter = pc_;
       bool should_pause = dbg->should_pause(dbg, thread, frame);
       if (should_pause) {
         debugger_pause(thread, frame);
@@ -2838,7 +2838,7 @@ static exception_table_entry *find_exception_handler(vm_thread *thread, stack_fr
   if (!table)
     return nullptr;
 
-  int const pc_ = frame->plain.program_counter;
+  int const pc_ = frame->program_counter;
 
   for (int i = 0; i < table->entries_count; ++i) {
     exception_table_entry *ent = &table->entries[i];
@@ -2920,7 +2920,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 
   // Now calculate sp correctly depending on whether we're advancing an instruction or not
-  sp = frame->plain.stack + frame->method->code_analysis->insn_index_to_sd[pc + advance_pc]; // correct sp
+  sp = frame->stack + frame->method->code_analysis->insn_index_to_sd[pc + advance_pc]; // correct sp
 
   frame->is_async_suspended = false;
   if (unlikely(thread->current_exception)) {
@@ -2946,11 +2946,11 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 }
 
-static inline stack_value interpret_native_frame(future_t *fut, vm_thread *thread, stack_frame *frame_) {
+static inline stack_value interpret_native_frame(future_t *fut, vm_thread *thread, stack_frame *frame) {
   run_native_t ctx;
 
-  if (!frame_->is_async_suspended) {
-    ctx = (run_native_t){.args = {.thread = thread, .frame = frame_}};
+  if (!frame->is_async_suspended) {
+    ctx = (run_native_t){.args = {.thread = thread, .frame = frame}};
   } else {
     continuation_frame *cont = async_stack_pop(thread);
     DCHECK(cont->pnt == CONT_RUN_NATIVE);
@@ -2960,55 +2960,54 @@ static inline stack_value interpret_native_frame(future_t *fut, vm_thread *threa
   *fut = run_native(&ctx);
 
   if (likely(fut->status == FUTURE_READY)) {
-    frame_->is_async_suspended = false;
-    pop_frame(thread, frame_);
+    frame->is_async_suspended = false;
+    pop_frame(thread, frame);
     return ctx._result;
   } else {
     continuation_frame *cont = async_stack_push(thread);
     *cont = (continuation_frame){.pnt = CONT_RUN_NATIVE, .ctx.run_native = ctx};
-    frame_->is_async_suspended = true;
+    frame->is_async_suspended = true;
     return (stack_value){0};
   }
 }
 
 __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut, vm_thread *thread,
-                                                                  stack_frame *frame_) {
+                                                                  stack_frame *frame) {
   stack_value result;
 
   do {
   interpret_begin:
-    plain_frame *frame = get_plain_frame(frame_);
-    stack_value *sp_ = &frame->stack[stack_depth(frame_)];
     s32 pc_ = frame->program_counter;
-    bytecode_insn *insns = frame_->method->code->code;
+    stack_value *sp_ = &frame->stack[stack_depth(frame)];
+    bytecode_insn *insns = frame->method->code->code;
     [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 
-    if (unlikely(frame_->is_async_suspended)) {
+    if (unlikely(frame->is_async_suspended)) {
 #if DO_TAILS
-      result.l = async_resume_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+      result.l = async_resume_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
       handler_i =
-          async_resume_impl_void(thread, frame_, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
+          async_resume_impl_void(thread, frame, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
 #endif
     }
 
 #if DO_TAILS
     else {
-      result.l = entry_impl_void(thread, frame_, insns + pc_, pc_, sp_, 0, 0, 0);
+      result.l = entry_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
     }
 #else
-    if (likely(!frame_->is_async_suspended && !thread->current_exception)) {
+    if (likely(!frame->is_async_suspended && !thread->current_exception)) {
       // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
       if (thread->is_single_stepping) {
-        result.l = entry_notco_with_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+        result.l = entry_notco_with_stepping(thread, frame, insns, pc_, sp_, handler_i);
       } else {
-        result.l = entry_notco_no_stepping(thread, frame_, insns, pc_, sp_, handler_i);
+        result.l = entry_notco_no_stepping(thread, frame, insns, pc_, sp_, handler_i);
       }
     }
 #endif
 
     // we really should just have all the methods return a future_t via a pointer, but whatever
-    if (unlikely(frame_->is_async_suspended)) {
+    if (unlikely(frame->is_async_suspended)) {
       // reconstruct future to return
       void *wk = async_stack_top(thread);
       *fut = (future_t){FUTURE_NOT_READY, wk};
@@ -3016,7 +3015,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
     }
 
     if (unlikely(thread->current_exception)) {
-      exception_table_entry *handler = find_exception_handler(thread, frame_, thread->current_exception->descriptor);
+      exception_table_entry *handler = find_exception_handler(thread, frame, thread->current_exception->descriptor);
 
       if (handler) {
         frame->program_counter = handler->handler_insn;
@@ -3028,7 +3027,7 @@ __attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut,
     }
   } while (0);
 
-  pop_frame(thread, frame_);
+  pop_frame(thread, frame);
   *fut = (future_t){FUTURE_READY};
 
   return result;
@@ -3049,15 +3048,15 @@ object get_sync_object(vm_thread *thread, stack_frame *frame) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
-  InstrumentMethodEntry(thread, frame_);
+stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame) {
+  InstrumentMethodEntry(thread, frame);
 
-  object synchronized_on = get_sync_object(thread, frame_);
-  if (unlikely(synchronized_on) && frame_->synchronized_state < SYNCHRONIZE_DONE) {
+  object synchronized_on = get_sync_object(thread, frame);
+  if (unlikely(synchronized_on) && frame->synchronized_state < SYNCHRONIZE_DONE) {
     monitor_acquire_t *store = (monitor_acquire_t *)thread->stack.synchronize_acquire_continuation;
     monitor_acquire_t ctx =
-        frame_->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
-    frame_->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
+        frame->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
+    frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
     *fut = monitor_acquire(&ctx);
     if (fut->status == FUTURE_NOT_READY) {
       memcpy(store, &ctx, sizeof(ctx));
@@ -3065,18 +3064,18 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
                     "context can not be stored within thread cache");
       return value_null();
     }
-    frame_->synchronized_state = SYNCHRONIZE_DONE;
+    frame->synchronized_state = SYNCHRONIZE_DONE;
   }
 
   stack_value result;
-  if (unlikely(is_frame_native(frame_))) {
-    result = interpret_native_frame(fut, thread, frame_);
+  if (unlikely(is_frame_native(frame))) {
+    result = interpret_native_frame(fut, thread, frame);
   } else {
-    result = interpret_java_frame(fut, thread, frame_);
+    result = interpret_java_frame(fut, thread, frame);
   }
 
   if (likely(fut->status == FUTURE_READY)) {
-    synchronized_on = get_sync_object(thread, frame_); // re-compute in case of intervening GC
+    synchronized_on = get_sync_object(thread, frame); // re-compute in case of intervening GC
     if (unlikely(synchronized_on)) {                   // monitor release at the end of synchronized
       int err = monitor_release(thread, synchronized_on);
       if (err) {
@@ -3087,7 +3086,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame_) {
       }
     }
 
-    InstrumentMethodReturn(thread, frame_);
+    InstrumentMethodReturn(thread, frame);
   }
 
   return result;

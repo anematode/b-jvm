@@ -4,17 +4,18 @@
 void raise_exception_object(vm_thread *thread, object obj) {
   DCHECK(!thread->current_exception && "Exception is already raised");
   DCHECK(obj && "Exception object must be non-null");
-  DCHECK(instanceof(obj->descriptor, cached_classes(thread->vm)->throwable) &&
-         "Exception is not subclass of Throwable");
+  // this check isn't possible early into vm setup
+//  DCHECK(instanceof(obj->descriptor, cached_classes(thread->vm)->throwable) &&
+//         "Exception is not subclass of Throwable");
 
   thread->current_exception = obj;
 
 #define T ((struct native_Throwable *)obj)
 
-  if (arrlen(thread->stack.frames) > 0) {
-    stack_frame *frame = arrlast(thread->stack.frames);
+  stack_frame *frame = thread->stack.top;
+  if (frame) {
     if (!is_frame_native(frame)) {
-      T->faulting_insn = frame->plain.program_counter;
+      T->faulting_insn = frame->program_counter;
       T->method = frame->method;
     }
   }

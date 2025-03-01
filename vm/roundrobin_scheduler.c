@@ -21,8 +21,58 @@ typedef struct {
   execution_record **executions;
 } impl;
 
-void free_thread_info(thread_info *info) {
-  // todo: should acquire thread_obj monitor and run notifyAll
+void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
+  // iterate through the threads and find one that is waiting on the monitor
+  impl *I = scheduler->_impl;
+  for (int i = 0; i < arrlen(I->round_robin); i++) {
+    rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
+    if (!wakeup_info)
+      continue;
+    if (wakeup_info->kind == RR_MONITOR_WAIT && wakeup_info->monitor_wakeup.monitor->obj == monitor) {
+      wakeup_info->monitor_wakeup.ready = true;
+      return;
+    }
+  }
+}
+
+void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
+  // iterate through the threads and find all that are waiting on the monitor
+  impl *I = scheduler->_impl;
+  for (int i = 0; i < arrlen(I->round_robin); i++) {
+    rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
+    if (!wakeup_info)
+      continue;
+    if (wakeup_info->kind == RR_MONITOR_WAIT && wakeup_info->monitor_wakeup.monitor->obj == monitor) {
+      wakeup_info->monitor_wakeup.ready = true;
+    }
+  }
+}
+
+void monitor_exit_handler(rr_scheduler *scheduler, obj_header *monitor) {
+  // iterate through the threads and find all that are waiting to enter
+  impl *I = scheduler->_impl;
+  for (int i = 0; i < arrlen(I->round_robin); i++) {
+    rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
+    if (!wakeup_info)
+      continue;
+    if (wakeup_info->kind == RR_MONITOR_ENTER_WAITING && wakeup_info->monitor_wakeup.monitor->obj == monitor) {
+      wakeup_info->monitor_wakeup.ready = true;
+      return; // we only need to notify one waiter at most (but it probably wouldn't hurt either way)
+    }
+  }
+}
+
+void free_thread_info(rr_scheduler *scheduler, thread_info *info) {
+  // technically doesn't need to acquire the monitor to notify, since scheduler is god
+  info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
+  monitor_notify_all(scheduler, (obj_header *) info->thread->thread_obj);
+
+  arrfree(info->call_queue);
+  free(info);
+}
+
+/// does not reättempt the notifyAll on the thread; assume the scheduler is dead
+static void free_thread_info_shutdown(thread_info *info) {
   info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
 
   arrfree(info->call_queue);
@@ -37,7 +87,7 @@ void rr_scheduler_init(rr_scheduler *scheduler, vm *vm) {
 void rr_scheduler_uninit(rr_scheduler *scheduler) {
   impl *I = scheduler->_impl;
   for (int i = 0; i < arrlen(I->round_robin); i++) {
-    free_thread_info(I->round_robin[i]);
+    free_thread_info_shutdown(I->round_robin[i]);
   }
   for (int i = 0; i < arrlen(I->executions); i++) {
     free(I->executions[i]);
@@ -47,14 +97,26 @@ void rr_scheduler_uninit(rr_scheduler *scheduler) {
   free(I);
 }
 
-static bool is_sleeping(thread_info *info, s64 time) {
-  return info->wakeup_info && info->wakeup_info->kind == RR_WAKEUP_SLEEP && (s64)info->wakeup_info->wakeup_us > time;
+static bool is_sleeping(thread_info *info, u64 time) {
+  if (!info->wakeup_info)
+    return false;
+  if (info->wakeup_info->kind == RR_WAKEUP_SLEEP
+      || (info->wakeup_info->kind == RR_THREAD_PARK && !query_unpark_permit(info->thread))
+      || (info->wakeup_info->kind == RR_MONITOR_WAIT && !info->wakeup_info->monitor_wakeup.ready)
+      || (info->wakeup_info->kind == RR_MONITOR_ENTER_WAITING && !info->wakeup_info->monitor_wakeup.ready)) {
+    u64 wakeup = info->wakeup_info->wakeup_us;
+    // montitor enter is non-interruptible by Java language spec
+    bool interrupted = info->thread->thread_obj->interrupted && info->wakeup_info->kind != RR_MONITOR_ENTER_WAITING;
+    return !interrupted && (wakeup == 0 || wakeup >= time);
+  } else {
+    return false; // blocking on something else which presumably can resume soon
+  }
 }
 
 static thread_info *get_next_thr(impl *impl) {
   assert(impl->round_robin && "No threads to run");
   thread_info *info = nullptr;
-  s64 time = (s64)get_unix_us();
+  u64 time = get_unix_us();
   for (int i = 0; i < arrlen(impl->round_robin); ++i) {
     info = impl->round_robin[0];
     arrdel(impl->round_robin, 0);
@@ -83,9 +145,9 @@ static thread_info *get_next_thr(impl *impl) {
 }
 
 u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler) {
-  s64 min = INT64_MAX;
+  u64 min = UINT64_MAX;
   impl *I = scheduler->_impl;
-  s64 time = (s64)get_unix_us();
+  u64 time = get_unix_us();
 
   // Check all infos for wakeup times
   for (int i = 0; i < arrlen(I->round_robin); i++) {
@@ -93,19 +155,24 @@ u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler) {
 
     if (arrlen(info->call_queue) > 0) {
       if (is_sleeping(info, time)) {
-        if ((s64)info->wakeup_info->wakeup_us < min) {
-          min = (s64)info->wakeup_info->wakeup_us;
+        u64 wakeup_time = info->wakeup_info->wakeup_us;
+//        if (wakeup_time == 0) {
+//          wakeup_time = time + 10 * 1000000; // 10 seconds instead of infinite sleep just to be safe
+//        }
+
+        if (wakeup_time != 0 && wakeup_time < min) {
+          min = wakeup_time;
         }
       } else {
         return 0; // at least one thing is waiting, and not sleeping
       }
     }
   }
-  min -= time;
-  return min >= 0 ? min : 0;
+
+  return min > time ? min - time : 0;
 }
 
-void unshift(impl *I, thread_info *info) {
+void unshift(rr_scheduler *scheduler, impl *I, thread_info *info) {
   if (arrlen(info->call_queue) > 0) {
     arrdel(info->call_queue, 0);
   }
@@ -117,7 +184,7 @@ void unshift(impl *I, thread_info *info) {
         break;
       }
     }
-    free_thread_info(info);
+    free_thread_info(scheduler, info);
   }
 }
 
@@ -134,17 +201,13 @@ bool only_daemons_running(thread_info **thread_info) {
 scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
   impl *impl = scheduler->_impl;
 
-  if (arrlen(impl->round_robin) == 0)
+  if (arrlen(impl->round_robin) == 0 || only_daemons_running(impl->round_robin))
     return SCHEDULER_RESULT_DONE;
 
   u64 time = get_unix_us();
   thread_info *info = get_next_thr(impl);
-  if (!info)
+  if (!info) // returned nullptr; no threads are available to run
     return SCHEDULER_RESULT_DONE;
-
-  if (only_daemons_running(impl->round_robin)) {
-    return SCHEDULER_RESULT_DONE;
-  }
 
   vm_thread *thread = info->thread;
   const int MICROSECONDS_TO_RUN = 10000;
@@ -152,11 +215,14 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
   thread->fuel = 10000;
 
   // If the thread is sleeping, check if it's time to wake up
-  if (is_sleeping(info, (s64)time)) {
+  if (is_sleeping(info, time)) {
     if (time < info->wakeup_info->wakeup_us) {
       return SCHEDULER_RESULT_MORE;
     }
   }
+
+  // else, we start calling it
+  info->wakeup_info = nullptr;
 
   thread->yield_at_time = time + MICROSECONDS_TO_RUN;
 
@@ -181,12 +247,12 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
     }
 
     free(call->call.args.args); // free the copied arguments
-    unshift(impl, info);
+    unshift(scheduler, impl, info);
   } else {
     info->wakeup_info = (void *)fut.wakeup;
   }
 
-  return arrlen(impl->round_robin) ? SCHEDULER_RESULT_MORE : SCHEDULER_RESULT_DONE;
+  return (arrlen(impl->round_robin) == 0 || only_daemons_running(impl->round_robin)) ? SCHEDULER_RESULT_DONE : SCHEDULER_RESULT_MORE;
 }
 
 static thread_info *get_or_create_thread_info(impl *impl, vm_thread *thread) {

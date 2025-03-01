@@ -77,6 +77,17 @@ DEFINE_ASYNC(init_cached_classdescs) {
   ASYNC_END(0);
 }
 
+inline int set_unpark_permit(vm_thread *thread) {
+  if (unlikely(!thread))
+    return -1;
+  thread->unpark_permit = true;
+  return 0;
+}
+
+inline bool query_unpark_permit(vm_thread *thread) {
+  return thread->unpark_permit;
+}
+
 bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
 mark_word_t *get_mark_word(vm *vm, header_word *data) {
@@ -109,7 +120,7 @@ monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj) {
 u16 stack_depth(const stack_frame *frame) {
   DCHECK(!is_frame_native(frame), "Can't get stack depth of native frame");
   DCHECK(frame->method, "Can't get stack depth of fake frame");
-  int pc = frame->plain.program_counter;
+  int pc = frame->program_counter;
   if (pc == 0) // stack is always 0 at method entry, common case
     return 0;
   code_analysis *analy = frame->method->code_analysis;
@@ -124,17 +135,12 @@ value *get_native_args(const stack_frame *frame) {
 
 stack_value *frame_stack(stack_frame *frame) {
   DCHECK(!is_frame_native(frame));
-  return frame->plain.stack;
+  return frame->stack;
 }
 
 native_frame *get_native_frame_data(stack_frame *frame) {
   DCHECK(is_frame_native(frame));
-  return &frame->native;
-}
-
-plain_frame *get_plain_frame(stack_frame *frame) {
-  DCHECK(!is_frame_native(frame));
-  return &frame->plain;
+  return (native_frame*) (frame + 1);
 }
 
 cp_method *get_frame_method(stack_frame *frame) { return frame->method; }
@@ -247,32 +253,35 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
                                stack_value *args, u8 argc) {
   native_callback *native = method->native_handle;
   if (!native) {
+    printf("Class state (before pushing native frame of it): %d\n", method->my_class->state);
+    printf("Neighborhood bytes around native_handle ( %p ): ", &method->native_handle);
+    for (int i = -16; i < 16; i++) {
+      printf("%02x ", ((u8 *)&method->native_handle)[i]);
+    }
+    printf("\n");
     raise_unsatisfied_link_error(thread, method);
-    return nullptr;
-  }
-
-  const size_t header_bytes = sizeof(stack_frame);
-  size_t args_bytes = argc * sizeof(value);
-  size_t total = header_bytes + args_bytes;
-
-  if (total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
-    raise_exception_object(thread, thread->stack_overflow_error);
     return nullptr;
   }
 
   value *locals = (value *)(args + argc); // reserve new memory on stack
   stack_frame *frame = (stack_frame *)(locals + argc);
 
-  DCHECK((uintptr_t)frame % 8 == 0, "Frame is aligned");
-  arrput(thread->stack.frames, frame);
+  if ((uintptr_t)frame + sizeof(stack_frame) > (uintptr_t)thread->stack.frame_buffer_end) {
+    raise_exception_object(thread, thread->stack_overflow_error);
+    return nullptr;
+  }
 
-  thread->stack.frame_buffer_used = (char *)frame + sizeof(*frame) - thread->stack.frame_buffer;
+  DCHECK((uintptr_t)frame % 8 == 0, "Frame must be aligned");
 
-  frame->is_native = FRAME_KIND_NATIVE;
+  frame->prev = thread->stack.top;
+  thread->stack.top = frame;
+
+  frame->kind = FRAME_KIND_NATIVE;
   frame->num_locals = argc;
+  // this many additional slots are used for the native info
+  frame->max_stack = align_up(sizeof(native_frame), sizeof(stack_value));
   frame->method = method;
-  frame->native.method_shape = descriptor;
-  frame->native.state = 0;
+  get_native_frame_data(frame)->method_shape = descriptor;
   frame->is_async_suspended = false;
   frame->synchronized_state = SYNCHRONIZE_NONE;
 
@@ -283,33 +292,30 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
 
 stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value *args, u8 argc) {
   const attribute_code *code = method->code;
-  if (!code) {
+  if (unlikely(!code)) {
     raise_abstract_method_error(thread, method);
     return nullptr;
   }
 
   DCHECK(argc <= code->max_locals);
 
-  const size_t header_bytes = sizeof(stack_frame);
-  size_t values_bytes = code->max_stack * sizeof(stack_value);
-  size_t total = header_bytes + values_bytes;
-
-  if (unlikely(total + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity)) {
+  stack_frame *frame = (stack_frame *)(args + code->max_locals);
+  if ((uintptr_t)(frame + sizeof(stack_frame) + code->max_stack * sizeof(stack_value)) >
+      (uintptr_t)thread->stack.frame_buffer_end) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return nullptr;
   }
 
-  stack_frame *frame = (stack_frame *)(args + code->max_locals);
+  frame->method = method;
+  frame->prev = thread->stack.top;
+  thread->stack.top = frame;
 
-  thread->stack.frame_buffer_used = (char *)(frame->plain.stack + code->max_stack) - thread->stack.frame_buffer;
-  arrput(thread->stack.frames, frame);
-  frame->is_native = FRAME_KIND_INTERPRETER;
+  frame->kind = FRAME_KIND_INTERPRETER;
   frame->is_async_suspended = false;
   frame->synchronized_state = SYNCHRONIZE_NONE;
+  frame->program_counter = 0;
+  frame->max_stack = code->max_stack;
   frame->num_locals = code->max_locals;
-  frame->plain.program_counter = 0;
-  frame->plain.max_stack = code->max_stack;
-  frame->method = method;
 
   // Not necessary, but possibly helpful when looking at debug dumps
   // memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));
@@ -357,45 +363,27 @@ void dump_frame(FILE *stream, const stack_frame *frame) {
 
   for (int i = 0; i < sd; ++i) {
     stack_value value = frame_stack((void *)frame)[i];
-    const char *is_ref = infer_type(frame->method->code_analysis, frame->plain.program_counter, i, false);
+    const char *is_ref = infer_type(frame->method->code_analysis, frame->program_counter, i, false);
     write += snprintf(write, end - write, " stack[%d] = [ ref = %p, int = %d ] %s\n", i, value.obj, value.i, is_ref);
   }
 
   for (int i = 0; i < frame->num_locals; ++i) {
     stack_value value = frame_locals(frame)[i];
-    const char *is_ref = infer_type(frame->method->code_analysis, frame->plain.program_counter, i, true);
+    const char *is_ref = infer_type(frame->method->code_analysis, frame->program_counter, i, true);
     write += snprintf(write, end - write, "locals[%d] = [ ref = %p, int = %d ] %s\n", i, value.obj, value.i, is_ref);
   }
 
   fprintf(stream, "%s", buf);
 }
 
-u32 compute_used(vm_thread *thread) {
-  if (arrlen(thread->stack.frames) == 0) {
-    return 0;
-  }
-  stack_frame *frame = arrlast(thread->stack.frames);
-  DCHECK(frame);
-  switch (frame->is_native) {
-  case FRAME_KIND_INTERPRETER:
-    return (char *)frame + sizeof(stack_frame) + frame->plain.max_stack * sizeof(stack_value) -
-           thread->stack.frame_buffer;
-  case FRAME_KIND_NATIVE:
-    return (char *)frame + sizeof(stack_frame) - thread->stack.frame_buffer;
-  case FRAME_KIND_COMPILED:
-  default:
-    UNREACHABLE();
-  }
-}
-
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference) {
-  DCHECK(arrlen(thr->stack.frames) > 0);
-  stack_frame *frame = arrpop(thr->stack.frames);
+  stack_frame *frame = thr->stack.top;
+  DCHECK(frame);
   DCHECK(reference == nullptr || reference == frame);
   if (is_frame_native(frame)) {
-    drop_handles_array(thr, frame->method, frame->native.method_shape, get_native_args(frame));
+    drop_handles_array(thr, frame->method, get_native_frame_data(frame)->method_shape, get_native_args(frame));
   }
-  thr->stack.frame_buffer_used = compute_used(thr);
+  thr->stack.top = frame->prev;
 }
 
 // Symmetry with make_primitive_classdesc
@@ -433,6 +421,8 @@ void register_native(vm *vm, slice class, const slice method_name, const slice m
                      native_callback callback) {
   if (class.chars[0] == '/')
     class = subslice(class, 1);
+
+//  printf("Registering native: %.*s on class %.*s\n", fmt_slice(method_name), fmt_slice(class));
 
   heap_string heap_class = make_heap_str_from(class);
   for (size_t i = 0; i < class.len; i++) { // hacky way to avoid emscripten from complaining about symbol names
@@ -817,6 +807,7 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
 
   thr->vm = vm;
   thr->stack.frame_buffer = calloc(1, thr->stack.frame_buffer_capacity = options.stack_space);
+  thr->stack.frame_buffer_end = thr->stack.frame_buffer + options.stack_space;
   thr->js_jit_enabled = options.js_jit_enabled;
   const int HANDLES_CAPACITY = 200;
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
@@ -894,7 +885,7 @@ vm_thread *create_main_thread(vm *vm, thread_options options) {
         if (obj.obj) {
           CHECK(read_string_to_utf8(thr, &message, obj.obj) == 0);
         }
-        fprintf(stderr, "Error in init phase %.*s: %.*s, %s\n", fmt_slice(thr->current_exception->descriptor->name),
+        printf("Error in init phase %.*s: %.*s, %s\n", fmt_slice(thr->current_exception->descriptor->name),
                 fmt_slice(phases[i]), obj.obj ? message.chars : "no message");
         abort();
       }
@@ -934,6 +925,7 @@ vm_thread *create_vm_thread(vm *vm, vm_thread *creator_thread, struct native_Thr
 
   thr->vm = vm;
   thr->stack.frame_buffer = calloc(1, thr->stack.frame_buffer_capacity = options.stack_space);
+  thr->stack.frame_buffer_end = thr->stack.frame_buffer + options.stack_space;
   thr->js_jit_enabled = options.js_jit_enabled;
   const int HANDLES_CAPACITY = 200;
   thr->handles = calloc(1, sizeof(handle) * HANDLES_CAPACITY);
@@ -1022,7 +1014,6 @@ void free_thread(vm_thread *thread) {
   finish_profiler(thread->profiler); // no-op if no profiler is active
 
   free(thread->stack.async_call_stack);
-  arrfree(thread->stack.frames);
   free(thread->stack.frame_buffer);
   free(thread->handles);
   free(thread->refuel_wakeup_info);
@@ -1400,16 +1391,21 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
   if (entries) {
     for (int i = 0; i < arrlen(entries->entries); i++) {
       native_entry *entry = entries->entries + i;
+//      printf("Trying to bind method %.*s on class %.*s\n", fmt_slice(entry->name), fmt_slice(chars));
 
       for (int j = 0; j < class->methods_count; ++j) {
         cp_method *method = class->methods + j;
 
         if (utf8_equals_utf8(method->name, entry->name) &&
             utf8_equals_utf8(method->unparsed_descriptor, entry->descriptor)) {
+//          printf("Successfully bound method %.*s on class %.*s\n", fmt_slice(entry->name), fmt_slice(chars));
           method->native_handle = &entry->callback;
-          break;
+          goto done;
         }
       }
+
+//      printf("Failed to bind method %.*s on class %.*s\n", fmt_slice(entry->name), fmt_slice(chars));
+      done:
     }
   }
 
@@ -1435,16 +1431,17 @@ error_1:
 
 void dump_trace(vm_thread *thread) {
   // Walk frames and print the method/line number
-  for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
-    stack_frame *frame = thread->stack.frames[i];
+  stack_frame *frame = thread->stack.top;
+  while (frame) {
     cp_method *method = get_frame_method(frame);
     if (is_frame_native(frame)) {
       printf("  at %.*s.%.*s(Native Method)\n", fmt_slice(method->my_class->name), fmt_slice(method->name));
     } else {
-      int line = get_line_number(method->code, frame->plain.program_counter);
+      int line = get_line_number(method->code, frame->program_counter);
       printf("  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
              fmt_slice(method->my_class->source_file ? method->my_class->source_file->name : null_str()), line);
     }
+    frame = frame->prev;
   }
 }
 
@@ -1478,12 +1475,14 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
   if (!class) {
     // Maybe it's an anonymous class, read the thread stack looking for a
     // class with a matching name
-    for (int i = (int)arrlen(thread->stack.frames) - 1; i >= 0; --i) {
-      classdesc *d = get_frame_method(thread->stack.frames[i])->my_class;
+    stack_frame *frame = thread->stack.top;
+    while (frame) {
+      classdesc *d = get_frame_method(frame)->my_class;
       if (utf8_equals_utf8(d->name, chars)) {
         class = d;
         break;
       }
+      frame = frame->prev;
     }
   }
 
@@ -1738,7 +1737,9 @@ DEFINE_ASYNC(initialize_class) {
   }
 
   cp_method *clinit = method_lookup(cd, STR("<clinit>"), STR("()V"), false, false);
+
   if (clinit) {
+
     AWAIT(call_interpreter, thread, clinit, nullptr);
     if (thread->current_exception && !is_error(thread->current_exception->descriptor)) {
       wrap_in_exception_in_initializer_error(thread);
@@ -1803,29 +1804,28 @@ cp_method *method_lookup(classdesc *descriptor, const slice name, const slice me
   return nullptr;
 }
 
+static char *get_next_frame_start(vm_thread *thread) {
+  if (thread->stack.top) {
+    return (char*)thread->stack.top + sizeof(stack_frame) + thread->stack.top->max_stack * sizeof(stack_value);
+  }
+  return thread->stack.frame_buffer;
+}
+
 // Returns true on failure to initialize the context
 static bool initialize_async_ctx(async_run_ctx *ctx, vm_thread *thread, cp_method *method, stack_value *args) {
   assert(method && "Method is null");
   memset(ctx, 0, sizeof(*ctx));
 
   u8 argc = method_argc(method);
-  stack_value *stack_top = (stack_value *)(thread->stack.frame_buffer + thread->stack.frame_buffer_used);
-  if (arrlen(thread->stack.frames)) {
-    stack_frame *last = arrlast(thread->stack.frames);
-    if (last->is_native == FRAME_KIND_INTERPRETER) {
-      // Make sure we're not trampling over the previous interpreter frame
-      DCHECK((uintptr_t)last->plain.stack + last->plain.max_stack * sizeof(stack_value) <= (uintptr_t)stack_top);
-    }
-  }
-  size_t args_size = sizeof(stack_value) * argc;
+  stack_value *stack_top = (stack_value*)get_next_frame_start(thread);
 
-  if (args_size + thread->stack.frame_buffer_used > thread->stack.frame_buffer_capacity) {
+  if ((uintptr_t)(stack_top + argc) > (uintptr_t)thread->stack.frame_buffer_end) {
     raise_exception_object(thread, thread->stack_overflow_error);
     return true;
   }
 
+  size_t args_size = argc * sizeof(stack_value);
   memcpy(stack_top, args, args_size);
-  thread->stack.frame_buffer_used += args_size;
 
   ctx->thread = thread;
   ctx->frame = push_frame(thread, method, stack_top, argc);
@@ -1860,12 +1860,14 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
   // TODO this is rly dumb, review the spec for how this should really work (need to ignore stack frames associated
   // with reflection n' shit)
   object loader = nullptr;
-  for (int i = arrlen(thread->stack.frames) - 1; i >= 0; --i) {
-    void *candidate = thread->stack.frames[i]->method->my_class->classloader;
+  stack_frame *frame = thread->stack.top;
+  while (frame) {
+    void *candidate = frame->method->my_class->classloader;
     if (candidate) {
       loader = candidate;
       break;
     }
+    frame = frame->prev;
   }
 
   classdesc *existing = bootstrap_lookup_class_impl(thread, info->name, false);
@@ -2320,7 +2322,6 @@ doit:
     AWAIT(call_interpreter, thread, valueFromMethodName, arg);
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
-      drop_handle(thread, self->result);
       ASYNC_RETURN_VOID();
     }
 
@@ -2411,7 +2412,7 @@ DEFINE_ASYNC(resolve_methodref) {
 #undef thread
 }
 
-int multianewarray(vm_thread *thread, plain_frame *frame, struct multianewarray_data *multianewarray, u16 *sd) {
+int multianewarray(vm_thread *thread, stack_frame *frame, struct multianewarray_data *multianewarray, u16 *sd) {
   int dims = multianewarray->dimensions;
   DCHECK(*sd >= dims);
   // DCHECK(stack_depth(frame) >= dims);
@@ -2620,7 +2621,7 @@ DEFINE_ASYNC(run_native) {
 DEFINE_ASYNC(interpret) {
 #define thread args->thread
 #define raw_frame args->raw_frame
-  DCHECK(arrlast(thread->stack.frames) == raw_frame, "Frame is not last frame on stack");
+  DCHECK(thread->stack.top == raw_frame, "Frame is not last frame on stack");
 
   for (;;) {
     future_t f;

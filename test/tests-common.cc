@@ -33,9 +33,21 @@ using std::string_view;
 using std::vector;
 
 namespace Bjvm::Tests {
+// todo: use actual c++ RAII class instead of this scuff
+static void tear_down_vm(vm *vm) {
+  auto *scheduler = (rr_scheduler *) vm->scheduler;
+  if (scheduler) rr_scheduler_uninit(scheduler);
+  free_vm(vm);
+  delete scheduler; // scuff scuff scuff
+}
+
+// todo: use actual c++ RAII class instead of this scuff
 std::unique_ptr<vm, void (*)(vm *)> CreateTestVM(vm_options options) {
   vm *vm = create_vm(options);
-  return {vm, free_vm};
+  auto *scheduler = new rr_scheduler {};
+  rr_scheduler_init(scheduler, vm);
+  vm->scheduler = scheduler;
+    return { vm, tear_down_vm };
 }
 
 std::vector<std::string> ListDirectory(const std::string &path, bool recursive) {
@@ -158,6 +170,14 @@ std::optional<std::vector<u8>> ReadFile(const std::string &file) {
 #endif
 }
 
+std::string ReadFileAsString(const std::string &file) {
+  auto data = ReadFile(file);
+  if (!data) {
+    return { };
+  }
+  return {data->begin(), data->end()};
+}
+
 std::unordered_map<std::string, int> method_sigs;
 
 void print_method_sigs() {
@@ -221,6 +241,11 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
     fprintf(stderr, "Failed to create VM");
     return result;
   }
+
+  rr_scheduler scheduler;
+  rr_scheduler_init(&scheduler, vm);
+  vm->scheduler = &scheduler;
+
   vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
@@ -238,10 +263,6 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   CHECK(f.status == FUTURE_READY);
 
   method = method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"), false, false);
-
-  rr_scheduler scheduler;
-  rr_scheduler_init(&scheduler, vm);
-  vm->scheduler = &scheduler;
 
   handle *string_args_as_object =
       make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
@@ -267,7 +288,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
     u64 sleep_for = rr_scheduler_may_sleep_us(&scheduler);
     if (sleep_for) {
       result.sleep_count++;
-      result.ms_slept += sleep_for;
+      result.us_slept += sleep_for;
 #ifdef EMSCRIPTEN
       // long-term, we will use the JS scheduler instead of this hack
       busy_wait(sleep_for);
