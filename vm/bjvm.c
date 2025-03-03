@@ -18,6 +18,8 @@
 #include <reflection.h>
 
 #include "cached_classdescs.h"
+#include "wasm/wasm_utils.h"
+
 #include <errno.h>
 #include <linkage.h>
 #include <monitors.h>
@@ -658,9 +660,25 @@ vm *create_vm(const vm_options options) {
                     native_ptr->callback);
   }
 
+#ifdef EMSCRIPTEN
+  wasm_init_fma_handles();
+#endif
+
   register_native_padding(vm);
 
   return vm;
+}
+
+bool free_unsafe_allocation(vm *vm, void *allocation) {
+  void **unsafe_allocations = vm->unsafe_allocations;
+  for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
+    if (unsafe_allocations[i] == allocation) {
+      free(allocation);
+      arrdelswap(unsafe_allocations, i);
+      return true;
+    }
+  }
+  return false;
 }
 
 void free_unsafe_allocations(vm *vm) {
@@ -2605,11 +2623,14 @@ DEFINE_ASYNC(run_native) {
   }
 
   self->native_struct = malloc(hand->async_ctx_bytes);
+  arrput(thread->vm->unsafe_allocations, self->native_struct);
+
   *self->native_struct = (async_natives_args){{thread, target_handle, native_args, argc}, 0};
   AWAIT_FUTURE_EXPR(((native_callback *)frame->method->native_handle)->async(self->native_struct));
+
   // We've laid out the context struct so that the result is always at offset 0
   stack_value result = ((async_natives_args *)self->native_struct)->result;
-  free(self->native_struct);
+  free_unsafe_allocation(thread->vm, self->native_struct);
 
   ASYNC_END(result);
 

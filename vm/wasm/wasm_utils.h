@@ -507,6 +507,18 @@ typedef struct {
 void free_wasm_instantiation_result(wasm_instantiation_result *result);
 wasm_instantiation_result *wasm_instantiate_module(wasm_module *module, const char *debug_name);
 
+/** fma_support.c, WASM only */
+
+#ifdef EMSCRIPTEN
+typedef float (*wasm_fmaf_handle)(float a, float b, float c);
+typedef double (*wasm_fma_handle)(double a, double b, double c);
+
+extern wasm_fmaf_handle wasm_fmaf_impl;
+extern wasm_fma_handle wasm_fma_impl;
+
+void wasm_init_fma_handles();
+#endif
+
 #ifdef __cplusplus
 }
 #endif
