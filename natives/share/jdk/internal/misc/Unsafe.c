@@ -173,13 +173,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   DCHECK(argc == 1);
   free((void *)args[0].l);
-  void **unsafe_allocations = thread->vm->unsafe_allocations;
-  for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
-    if (unsafe_allocations[i] == (void *)args[0].l) {
-      arrdelswap(unsafe_allocations, i);
-      return value_null();
-    }
-  }
+  remove_unsafe_allocation(thread->vm, (void*) args[0].l);
   fprintf(stderr, "Attempted to free memory that was not allocated by Unsafe\n");
   abort();
 }

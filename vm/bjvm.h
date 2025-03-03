@@ -409,6 +409,7 @@ typedef struct vm {
 } vm;
 
 struct cached_classdescs *cached_classes(vm *vm);
+void remove_unsafe_allocation(vm *vm, void *allocation);
 
 // Java Module
 typedef struct module {

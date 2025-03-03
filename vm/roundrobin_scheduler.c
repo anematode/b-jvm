@@ -75,6 +75,12 @@ void free_thread_info(rr_scheduler *scheduler, thread_info *info) {
 static void free_thread_info_shutdown(thread_info *info) {
   info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
 
+  for (int call_i = 0; call_i < arrlen(info->call_queue); call_i++) {
+    pending_call *pending = &info->call_queue[call_i];
+    free_execution_record(pending->record);
+    free(pending->call.args.args);
+  }
+
   arrfree(info->call_queue);
   free(info);
 }
