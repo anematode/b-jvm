@@ -261,8 +261,6 @@ static void mark_reachable(gc_ctx *ctx, object obj) {
   }
 }
 
-static int comparator(const void *a, const void *b) { return *(char **)a - *(char **)b; }
-
 size_t size_of_object(object obj) {
   if (obj->descriptor->kind == CD_KIND_ORDINARY) {
     return obj->descriptor->instance_bytes;
@@ -271,6 +269,48 @@ size_t size_of_object(object obj) {
     return kArrayDataOffset + ArrayLength(obj) * sizeof(void *);
   }
   return kArrayDataOffset + ArrayLength(obj) * sizeof_type_kind(obj->descriptor->primitive_component);
+}
+
+[[maybe_unused]] static void **binary_search_for_pointer(void *ptr, void **ptrs, s64 count) {
+  s64 low = 0, high = count - 1;
+  while (low <= high) {
+    size_t mid = (low + high) / 2;
+    if ((uintptr_t)ptrs[mid] == (uintptr_t)ptr) {
+      return &ptrs[mid];
+    }
+    if ((uintptr_t)ptrs[mid] < (uintptr_t)ptr) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return nullptr;
+}
+
+// NOLINTNEXTLINE(misc-no-recursion)
+static void quicksort_pointers(void **ptrs, size_t count) {
+  if (count <= 1) {
+    return;
+  }
+  void *pivot = ptrs[count / 2];
+  void **left = ptrs, **right = ptrs + count - 1;
+  while (left <= right) {
+    while (*left < pivot) {
+      left++;
+    }
+    while (*right > pivot) {
+      right--;
+    }
+    if (left <= right) {
+      void *tmp = *left;
+      *left = *right;
+      *right = tmp;
+      left++;
+      right--;
+    }
+  }
+  quicksort_pointers(ptrs, right - ptrs + 1);
+  quicksort_pointers(left, ptrs + count - left);
 }
 
 static void relocate_object(gc_ctx *ctx, object *obj) {
@@ -284,7 +324,7 @@ static void relocate_object(gc_ctx *ctx, object *obj) {
 #endif
 
   // Binary search for obj in ctx->roots
-  void **found = bsearch(obj, ctx->objs, arrlen(ctx->objs), sizeof(object), comparator);
+  void **found = binary_search_for_pointer(*obj, ctx->objs, arrlen(ctx->objs));
   if (found) {
     object relocated = ctx->new_location[found - ctx->objs];
     DCHECK(relocated);
@@ -316,7 +356,7 @@ void relocate_instance_fields(gc_ctx *ctx) {
     if (has_expanded_data(&obj->header_word)) {
       monitor_data *monitor = obj->header_word.expanded_data;
       void *key = (void *)((uintptr_t)monitor | 1);
-      void **found = bsearch(&key, ctx->objs, arrlen(ctx->objs), sizeof(object), comparator);
+      void **found = binary_search_for_pointer(key, ctx->objs, arrlen(ctx->objs));
       if (!found) {
         fprintf(stderr, "Can't find monitor %p!\n", monitor);
         abort();
@@ -373,7 +413,7 @@ void major_gc(vm *vm) {
   arrfree(bitset[0]);
 
   // Sort roots by address
-  qsort(ctx.objs, arrlen(ctx.objs), sizeof(object), comparator);
+  quicksort_pointers(ctx.objs, arrlen(ctx.objs));
   object *new_location = ctx.new_location = malloc(arrlen(ctx.objs) * sizeof(object));
 
   // Create a new heap of the same size so ASAN can enjoy itself
