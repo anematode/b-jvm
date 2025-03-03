@@ -259,7 +259,8 @@ typedef enum : u8 {
   insn_putstatic_L,
 
   /** intrinsics understood by the interpreter */
-  insn_sqrt
+  insn_fma,  // fused multiply add (float or double)
+  insn_sqrt  // square root (float or double)
 } insn_code_kind;
 
 #define MAX_INSN_KIND (insn_sqrt + 1)

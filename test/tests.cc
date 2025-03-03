@@ -794,6 +794,13 @@ TEST_CASE("Kotlin says hi") {
   REQUIRE(result.stdout_ == "First 10 terms: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, \nHello from Kotlin!");
 }
 
+TEST_CASE("Fused multiply-add") {
+  auto result = run_test_case("test_files/fma/", true, "FusedMultiplyAdd");
+  REQUIRE(result.stdout_ == R"(8.271806125530277E-25
+9.094947E-13
+)");
+}
+
 #if 0
 TEST_CASE("Print useful trampolines") { print_method_sigs(); }
 #endif

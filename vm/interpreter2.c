@@ -41,7 +41,6 @@
 #include <analysis.h>
 #include <debugger.h>
 #include <math.h>
-#include <tgmath.h>
 
 #include <exceptions.h>
 #include <linkage.h>
@@ -1726,6 +1725,10 @@ static int intrinsify(bytecode_insn *inst) {
       inst->kind = insn_sqrt;
       return 1;
     }
+    if (utf8_equals(method->name, "fma")) {
+      inst->kind = insn_fma;
+      return 1;
+    }
   }
   return 0;
 }
@@ -2691,6 +2694,28 @@ static s64 sqrt_impl_float(ARGS_FLOAT) {
   NEXT_FLOAT(sqrt(tos))
 }
 
+static s64 fma_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+#ifdef EMSCRIPTEN
+  double result = wasm_fma_impl((sp - 3)->d, (sp - 2)->d, tos);
+#else
+  double result = fma((sp - 3)->d, (sp - 2)->d, tos);
+#endif
+  sp -= 2;
+  NEXT_DOUBLE(result)
+}
+
+static s64 fma_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+#ifdef EMSCRIPTEN
+  float result = wasm_fmaf_impl((sp - 3)->f, (sp - 2)->f, tos);
+#else
+  float result = fmaf((sp - 3)->f, (sp - 2)->f, tos);
+#endif
+  sp -= 2;
+  NEXT_FLOAT(result)
+}
+
 static s64 frem_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   float a = (sp - 2)->f, b = tos;
@@ -3093,7 +3118,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame) {
   return result;
 }
 
-/** Jump table definitions. Must be kept in sync with the enum order. */
+/** Jump table definitions. */
 
 #define PAGE_ALIGN _Alignas(4096)
 
@@ -3212,6 +3237,7 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
     [insn_drem] = drem_impl_double,
+    [insn_fma] = fma_impl_double,
     [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3446,4 +3472,5 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_L] = getstatic_L_impl_float,
     [insn_putstatic_F] = putstatic_F_impl_float,
     [insn_frem] = frem_impl_float,
+    [insn_fma] = fma_impl_float,
     [insn_sqrt] = sqrt_impl_float};

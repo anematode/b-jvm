@@ -18,6 +18,8 @@
 #include <reflection.h>
 
 #include "cached_classdescs.h"
+#include "wasm/wasm_utils.h"
+
 #include <errno.h>
 #include <linkage.h>
 #include <monitors.h>
@@ -657,6 +659,10 @@ vm *create_vm(const vm_options options) {
     register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
                     native_ptr->callback);
   }
+
+#ifdef EMSCRIPTEN
+  wasm_init_fma_handles();
+#endif
 
   register_native_padding(vm);
 
