@@ -390,7 +390,7 @@ typedef struct vm {
 
   s64 next_thread_id; // MUST BE 64 BITS
 
-  // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
+  // Vector of allocations done via Unsafe.allocateMemory0 or for other purposes in the VM, to be freed in case
   // the finalizers aren't run
   void **unsafe_allocations;
 
@@ -614,10 +614,9 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
  * check.
  */
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference);
-
 vm_options default_vm_options();
-
 vm *create_vm(vm_options options);
+bool free_unsafe_allocation(vm *vm, void *allocation);
 
 typedef struct {
   u32 stack_space;
