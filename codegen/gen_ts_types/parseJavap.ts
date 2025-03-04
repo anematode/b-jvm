@@ -1,168 +1,257 @@
-type JavaType = {
-	baseType:
-		| "double"
-		| "int"
-		| "boolean"
-		| "float"
-		| "long"
-		| "short"
-		| "byte"
-		| "char"
-		| "void"
-		| "object";
-	arrayDimensions: number;
-	objectName: string;
-	typeParameters: JavaType[];
-};
+export type JavaPrimitiveType =
+	| "double"
+	| "int"
+	| "boolean"
+	| "float"
+	| "long"
+	| "short"
+	| "byte"
+	| "char"
+	| "void";
 
-type MethodInfo = {
-	name: string;
-	returnType: JavaType;
-	parameters: { name: string; type: JavaType }[];
-	typeParameters: string[];
-};
+export type JavaType =
+	| {
+			kind: "primitive";
+			type: JavaPrimitiveType;
+	  }
+	| {
+			kind: "class";
+			name: string;
+	  }
+	| {
+			kind: "array";
+			type: JavaType;
+			dimensions: number;
+	  };
 
-type FieldInfo = {
-	name: string;
+export type JavaModifier =
+	| "public"
+	| "private"
+	| "protected"
+	| "static"
+	| "final"
+	| "abstract"
+	| "synchronized"
+	| "volatile"
+	| "transient";
+
+export type JavaMethodParameter = {
 	type: JavaType;
+	name?: string;
 };
 
-type ClassInfo = {
+export type JavaMethodKind = "constructor" | "method";
+
+export type JavaMethod = {
 	name: string;
-	methods: MethodInfo[];
-	fields: FieldInfo[];
+	kind: JavaMethodKind;
+	modifiers: JavaModifier[];
+	returnType: JavaType;
+	parameters: JavaMethodParameter[];
+	descriptor: string;
 };
 
-function parseJavaNonArrayType(type: string): JavaType {
-	switch (type) {
-		case "double":
-		case "int":
-		case "boolean":
-		case "float":
-		case "long":
-		case "short":
-		case "byte":
-		case "char":
-		case "void":
-			return {
-				baseType: type,
-				arrayDimensions: 0,
-				objectName: "",
-				typeParameters: [],
-			};
-		default:
-			// Look for type parameters
-			const typeParameters: JavaType[] = [];
-			let i = type.indexOf("<");
-			if (i === -1) {
-				return {
-					baseType: "object",
-					arrayDimensions: 0,
-					objectName: type,
-					typeParameters,
-				};
-			}
-			const objectName = type.substring(0, i);
-			i++;
-			let depth = 1;
-			let start = i;
-			while (depth > 0) {
-				if (type[i] === "<") {
-					depth++;
-				} else if (type[i] === ">") {
-					depth--;
-				}
-				if (depth === 0) {
-					typeParameters.push(
-						parseJavaType(type.substring(start, i))
+export type JavaField = {
+	name: string;
+	modifiers: JavaModifier[];
+	type: JavaType;
+	descriptor: string;
+};
+
+export type ClassInfo = {
+	className: string;
+	packageName?: string;
+	modifiers: JavaModifier[];
+	superClass?: string;
+	interfaces: string[];
+	methods: JavaMethod[];
+	fields: JavaField[];
+};
+
+function parseJavaType(typeStr: string): JavaType {
+	// Handle array types
+	const arrayMatch = typeStr.match(/^(.+?)(\[\])+$/);
+	if (arrayMatch) {
+		const [, baseType, arrayBrackets] = arrayMatch;
+		return {
+			kind: "array",
+			type: parseJavaType(baseType),
+			dimensions: arrayBrackets.length / 2,
+		};
+	}
+
+	// Handle primitive types
+	const primitiveTypes: JavaPrimitiveType[] = [
+		"double",
+		"int",
+		"boolean",
+		"float",
+		"long",
+		"short",
+		"byte",
+		"char",
+		"void",
+	];
+
+	if (primitiveTypes.includes(typeStr as JavaPrimitiveType)) {
+		return {
+			kind: "primitive",
+			type: typeStr as JavaPrimitiveType,
+		};
+	}
+
+	// Everything else is a class type
+	return {
+		kind: "class",
+		name: typeStr,
+	};
+}
+
+function parseParameters(paramsStr: string): JavaMethodParameter[] {
+	if (!paramsStr.trim()) return [];
+
+	return paramsStr
+		.split(",")
+		.filter(Boolean)
+		.map((param) => {
+			const parts = param.trim().split(/\s+/);
+			return parts.length > 1
+				? { type: parseJavaType(parts[0]), name: parts[1] }
+				: { type: parseJavaType(parts[0]) };
+		});
+}
+
+/**
+ * Parses a string of javap output and returns a structured representation
+ */
+export function parseJavap(javapOutputString: string): ClassInfo[] {
+	const lines = javapOutputString.split("\n").map((l) => l.trim());
+	const makeNewResult = (): ClassInfo => ({
+		className: "",
+		modifiers: [],
+		interfaces: [],
+		methods: [],
+		fields: [],
+	});
+	let result: ClassInfo = null as never;
+	const results: ClassInfo[] = [];
+
+	let currentSection: "class" | "fields" | "methods" = "class";
+	let currentClassName = ""; // Store class name for constructor detection
+
+	for (const line of lines) {
+		if (line === "") {
+			continue;
+		}
+		if (line.startsWith("Compiled from")) {
+			result = makeNewResult();
+			results.push(result);
+			continue;
+		}
+
+		if (currentSection === "class" && line.includes("class")) {
+			const classMatch = line.match(
+				/^((?:public |final |abstract )*)?class\s+(\S+)(?:\s+extends\s+(\S+))?(?:\s+implements\s+(.+))?/
+			);
+			if (classMatch) {
+				const [
+					,
+					modifiersStr,
+					fullClassName,
+					superClass,
+					interfacesStr,
+				] = classMatch;
+
+				// Handle package and class name
+				const lastDotIndex = fullClassName.lastIndexOf(".");
+				if (lastDotIndex !== -1) {
+					result.packageName = fullClassName.substring(
+						0,
+						lastDotIndex
 					);
+					result.className = fullClassName.substring(
+						lastDotIndex + 1
+					);
+				} else {
+					result.className = fullClassName;
 				}
-				i++;
+				currentClassName = result.className; // Store for constructor detection
+
+				// Handle modifiers
+				if (modifiersStr) {
+					result.modifiers = modifiersStr
+						.trim()
+						.split(" ")
+						.filter(Boolean) as JavaModifier[];
+				}
+
+				// Handle superclass
+				if (superClass) {
+					result.superClass = superClass;
+				}
+
+				// Handle interfaces
+				if (interfacesStr) {
+					result.interfaces = interfacesStr
+						.split(",")
+						.map((i) => i.trim());
+				}
 			}
-			return {
-				baseType: "object",
-				arrayDimensions: 0,
-				objectName,
-				typeParameters,
+			continue;
+		}
+
+		// Parse methods and constructors
+		const methodMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+.+)?;\s*(?:\/\/\s*(.+))?$/
+		);
+		if (methodMatch) {
+			const [, modifiersStr, returnType, name, paramsStr, descriptor] =
+				methodMatch;
+
+			const isConstructor = name === currentClassName;
+
+			const method: JavaMethod = {
+				name,
+				kind: isConstructor ? "constructor" : "method",
+				returnType: isConstructor
+					? { kind: "class", name: currentClassName }
+					: returnType
+					? parseJavaType(returnType)
+					: { kind: "primitive", type: "void" },
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				parameters: parseParameters(paramsStr),
+				descriptor: descriptor || "",
 			};
-	}
-}
 
-function parseJavaType(type: string): JavaType {
-	let i = 0;
-	while (type[i] === "[") {
-		i++;
-	}
-	const arrayDimensions = i;
-	const nonArray = parseJavaNonArrayType(type.substring(i));
-	nonArray.arrayDimensions = arrayDimensions;
-	return nonArray;
-}
+			result.methods.push(method);
+			continue;
+		}
 
-export const parseJavap = (output: string): ClassInfo => {
-	// Compiled from "Egg.java"
-	// class Example<B> {
-	//   public int x;
-	//   public java.util.ArrayList<java.lang.Double> y;
-	//   public java.lang.Object z;
-	//   public java.util.ArrayList<java.lang.String> returnsArrayListString();
-	//   public B returnsTypeParameter();
-	//   public void egg(double);
-	//   public void egg(int);
-	// }
-
-	const lines = output.split("\n");
-	const className = lines[1]!;
-	// Look for contents between 'class' and '{'
-	const regex = /class ([^<]+)(<([^>]+)>)? {/;
-	const match = className.match(regex);
-	if (!match) {
-		throw new Error("Invalid class name: " + className);
-	}
-
-	const name = match[1]!;
-	const typeParameters = match[3] ? match[3].split(",") : [];
-
-	const methods: MethodInfo[] = [];
-	const fields: FieldInfo[] = [];
-
-	for (let i = 2; i < lines.length; i++) {
-		const trimmed = lines[i]!.trim();
-		if (trimmed.startsWith("public ")) {
-			const line = trimmed.substring("public ".length);
-			if (line.includes("(")) {
-				// Method
-				const returnType = parseJavaType(
-					line.substring(0, line.indexOf(" ")).trim()
-				);
-				const name = line
-					.substring(line.indexOf(" ") + 1, line.indexOf("("))
-					.trim();
-				let parameters: { name: string; type: JavaType }[] = [];
-				if (line.indexOf("(") !== -1) {
-					parameters = line
-						.substring(line.indexOf("(") + 1, line.indexOf(")"))
-						.split(", ")
-						.map((param, i) => {
-							const split = param.split(" ");
-							return {
-								name: split[1] ?? "arg" + i,
-								type: parseJavaType(split[0]!),
-							};
-						});
-				}
-
-				methods.push({ name, returnType, parameters, typeParameters });
-			} else {
-				// Field
-				const type = line.substring(0, line.indexOf(" ")).trim();
-				const name = line
-					.substring(line.indexOf(" ") + 1, line.length - 1)
-					.trim();
-				fields.push({ name, type: parseJavaType(type) });
-			}
+		// Parse fields
+		const fieldMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+)\s+(\S+);(?:\s*\/\/\s*(.+))?$/
+		);
+		if (fieldMatch) {
+			const [, modifiersStr, type, name, descriptor] = fieldMatch;
+			const field: JavaField = {
+				name,
+				type: parseJavaType(type),
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				descriptor: descriptor || "",
+			};
+			result.fields.push(field);
 		}
 	}
 
-	return { name, methods, fields };
-};
+	return results;
+}
