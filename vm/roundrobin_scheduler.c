@@ -217,7 +217,7 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
     return SCHEDULER_RESULT_DONE;
 
   vm_thread *thread = info->thread;
-  const u64 MICROSECONDS_TO_RUN = scheduler->preemption_us;
+  const u64 MICROSECONDS_TO_RUN = scheduler->preemption_us == 0 ? 30000 : scheduler->preemption_us;
 
   thread->fuel = 10000;
 

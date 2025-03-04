@@ -59,13 +59,12 @@
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 17795295LL && tick < 17797295LL) {                                                  \
+  if (1) {                                                  \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
     printf("Calling method %.*s, descriptor %.*s, on class %.*s; sp = %ld; %d, %lld, %d\n", fmt_slice(m->name),              \
-           fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->plain.stack, __LINE__, tick, pc);  \
-    printf("arg_1: %llx, arg_2: %f, arg_3: %lf, tos: %llx\n", *arg_1, *arg_2, *arg_3, (s64)tos);                                                \
+           fmt_slice(m->unparsed_descriptor), fmt_slice(m->my_class->name), sp - frame->stack, __LINE__, tick, pc);  \
     heap_string s = insn_to_string(insn, pc);                                                                          \
     printf("Insn kind: %.*s\n", fmt_slice(s));                                                                         \
     free_heap_str(s);                                                                                                  \
@@ -513,9 +512,8 @@ typedef enum { STATE_DONE, STATE_FAILED, STATE_YIELD } async_task_status;
 
 typedef enum {
   CONT_RESOLVE,
-  CONT_INVOKE,
-  CONT_INVOKESIGPOLY, // tos must be reloaded
   CONT_RUN_NATIVE,
+  CONT_INVOKESIGPOLY,
   CONT_MONITOR_ENTER,
   CONT_RESUME_INSN,
   CONT_DEBUGGER_PAUSE
@@ -524,6 +522,7 @@ typedef enum {
 typedef struct {
   void *wakeup;
   continuation_point pnt;
+  stack_frame *frame;  // frame associated with the continuation
 
   union {
     resolve_insn_t resolve_insn;
@@ -579,9 +578,9 @@ static continuation_frame *async_stack_pop(vm_thread *thread) {
   return &thread->stack.async_call_stack->frames[--thread->stack.async_call_stack->height];
 }
 
-static void *async_stack_top(vm_thread *thread) {
+static continuation_frame *async_stack_peek(vm_thread *thread) {
   assert(thread->stack.async_call_stack->height > 0);
-  return thread->stack.async_call_stack->frames[thread->stack.async_call_stack->height - 1].wakeup;
+  return &thread->stack.async_call_stack->frames[thread->stack.async_call_stack->height - 1];
 }
 
 /** FUEL CHECKING */
@@ -607,7 +606,7 @@ __attribute__((noinline)) static bool refuel_check(vm_thread *thread) {
     static_assert(sizeof(*wakeup) <= sizeof(thread->refuel_wakeup_info),
                   "wakeup info can not be stored within thread cache");
     wakeup->kind = RR_WAKEUP_YIELDING;
-    *cont = (continuation_frame){.pnt = CONT_RESUME_INSN, .wakeup = (void *)wakeup};
+    *cont = (continuation_frame){.pnt = CONT_RESUME_INSN, .frame=thread->stack.top, .wakeup = (void *)wakeup};
     return true;
   }
   return false;
@@ -728,7 +727,7 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     if (unlikely(fut.status == FUTURE_NOT_READY)) {                                                                    \
       continuation_frame *cont = async_stack_push(thread);                                                             \
       frame->is_async_suspended = true;                                                                                \
-      *cont = (continuation_frame){.pnt = CONT_RESOLVE, .wakeup = fut.wakeup, .ctx.resolve_insn = ctx};                 \
+      *cont = (continuation_frame){.pnt = CONT_RESOLVE, .frame=frame_, .wakeup = fut.wakeup, .ctx.resolve_insn = ctx};                 \
       return 0;                                                                                                        \
     }                                                                                                                  \
     if (thread->current_exception)                                                                                     \
@@ -1590,7 +1589,7 @@ static s64 monitorenter_impl_int(ARGS_INT) {
     if (fut.status == FUTURE_NOT_READY) { // monitor is contended
       continuation_frame *cont = async_stack_push(thread);
       frame->is_async_suspended = true;
-      *cont = (continuation_frame){.pnt = CONT_MONITOR_ENTER, .wakeup = fut.wakeup, .ctx.acquire_monitor = ctx};
+      *cont = (continuation_frame){.pnt = CONT_MONITOR_ENTER, .frame=frame, .wakeup = fut.wakeup, .ctx.acquire_monitor = ctx};
       return 0;
     }
   } while (0);
@@ -1757,31 +1756,8 @@ __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokestatic)
 
-static u8 attempt_invoke(vm_thread *thread, stack_frame *invoked_frame, stack_frame *outer_frame, u8 argc, bool returns,
-                         stack_value *result) {
-  future_t fut;
-  *result = interpret_2(&fut, thread, invoked_frame);
-  if (unlikely(fut.status == FUTURE_NOT_READY)) {
-    DCHECK(invoked_frame->is_async_suspended);
-    continuation_frame *cont = async_stack_push(thread);
-    *cont = (continuation_frame){.pnt = CONT_INVOKE,
-                                 .wakeup = fut.wakeup,
-                                 .ctx.interp_call = {.frame = invoked_frame, .argc = argc, .returns = returns}};
-    outer_frame->is_async_suspended = true;
-    return 1;
-  }
-
-  return 0;
-}
-
 #define AttemptInvoke(thread, invoked_frame, argc, returns)                                                            \
-  ({                                                                                                                   \
-    stack_value result;                                                                                                \
-    if (unlikely(attempt_invoke(thread, invoked_frame, frame, argc, returns, &result))) {                              \
-      return 0;                                                                                                        \
-    }                                                                                                                  \
-    result;                                                                                                            \
-  })
+  return 0;
 
 #define JIT_THRESHOLD 500
 
@@ -1835,19 +1811,7 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
     return 0;
   }
 
-  stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception) {
-    return 0;
-  }
-
-  if (returns) {
-    *(sp - insn->args) = result;
-  }
-
-  sp -= insn->args;
-  sp += returns;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1));
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
 }
 FORWARD_TO_NULLARY(invokestatic_resolved)
 
@@ -1984,18 +1948,7 @@ static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   if (!invoked_frame)
     return 0;
 
-  stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception)
-    return 0;
-
-  if (returns) {
-    *(sp - insn->args) = result;
-  }
-
-  sp -= insn->args;
-  sp += returns;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
 }
 FORWARD_TO_NULLARY(invokespecial_resolved)
 
@@ -2078,17 +2031,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   if (!invoked_frame)
     return 0;
 
-  stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-  if (thread->current_exception) {
-    return 0;
-  }
-
-  if (returns) {
-    *(sp - insn->args) = result;
-  }
-  sp -= insn->args;
-  sp += returns;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
 }
 FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
@@ -2102,15 +2045,16 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
   invokevirtual_signature_polymorphic_t ctx = {
       .args = {.thread = thread,
                .method = insn->ic,
-               .provider_mt = (struct native_MethodType **)&insn->ic2, // GC root
                .sp_ = sp - insn->args,
+               .provider_mt = (struct native_MethodType **)&insn->ic2, // GC root
                .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
+    printf("Suspending call with sp = %p\n", sp - insn->args);
     continuation_frame *cont = async_stack_push(thread);
     frame->is_async_suspended = true;
-    *cont = (continuation_frame){.pnt = CONT_INVOKESIGPOLY, .wakeup = fut.wakeup, .ctx.sigpoly = ctx};
+    *cont = (continuation_frame){.pnt = CONT_INVOKESIGPOLY, .frame=frame, .wakeup = fut.wakeup, .ctx.sigpoly = ctx};
     return 0;
   }
 
@@ -2142,17 +2086,7 @@ static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   if (!invoked_frame)
     return 0;
 
-  stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception)
-    return 0;
-
-  if (returns) {
-    *(sp - insn->args) = result;
-  }
-  sp -= insn->args;
-  sp += returns;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
 }
 FORWARD_TO_NULLARY(invokeitable_polymorphic)
 
@@ -2171,17 +2105,7 @@ static s64 invokevtable_polymorphic_impl_void(ARGS_VOID) {
   if (!invoked_frame)
     return 0;
 
-  stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-  if (thread->current_exception)
-    return 0;
-
-  if (returns) {
-    *(sp - insn->args) = result;
-  }
-  sp -= insn->args;
-  sp += returns;
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
 }
 FORWARD_TO_NULLARY(invokevtable_polymorphic)
 
@@ -2227,8 +2151,6 @@ static s64 invokecallsite_impl_void(ARGS_VOID) {
   method_handle_kind kind = (name->flags >> 24) & 0xf;
   SPILL_VOID
   if (kind == MH_KIND_INVOKE_STATIC) {
-    bool returns = form->result != -1;
-
     // Invoke name->vmtarget with arguments mh, args
     cp_method *invoke = name->vmtarget;
 
@@ -2248,22 +2170,10 @@ static s64 invokecallsite_impl_void(ARGS_VOID) {
       return 0;
     }
 
-    stack_value result = AttemptInvoke(thread, invoked_frame, insn->args, returns);
-
-    if (returns) {
-      *(sp - insn->args + 1) = result;
-    }
-
-    sp -= insn->args - 1;
-    sp += returns;
-
-    if (thread->current_exception) {
-      return 0;
-    }
+    AttemptInvoke(thread, invoked_frame, insn->args, returns);
   } else {
     UNREACHABLE();
   }
-  STACK_POLYMORPHIC_NEXT(*(sp - 1))
 }
 FORWARD_TO_NULLARY(invokecallsite)
 
@@ -2709,7 +2619,7 @@ static s64 drem_impl_double(ARGS_DOUBLE) {
 
 __attribute__((noinline)) void debugger_pause(vm_thread *thread, stack_frame *frame) {
   continuation_frame *cont = async_stack_push(thread);
-  *cont = (continuation_frame){.pnt = CONT_DEBUGGER_PAUSE};
+  *cont = (continuation_frame){.pnt = CONT_DEBUGGER_PAUSE, .frame=frame};
   frame->is_async_suspended = true;
 }
 
@@ -2864,10 +2774,8 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   // we need to pop (not peek) because if we re-enter this method, it'll need to pop its fram
   continuation_frame cont = *async_stack_pop(thread);
 
-  stack_value result;
   future_t fut;
 
-  bool has_result = false;
   bool advance_pc = false;
   bool needs_polymorphic_jump = false;
 
@@ -2889,12 +2797,6 @@ static s64 async_resume_impl_void(ARGS_VOID) {
     break;
   }
 
-  case CONT_INVOKE:
-    result = interpret_2(&fut, thread, cont.ctx.interp_call.frame);
-    has_result = cont.ctx.interp_call.returns;
-    advance_pc = true;
-    break;
-
   case CONT_MONITOR_ENTER:
     fut = monitor_acquire(&cont.ctx.acquire_monitor);
     advance_pc = true;
@@ -2902,7 +2804,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   case CONT_INVOKESIGPOLY:
     fut = invokevirtual_signature_polymorphic(&cont.ctx.sigpoly);
-    has_result = false;
+    printf("Reading from %p\n", frame);
     advance_pc = true;
     break;
 
@@ -2924,10 +2826,6 @@ static s64 async_resume_impl_void(ARGS_VOID) {
     return 0;
   }
 
-  if (has_result) {
-    *(sp - 1) = result; // sp has the correct value above, don't move it
-  }
-
 #if !DO_TAILS
   arg_1 = &(sp - 1)->l;
   arg_2 = &(sp - 1)->f;
@@ -2941,93 +2839,6 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   } else {
     JMP_VOID;
   }
-}
-
-static inline stack_value interpret_native_frame(future_t *fut, vm_thread *thread, stack_frame *frame) {
-  run_native_t ctx;
-
-  if (!frame->is_async_suspended) {
-    ctx = (run_native_t){.args = {.thread = thread, .frame = frame}};
-  } else {
-    continuation_frame *cont = async_stack_pop(thread);
-    DCHECK(cont->pnt == CONT_RUN_NATIVE);
-    ctx = cont->ctx.run_native;
-  }
-
-  *fut = run_native(&ctx);
-
-  if (likely(fut->status == FUTURE_READY)) {
-    frame->is_async_suspended = false;
-    pop_frame(thread, frame);
-    return ctx._result;
-  } else {
-    continuation_frame *cont = async_stack_push(thread);
-    *cont = (continuation_frame){.pnt = CONT_RUN_NATIVE, .wakeup = fut->wakeup, .ctx.run_native = ctx};
-    frame->is_async_suspended = true;
-    return (stack_value){0};
-  }
-}
-
-__attribute__((noinline)) static stack_value interpret_java_frame(future_t *fut, vm_thread *thread,
-                                                                  stack_frame *frame) {
-  stack_value result;
-
-  do {
-  interpret_begin:
-    s32 pc_ = frame->program_counter;
-    stack_value *sp_ = &frame->stack[stack_depth(frame)];
-    bytecode_insn *insns = frame->method->code->code;
-    [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
-
-    if (unlikely(frame->is_async_suspended)) {
-#if DO_TAILS
-      result.l = async_resume_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
-#else
-      handler_i =
-          async_resume_impl_void(thread, frame, insns + pc_, &pc_, &sp_, nullptr /* computed */, nullptr, nullptr);
-#endif
-    }
-
-#if DO_TAILS
-    else {
-      result.l = entry_impl_void(thread, frame, insns + pc_, pc_, sp_, 0, 0, 0);
-    }
-#else
-    if (likely(!frame->is_async_suspended && !thread->current_exception)) {
-      // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
-      if (thread->is_single_stepping) {
-        result.l = entry_notco_with_stepping(thread, frame, insns, pc_, sp_, handler_i);
-      } else {
-        result.l = entry_notco_no_stepping(thread, frame, insns, pc_, sp_, handler_i);
-      }
-    }
-#endif
-
-    // we really should just have all the methods return a future_t via a pointer, but whatever
-    if (unlikely(frame->is_async_suspended)) {
-      // reconstruct future to return
-      void *wk = async_stack_top(thread);
-      *fut = (future_t){FUTURE_NOT_READY, wk};
-      return (stack_value){0};
-    }
-
-    if (unlikely(thread->current_exception)) {
-      exception_table_entry *handler = find_exception_handler(thread, frame, thread->current_exception->descriptor);
-
-      if (handler) {
-        frame->program_counter = handler->handler_insn;
-        frame->stack[0] = (stack_value){.obj = thread->current_exception};
-        thread->current_exception = nullptr;
-
-        goto interpret_begin;
-      }
-    }
-  } while (0);
-
-  pop_frame(thread, frame);
-  *fut = (future_t){FUTURE_READY};
-
-  return result;
 }
 
 object get_sync_object(vm_thread *thread, stack_frame *frame) {
@@ -3045,49 +2856,127 @@ object get_sync_object(vm_thread *thread, stack_frame *frame) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *frame) {
-  InstrumentMethodEntry(thread, frame);
-
-  object synchronized_on = get_sync_object(thread, frame);
-  if (unlikely(synchronized_on) && frame->synchronized_state < SYNCHRONIZE_DONE) {
-    monitor_acquire_t *store = (monitor_acquire_t *)thread->stack.synchronize_acquire_continuation;
-    monitor_acquire_t ctx =
-        frame->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
-    *fut = monitor_acquire(&ctx);
-    if (fut->status == FUTURE_NOT_READY) {
-      memcpy(store, &ctx, sizeof(ctx));
-      static_assert(sizeof(ctx) <= sizeof(thread->stack.synchronize_acquire_continuation),
-                    "context can not be stored within thread cache");
-      frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
-      frame->is_async_suspended = true;
-      return value_null();
-    }
-    frame->synchronized_state = SYNCHRONIZE_DONE;
-    frame->is_async_suspended = false;
+stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_frame) {
+  stack_frame *current_frame = entry_frame;
+  if (unlikely(entry_frame->is_async_suspended)) {
+    // Advance the interpreter to the frame in this chain of pure Java calls which was suspended
+    current_frame = async_stack_peek(thread)->frame;
   }
 
   stack_value result;
-  if (unlikely(is_frame_native(frame))) {
-    result = interpret_native_frame(fut, thread, frame);
-  } else {
-    result = interpret_java_frame(fut, thread, frame);
-  }
 
-  if (likely(fut->status == FUTURE_READY)) {
-    synchronized_on = get_sync_object(thread, frame); // re-compute in case of intervening GC
-    if (unlikely(synchronized_on)) {                   // monitor release at the end of synchronized
-      int err = monitor_release(thread, synchronized_on);
-      if (err) {
-        // the current exception is replaced with an IllegalMonitorStateException
-        thread->current_exception = nullptr;
-        raise_illegal_monitor_state_exception(thread);
-        return value_null();
+  while (true) {
+    if (is_frame_native(current_frame)) {
+      /** Handle native calls */
+      run_native_t ctx;
+
+      if (!current_frame->is_async_suspended) {
+        // Spawn the native call
+        ctx = (run_native_t){.args = {.thread = thread, .frame = current_frame}};
+      } else {
+        // We were already calling the native and it's an async native. Resume it.
+        continuation_frame *cont = async_stack_pop(thread);
+        DCHECK(cont->pnt == CONT_RUN_NATIVE);
+        ctx = cont->ctx.run_native;
+      }
+
+      // Run or continue the native call
+      *fut = run_native(&ctx);
+
+      if (likely(fut->status == FUTURE_READY)) {
+        // The native call finished. Go to the outer frame
+        current_frame->is_async_suspended = false;
+        entry_frame->is_async_suspended = false;
+        // thanks to shared stack/locals optimization, will be TOS of the previous frame
+        result = ctx._result;
+      } else {
+        continuation_frame *cont = async_stack_push(thread);
+        *cont = (continuation_frame){
+          .pnt = CONT_RUN_NATIVE, .frame=current_frame, .wakeup = fut->wakeup, .ctx.run_native = ctx
+        };
+        current_frame->is_async_suspended = true;
+        entry_frame->is_async_suspended = true;
+        return (stack_value){0};
+      }
+    } else {
+      java_interpret_begin:
+
+      /** Handle Java frames */
+      s32 pc_ = current_frame->program_counter;
+      stack_value *sp_ = &current_frame->stack[stack_depth(current_frame)];
+      bytecode_insn *insns = current_frame->method->code->code;
+      [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
+
+      if (unlikely(current_frame->is_async_suspended)) {
+#if DO_TAILS
+        entry_frame->is_async_suspended = false;
+        result.l = async_resume_impl_void(thread, current_frame, insns + pc_, pc_, sp_, 0, 0, 0);
+#else
+        handler_i =
+            async_resume_impl_void(thread, current_frame, insns + pc_, &pc_, &sp_,
+              nullptr /* computed */, nullptr, nullptr);
+#endif
+      }
+
+#if DO_TAILS
+      else {
+        result.l = entry_impl_void(thread, current_frame, insns + pc_, pc_, sp_, 0, 0, 0);
+      }
+#else
+      if (likely(!frame->is_async_suspended && !thread->current_exception)) {
+        // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
+        if (thread->is_single_stepping) {
+          result.l = entry_notco_with_stepping(thread, frame, insns, pc_, sp_, handler_i);
+        } else {
+          result.l = entry_notco_no_stepping(thread, frame, insns, pc_, sp_, handler_i);
+        }
+      }
+#endif
+
+      if (thread->stack.top != current_frame) { // Java -> (Java or native) method call
+        DCHECK(result.l == 0);
+        current_frame = thread->stack.top;
+        continue;
+      }
+
+      if (unlikely(current_frame->is_async_suspended)) {
+        // reconstruct future to return
+        void *wk = async_stack_peek(thread)->wakeup;
+        entry_frame->is_async_suspended = true;
+        *fut = (future_t){FUTURE_NOT_READY, wk};
+        return (stack_value){0};
+      }
+
+      if (unlikely(thread->current_exception)) {
+        find_exception_handler:
+        exception_table_entry *handler = find_exception_handler(thread, current_frame, thread->current_exception->descriptor);
+
+        if (handler) {
+          current_frame->program_counter = handler->handler_insn;
+          current_frame->stack[0] = (stack_value){.obj = thread->current_exception};
+          thread->current_exception = nullptr;
+
+          goto java_interpret_begin;
+        }
       }
     }
 
-    InstrumentMethodReturn(thread, frame);
+    pop_frame(thread, current_frame);
+    if (current_frame == entry_frame) { // done with this chain of interpreter frames
+      break;
+    }
+    frame_base(current_frame)[0] = result;
+
+    current_frame = thread->stack.top;
+    DCHECK(is_interpreter_frame(current_frame));
+    if (thread->current_exception) {
+      goto find_exception_handler;
+    }
+    current_frame->program_counter++;
+    goto java_interpret_begin;
   }
 
+  fut->status = FUTURE_READY;
   return result;
 }
 
