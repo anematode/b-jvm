@@ -151,7 +151,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 		if (currentSection === "class" && line.includes("class")) {
 			const classMatch = line.match(
-				/^((?:public |final |abstract )*)?class\s+(\S+)(?:\s+extends\s+(\S+))?(?:\s+implements\s+(.+))?/
+				/^((?:public |final |abstract )*)?class\s+(\S+)\s+(?:extends\s+(\S+)\s+)?(?:implements\s+(\S+)\s+)?\{/
 			);
 			if (classMatch) {
 				const [

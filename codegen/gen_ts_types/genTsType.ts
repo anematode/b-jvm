@@ -43,8 +43,19 @@ export const genTsTypeFromClassInfo = (classInfo: ClassInfo): string => {
 					.join(", ")}): ${javaTypeToTsType(methodInfo.returnType)}`
 		);
 
-	const type = `declare class ${classInfo.className} {
+	const type = `declare class ${classInfo.className}${
+		classInfo.superClass
+			? ` extends JavaClass<"${classInfo.superClass}">`
+			: ""
+	} implements ${classInfo.interfaces
+		.map((i) => `JavaClass<"${i}">`)
+		.join(", ")} {
 	${[...constructors, ...fields, ...methods].join(";\n\t")}
+	[_BRAND]: {
+		${[classInfo.className, ...classInfo.interfaces]
+			.map((interfaceName) => `"${interfaceName}": true`)
+			.join(";\n\t\t")}
+	};
 }`;
 	return type;
 };

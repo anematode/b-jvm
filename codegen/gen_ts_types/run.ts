@@ -31,10 +31,26 @@ class GameOfLife {
   public void randomSeed();
   public byte[] getData();
 }
+
+Compiled from "FtpClient.java"
+class sun.net.ftp.impl.FtpClient$MLSxParser implements sun.net.ftp.FtpDirParser {
+  public sun.net.ftp.FtpDirEntry parseLine(java.lang.String);
+}
+
+Compiled from "LauncherHelper.java"
+final class sun.launcher.LauncherHelper$SizePrefix extends java.lang.Enum<sun.launcher.LauncherHelper$SizePrefix> {
+  public static final sun.launcher.LauncherHelper$SizePrefix KILO;
+  public static final sun.launcher.LauncherHelper$SizePrefix MEGA;
+  public static final sun.launcher.LauncherHelper$SizePrefix GIGA;
+  public static final sun.launcher.LauncherHelper$SizePrefix TERA;
+  public static sun.launcher.LauncherHelper$SizePrefix[] values();
+  public static sun.launcher.LauncherHelper$SizePrefix valueOf(java.lang.String);
+}
 `;
 
 const classesInfo = parseJavap(javapOutput);
 
 const tsTypes = classesInfo.map(genTsTypeFromClassInfo).join("\n\n");
 
+console.log(classesInfo);
 console.log(tsTypes);
