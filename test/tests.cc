@@ -832,6 +832,10 @@ TEST_CASE("Kotlin says hi") {
   REQUIRE(result.stdout_ == "First 10 terms: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34, \nHello from Kotlin!");
 }
 
+TEST_CASE("Java Swing") {
+  auto result = run_test_case("test_files/swing/", false, "ExampleWindow");
+}
+
 #if 0
 TEST_CASE("Print useful trampolines") { print_method_sigs(); }
 #endif
