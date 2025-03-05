@@ -836,6 +836,11 @@ TEST_CASE("Controlled stack overflow") {
   auto result = run_test_case("test_files/stack_overflow", false, "StackOverflow");
 }
 
+TEST_CASE("Deep recursion in GC") {
+  auto result = run_test_case("test_files/tricky_gc", true, "AttemptGcCrash");
+  REQUIRE(result.stdout_ == "Out of memory!\n");
+}
+
 #if 0
 TEST_CASE("Print useful trampolines") { print_method_sigs(); }
 #endif
