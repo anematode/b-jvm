@@ -70,6 +70,7 @@ extern "C" {
   X(boolean, "java/lang/Boolean")                                                                                       \
   X(character, "java/lang/Character")                                                                                       \
   X(byte, "java/lang/Byte")                                                                                       \
+  X(reference, "java/lang/ref/Reference") \
   X(throwable, "java/lang/Throwable")
 
 #define CACHED_CLASSDESCS(X)                                                                                           \

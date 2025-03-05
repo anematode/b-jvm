@@ -409,6 +409,7 @@ typedef struct vm {
 
   // Latest TID
   s32 next_tid;
+  struct native_Reference *reference_pending_list;  // for java/lang/ref/Reference implementation
 
   bool vm_initialized;
   void *scheduler; // rr_scheduler or null

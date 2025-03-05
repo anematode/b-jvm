@@ -651,6 +651,7 @@ vm *create_vm(const vm_options options) {
   vm->stdio_override_param = options.stdio_override_param;
 
   vm->next_tid = 0;
+  vm->reference_pending_list = nullptr;
 
   for (size_t i = 0; i < bjvm_natives_count; ++i) {
     native_t const *native_ptr = bjvm_natives[i];

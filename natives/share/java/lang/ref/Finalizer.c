@@ -17,10 +17,7 @@ DECLARE_ASYNC_NATIVE("java/lang/ref", Reference, waitForReferencePendingList, "(
                      locals(rr_wakeup_info wakeup_info;), invoked_methods()) {
   DEBUG_PEDANTIC_YIELD(self->wakeup_info);
 
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  u64 time = tv.tv_sec * 1000000 + tv.tv_usec;
-  u64 end = time + 1e10;
+  u64 end = get_unix_us() + 100000;
 
   self->wakeup_info.kind = RR_WAKEUP_SLEEP;
   self->wakeup_info.wakeup_us = end;
@@ -32,5 +29,7 @@ DECLARE_ASYNC_NATIVE("java/lang/ref", Reference, waitForReferencePendingList, "(
 }
 
 DECLARE_NATIVE("java/lang/ref", Reference, getAndClearReferencePendingList, "()Ljava/lang/ref/Reference;") {
-  return value_null();
+  object list = (object)thread->vm->reference_pending_list;
+  thread->vm->reference_pending_list = nullptr;
+  return (stack_value){.obj = list};
 }

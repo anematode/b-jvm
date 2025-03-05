@@ -3,6 +3,8 @@
 #include "analysis.h"
 #include "arrays.h"
 #include "bjvm.h"
+#include "cached_classdescs.h"
+
 #include <gc.h>
 #include <roundrobin_scheduler.h>
 
@@ -18,6 +20,8 @@ typedef struct gc_ctx {
   object *worklist; // should contain a reachable object exactly once over its lifetime
 
   object **relocations;
+
+  classdesc *Reference;
 } gc_ctx;
 
 int in_heap(const vm *vm, object field) {
@@ -176,6 +180,8 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
     PUSH_ROOT(&vm->js_handles[i]);
   }
 
+  PUSH_ROOT(&vm->reference_pending_list);
+
   // Static fields of bootstrap-loaded classes
   hash_table_iterator it = hash_table_get_iterator(&vm->classes);
   char *key;
@@ -241,7 +247,12 @@ static void mark_reachable(gc_ctx *ctx, object obj) {
   classdesc *desc = obj->descriptor;
   if (desc->kind == CD_KIND_ORDINARY) {
     reference_list *refs = desc->instance_references;
-    for (size_t i = 0; i < refs->count; ++i) {
+    size_t i = 0;
+    if (instanceof(desc, ctx->Reference)) {
+      ++i;  // skip the 'referent' field
+    }
+
+    for (; i < refs->count; ++i) {
       object field_obj = *((object *)obj + refs->slots_unscaled[i]);
       if (field_obj && in_heap(ctx->vm, field_obj) && !(*get_flags(ctx->vm, field_obj) & IS_REACHABLE)) {
         *get_flags(ctx->vm, field_obj) |= IS_REACHABLE;
@@ -313,15 +324,12 @@ static void quicksort_pointers(void **ptrs, size_t count) {
   quicksort_pointers(left, ptrs + count - left);
 }
 
-static void relocate_object(gc_ctx *ctx, object *obj) {
+// Returns false if the object could not be relocated
+static bool relocate_object(gc_ctx *ctx, object *obj) {
   if (!*obj)
-    return;
+    return true;  // object was nullptr
 
   DCHECK(((uintptr_t)obj & 1) == 0);
-
-#if DCHECKS_ENABLED
-  arrput(ctx->relocations, obj);
-#endif
 
   // Binary search for obj in ctx->roots
   void **found = binary_search_for_pointer(*obj, ctx->objs, arrlen(ctx->objs));
@@ -330,19 +338,10 @@ static void relocate_object(gc_ctx *ctx, object *obj) {
     DCHECK(relocated);
     DCHECK(!((uintptr_t)relocated & 1));
     *obj = relocated;
-  } else {
-    if (in_heap(ctx->vm, *obj)) {
-      // Check for a double relocation
-      for (int i = 0; i < arrlen(ctx->relocations); ++i) {
-        if (ctx->relocations[i] == obj) {
-          fprintf(stderr, "Double relocation.");
-          break;
-        }
-      }
-      fprintf(stderr, "Dangling reference! %p %p", obj, *obj);
-      CHECK(false);
-    }
+    return true;
   }
+
+  return false;
 }
 
 void relocate_instance_fields(gc_ctx *ctx) {
@@ -367,7 +366,27 @@ void relocate_instance_fields(gc_ctx *ctx) {
     if (obj->descriptor->kind == CD_KIND_ORDINARY) {
       classdesc *desc = obj->descriptor;
       reference_list *refs = desc->instance_references;
-      for (size_t j = 0; j < refs->count; ++j) {
+
+      size_t j = 0;
+      if (instanceof(desc, ctx->Reference)) {
+        DCHECK(refs->count >= 1);
+        object *field = (object *)obj + refs->slots_unscaled[0];
+        bool found = relocate_object(ctx, field);
+        if (!found) {
+          // The object is no longer reachable. (TODO: these are not the semantics for FinalReference)
+          struct native_Reference *as_ref = (struct native_Reference *)obj;
+          as_ref->referent = nullptr;
+          if (ctx->vm->reference_pending_list) {
+            as_ref->next = (object)ctx->vm->reference_pending_list;
+          } else {
+            as_ref->next = (object)as_ref;  // signifies to the JDK: end of the list
+          }
+          ctx->vm->reference_pending_list = as_ref;
+        }
+        ++j;
+      }
+
+      for (; j < refs->count; ++j) {
         object *field = (object *)obj + refs->slots_unscaled[j];
         relocate_object(ctx, field);
       }
@@ -391,7 +410,7 @@ void relocate_instance_fields(gc_ctx *ctx) {
 void major_gc(vm *vm) {
   // TODO wait for all threads to get ready (for now we'll just call this from
   // an already-running thread)
-  gc_ctx ctx = {.vm = vm};
+  gc_ctx ctx = {.vm = vm, .Reference = cached_classes(vm)->reference};
   major_gc_enumerate_gc_roots(&ctx);
 
   // Mark phase
