@@ -174,8 +174,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   DCHECK(argc == 1);
   free((void *)args[0].l);
   remove_unsafe_allocation(thread->vm, (void*) args[0].l);
-  fprintf(stderr, "Attempted to free memory that was not allocated by Unsafe\n");
-  abort();
+  return value_null();
 }
 
 DECLARE_NATIVE_OVERLOADED("jdk/internal/misc", Unsafe, putLong, "(JJ)V", 1) {

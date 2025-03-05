@@ -367,11 +367,18 @@ void relocate_instance_fields(gc_ctx *ctx) {
       classdesc *desc = obj->descriptor;
       reference_list *refs = desc->instance_references;
 
-      size_t j = 0;
-      if (instanceof(desc, ctx->Reference)) {
+      bool is_ref = instanceof(desc, ctx->Reference);
+      size_t j = is_ref ? 1 : 0;
+
+      for (; j < refs->count; ++j) {
+        object *field = (object *)obj + refs->slots_unscaled[j];
+        relocate_object(ctx, field);
+      }
+
+      if (is_ref) {
         DCHECK(refs->count >= 1);
-        object *field = (object *)obj + refs->slots_unscaled[0];
-        bool found = relocate_object(ctx, field);
+        object *referent = (object *)obj + refs->slots_unscaled[0];
+        bool found = relocate_object(ctx, referent);
         if (!found) {
           // The object is no longer reachable. (TODO: these are not the semantics for FinalReference)
           struct native_Reference *as_ref = (struct native_Reference *)obj;
@@ -381,12 +388,6 @@ void relocate_instance_fields(gc_ctx *ctx) {
             ctx->vm->reference_pending_list = as_ref;
           }
         }
-        ++j;
-      }
-
-      for (; j < refs->count; ++j) {
-        object *field = (object *)obj + refs->slots_unscaled[j];
-        relocate_object(ctx, field);
       }
     } else if (obj->descriptor->kind == CD_KIND_ORDINARY_ARRAY ||
                (obj->descriptor->kind == CD_KIND_PRIMITIVE_ARRAY && obj->descriptor->dimensions > 1)) {
