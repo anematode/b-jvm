@@ -21,9 +21,8 @@ DECLARE_ASYNC_NATIVE("java/lang/ref", Reference, waitForReferencePendingList, "(
     self->wakeup_info.kind = RR_WAKEUP_REFERENCE_PENDING;
     self->wakeup_info.wakeup_us = INT64_MAX;
     ASYNC_YIELD((void *)&self->wakeup_info);
+    DEBUG_PEDANTIC_YIELD(self->wakeup_info);
   }
-
-  DEBUG_PEDANTIC_YIELD(self->wakeup_info);
 
   ASYNC_END_VOID();
 }
