@@ -679,7 +679,6 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
   // For brevity
 #define inst self->args.inst
 #define thread self->args.thread
-
   self->field_info = &inst->cp->field;
   self->class = self->field_info->class_info;
 
@@ -2780,9 +2779,9 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   switch (cont.pnt) {
   case CONT_RESOLVE:
+    bytecode_insn *in = cont.ctx.resolve_insn.args.inst;
     fut = resolve_insn(&cont.ctx.resolve_insn);
 
-    bytecode_insn *in = cont.ctx.resolve_insn.args.inst;
     int fail = cont.ctx.resolve_insn._result;
     if (!fail && in->kind == insn_invokestatic && fut.status == FUTURE_READY) {
       needs_polymorphic_jump = intrinsify(in);
@@ -2944,8 +2943,8 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
       [[maybe_unused]] unsigned handler_i = 4 * (insns + pc_)->kind + (insns + pc_)->tos_before;
 
       if (unlikely(current_frame->is_async_suspended)) {
-#if DO_TAILS
         entry_frame->is_async_suspended = false;
+#if DO_TAILS
         result.l = async_resume_impl_void(thread, current_frame, insns + pc_, pc_, sp_, 0, 0, 0);
 #else
         handler_i =
@@ -2959,12 +2958,12 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
         result.l = entry_impl_void(thread, current_frame, insns + pc_, pc_, sp_, 0, 0, 0);
       }
 #else
-      if (likely(!frame->is_async_suspended && !thread->current_exception)) {
+      if (likely(!current_frame->is_async_suspended && !thread->current_exception)) {
         // In the no-tails case, sp, pc, etc. will have been set up appropriately for this call
         if (thread->is_single_stepping) {
-          result.l = entry_notco_with_stepping(thread, frame, insns, pc_, sp_, handler_i);
+          result.l = entry_notco_with_stepping(thread, current_frame, insns, pc_, sp_, handler_i);
         } else {
-          result.l = entry_notco_no_stepping(thread, frame, insns, pc_, sp_, handler_i);
+          result.l = entry_notco_no_stepping(thread, current_frame, insns, pc_, sp_, handler_i);
         }
       }
 #endif
