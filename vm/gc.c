@@ -376,12 +376,10 @@ void relocate_instance_fields(gc_ctx *ctx) {
           // The object is no longer reachable. (TODO: these are not the semantics for FinalReference)
           struct native_Reference *as_ref = (struct native_Reference *)obj;
           as_ref->referent = nullptr;
-          if (ctx->vm->reference_pending_list) {
-            as_ref->next = (object)ctx->vm->reference_pending_list;
-          } else {
-            as_ref->next = (object)as_ref;  // signifies to the JDK: end of the list
+          if (!as_ref->discovered) {
+            as_ref->discovered = (object)ctx->vm->reference_pending_list;
+            ctx->vm->reference_pending_list = as_ref;
           }
-          ctx->vm->reference_pending_list = as_ref;
         }
         ++j;
       }

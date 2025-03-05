@@ -108,6 +108,9 @@ static bool is_sleeping(thread_info *info, u64 time) {
   rr_wakeup_info *wakeup_info = info->wakeup_info;
   if (!wakeup_info)
     return false;
+  if (wakeup_info->kind == RR_WAKEUP_REFERENCE_PENDING) {
+    return !info->thread->vm->reference_pending_list;
+  }
   if (wakeup_info->kind == RR_WAKEUP_SLEEP
       || (wakeup_info->kind == RR_THREAD_PARK && !query_unpark_permit(info->thread))
       || (wakeup_info->kind == RR_MONITOR_WAIT && !wakeup_info->monitor_wakeup.ready)

@@ -17,11 +17,11 @@ DECLARE_ASYNC_NATIVE("java/lang/ref", Reference, waitForReferencePendingList, "(
                      locals(rr_wakeup_info wakeup_info;), invoked_methods()) {
   DEBUG_PEDANTIC_YIELD(self->wakeup_info);
 
-  u64 end = get_unix_us() + 100000;
-
-  self->wakeup_info.kind = RR_WAKEUP_SLEEP;
-  self->wakeup_info.wakeup_us = end;
-  ASYNC_YIELD((void *)&self->wakeup_info);
+  while (!thread->vm->reference_pending_list) {
+    self->wakeup_info.kind = RR_WAKEUP_REFERENCE_PENDING;
+    self->wakeup_info.wakeup_us = INT64_MAX;
+    ASYNC_YIELD((void *)&self->wakeup_info);
+  }
 
   DEBUG_PEDANTIC_YIELD(self->wakeup_info);
 
