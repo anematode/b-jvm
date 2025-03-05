@@ -2305,7 +2305,6 @@ doit:
       if (self->method->descriptor->return_type.base_kind != TYPE_KIND_VOID) {
         // Store the result in the frame
         *args->sp_ = self->interpreter_ctx->_result;
-        printf("Storing result to %p\n", args->sp_);
       }
       free(self->interpreter_ctx);
     } else {

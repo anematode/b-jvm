@@ -2051,7 +2051,6 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
   if (unlikely(fut.status == FUTURE_NOT_READY)) {
-    printf("Suspending call with sp = %p\n", sp - insn->args);
     continuation_frame *cont = async_stack_push(thread);
     frame->is_async_suspended = true;
     *cont = (continuation_frame){.pnt = CONT_INVOKESIGPOLY, .frame=frame, .wakeup = fut.wakeup, .ctx.sigpoly = ctx};
@@ -2804,7 +2803,6 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   case CONT_INVOKESIGPOLY:
     fut = invokevirtual_signature_polymorphic(&cont.ctx.sigpoly);
-    printf("Reading from %p\n", frame);
     advance_pc = true;
     break;
 
@@ -2815,6 +2813,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   if (fut.status == FUTURE_NOT_READY) {
     cont.wakeup = fut.wakeup;
     *async_stack_push(thread) = cont;
+    frame->is_async_suspended = true;
     return 0;
   }
 
@@ -2855,23 +2854,61 @@ object get_sync_object(vm_thread *thread, stack_frame *frame) {
   return synchronized_on;
 }
 
+static void on_frame_end(vm_thread *thread, stack_frame *frame) {
+  object synchronized_on = get_sync_object(thread, frame); // re-compute in case of intervening GC
+  if (unlikely(synchronized_on)) {                   // monitor release at the end of synchronized
+    int err = monitor_release(thread, synchronized_on);
+    if (err) {
+      // the current exception is replaced with an IllegalMonitorStateException
+      thread->current_exception = nullptr;
+      raise_illegal_monitor_state_exception(thread);
+    }
+  }
+}
+
+static bool on_frame_start(future_t *fut, vm_thread *thread, stack_frame *frame) {
+  object synchronized_on = get_sync_object(thread, frame);
+  if (unlikely(synchronized_on) && frame->synchronized_state < SYNCHRONIZE_DONE) {
+    monitor_acquire_t *store = (monitor_acquire_t *)thread->stack.synchronize_acquire_continuation;
+    monitor_acquire_t ctx =
+        frame->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
+    *fut = monitor_acquire(&ctx);
+    if (fut->status == FUTURE_NOT_READY) {
+      memcpy(store, &ctx, sizeof(ctx));
+      static_assert(sizeof(ctx) <= sizeof(thread->stack.synchronize_acquire_continuation),
+                    "context can not be stored within thread cache");
+      frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
+      frame->is_async_suspended = true;
+      return true;
+    }
+    frame->synchronized_state = SYNCHRONIZE_DONE;
+    frame->is_async_suspended = false;
+  }
+  return false;
+}
+
+
 // NOLINTNEXTLINE(misc-no-recursion)
 stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_frame) {
   stack_frame *current_frame = entry_frame;
   if (unlikely(entry_frame->is_async_suspended)) {
     // Advance the interpreter to the frame in this chain of pure Java calls which was suspended
     current_frame = async_stack_peek(thread)->frame;
+  } else {
+    if (on_frame_start(fut, thread, current_frame)) {
+      entry_frame->is_async_suspended = true;
+      return (stack_value){0};
+    }
   }
 
   stack_value result;
-
   while (true) {
     if (is_frame_native(current_frame)) {
       /** Handle native calls */
       run_native_t ctx;
 
       if (!current_frame->is_async_suspended) {
-        // Spawn the native call
+        // We're not resuming from async. Spawn the native call
         ctx = (run_native_t){.args = {.thread = thread, .frame = current_frame}};
       } else {
         // We were already calling the native and it's an async native. Resume it.
@@ -2887,7 +2924,6 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
         // The native call finished. Go to the outer frame
         current_frame->is_async_suspended = false;
         entry_frame->is_async_suspended = false;
-        // thanks to shared stack/locals optimization, will be TOS of the previous frame
         result = ctx._result;
       } else {
         continuation_frame *cont = async_stack_push(thread);
@@ -2933,18 +2969,23 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
       }
 #endif
 
-      if (thread->stack.top != current_frame) { // Java -> (Java or native) method call
-        DCHECK(result.l == 0);
-        current_frame = thread->stack.top;
-        continue;
-      }
-
       if (unlikely(current_frame->is_async_suspended)) {
         // reconstruct future to return
         void *wk = async_stack_peek(thread)->wakeup;
         entry_frame->is_async_suspended = true;
         *fut = (future_t){FUTURE_NOT_READY, wk};
         return (stack_value){0};
+      }
+
+      if (thread->stack.top != current_frame) { // Java -> (Java or native) method call
+        DCHECK(result.l == 0);
+        DCHECK(!current_frame->is_async_suspended);
+        current_frame = thread->stack.top;
+        if (on_frame_start(fut, thread, current_frame)) {
+          entry_frame->is_async_suspended = true;
+          return (stack_value){0};
+        }
+        continue;
       }
 
       if (unlikely(thread->current_exception)) {
@@ -2961,11 +3002,12 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
       }
     }
 
+    on_frame_end(thread, current_frame);
     pop_frame(thread, current_frame);
     if (current_frame == entry_frame) { // done with this chain of interpreter frames
       break;
     }
-    frame_base(current_frame)[0] = result;
+    frame_beginning(current_frame)[0] = result;
 
     current_frame = thread->stack.top;
     DCHECK(is_interpreter_frame(current_frame));

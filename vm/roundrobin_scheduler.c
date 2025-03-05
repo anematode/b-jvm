@@ -87,6 +87,7 @@ static void free_thread_info_shutdown(thread_info *info) {
 
 void rr_scheduler_init(rr_scheduler *scheduler, vm *vm) {
   scheduler->vm = vm;
+  scheduler->preemption_us = 30000;
   scheduler->_impl = calloc(1, sizeof(impl));
 }
 
@@ -217,7 +218,7 @@ scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler) {
     return SCHEDULER_RESULT_DONE;
 
   vm_thread *thread = info->thread;
-  const u64 MICROSECONDS_TO_RUN = scheduler->preemption_us == 0 ? 30000 : scheduler->preemption_us;
+  const u64 MICROSECONDS_TO_RUN = scheduler->preemption_us;
 
   thread->fuel = 10000;
 

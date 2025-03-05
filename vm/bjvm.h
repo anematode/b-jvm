@@ -714,12 +714,11 @@ static inline stack_value *frame_locals(const stack_frame *frame) {
   return ((stack_value *)frame) - frame->num_locals;
 }
 
-static inline stack_value *frame_base(const stack_frame *frame) {
+static inline stack_value *frame_beginning(const stack_frame *frame) {
   if (is_frame_native(frame)) {
     return ((stack_value *)frame) - 2 * frame->num_locals;
-  } else {
-    return ((stack_value *)frame) - frame->num_locals;
   }
+  return ((stack_value *)frame) - frame->num_locals;
 }
 
 classdesc *primitive_classdesc(vm_thread *thread, type_kind prim_kind);
