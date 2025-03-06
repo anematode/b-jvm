@@ -384,11 +384,6 @@ typedef struct vm {
   size_t heap_used;
   size_t heap_capacity;
 
-  // This capacity is used solely when handling an OutOfMemoryError, because
-  // fillInStackTrace allocates stuff. The reserved space is a constant in
-  // bjvm.c.
-  size_t true_heap_capacity;
-
   // Handles referenced from JS
   obj_header **js_handles;
 

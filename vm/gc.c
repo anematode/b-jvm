@@ -25,7 +25,7 @@ typedef struct gc_ctx {
 } gc_ctx;
 
 int in_heap(const vm *vm, object field) {
-  return (u8 *)field >= vm->heap && (u8 *)field < vm->heap + vm->true_heap_capacity;
+  return (u8 *)field >= vm->heap && (u8 *)field < vm->heap + vm->heap_capacity;
 }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
@@ -437,9 +437,9 @@ void major_gc(vm *vm) {
 
   // Create a new heap of the same size so ASAN can enjoy itself
 #if NEW_HEAP_EACH_GC
-  u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity), *end = new_heap + vm->true_heap_capacity;
+  u8 *new_heap = aligned_alloc(4096, vm->true_heap_capacity), *end = new_heap + vm->heap_capacity;
 #else
-  u8 *new_heap = vm->heap, *end = vm->heap + vm->true_heap_capacity;
+  u8 *new_heap = vm->heap, *end = vm->heap + vm->heap_capacity;
 #endif
 
   u8 *write_ptr = new_heap;

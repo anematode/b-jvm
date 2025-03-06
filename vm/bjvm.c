@@ -598,8 +598,6 @@ module *get_module(vm *vm, slice module_name) {
   return hash_table_lookup(&vm->modules, module_name.chars, (int)module_name.len);
 }
 
-#define OOM_SLOP_BYTES (1 << 12)
-
 vm *create_vm(const vm_options options) {
   vm *vm = calloc(1, sizeof(*vm));
 
@@ -624,7 +622,6 @@ vm *create_vm(const vm_options options) {
   vm->heap = aligned_alloc(4096, options.heap_size);
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
-  vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
   vm->active_threads = nullptr;
 
   vm->read_stdin = options.read_stdin;
@@ -1535,24 +1532,10 @@ classdesc *bootstrap_lookup_class(vm_thread *thread, const slice name) {
 }
 
 void out_of_memory(vm_thread *thread) {
-  vm *vm = thread->vm;
   thread->current_exception = nullptr;
-  if (vm->heap_capacity == vm->true_heap_capacity) {
-    // We're currently calling fillInStackTrace on the OOM instance, just
-    // shut up
-    return;
-  }
-
-  // temporarily expand the valid heap so that we can allocate the OOM error and
-  // its constituents
-  size_t original_capacity = vm->heap_capacity;
-  vm->heap_capacity = vm->true_heap_capacity;
 
   obj_header *oom = thread->out_of_mem_error;
-  // TODO call fillInStackTrace
-  raise_exception_object(thread, oom);
-
-  vm->heap_capacity = original_capacity;
+  raise_exception_object(thread, oom);  // the JDK docs let us skip filling in the stack trace for OOM errors
 }
 
 void *bump_allocate(vm_thread *thread, size_t bytes) {
