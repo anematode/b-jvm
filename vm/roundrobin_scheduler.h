@@ -84,7 +84,6 @@ void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vec
 
 void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor);
 void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor);
-void monitor_exit_handler(rr_scheduler *scheduler, obj_header *monitor);
 
 #ifdef __cplusplus
 }
