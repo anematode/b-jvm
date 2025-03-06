@@ -69,6 +69,7 @@ DEFINE_ASYNC(monitor_acquire) {
 
     // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
+    self->wakeup_info.wakeup_us = 0; // no timeout
     self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
     DEBUG_PEDANTIC_YIELD(self->wakeup_info);
@@ -115,6 +116,7 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
 
     // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
+    self->wakeup_info.wakeup_us = 0; // no timeout
     self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
     DEBUG_PEDANTIC_YIELD(self->wakeup_info);
