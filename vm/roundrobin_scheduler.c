@@ -105,9 +105,7 @@ static bool is_sleeping(thread_info *info, u64 time) {
   }
   if (wakeup_info->kind == RR_MONITOR_ENTER_WAITING) {
     // try to acquire the monitor
-    if (!attempt_monitor_reserve(info->thread, wakeup_info->monitor_wakeup.monitor->obj)) {
-      return true;
-    }
+    return !attempt_monitor_reserve(info->thread, wakeup_info->monitor_wakeup.monitor->obj);
   }
   if (wakeup_info->kind == RR_WAKEUP_SLEEP ||
       (wakeup_info->kind == RR_THREAD_PARK && !query_unpark_permit(info->thread)) ||
