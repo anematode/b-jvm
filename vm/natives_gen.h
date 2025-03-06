@@ -175,7 +175,7 @@ struct native_Thread {
   vm_thread *vm_thread;
 
   // my fields
-  s64 eetop;                                 // J
+  volatile s64 eetop;                        // J // todo: make it automatically generate volatile fields
   s64 tid;                                   // J
   obj_header *name;                          // Ljava/lang/String;
   s32 interrupted;                           // Z

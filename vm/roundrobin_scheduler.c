@@ -24,10 +24,8 @@ typedef struct {
   pthread_mutex_t mutex; // used for all changes to the scheduler
 } impl;
 
-void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
+static void monitor_notify_one_impl(impl *I, obj_header *monitor) {
   // iterate through the threads and find one that is waiting on the monitor
-  impl *I = scheduler->_impl;
-  pthread_mutex_lock(&I->mutex); // todo: check result?
   for (int i = 0; i < arrlen(I->round_robin); i++) {
     rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
     if (!wakeup_info)
@@ -37,13 +35,19 @@ void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
       break;
     }
   }
+}
+
+void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
+  // iterate through the threads and find one that is waiting on the monitor
+  impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
+  monitor_notify_one_impl(I, monitor);
   pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
-void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
+/// the raw operation which assumes the lock is held already
+static void monitor_notify_all_impl(impl *I, obj_header *monitor) {
   // iterate through the threads and find all that are waiting on the monitor
-  impl *I = scheduler->_impl;
-  pthread_mutex_lock(&I->mutex); // todo: check result?
   for (int i = 0; i < arrlen(I->round_robin); i++) {
     rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
     if (!wakeup_info)
@@ -52,16 +56,26 @@ void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
       wakeup_info->monitor_wakeup.ready = true;
     }
   }
+}
+
+void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
+  // iterate through the threads and find all that are waiting on the monitor
+  impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
+  monitor_notify_all_impl(I, monitor);
   pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
 void free_thread_info(rr_scheduler *scheduler, thread_info *info) {
+  impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
   // technically doesn't need to acquire the monitor to notify, since scheduler is god
   info->thread->thread_obj->eetop = 0; // set the eetop to nullptr
-  monitor_notify_all(scheduler, (obj_header *)info->thread->thread_obj);
+  monitor_notify_all_impl(I, (obj_header *)info->thread->thread_obj); // we can't have reentrancy; call inner
 
   arrfree(info->call_queue);
   free(info);
+  pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
 /// does not reättempt the notifyAll on the thread; assume the scheduler is dead
