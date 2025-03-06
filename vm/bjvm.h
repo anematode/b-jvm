@@ -562,7 +562,7 @@ typedef struct vm_thread {
 
   bool js_jit_enabled;
 
-  bool unpark_permit; // set by unpark, queried by park
+  volatile bool unpark_permit; // set by unpark, queried by park
 
   // Instance of java.lang.Thread
   struct native_Thread *thread_obj;

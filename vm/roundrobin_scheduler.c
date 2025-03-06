@@ -27,20 +27,23 @@ typedef struct {
 void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
   // iterate through the threads and find one that is waiting on the monitor
   impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
   for (int i = 0; i < arrlen(I->round_robin); i++) {
     rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
     if (!wakeup_info)
       continue;
     if (wakeup_info->kind == RR_MONITOR_WAIT && wakeup_info->monitor_wakeup.monitor->obj == monitor) {
       wakeup_info->monitor_wakeup.ready = true;
-      return;
+      break;
     }
   }
+  pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
 void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
   // iterate through the threads and find all that are waiting on the monitor
   impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
   for (int i = 0; i < arrlen(I->round_robin); i++) {
     rr_wakeup_info *wakeup_info = I->round_robin[i]->wakeup_info;
     if (!wakeup_info)
@@ -49,6 +52,7 @@ void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor) {
       wakeup_info->monitor_wakeup.ready = true;
     }
   }
+  pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
 void free_thread_info(rr_scheduler *scheduler, thread_info *info) {
