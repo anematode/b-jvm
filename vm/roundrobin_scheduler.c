@@ -3,6 +3,7 @@
 #include "roundrobin_scheduler.h"
 
 #include "exceptions.h"
+#include <pthread.h>
 
 typedef struct {
   call_interpreter_t call;
@@ -19,6 +20,7 @@ typedef struct {
 typedef struct {
   thread_info **round_robin; // Threads are cycled here
   execution_record **executions;
+  pthread_mutex_t mutex; // used for all changes to the scheduler
 } impl;
 
 void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor) {
@@ -89,6 +91,8 @@ void rr_scheduler_init(rr_scheduler *scheduler, vm *vm) {
   scheduler->vm = vm;
   scheduler->preemption_us = 30000;
   scheduler->_impl = calloc(1, sizeof(impl));
+  impl *I = scheduler->_impl;
+  pthread_mutex_init(&I->mutex, nullptr); // todo: check result of this?
 }
 
 void rr_scheduler_uninit(rr_scheduler *scheduler) {
@@ -101,6 +105,7 @@ void rr_scheduler_uninit(rr_scheduler *scheduler) {
   }
   arrfree(I->executions);
   arrfree(I->round_robin);
+  pthread_mutex_destroy(&I->mutex); // todo: check result of this?
   free(I);
 }
 
