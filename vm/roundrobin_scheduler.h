@@ -64,15 +64,11 @@ typedef struct {
 } execution_record;
 
 scheduler_polled_info_t scheduler_poll(rr_scheduler *scheduler); // synchronize and fetch a job (tells scheduler that this is being worked on)
-execution_record scheduler_execute(scheduler_polled_info_t *info); // doesn't require synchronization
-void scheduler_push_execution_record(execution_record *record); // synchronize and push the result back
-scheduler_polled_info_t scheduler_push_execution_record_and_repoll(execution_record *record); // same thing, but also poll within the same lock hold
+void scheduler_execute(vm *vm, scheduler_polled_info_t info, u64 preemption_us); // doesn't require synchronization todo: does it really need to pass in *info as a pointer?
+void scheduler_push_execution_record(rr_scheduler *scheduler, scheduler_polled_info_t info); // synchronize and push the result back
+scheduler_polled_info_t scheduler_push_execution_record_and_repoll(rr_scheduler *scheduler, scheduler_polled_info_t info); // same thing, but also poll within the same lock hold
 
-// old
-scheduler_status_t rr_scheduler_step(rr_scheduler *scheduler);
-u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler);
-
-scheduler_status_t rr_scheduler_execute_immediately(execution_record *record);
+scheduler_status_t rr_scheduler_execute_immediately(execution_record *record); // todo: i'm not sure how to work with threads here
 
 typedef enum {
   RR_WAKEUP_YIELDING,          // timeslice yielded, resume soon

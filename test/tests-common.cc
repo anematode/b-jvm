@@ -278,16 +278,21 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
-  while (true) {
-    auto status = rr_scheduler_step(&scheduler);
-    if (status == SCHEDULER_RESULT_DONE) {
-      break;
+  scheduler_polled_info_t task = scheduler_poll(&scheduler);
+
+  for (;;result.yield_count++) {
+    if (task.current_status == SCHEDULER_RESULT_DONE) {
+      break; // probably, idk
     }
 
-    result.yield_count++;
+    if (task.thread_info) {
+      scheduler_execute(vm, task, scheduler.preemption_us);
+      task = scheduler_push_execution_record_and_repoll(&scheduler, task);
+      continue;
+    }
 
-    u64 sleep_for = rr_scheduler_may_sleep_us(&scheduler);
-    if (sleep_for) {
+    u64 sleep_for = task.may_sleep_us;
+    if (sleep_for) { // we've been told to sleep
       result.sleep_count++;
       result.us_slept += sleep_for;
 #ifdef EMSCRIPTEN
@@ -297,6 +302,8 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
       usleep(sleep_for);
 #endif
     }
+
+    task = scheduler_push_execution_record_and_repoll(&scheduler, task);
   }
 
   if (thread->current_exception) {
