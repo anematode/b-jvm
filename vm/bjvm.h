@@ -10,6 +10,7 @@
 #include <wchar.h>
 
 #include "classfile.h"
+#include "classloader.h"
 #include "classpath.h"
 
 #ifdef EMSCRIPTEN
@@ -369,6 +370,8 @@ typedef struct vm {
 
   // Primitive classes (int.class, etc.)
   classdesc *primitive_classes[9];
+  // Classloaders (besides the bootstrap class loader) which have defined at least one class
+  classloader **classloaders;
 
   vm_thread **active_threads;
 
@@ -395,7 +398,7 @@ typedef struct vm {
   /// Struct containing cached classdescs
   void *_cached_classdescs; // struct cached_classdescs* -- type erased to discourage unsafe accesses
 
-  s64 next_thread_id; // MUST BE 64 BITS
+  s64 next_thread_id; // MUST BE 64 BITS. Used directly via Unsafe by the JDK
 
   // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
   // the finalizers aren't run
@@ -416,6 +419,7 @@ typedef struct vm {
   void *debugger;  // standard_debugger or null
 } vm;
 
+classloader *get_or_create_classloader(vm *vm, object java_object);
 struct cached_classdescs *cached_classes(vm *vm);
 void remove_unsafe_allocation(vm *vm, void *allocation);
 
@@ -653,8 +657,9 @@ void free_classfile(classdesc cf);
 void free_vm(vm *vm);
 
 classdesc *bootstrap_lookup_class(vm_thread *thread, slice name);
-classdesc *bootstrap_lookup_class_impl(vm_thread *thread, slice name, bool raise_class_not_found);
-classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *classfile_bytes, size_t classfile_len);
+classdesc *lookup_existing_class(vm_thread *thread, slice name, bool raise_class_not_found, classloader *cl);
+classdesc *define_new_class(vm_thread *thread, slice chars,
+  const u8 *classfile_bytes, size_t classfile_len, classloader *loader);
 cp_method *method_lookup(classdesc *classdesc, const slice name, const slice descriptor, bool superclasses,
                          bool superinterfaces);
 

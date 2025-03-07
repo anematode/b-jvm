@@ -889,6 +889,31 @@ null
 )");
 }
 
+TEST_CASE("Multiple classloaders") {
+  auto result = run_test_case("test_files/multiple_classloaders", true, "MultipleClassloaders");
+  REQUIRE(result.stdout_ == R"(I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+I was initialized!
+Hello, world!
+)");
+}
+
 #if 0
 TEST_CASE("Print useful trampolines") { print_method_sigs(); }
 #endif

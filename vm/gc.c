@@ -167,24 +167,8 @@ static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
   PUSH_ROOT(&thr->stack_overflow_error);
 }
 
-static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
-  vm *vm = ctx->vm;
-  if (vm->primitive_classes[0]) {
-    for (size_t i = 0; i < lengthof(vm->primitive_classes); ++i) {
-      enumerate_reflection_roots(ctx, vm->primitive_classes[i]);
-    }
-  }
-
-  // JS Handles
-  for (int i = 0; i < arrlen(vm->js_handles); ++i) {
-    PUSH_ROOT(&vm->js_handles[i]);
-  }
-
-  // Pending references
-  PUSH_ROOT(&vm->reference_pending_list);
-
-  // Static fields of bootstrap-loaded classes
-  hash_table_iterator it = hash_table_get_iterator(&vm->classes);
+void enumerate_class_tbl_roots(gc_ctx* ctx, string_hash_table * classes) {
+  hash_table_iterator it = hash_table_get_iterator(classes);
   char *key;
   size_t key_len;
   classdesc *desc;
@@ -201,13 +185,41 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
     enumerate_reflection_roots(ctx, desc);
     hash_table_iterator_next(&it);
   }
+}
+
+static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
+  vm *vm = ctx->vm;
+  if (vm->primitive_classes[0]) {
+    for (size_t i = 0; i < lengthof(vm->primitive_classes); ++i) {
+      enumerate_reflection_roots(ctx, vm->primitive_classes[i]);
+    }
+  }
+
+  // JS Handles
+  for (int i = 0; i < arrlen(vm->js_handles); ++i) {
+    PUSH_ROOT(&vm->js_handles[i]);
+  }
+
+  // Pending references
+  PUSH_ROOT(&vm->reference_pending_list);
+
+  // Bootstrap-loaded classes
+  enumerate_class_tbl_roots(ctx, &vm->classes);
+  // Classloader-loaded classes
+  for (int i = 0; i < arrlen(vm->classloaders); ++i) {
+    classloader *cl = vm->classloaders[i];
+    PUSH_ROOT(&cl->mirror);
+    enumerate_class_tbl_roots(ctx, &cl->classes);
+  }
 
   // main thread group
   PUSH_ROOT(&vm->main_thread_group);
 
   // Modules
-  it = hash_table_get_iterator(&vm->modules);
+  hash_table_iterator it = hash_table_get_iterator(&vm->modules);
   module *module;
+  char *key;
+  size_t key_len;
   while (hash_table_iterator_has_next(it, &key, &key_len, (void **)&module)) {
     PUSH_ROOT(&module->reflection_object);
     hash_table_iterator_next(&it);

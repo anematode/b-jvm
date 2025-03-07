@@ -156,7 +156,7 @@ class BovineThread<Classes> {
                 }
             }
             for (let i = 0; i < stringIndices.length; ++i) {
-                args[stringIndices[i]]!.drop();
+                args[stringIndices[i]!]!.drop();
             }
 
             const promise = (async () => {

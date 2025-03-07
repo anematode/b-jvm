@@ -24,7 +24,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBootstrapClass, "(Ljava/lang/String
   for (u32 i = 0; i < read.len; ++i)
     if (read.chars[i] == '.')
       read.chars[i] = '/';
-  classdesc *cd = bootstrap_lookup_class_impl(thread, hslc(read), false);
+  classdesc *cd = lookup_existing_class(thread, hslc(read), false, nullptr);
   free_heap_str(read);
   return (stack_value){.obj = cd ? (void *)get_class_mirror(thread, cd) : nullptr};
 
@@ -58,7 +58,8 @@ stack_value define_class(vm_thread *thread, handle *loader, handle *parent_class
   }
 
   // Now append some random stuff to the name
-  classdesc *result = define_bootstrap_class(thread, cf_name, data_bytes, length);
+  classloader *cl = get_or_create_classloader(thread->vm, loader->obj);
+  classdesc *result = define_new_class(thread, cf_name, data_bytes, length, cl);
   result->classloader = loader->obj;
 
   free_heap_str(name_str);

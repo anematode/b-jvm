@@ -589,6 +589,26 @@ void existing_classes_are_javabase(vm *vm, module *module) {
   }
 }
 
+classloader *get_or_create_classloader(vm *vm, object java_object) {
+  if (java_object == nullptr)
+    return nullptr;
+
+  // TODO check that this object really is a CL
+  // Search existing class loaders for one with a matching mirror
+  for (int i = 0; i < arrlen(vm->classloaders); ++i) {
+    classloader *loader = vm->classloaders[i];
+    if (loader->mirror == java_object) {
+      return loader;
+    }
+  }
+  // Create a new class loader
+  classloader *loader = calloc(1, sizeof(classloader));
+  loader->mirror = java_object;
+  loader->classes = make_hash_table(free_classdesc, 0.75, 16);
+  arrput(vm->classloaders, loader);
+  return loader;
+}
+
 struct cached_classdescs *cached_classes(vm *vm) {
   CHECK(vm->_cached_classdescs && "Cached classdescs not yet initialized");
   return vm->_cached_classdescs;
@@ -635,6 +655,7 @@ vm *create_vm(const vm_options options) {
   vm->heap_used = 0;
   vm->heap_capacity = options.heap_size;
   vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
+  vm->classloaders = nullptr;
   vm->active_threads = nullptr;
 
   vm->read_stdin = options.read_stdin;
@@ -695,6 +716,11 @@ void free_vm(vm *vm) {
   free_hash_table(vm->interned_strings);
   free_hash_table(vm->class_padding);
   free_hash_table(vm->modules);
+
+  for (int i = 0; i < arrlen(vm->classloaders); ++i) {
+    free_classloader(vm->classloaders[i]);
+  }
+  arrfree(vm->classloaders);
 
   if (vm->primitive_classes[0]) {
     for (int i = 0; i < 9; ++i) {
@@ -1340,7 +1366,8 @@ bool is_builtin_class(slice chars) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *classfile_bytes, size_t classfile_len) {
+classdesc *define_new_class(vm_thread *thread, slice chars,
+  const u8 *classfile_bytes, size_t classfile_len, classloader *loader) {
   vm *vm = thread->vm;
   classdesc *class = calloc(1, sizeof(classdesc));
 
@@ -1359,7 +1386,8 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
   // direct superclass is resolved using the algorithm of §5.4.3.1.
   cp_class_info *super = class->super_class;
   if (super) {
-    // If the superclass is currently being loaded -> circularity  error
+    // If the superclass is currently being loaded -> circularity error
+    // TODO how does this interact with class loaders?
     if (hash_table_lookup(&vm->inchoate_classes, super->name.chars, (int)super->name.len)) {
       class_circularity_error(thread, class);
       goto error_2;
@@ -1416,7 +1444,7 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
 
   class->kind = CD_KIND_ORDINARY;
   class->dtor = free_ordinary_classdesc;
-  class->classloader = nullptr;
+  class->classloader = loader;
 
   if (is_builtin_class(chars)) {
     class->module = get_module(vm, STR("java.base"));
@@ -1424,7 +1452,12 @@ classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *clas
     class->module = get_unnamed_module(thread);
   }
 
-  (void)hash_table_insert(&vm->classes, chars.chars, (int)chars.len, class);
+  if (loader == nullptr) {
+    (void)hash_table_insert(&vm->classes, chars.chars, (int)chars.len, class);
+  } else {
+    (void)hash_table_insert(&loader->classes, chars.chars, (int)chars.len, class);
+  }
+
   return class;
 
 error_2:
@@ -1451,7 +1484,7 @@ void dump_trace(vm_thread *thread) {
 }
 
 // NOLINTNEXTLINE(misc-no-recursion)
-classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool raise_class_not_found) {
+classdesc *lookup_existing_class(vm_thread *thread, const slice name, bool raise_class_not_found, classloader *cl) {
   vm *vm = thread->vm;
 
   int dimensions = 0;
@@ -1477,7 +1510,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
     class = hash_table_lookup(&vm->classes, chars.chars, (int)chars.len);
   }
 
-  if (!class) {
+  if (class == nullptr) {
     // Maybe it's an anonymous class, read the thread stack looking for a
     // class with a matching name
     stack_frame *frame = thread->stack.top;
@@ -1491,7 +1524,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
     }
   }
 
-  if (!class) {
+  if (class == nullptr) {
     (void)hash_table_insert(&vm->inchoate_classes, chars.chars, (int)chars.len, (void *)1);
 
     // e.g. "java/lang/Object.class"
@@ -1521,7 +1554,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
       return nullptr;
     }
 
-    class = define_bootstrap_class(thread, chars, bytes, cf_len);
+    class = define_new_class(thread, chars, bytes, cf_len, nullptr);
     free(bytes);
     (void)hash_table_delete(&vm->inchoate_classes, chars.chars, (int)chars.len);
     if (!class)
@@ -1541,7 +1574,7 @@ classdesc *bootstrap_lookup_class_impl(vm_thread *thread, const slice name, bool
 // name = "java/lang/Object" or "[[J" or "[Ljava/lang/String;"
 // NOLINTNEXTLINE(misc-no-recursion)
 classdesc *bootstrap_lookup_class(vm_thread *thread, const slice name) {
-  return bootstrap_lookup_class_impl(thread, name, true);
+  return lookup_existing_class(thread, name, true, nullptr);
 }
 
 void out_of_memory(vm_thread *thread) {
@@ -1874,7 +1907,8 @@ int resolve_class(vm_thread *thread, cp_class_info *info) {
     frame = frame->prev;
   }
 
-  classdesc *existing = bootstrap_lookup_class_impl(thread, info->name, false);
+  classloader *cl = get_or_create_classloader(thread->vm, loader);
+  classdesc *existing = lookup_existing_class(thread, info->name, false, cl);
   if (existing) {
     info->classdesc = existing;
     return 0;

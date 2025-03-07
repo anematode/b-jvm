@@ -10,8 +10,6 @@ DECLARE_NATIVE("java/lang/reflect", Proxy, defineClass0,
   int length = args[4].i;
   obj_header *loader = args[0].handle->obj;
 
-  (void)loader;
-
   heap_string name_str = AsHeapString(name, on_oom);
   u8 *bytes = ArrayData(data) + offset;
 
@@ -22,7 +20,8 @@ DECLARE_NATIVE("java/lang/reflect", Proxy, defineClass0,
     }
   }
 
-  classdesc *result = define_bootstrap_class(thread, hslc(name_str), bytes, length);
+  classloader *cl = get_or_create_classloader(thread->vm, loader);
+  classdesc *result = define_new_class(thread, hslc(name_str), bytes, length, cl);
 
   free_heap_str(name_str);
 

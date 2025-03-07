@@ -2,46 +2,44 @@
 declare namespace RuntimeExports {
     let wasmMemory: any;
     /** @param {string=} sig */
-    function addFunction(func: any, sig?: string | undefined): any;
+    function addFunction(func: any, sig?: string): any;
     function removeFunction(index: any): void;
     let wasmTable: WebAssembly.Table;
     namespace FS {
-        function init(): void;
-        let ErrnoError: any;
-        function handleError(returnValue: any): any;
-        function ensureErrnoError(): void;
-        function createDataFile(parent: any, name: any, fileData: any, canRead: any, canWrite: any, canOwn: any): void;
-        function createPath(parent: any, path: any, canRead: any, canWrite: any): any;
-        function createPreloadedFile(parent: any, name: any, url: any, canRead: any, canWrite: any, onload: any, onerror: any, dontCreateFile: any, canOwn: any, preFinish: any): any;
-        function readFile(path: any, opts?: {}): Uint8Array;
-        function cwd(): any;
-        function analyzePath(path: any): {
+        export { ErrnoError };
+        export function handleError(returnValue: any): any;
+        export function createDataFile(parent: any, name: any, fileData: any, canRead: any, canWrite: any, canOwn: any): void;
+        export function createPath(parent: any, path: any, canRead: any, canWrite: any): any;
+        export function createPreloadedFile(parent: any, name: any, url: any, canRead: any, canWrite: any, onload: any, onerror: any, dontCreateFile: any, canOwn: any, preFinish: any): any;
+        export function readFile(path: any, opts?: {}): Uint8Array;
+        export function cwd(): any;
+        export function analyzePath(path: any): {
             exists: boolean;
             object: {
                 contents: any;
             };
         };
-        function mkdir(path: any, mode: any): any;
-        function mkdirTree(path: any, mode: any): any;
-        function rmdir(path: any): any;
-        function open(path: any, flags: any, mode?: number): any;
-        function create(path: any, mode: any): any;
-        function close(stream: any): any;
-        function unlink(path: any): any;
-        function chdir(path: any): any;
-        function read(stream: any, buffer: any, offset: any, length: any, position: any): any;
-        function write(stream: any, buffer: any, offset: any, length: any, position: any, canOwn: any): any;
-        function allocate(stream: any, offset: any, length: any): any;
-        function writeFile(path: any, data: any): any;
-        function mmap(stream: any, length: any, offset: any, prot: any, flags: any): {
+        export function mkdir(path: any, mode: any): any;
+        export function mkdirTree(path: any, mode: any): any;
+        export function rmdir(path: any): any;
+        export function open(path: any, flags: any, mode?: number): any;
+        export function create(path: any, mode: any): any;
+        export function close(stream: any): any;
+        export function unlink(path: any): any;
+        export function chdir(path: any): any;
+        export function read(stream: any, buffer: any, offset: any, length: any, position: any): any;
+        export function write(stream: any, buffer: any, offset: any, length: any, position: any, canOwn: any): any;
+        export function allocate(stream: any, offset: any, length: any): any;
+        export function writeFile(path: any, data: any): any;
+        export function mmap(stream: any, length: any, offset: any, prot: any, flags: any): {
             ptr: any;
             allocated: boolean;
         };
-        function msync(stream: any, bufferPtr: any, offset: any, length: any, mmapFlags: any): any;
-        function munmap(addr: any, length: any): any;
-        function symlink(target: any, linkpath: any): any;
-        function readlink(path: any): any;
-        function statBufToObject(statBuf: any): {
+        export function msync(stream: any, bufferPtr: any, offset: any, length: any, mmapFlags: any): any;
+        export function munmap(addr: any, length: any): any;
+        export function symlink(target: any, linkpath: any): any;
+        export function readlink(path: any): any;
+        export function statBufToObject(statBuf: any): {
             dev: any;
             mode: any;
             nlink: any;
@@ -56,28 +54,28 @@ declare namespace RuntimeExports {
             ctime: any;
             ino: any;
         };
-        function stat(path: any): any;
-        function lstat(path: any): any;
-        function chmod(path: any, mode: any): any;
-        function lchmod(path: any, mode: any): any;
-        function fchmod(fd: any, mode: any): any;
-        function utime(path: any, atime: any, mtime: any): any;
-        function truncate(path: any, len: any): any;
-        function ftruncate(fd: any, len: any): any;
-        function findObject(path: any): {
+        export function stat(path: any): any;
+        export function lstat(path: any): any;
+        export function chmod(path: any, mode: any): any;
+        export function lchmod(path: any, mode: any): any;
+        export function fchmod(fd: any, mode: any): any;
+        export function utime(path: any, atime: any, mtime: any): any;
+        export function truncate(path: any, len: any): any;
+        export function ftruncate(fd: any, len: any): any;
+        export function findObject(path: any): {
             isFolder: boolean;
             isDevice: boolean;
         };
-        function readdir(path: any): any;
-        function mount(type: any, opts: any, mountpoint: any): any;
-        function unmount(mountpoint: any): any;
-        function mknod(path: any, mode: any, dev: any): any;
-        function makedev(ma: any, mi: any): number;
-        function registerDevice(dev: any, ops: any): void;
-        function createDevice(parent: any, name: any, input: any, output: any): any;
-        function mkdev(path: any, mode: any, dev: any): any;
-        function rename(oldPath: any, newPath: any): any;
-        function llseek(stream: any, offset: any, whence: any): any;
+        export function readdir(path: any): any;
+        export function mount(type: any, opts: any, mountpoint: any): any;
+        export function unmount(mountpoint: any): any;
+        export function mknod(path: any, mode: any, dev: any): any;
+        export function makedev(ma: any, mi: any): number;
+        export function registerDevice(dev: any, ops: any): void;
+        export function createDevice(parent: any, name: any, input: any, output: any): any;
+        export function mkdev(path: any, mode: any, dev: any): any;
+        export function rename(oldPath: any, newPath: any): any;
+        export function llseek(stream: any, offset: any, whence: any): any;
     }
     /**
      * Given a pointer 'ptr' to a null-terminated UTF8-encoded string in the
@@ -94,7 +92,7 @@ declare namespace RuntimeExports {
      *   JS JIT optimizations off, so it is worth to consider consistently using one
      * @return {string}
      */
-    function UTF8ToString(ptr: number, maxBytesToRead?: number | undefined): string;
+    function UTF8ToString(ptr: number, maxBytesToRead?: number): string;
     /**
      * @param {number} ptr
      * @param {string} type
@@ -123,6 +121,10 @@ declare namespace RuntimeExports {
     function FS_unlink(path: any): any;
     let addRunDependency: any;
     let removeRunDependency: any;
+}
+declare class ErrnoError extends Error {
+    constructor(code: any);
+    errno: any;
 }
 interface WasmModule {
   _ffi_create_vm(_0: number, _1: number, _2: number, _3: number): number;
