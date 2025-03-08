@@ -10,6 +10,15 @@ void raise_exception_object(vm_thread *thread, object obj) {
 
   thread->current_exception = obj;
 
+  struct native_Throwable *throwable = (void*)thread->current_exception;
+  object message = throwable->detailMessage;
+  heap_string msg;
+  if (message) {
+    read_string_to_utf8(thread, &msg, message);
+    fprintf(stderr, "Message: %.*s\n", fmt_slice(msg));
+  }
+  dump_trace(thread);
+
 #define T ((struct native_Throwable *)obj)
 
   stack_frame *frame = thread->stack.top;
@@ -66,7 +75,7 @@ void raise_div0_arithmetic_exception(vm_thread *thread) {
 
 void raise_unsatisfied_link_error(vm_thread *thread, const cp_method *method) {
   // Useful for now as we have a ton of natives to implement. We'll remove it long term.
-  printf("Unsatisfied link error %.*s on %.*s\n", fmt_slice(method->name), fmt_slice(method->my_class->name));
+  fprintf(stderr, "Unsatisfied link error %.*s on %.*s\n", fmt_slice(method->name), fmt_slice(method->my_class->name));
 
   INIT_STACK_STRING(err, 1000);
   INIT_STACK_STRING(class_name, 1000);

@@ -890,7 +890,7 @@ null
 }
 
 TEST_CASE("Multiple classloaders") {
-  auto result = run_test_case("test_files/multiple_classloaders", true, "MultipleClassloaders");
+  auto result = run_test_case("test_files/multiple_classloaders", false, "MultipleClassloaders");
   REQUIRE(result.stdout_ == R"(I was initialized!
 Hello, world!
 I was initialized!

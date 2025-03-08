@@ -124,8 +124,9 @@ DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getClassLoader, "()Ljava/lang/ClassLoader;") {
-  printf("TODO: getClassLoader\n");
-  return value_null(); // TODO
+  classdesc *desc = unmirror_class(obj->obj);
+  object loader = desc->classloader;
+  return (stack_value){.obj = loader};
 }
 
 DECLARE_NATIVE("java/lang", Class, getPermittedSubclasses0, "()[Ljava/lang/Class;") {
@@ -150,13 +151,14 @@ DECLARE_NATIVE("java/lang", Class, forName0,
                "Class;)Ljava/lang/Class;") {
   // Read args[0] as a string
   obj_header *name_obj = args[0].handle->obj;
-  obj_header *classloader = args[2].handle->obj;
+  obj_header *loader = args[2].handle->obj;
 
   heap_string name_str = AsHeapString(name_obj, oom);
   for (size_t i = 0; i < name_str.len; ++i) {
     name_str.chars[i] = name_str.chars[i] == '.' ? '/' : name_str.chars[i];
   }
   classdesc *c;
+  c = lookup_existing_class(thread, hslc(name_str), false,
   if (!classloader) {
     c = bootstrap_lookup_class(thread, hslc(name_str));
   } else {

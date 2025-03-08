@@ -1470,13 +1470,14 @@ error_1:
 void dump_trace(vm_thread *thread) {
   // Walk frames and print the method/line number
   stack_frame *frame = thread->stack.top;
+  fprintf(stderr, "Start trace\n");
   while (frame) {
     cp_method *method = frame->method;
     if (is_frame_native(frame)) {
-      printf("  at %.*s.%.*s(Native Method)\n", fmt_slice(method->my_class->name), fmt_slice(method->name));
+      fprintf(stderr, "  at %.*s.%.*s(Native Method)\n", fmt_slice(method->my_class->name), fmt_slice(method->name));
     } else {
       int line = get_line_number(method->code, frame->program_counter);
-      printf("  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
+      fprintf(stderr, "  at %.*s.%.*s(%.*s:%d)\n", fmt_slice(method->my_class->name), fmt_slice(method->name),
              fmt_slice(method->my_class->source_file ? method->my_class->source_file->name : null_str()), line);
     }
     frame = frame->prev;
@@ -1507,7 +1508,11 @@ classdesc *lookup_existing_class(vm_thread *thread, const slice name, bool raise
       chars = subslice_to(chars, 1, chars.len - 1);
       DCHECK(chars.len >= 1);
     }
+
     class = hash_table_lookup(&vm->classes, chars.chars, (int)chars.len);
+    if (class == nullptr && cl) {
+      class = hash_table_lookup(&cl->classes, chars.chars, (int)chars.len);
+    }
   }
 
   if (class == nullptr) {
@@ -2125,6 +2130,7 @@ struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
       class_mirror->module = cd->module->reflection_object;
     object componentType = cd->one_fewer_dim ? (void *)get_class_mirror(thread, cd->one_fewer_dim) : nullptr;
     class_mirror->componentType = componentType;
+    class_mirror->classLoader = cd->classloader;
   }
   struct native_Class *result = class_mirror;
   drop_handle(thread, cm_handle);
