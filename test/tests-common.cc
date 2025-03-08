@@ -242,6 +242,7 @@ void *worker_thread_run_until_completion(void *param) {
 
     task = scheduler_push_execution_record_and_repoll(scheduler, task);
   }
+  // todo: unregister?
 
   return result;
 }
@@ -323,6 +324,18 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
 
   pthread_t thread_1;
   pthread_create(&thread_1, nullptr, worker_thread_run_until_completion, &scheduler);
+
+//  usleep(1000000); // scuff trick to hopefully get the class intiialziation settled
+
+//  pthread_t thread_2;
+//  pthread_create(&thread_2, nullptr, worker_thread_run_until_completion, &scheduler);
+
+//  ScheduledTestCaseResult *result_2;
+//  pthread_join(thread_2, reinterpret_cast<void **>(&result_2));
+//  result.yield_count += result_2->yield_count;
+//  result.sleep_count += result_2->sleep_count;
+//  result.us_slept += result_2->us_slept;
+
   ScheduledTestCaseResult *result_1;
   pthread_join(thread_1, reinterpret_cast<void **>(&result_1));
   result.yield_count += result_1->yield_count;

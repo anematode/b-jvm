@@ -462,6 +462,7 @@ TEST_CASE("[perf test] Taylor series") {
   my_options.heap_size = 1 << 30; // 1 GB
   auto result = run_test_case("test_files/autodiff/", false, "TaylorSeriesTest", "", {"1"}, my_options);
   //  REQUIRE(result.stdout_.find("Done!") != std::string::npos);
+  std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
 }
 
 TEST_CASE("[perf test] Sudoku solver") {
