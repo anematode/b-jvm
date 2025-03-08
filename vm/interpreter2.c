@@ -619,12 +619,14 @@ enum {
 };
 
 #define FUEL_CHECK                                                                                                     \
+  gc_pause_if_requested(thread->vm);                                                                     \
   if (unlikely(FUEL-- == 0)) {                                                                                         \
     SPILL(tos);                                                                                                        \
     frame->is_async_suspended = true;                                                                                  \
     return RETVAL_FUEL_CHECK;                                                                                          \
   }
 #define FUEL_CHECK_VOID                                                                                                \
+  gc_pause_if_requested(thread->vm);                                                                     \
   if (unlikely(FUEL-- == 0)) {                                                                                         \
     frame->is_async_suspended = true;                                                                                  \
     SPILL_VOID return RETVAL_FUEL_CHECK;                                                                               \

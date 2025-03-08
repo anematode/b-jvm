@@ -407,9 +407,11 @@ void relocate_instance_fields(gc_ctx *ctx) {
 #define NEW_HEAP_EACH_GC 0
 #endif
 
-void major_gc(vm *vm) {
-  // TODO wait for all threads to get ready (for now we'll just call this from
-  // an already-running thread)
+/**
+ * Cleans up the heap.
+ * Must only be called by one thread, while all the other threads are suspended.
+ */
+static void major_gc(vm *vm) {
   gc_ctx ctx = {.vm = vm, .Reference = cached_classes(vm)->reference};
   major_gc_enumerate_gc_roots(&ctx);
 
@@ -488,4 +490,29 @@ void major_gc(vm *vm) {
 
   vm->heap = new_heap;
   vm->heap_used = align_up(write_ptr - new_heap, 8);
+}
+
+/**
+ * Garbage collects the heap.
+ * Invoking this method will set vm->gc_pause_requested to true (if not already),
+ * then wait for all threads to do call this function.
+ * All invocaations to this function will block until the GC has been completed by one particuliar thread.
+ */
+void scheduled_gc_pause(vm *vm) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    major_gc(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
 }

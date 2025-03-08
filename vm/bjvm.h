@@ -155,9 +155,13 @@ typedef enum : u32 {
 } mark_word_flags;
 
 struct vm;
+typedef struct vm vm;
+
+bool should_gc_pause(vm *vm); // atomically checks if a GC pause is needed
+void gc_pause_if_requested(vm *vm); // only pauses if another thread needs us to
 
 bool has_expanded_data(header_word *data);
-mark_word_t *get_mark_word(struct vm *vm, header_word *data);
+mark_word_t *get_mark_word(vm *vm, header_word *data);
 // nullptr if the object has never been locked, otherwise a pointer to a lock_record.
 monitor_data *inspect_monitor(header_word *data);
 // only call this if inspect_monitor returns nullptr
@@ -167,7 +171,6 @@ monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj); // doesn
 void read_string(vm_thread *thread, obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of
 int read_string_to_utf8(vm_thread *thread, heap_string *result, obj_header *obj);
-typedef struct vm vm;
 
 typedef void (*write_bytes)(char *buf, int len, void *param); // writes all the data in the buffer's length
 typedef int (*read_bytes)(char *buf, int len,
@@ -412,6 +415,7 @@ typedef struct vm {
   struct native_Reference *reference_pending_list; // for java/lang/ref/Reference implementation
 
   bool vm_initialized;
+  bool should_gc_pause; // only atomic access permitted; implicitly guarded by mutex
   void *scheduler; // rr_scheduler or null
   void *debugger;  // standard_debugger or null
 } vm;

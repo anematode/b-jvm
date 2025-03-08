@@ -7,6 +7,7 @@
 
 #include "bjvm.h"
 
+#include "worker_threads.h"
 #include <sys/time.h>
 
 #ifdef __cplusplus
@@ -36,6 +37,8 @@ typedef struct {
   u64 preemption_us;
   // Pointer to implementation
   void *_impl;
+  // Worker thread pool, used for GC pause management
+  worker_thread_pool thread_pool;
 } rr_scheduler;
 
 void rr_scheduler_init(rr_scheduler *scheduler, vm *vm);
@@ -92,7 +95,7 @@ typedef struct {
 
 execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t call);
 void free_execution_record(execution_record *record);
-void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vector);
+void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vector); // synchronized
 
 void monitor_notify_one(rr_scheduler *scheduler, obj_header *monitor);
 void monitor_notify_all(rr_scheduler *scheduler, obj_header *monitor);

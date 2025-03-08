@@ -86,6 +86,10 @@ inline int set_unpark_permit(vm_thread *thread) {
 
 inline bool query_unpark_permit(vm_thread *thread) { return thread->unpark_permit; }
 
+inline bool should_gc_pause(vm *vm) {
+  return __atomic_load_n(&vm->should_gc_pause, __ATOMIC_ACQUIRE);
+}
+
 bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
 mark_word_t *get_mark_word(vm *vm, header_word *data) {
@@ -635,6 +639,7 @@ vm *create_vm(const vm_options options) {
 
   vm->next_tid = 0;
   vm->reference_pending_list = nullptr;
+  vm->should_gc_pause = false;
 
   for (size_t i = 0; i < bjvm_natives_count; ++i) {
     native_t const *native_ptr = bjvm_natives[i];
@@ -1561,7 +1566,7 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
   vm *vm = thread->vm;
   DCHECK(vm->heap_used % 8 == 0);
   if (vm->heap_used + bytes > vm->heap_capacity) {
-    major_gc(thread->vm);
+    scheduled_gc_pause(thread->vm);
     if (vm->heap_used + bytes > vm->heap_capacity) {
       out_of_memory(thread);
       return nullptr;
@@ -1571,6 +1576,12 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
   memset(result, 0, bytes);
   vm->heap_used += bytes;
   return result;
+}
+
+inline void gc_pause_if_requested(vm *vm) {
+  if (unlikely(should_gc_pause(vm))) {
+    scheduled_gc_pause(vm);
+  }
 }
 
 // Returns true if the class descriptor is a subclass of java.lang.Error.

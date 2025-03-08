@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <roundrobin_scheduler.h>
+#include <worker_threads.h>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -247,6 +248,8 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   rr_scheduler_init(&scheduler, vm);
   vm->scheduler = &scheduler;
 
+  // todo: should we register as a worker thread here? or only later when we actually call interpreter
+
   vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
@@ -278,9 +281,12 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
+  // chop chop time to work
+  worker_thread_pool_register(&scheduler.thread_pool);
   scheduler_polled_info_t task = scheduler_poll(&scheduler);
-
   for (;;result.yield_count++) {
+    gc_pause_if_requested(vm);
+
     if (task.current_status == SCHEDULER_RESULT_DONE) {
       break; // probably, idk
     }

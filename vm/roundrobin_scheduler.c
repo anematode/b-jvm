@@ -27,6 +27,11 @@ typedef struct {
 
 static bool only_daemons_running(thread_info **thread_info);
 static u64 rr_scheduler_may_sleep_us(rr_scheduler *scheduler);
+static void free_execution_record_impl(execution_record *record);
+static void monitor_notify_one_impl(impl *I, obj_header *monitor);
+static void monitor_notify_all_impl(impl *I, obj_header *monitor);
+static void free_thread_info_shutdown(thread_info *info);
+static void free_thread_info(rr_scheduler *scheduler, thread_info *info);
 
 /// the raw operation which assumes the lock is held already
 static void monitor_notify_one_impl(impl *I, obj_header *monitor) {
@@ -88,7 +93,7 @@ static void free_thread_info_shutdown(thread_info *info) {
 
   for (int call_i = 0; call_i < arrlen(info->call_queue); call_i++) {
     pending_call *pending = &info->call_queue[call_i];
-    free_execution_record(pending->record);
+    free_execution_record_impl(pending->record); // todo: why are we doing this? i thought that the caller should free the record when done
     free(pending->call.args.args);
   }
 
@@ -101,6 +106,7 @@ void rr_scheduler_init(rr_scheduler *scheduler, vm *vm) {
   scheduler->preemption_us = 30000;
   scheduler->_impl = calloc(1, sizeof(impl));
   impl *I = scheduler->_impl;
+  worker_thread_pool_init(&scheduler->thread_pool);
   pthread_mutex_init(&I->mutex, nullptr); // todo: check result of this?
 }
 
@@ -115,6 +121,7 @@ void rr_scheduler_uninit(rr_scheduler *scheduler) {
   }
   arrfree(I->executions);
   arrfree(I->round_robin);
+  worker_thread_pool_uninit(&scheduler->thread_pool);
   pthread_mutex_unlock(&I->mutex); // todo: check result?
   pthread_mutex_destroy(&I->mutex); // todo: check result of this?
   free(I);
@@ -392,10 +399,11 @@ static bool is_nth_arg_reference(cp_method *method, int i) {
   return i == 0 || method->descriptor->args[i - 1].repr_kind == TYPE_KIND_REFERENCE;
 }
 
-// todo: this should only be called when the lock is held
 void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vector) {
   // Iterate through all pending_calls and add object arguments as roots
   impl *I = scheduler->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
+
   for (int i = 0; i < arrlen(I->round_robin); i++) {
     thread_info *info = I->round_robin[i];
     for (int j = 0; j < arrlen(info->call_queue); j++) {
@@ -407,12 +415,15 @@ void rr_scheduler_enumerate_gc_roots(rr_scheduler *scheduler, object **stbds_vec
       }
     }
   }
+
+  pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
 
 // todo: how to synchronize this? just obtain the lock?
 execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t call) {
   impl *I = scheduler->_impl;
   pthread_mutex_lock(&I->mutex); // todo: check result?
+
   vm_thread *thread = call.args.thread;
   thread_info *info = get_or_create_thread_info(scheduler->_impl, thread);
 
@@ -430,15 +441,17 @@ execution_record *rr_scheduler_run(rr_scheduler *scheduler, call_interpreter_t c
 
   arrput(info->call_queue, pending);
   arrput(((impl *)scheduler->_impl)->executions, rec);
+
   pthread_mutex_unlock(&I->mutex); // todo: check result?
   return pending.record;
 }
 
-void free_execution_record(execution_record *record) {
+/// the raw operation which assumes the lock is held already
+static void free_execution_record_impl(execution_record *record) {
+  impl *I = record->_impl;
   if (record->js_handle != -1) {
     drop_js_handle(record->vm, record->js_handle);
   }
-  impl *I = record->_impl;
   for (int i = 0; i < arrlen(I->executions); i++) {
     if (I->executions[i] == record) {
       arrdelswap(I->executions, i);
@@ -446,4 +459,14 @@ void free_execution_record(execution_record *record) {
     }
   }
   free(record);
+}
+
+// todo: how to synchronize this? just obtain the lock?
+// todo: this is never getting called except for specific instances in the shutdown sequence...
+// todo: this api very susceptible to uaf/memory leaks ^^ (rn finished records are never freed)
+void free_execution_record(execution_record *record) {
+  impl *I = record->_impl;
+  pthread_mutex_lock(&I->mutex); // todo: check result?
+  free_execution_record_impl(record);
+  pthread_mutex_unlock(&I->mutex); // todo: check result?
 }
