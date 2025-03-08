@@ -119,6 +119,24 @@ static int *reorder_fields_for_compactness(cp_field *fields, int fields_count) {
   return order;
 }
 
+void create_template_interpreter_frame(cp_method * method) {
+  stack_frame frame = {nullptr};
+  frame.method = method;
+  frame.code = method->code->code;
+  DCHECK(frame.code);
+  frame.insn_index_to_sd = method->code_analysis->insn_index_to_sd;
+  DCHECK(frame.insn_index_to_sd);
+  frame.kind = FRAME_KIND_INTERPRETER;
+  frame.is_async_suspended = false;
+  frame.synchronized_state = SYNCHRONIZE_NONE;
+  frame.program_counter = 0;
+  frame.max_stack = method->code->max_stack;
+  frame.num_locals = method->code->max_locals;
+  static_assert(sizeof(method->template_frame) >= sizeof(frame));
+  memcpy(method->template_frame, &frame, sizeof(frame));
+}
+
+
 // Link the class.
 int link_class(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
@@ -168,6 +186,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
         free_heap_str(error_str);
         return -1;
       }
+      create_template_interpreter_frame(method);
     }
   }
 

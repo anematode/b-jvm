@@ -274,35 +274,45 @@ stack_frame *push_native_frame(vm_thread *thread, cp_method *method, const metho
   return frame;
 }
 
+// See push_plain_frame
+__attribute__((noinline)) static stack_frame *raise_abstract_method_error_tramp(vm_thread *thread, cp_method *method) {
+  raise_abstract_method_error(thread, method);
+  return nullptr;
+}
+
+// See push_plain_frame
+__attribute__((noinline)) static stack_frame *raise_exception_object_tramp(vm_thread *thread,
+  [[maybe_unused]] cp_method *method, [[maybe_unused]] stack_value *args, [[maybe_unused]] u8 argc) {
+  raise_exception_object(thread, thread->stack_overflow_error);
+  return nullptr;
+}
+
+// This function is extremely hot
 stack_frame *push_plain_frame(vm_thread *thread, cp_method *method, stack_value *args, u8 argc) {
   const attribute_code *code = method->code;
   if (unlikely(!code)) {
-    raise_abstract_method_error(thread, method);
-    return nullptr;
+    // allows the above check to become a tail call (jcc on x86, cbz on arm)
+    return raise_abstract_method_error_tramp(thread, method);
   }
 
   DCHECK(argc <= code->max_locals);
 
-  stack_frame *frame = (stack_frame *)(args + code->max_locals);
-  if ((uintptr_t)(frame + sizeof(stack_frame) + code->max_stack * sizeof(stack_value)) >
-      (uintptr_t)thread->stack.frame_buffer_end) {
-    raise_exception_object(thread, thread->stack_overflow_error);
-    return nullptr;
+  stack_frame *restrict frame = (stack_frame *)(args + code->max_locals);
+  if ((uintptr_t)((char*)frame + code->frame_size) > (uintptr_t)thread->stack.frame_buffer_end) {
+    // allows the above check to become a tail call
+    return raise_exception_object_tramp(thread, method, args, argc);
   }
+
+  // See linkage.c for how the template frame is generated
 
   frame->method = method;
   frame->prev = thread->stack.top;
   thread->stack.top = frame;
 
-  frame->kind = FRAME_KIND_INTERPRETER;
-  frame->is_async_suspended = false;
-  frame->synchronized_state = SYNCHRONIZE_NONE;
-  frame->program_counter = 0;
-  frame->max_stack = code->max_stack;
-  frame->num_locals = code->max_locals;
-
-  frame->code = code->code;
-  frame->insn_index_to_sd = method->code_analysis->insn_index_to_sd;
+  constexpr size_t copy_sz = sizeof(stack_frame) - offsetof(stack_frame, kind);
+  memcpy(&frame->kind /* member following prev */,
+    &((stack_frame *)method->template_frame)->kind,
+    copy_sz);
 
   // Not necessary, but possibly helpful when looking at debug dumps
   // memset(frame_stack(frame), 0x0, code->max_stack * sizeof(stack_value));

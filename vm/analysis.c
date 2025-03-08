@@ -207,6 +207,16 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
   }
 }
 
+// Calculate the delta field for instructions like aload, fstore
+static void calculate_local_modifying_insn_delta(bytecode_insn *insn, const struct method_analysis_ctx *ctx) {
+  insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+}
+
+// Calculate the delta field for branches (besides *switch)
+static void calculate_branch_delta(bytecode_insn * insn, int curr_index) {
+  insn->delta = ((s32)insn->index - (s32)curr_index) * (s32)sizeof(bytecode_insn);
+}
+
 /** Helper macros for analyze_instruction */
 
 // Pop a value from the analysis stack and return it.
@@ -667,74 +677,74 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     SWIZZLE_LOCAL(insn->index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, DOUBLE)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_fload: {
     SWIZZLE_LOCAL(insn->index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, FLOAT)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_iload: {
     SWIZZLE_LOCAL(insn->index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, INT)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_lload: {
     SWIZZLE_LOCAL(insn->index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, LONG)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_dstore: {
     POP(DOUBLE)
     SWIZZLE_LOCAL(insn->index)
     SET_LOCAL(insn->index, DOUBLE)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_fstore: {
     POP(FLOAT)
     SWIZZLE_LOCAL(insn->index)
     SET_LOCAL(insn->index, FLOAT)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_istore: {
     POP(INT)
     SWIZZLE_LOCAL(insn->index)
     SET_LOCAL(insn->index, INT)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_lstore: {
     POP(LONG)
     SWIZZLE_LOCAL(insn->index)
     SET_LOCAL(insn->index, LONG)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_aload: {
     SWIZZLE_LOCAL(insn->index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
     CHECK_LOCAL(insn->index, REFERENCE)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_astore: {
     POP(REFERENCE)
     SWIZZLE_LOCAL(insn->index)
     SET_LOCAL(insn->index, REFERENCE)
-    insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+    calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_goto: {
-    insn->delta = (s32)insn->index - (s32)insn_index;
+    calculate_branch_delta(insn, insn_index);
     if (push_branch_target(ctx, insn_index, insn->index))
       goto error;
     *state_terminated = true;
@@ -750,7 +760,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_if_acmpne: {
     POP(REFERENCE)
     POP(REFERENCE)
-    insn->delta = (s32)insn->index - (s32)insn_index;
+    calculate_branch_delta(insn, insn_index);
     if (push_branch_target(ctx, insn_index, insn->index))
       goto error;
     break;
@@ -770,7 +780,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_ifgt:
   case insn_ifle: {
     POP(INT)
-    insn->delta = (s32)insn->index - (s32)insn_index;
+    calculate_branch_delta(insn, insn_index);
     if (push_branch_target(ctx, insn_index, insn->index))
       goto error;
     break;
@@ -778,7 +788,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_ifnonnull:
   case insn_ifnull: {
     POP(REFERENCE)
-    insn->delta = (s32)insn->index - (s32)insn_index;
+    calculate_branch_delta(insn, insn_index);
     if (push_branch_target(ctx, insn_index, insn->index))
       goto error;
     break;

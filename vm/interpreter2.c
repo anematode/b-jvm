@@ -195,14 +195,12 @@
   WITH_UNDEF(jmp_table_void[insns[1].kind](thread, frame, insns + 1, FUEL, sp, a_undef, b_undef, c_undef));
 
 #define STACK_POLYMORPHIC_NEXT(tos)                                                                                    \
-  stack_value __tos = (tos);                                                                                           \
-  MUSTTAIL return bytecode_tables[insns[1].tos_before][insns[1].kind](thread, frame, insns + 1, FUEL, sp, __tos.l,     \
-                                                                      __tos.f, __tos.d);
+  MUSTTAIL return bytecode_tables[insns[1].tos_before][insns[1].kind](thread, frame, insns + 1, FUEL, sp, \
+    (sp - 1)->l, (sp - 1)->f, (sp - 1)->d);
 
 #define STACK_POLYMORPHIC_JMP(tos)                                                                                     \
-  stack_value __tos = (tos);                                                                                           \
-  MUSTTAIL return bytecode_tables[insns[0].tos_before][insns[0].kind](thread, frame, insns, FUEL, sp, __tos.l,         \
-                                                                      __tos.f, __tos.d);
+  MUSTTAIL return bytecode_tables[insns[0].tos_before][insns[0].kind](thread, frame, insns, FUEL, sp, \
+    (sp - 1)->l, (sp - 1)->f, (sp - 1)->d);
 #endif // ifdef EMSCRIPTEN
 #else  // !DO_TAILS
 
@@ -276,7 +274,7 @@ static double *arg_3;
 
 #ifdef __clang__
 // TODO see if this is worth it
-#define UNPREDICTABLE(x) x //__builtin_unpredictable(x)
+#define UNPREDICTABLE(x) x // __builtin_unpredictable(x)
 #else
 #define UNPREDICTABLE(x) x
 #endif
@@ -517,7 +515,8 @@ typedef enum {
   CONT_INVOKESIGPOLY,
   CONT_MONITOR_ENTER,
   CONT_RESUME_INSN,
-  CONT_DEBUGGER_PAUSE
+  CONT_DEBUGGER_PAUSE,
+  CONT_SYNCHRONIZED_METHOD
 } continuation_point;
 
 typedef struct {
@@ -1437,28 +1436,28 @@ static s64 dreturn_impl_double(ARGS_DOUBLE) {
 static s64 goto_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   FUEL_CHECK_VOID
-  insns += insn->delta;
+  insns = (bytecode_insn*)((char*)insns + insn->delta);
   JMP_VOID
 }
 
 static s64 goto_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns += insn->delta;
+  insns = (bytecode_insn*)((char*)insns + insn->delta);
   JMP_DOUBLE(tos)
 }
 
 static s64 goto_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns += insn->delta;
+  insns = (bytecode_insn*)((char*)insns + insn->delta);
   JMP_FLOAT(tos)
 }
 
 static s64 goto_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns += insn->delta;
+  insns = (bytecode_insn*)((char*)insns + insn->delta);
   JMP_INT(tos)
 }
 
@@ -1512,8 +1511,8 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
   static s64 which##_impl_int(ARGS_INT) {                                                                              \
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
-    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->delta : 1;                                                       \
-    insns += offset;                                                                                                   \
+    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->delta : (s32)sizeof(bytecode_insn);                                   \
+    insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
     sp--;                                                                                                              \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
   }
@@ -1532,8 +1531,8 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
     s64 a = (sp - 2)->i, b = (int)tos;                                                                                 \
-    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->delta : 1;                                                    \
-    insns += offset;                                                                                                   \
+    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->delta : (s32)sizeof(bytecode_insn);                                \
+    insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
     sp -= 2;                                                                                                           \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
   }
@@ -1549,8 +1548,8 @@ static s64 if_acmpeq_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
-  s32 offset = UNPREDICTABLE(a == b) ? insn->delta : 1;
-  insns += offset;
+  s32 offset = UNPREDICTABLE(a == b) ? insn->delta : (s32)sizeof(bytecode_insn);
+  insns = (bytecode_insn*)((char*)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
@@ -1559,8 +1558,8 @@ static s64 if_acmpne_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
-  s32 offset = UNPREDICTABLE(a != b) ? insn->delta : 1;
-  insns += offset;
+  s32 offset = UNPREDICTABLE(a != b) ? insn->delta : (s32)sizeof(bytecode_insn);
+  insns = (bytecode_insn*)((char*)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
@@ -1716,6 +1715,10 @@ static int intrinsify(bytecode_insn *inst) {
       inst->kind = insn_sqrt;
       return 1;
     }
+    if (utf8_equals(method->name, "pow")) {
+      inst->kind = insn_pow;
+      return 1;
+    }
   }
   return 0;
 }
@@ -1795,8 +1798,8 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   if (method->is_signature_polymorphic) {
     invoked_frame = push_native_frame(thread, method, insn->cp->methodref.descriptor, sp - insn->args, insn->args);
   } else {
-    ConsiderJitEntry(thread, method, sp - insn->args) invoked_frame =
-        push_frame(thread, method, sp - insn->args, insn->args);
+    ConsiderJitEntry(thread, method, sp - insn->args);
+    invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
   }
   if (unlikely(!invoked_frame)) {
     return RETVAL_EXCEPTION_THROWN;
@@ -2590,6 +2593,20 @@ static s64 sqrt_impl_float(ARGS_FLOAT) {
   NEXT_FLOAT(sqrt(tos))
 }
 
+static s64 pow_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  double result = pow((sp - 2)->d, tos);
+  sp -= 1;
+  NEXT_DOUBLE(result)
+}
+
+static s64 pow_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  float result = pow((sp - 2)->f, tos);
+  sp -= 1;
+  NEXT_DOUBLE(result)
+}
+
 static s64 frem_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   float a = (sp - 2)->f, b = tos;
@@ -2848,23 +2865,30 @@ object get_sync_object(vm_thread *thread, stack_frame *frame) {
 }
 
 static bool do_entry_synchronization(future_t *fut, vm_thread *thread, stack_frame *frame, object synchronized_on) {
-  monitor_acquire_t *store = (monitor_acquire_t *)thread->stack.synchronize_acquire_continuation;
-  monitor_acquire_t ctx = frame->synchronized_state ? *store : (monitor_acquire_t){.args = {thread, synchronized_on}};
+  bool already_tried = frame->synchronized_state == SYNCHRONIZE_IN_PROGRESS;
+
+  monitor_acquire_t ctx = (monitor_acquire_t){.args = {thread, synchronized_on}};
+  if (unlikely(already_tried)) {  // resume the previous call to monitor acuiqre
+    continuation_frame *cont = async_stack_pop(thread);
+    DCHECK(cont->pnt == CONT_SYNCHRONIZED_METHOD);
+    ctx = cont->ctx.acquire_monitor;
+  }
+
   *fut = monitor_acquire(&ctx);
   if (fut->status == FUTURE_NOT_READY) {
-    memcpy(store, &ctx, sizeof(ctx));
-    static_assert(sizeof(ctx) <= sizeof(thread->stack.synchronize_acquire_continuation),
-                  "context can not be stored within thread cache");
+    continuation_frame *cont = async_stack_push(thread);
+    *cont = (continuation_frame){.pnt = CONT_SYNCHRONIZED_METHOD, .frame = frame, .ctx.acquire_monitor = ctx};
     frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
     frame->is_async_suspended = true;
     return true;
   }
+
   frame->synchronized_state = SYNCHRONIZE_DONE;
   frame->is_async_suspended = false;
   return false;
 }
 
-// Executed whenever a frame begins.
+// Executed whenever a frame begins or is resumed. (i.e., it can be called multiple times)
 static bool on_frame_start(future_t *fut, vm_thread *thread, stack_frame *frame) {
   object synchronized_on = get_sync_object(thread, frame);
   if (unlikely(synchronized_on) && frame->synchronized_state < SYNCHRONIZE_DONE) {
@@ -2896,14 +2920,14 @@ static void on_frame_end(vm_thread *thread, stack_frame *frame) {
 //    ↓
 // ┌──┴──────────────────┐       ┌──────────────────────────────────────┐
 // │ Is async suspended? ├──yes─→┤ Resume at end of chain, no cont. pop │
-// └──┬──────────────────┘       └───┬──────────────────────────────────┘
-//    ↓ no (current = entry_frame)   │
-// ┌──┴──────────────────────────┐   ╎        ╔═══════════════════╗
-// │ Synchronize on entry_frame? ├─suspended─→║ cont: none needed ║
-// └──┬──────────────────────────┘   ╎        ╚═══════════════════╝
-//    └────┐ ok               ┌──────┘
-//      ┌──┴──────────────────┴─────┐       ┌─────────────────┐            ╔═══════════════════╗
-//  ┌──→│ current frame is native?  ├──yes─→┤cont. pop if sus.├─suspended─→║ cont: CONT_NATIVE ║
+// └───────┬─────────────┘       └────────┬─────────────────────────────┘
+//         ↓ no (current = entry_frame)   │
+//      ┌──┴───────────────────────┐      ╎        ╔════════════════════════════════╗
+//  ┌──→│ Synchronize on current?  ├─suspended────→║ cont: CONT_SYNCHRONIZED_METHOD ║
+//  │   └──┬───────────────────────┘      ╎        ╚════════════════════════════════╝
+//  │      ↓ ok               ┌───────────┘
+//  │   ┌──┴──────────────────┴─────┐       ┌─────────────────┐            ╔═══════════════════╗
+//  │   │ current frame is native?  ├──yes─→┤cont. pop if sus.├─suspended─→║ cont: CONT_NATIVE ║
 //  │   └──┬────────────────────────┘       │ run native call │──→─┐       ╚═══════════════════╝
 //  │      │                                └─────────────────┘    │ok
 //  │      ↓ no                                                    │
@@ -2954,16 +2978,16 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
   if (unlikely(entry_frame->is_async_suspended)) {
     // Advance the interpreter to the frame in this chain of pure Java calls which was suspended
     current_frame = async_stack_peek(thread)->frame;
-  } else {
+  }
+
+  stack_value result;
+  while (true) {
     if (unlikely(on_frame_start(fut, thread, current_frame))) {
       // Suspension during synchronization
       entry_frame->is_async_suspended = true;
       return (stack_value){0};
     }
-  }
 
-  stack_value result;
-  while (true) {
     if (is_frame_native(current_frame)) {
       /** Handle native calls */
       run_native_t ctx;
@@ -3052,10 +3076,6 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
         DCHECK(result.l == 0);
         DCHECK(!current_frame->is_async_suspended);
         current_frame = thread->stack.top;
-        if (on_frame_start(fut, thread, current_frame)) {
-          entry_frame->is_async_suspended = true;
-          return (stack_value){0};
-        }
         continue;
       }
 
@@ -3212,6 +3232,7 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_L] = getstatic_L_impl_double,
     [insn_putstatic_D] = putstatic_D_impl_double,
     [insn_drem] = drem_impl_double,
+    [insn_pow] = pow_impl_double,
     [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3446,4 +3467,5 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_getstatic_L] = getstatic_L_impl_float,
     [insn_putstatic_F] = putstatic_F_impl_float,
     [insn_frem] = frem_impl_float,
+    [insn_pow] = pow_impl_float,
     [insn_sqrt] = sqrt_impl_float};

@@ -10,6 +10,7 @@
 #include "analysis.h"
 #include "classfile.h"
 #include "util.h"
+#include "bjvm.h"
 
 type_kind kind_to_representable_kind(type_kind kind) {
   switch (kind) {
@@ -1418,6 +1419,7 @@ attribute_code parse_code_attribute(cf_byteslice attr_reader, classfile_parse_ct
   return (attribute_code){.max_stack = max_stack,
                           .max_locals = max_locals,
                           .insn_count = insn_count,
+                          .frame_size = sizeof(stack_frame) + max_stack * sizeof(stack_value),
                           .max_formal_pc = ctx->current_code_max_pc,
                           .code = code,
                           .attributes = attributes,

@@ -259,7 +259,8 @@ typedef enum : u8 {
   insn_putstatic_L,
 
   /** intrinsics understood by the interpreter */
-  insn_sqrt
+  insn_pow,  // (FF)F, (DD)D
+  insn_sqrt  // (F)F, (D)D
 } insn_code_kind;
 
 #define MAX_INSN_KIND (insn_sqrt + 1)
@@ -615,7 +616,7 @@ typedef struct bytecode_insn {
     // index)
     struct {
       u32 index;
-      // for branches, the delta to the target.
+      // for branches, the delta to the target in BYTES (so, the pc is scaled by sizeof(bytecode_insn)).
       // For local instructions like astore/dload, equal to max_locals - index
       s32 delta;
     };
@@ -647,6 +648,7 @@ typedef struct bytecode_insn {
 typedef struct {
   u16 max_stack;
   u16 max_locals;
+  u32 frame_size;
   int insn_count;
   int max_formal_pc;
 
@@ -748,6 +750,8 @@ typedef struct cp_method {
   int attributes_count;
   attribute *attributes;
   attribute_code *code;
+
+  char template_frame[40];  // holds a stack_frame that is a template for an interpreter entry
 
   // Whether the method may be missing a StackMapTable because it's in an old class file
   bool missing_smt;

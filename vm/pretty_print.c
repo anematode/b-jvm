@@ -241,6 +241,7 @@ const char *insn_code_to_string(insn_code_kind code) {
     CASE(putstatic_L)
     CASE(putstatic_Z)
     CASE(invokesigpoly)
+    CASE(pow)
     CASE(sqrt)
   }
   printf("Unknown code: %d\n", code);
