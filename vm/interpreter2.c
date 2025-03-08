@@ -2877,7 +2877,7 @@ static bool do_entry_synchronization(future_t *fut, vm_thread *thread, stack_fra
   *fut = monitor_acquire(&ctx);
   if (fut->status == FUTURE_NOT_READY) {
     continuation_frame *cont = async_stack_push(thread);
-    *cont = (continuation_frame){.pnt = CONT_SYNCHRONIZED_METHOD, .frame = frame, .ctx.acquire_monitor = ctx};
+    *cont = (continuation_frame){.pnt = CONT_SYNCHRONIZED_METHOD, .frame = frame, .wakeup = fut->wakeup, .ctx.acquire_monitor = ctx};
     frame->synchronized_state = SYNCHRONIZE_IN_PROGRESS;
     frame->is_async_suspended = true;
     return true;
