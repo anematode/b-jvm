@@ -206,6 +206,46 @@ ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 static void busy_wait(double us) { EM_ASM("const endAt = Date.now() + $0 / 1000; while (Date.now() < endAt) {}", us); }
 #endif
 
+
+void *worker_thread_run_until_completion(void *param) {
+  auto *scheduler = (rr_scheduler *)param;
+  auto *vm = scheduler->vm;
+  auto *result = new ScheduledTestCaseResult {};
+
+  // chop chop time to work
+  worker_thread_pool_register(&scheduler->thread_pool);
+  scheduler_polled_info_t task = scheduler_poll(scheduler);
+  for (;;result->yield_count++) {
+    gc_pause_if_requested(vm);
+
+    if (task.current_status == SCHEDULER_RESULT_DONE) {
+      break; // probably, idk
+    }
+
+    if (task.thread_info) {
+      scheduler_execute(vm, task, scheduler->preemption_us);
+      task = scheduler_push_execution_record_and_repoll(scheduler, task);
+      continue;
+    }
+
+    u64 sleep_for = task.may_sleep_us;
+    if (sleep_for) { // we've been told to sleep
+      result->sleep_count++;
+      result->us_slept += sleep_for;
+#ifdef EMSCRIPTEN
+      // long-term, we will use the JS scheduler instead of this hack
+      busy_wait(sleep_for);
+#else
+      usleep(sleep_for);
+#endif
+    }
+
+    task = scheduler_push_execution_record_and_repoll(scheduler, task);
+  }
+
+  return result;
+}
+
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio, std::string main_class,
                                                 std::string input, std::vector<std::string> string_args,
                                                 vm_options options) {
@@ -281,36 +321,14 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
-  // chop chop time to work
-  worker_thread_pool_register(&scheduler.thread_pool);
-  scheduler_polled_info_t task = scheduler_poll(&scheduler);
-  for (;;result.yield_count++) {
-    gc_pause_if_requested(vm);
-
-    if (task.current_status == SCHEDULER_RESULT_DONE) {
-      break; // probably, idk
-    }
-
-    if (task.thread_info) {
-      scheduler_execute(vm, task, scheduler.preemption_us);
-      task = scheduler_push_execution_record_and_repoll(&scheduler, task);
-      continue;
-    }
-
-    u64 sleep_for = task.may_sleep_us;
-    if (sleep_for) { // we've been told to sleep
-      result.sleep_count++;
-      result.us_slept += sleep_for;
-#ifdef EMSCRIPTEN
-      // long-term, we will use the JS scheduler instead of this hack
-      busy_wait(sleep_for);
-#else
-      usleep(sleep_for);
-#endif
-    }
-
-    task = scheduler_push_execution_record_and_repoll(&scheduler, task);
-  }
+  pthread_t thread_1;
+  pthread_create(&thread_1, nullptr, worker_thread_run_until_completion, &scheduler);
+  ScheduledTestCaseResult *result_1;
+  pthread_join(thread_1, reinterpret_cast<void **>(&result_1));
+  result.yield_count += result_1->yield_count;
+  result.sleep_count += result_1->sleep_count;
+  result.us_slept += result_1->us_slept;
+  delete result_1;
 
   if (thread->current_exception) {
     method =
