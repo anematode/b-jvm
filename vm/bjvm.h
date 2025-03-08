@@ -379,18 +379,20 @@ typedef struct vm {
   // available (even if it isn't running anything)
   vm_thread *primordial_thread;
 
-  // The compacting heap.
-  u8 *heap;
+  struct {
+    // The compacting heap.
+    u8 *heap;
 
-  // Next object should be allocated here. Should always be 8-byte aligned
-  // which is the alignment of BJVM objects.
-  size_t heap_used;
-  size_t heap_capacity;
+    // Next object should be allocated here. Should always be 8-byte aligned
+    // which is the alignment of BJVM objects.
+    size_t heap_used;
+    size_t heap_capacity;
 
-  // This capacity is used solely when handling an OutOfMemoryError, because
-  // fillInStackTrace allocates stuff. The reserved space is a constant in
-  // bjvm.c.
-  size_t true_heap_capacity;
+    // This capacity is used solely when handling an OutOfMemoryError, because
+    // fillInStackTrace allocates stuff. The reserved space is a constant in
+    // bjvm.c.
+    size_t true_heap_capacity;
+  } heap;
 
   // Handles referenced from JS
   obj_header **js_handles;

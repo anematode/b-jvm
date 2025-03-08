@@ -625,10 +625,10 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
-  vm->heap = aligned_alloc(4096, options.heap_size);
-  vm->heap_used = 0;
-  vm->heap_capacity = options.heap_size;
-  vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
+  vm->heap.heap = aligned_alloc(4096, options.heap_size);
+  vm->heap.heap_used = 0;
+  vm->heap.heap_capacity = options.heap_size;
+  vm->heap.true_heap_capacity = vm->heap.heap_capacity + OOM_SLOP_BYTES;
   vm->active_threads = nullptr;
 
   vm->read_stdin = options.read_stdin;
@@ -705,7 +705,7 @@ void free_vm(vm *vm) {
     free_thread(vm->active_threads[i]);
   }
   arrfree(vm->active_threads);
-  free(vm->heap);
+  free(vm->heap.heap);
   free_unsafe_allocations(vm);
   free_zstreams(vm);
 
@@ -1542,7 +1542,7 @@ classdesc *bootstrap_lookup_class(vm_thread *thread, const slice name) {
 void out_of_memory(vm_thread *thread) {
   vm *vm = thread->vm;
   thread->current_exception = nullptr;
-  if (vm->heap_capacity == vm->true_heap_capacity) {
+  if (vm->heap.heap_capacity == vm->heap.true_heap_capacity) {
     // We're currently calling fillInStackTrace on the OOM instance, just
     // shut up
     return;
@@ -1550,31 +1550,31 @@ void out_of_memory(vm_thread *thread) {
 
   // temporarily expand the valid heap so that we can allocate the OOM error and
   // its constituents
-  size_t original_capacity = vm->heap_capacity;
-  vm->heap_capacity = vm->true_heap_capacity;
+  size_t original_capacity = vm->heap.heap_capacity;
+  vm->heap.heap_capacity = vm->heap.true_heap_capacity;
 
   obj_header *oom = thread->out_of_mem_error;
   // TODO call fillInStackTrace
   raise_exception_object(thread, oom);
 
-  vm->heap_capacity = original_capacity;
+  vm->heap.heap_capacity = original_capacity;
 }
 
 void *bump_allocate(vm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
   vm *vm = thread->vm;
-  DCHECK(vm->heap_used % 8 == 0);
-  if (vm->heap_used + bytes > vm->heap_capacity) {
+  DCHECK(vm->heap.heap_used % 8 == 0);
+  if (vm->heap.heap_used + bytes > vm->heap.heap_capacity) {
     scheduled_gc_pause(thread->vm);
-    if (vm->heap_used + bytes > vm->heap_capacity) {
+    if (vm->heap.heap_used + bytes > vm->heap.heap_capacity) {
       out_of_memory(thread);
       return nullptr;
     }
   }
-  void *result = vm->heap + vm->heap_used;
+  void *result = vm->heap.heap + vm->heap.heap_used;
   memset(result, 0, bytes);
-  vm->heap_used += bytes;
+  vm->heap.heap_used += bytes;
   return result;
 }
 
