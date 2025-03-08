@@ -1548,33 +1548,41 @@ void out_of_memory(vm_thread *thread) {
     return;
   }
 
-  // temporarily expand the valid heap so that we can allocate the OOM error and
-  // its constituents
-  size_t original_capacity = vm->heap.heap_capacity;
-  vm->heap.heap_capacity = vm->heap.true_heap_capacity;
-
   obj_header *oom = thread->out_of_mem_error;
-  // TODO call fillInStackTrace
+  // OOM does not need a stack trace
   raise_exception_object(thread, oom);
-
-  vm->heap.heap_capacity = original_capacity;
 }
 
+// does atomic access to be thread-safe
 void *bump_allocate(vm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
   vm *vm = thread->vm;
-  DCHECK(vm->heap.heap_used % 8 == 0);
-  if (vm->heap.heap_used + bytes > vm->heap.heap_capacity) {
+
+  static_assert(sizeof(vm->heap.heap_used) == sizeof(uintptr_t), "data size cannot be used in atomic addition operation!");
+
+  // bump allocate a slice optimistically
+  size_t heap_used = __atomic_fetch_add(&vm->heap.heap_used, bytes, __ATOMIC_SEQ_CST);
+  DCHECK(heap_used % 8 == 0);
+  size_t end;
+  [[maybe_unused]] bool overflow = __builtin_add_overflow(heap_used, bytes, &end);
+  DCHECK(!overflow); // todo: more strict overflow checking?
+  if (end > vm->heap.heap_capacity) {
     scheduled_gc_pause(thread->vm);
-    if (vm->heap.heap_used + bytes > vm->heap.heap_capacity) {
+
+    // try again; bump allocate a slice
+    heap_used = __atomic_fetch_add(&vm->heap.heap_used, bytes, __ATOMIC_SEQ_CST);
+    DCHECK(heap_used % 8 == 0);
+    overflow = __builtin_add_overflow(heap_used, bytes, &end);
+    DCHECK(!overflow); // todo: more strict overflow checking?
+    if (end > vm->heap.heap_capacity) {
       out_of_memory(thread);
       return nullptr;
     }
   }
-  void *result = vm->heap.heap + vm->heap.heap_used;
+
+  void *result = vm->heap.heap + heap_used;
   memset(result, 0, bytes);
-  vm->heap.heap_used += bytes;
   return result;
 }
 
