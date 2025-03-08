@@ -625,10 +625,10 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
-  vm->heap.heap = aligned_alloc(4096, options.heap_size);
+  vm->heap.heap = aligned_alloc(4096, options.heap_size + OOM_SLOP_BYTES);
   vm->heap.heap_used = 0;
   vm->heap.heap_capacity = options.heap_size;
-  vm->heap.true_heap_capacity = vm->heap.heap_capacity + OOM_SLOP_BYTES;
+  vm->heap.true_heap_capacity = options.heap_size + OOM_SLOP_BYTES;
   vm->active_threads = nullptr;
 
   vm->read_stdin = options.read_stdin;
@@ -1540,13 +1540,7 @@ classdesc *bootstrap_lookup_class(vm_thread *thread, const slice name) {
 }
 
 void out_of_memory(vm_thread *thread) {
-  vm *vm = thread->vm;
   thread->current_exception = nullptr;
-  if (vm->heap.heap_capacity == vm->heap.true_heap_capacity) {
-    // We're currently calling fillInStackTrace on the OOM instance, just
-    // shut up
-    return;
-  }
 
   obj_header *oom = thread->out_of_mem_error;
   // OOM does not need a stack trace
@@ -1564,6 +1558,7 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
   // bump allocate a slice optimistically
   size_t heap_used = __atomic_fetch_add(&vm->heap.heap_used, bytes, __ATOMIC_SEQ_CST);
   DCHECK(heap_used % 8 == 0);
+  DCHECK(heap_used < __atomic_load_n(&vm->heap.heap_used, __ATOMIC_SEQ_CST));
   size_t end;
   [[maybe_unused]] bool overflow = __builtin_add_overflow(heap_used, bytes, &end);
   DCHECK(!overflow); // todo: more strict overflow checking?
