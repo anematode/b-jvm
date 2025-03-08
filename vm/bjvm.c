@@ -2600,14 +2600,15 @@ DEFINE_ASYNC(run_native) {
   }
 
   self->native_struct = malloc(hand->async_ctx_bytes);
-  arrput(thread->vm->unsafe_allocations, self->native_struct);
+  // todo: commenting out the unsafe allocation stuff causes mallocations to not be tracked down
+//  arrput(thread->vm->unsafe_allocations, self->native_struct);
 
   *self->native_struct = (async_natives_args){{thread, target_handle, native_args, argc}, 0};
   AWAIT_FUTURE_EXPR(((native_callback *)frame->method->native_handle)->async(self->native_struct));
   // We've laid out the context struct so that the result is always at offset 0
   stack_value result = ((async_natives_args *)self->native_struct)->result;
   free(self->native_struct);
-  remove_unsafe_allocation(thread->vm, self->native_struct);
+//  remove_unsafe_allocation(thread->vm, self->native_struct);
 
   ASYNC_END(result);
 

@@ -482,13 +482,13 @@ TEST_CASE("[perf test] Sudoku solver") {
   std::cout << "That's " << (double)elapsed / num_puzzles << " ms per puzzle!" << std::endl;
 }
 
-TEST_CASE("[perf test] Scheduled sudoku solver") {
+TEST_CASE("[perf test] Queued parallel sudoku solver") {
   int num_puzzles = 33761;
-  std::cout << "Starting sudoku solver with a scheduler" << std::endl;
+  std::cout << "Starting sudoku solver using parallel task queues" << std::endl;
   std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
   auto now = std::chrono::system_clock::now();
 
-  auto result = run_scheduled_test_case("test_files/sudoku/", true, "Main");
+  auto result = run_scheduled_test_case("test_files/sudoku/", true, "QueuedParallelSudoku");
   // last puzzle
   REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
           std::string::npos);
@@ -503,7 +503,7 @@ TEST_CASE("[perf test] Scheduled sudoku solver") {
 
 TEST_CASE("[perf test] Scheduled worker sudoku solver") {
   int num_puzzles = 33761;
-  std::cout << "Starting sudoku solver with a worker thread" << std::endl;
+  std::cout << "Starting sudoku solver with an unsafe atomic worker thread" << std::endl;
   std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
   auto now = std::chrono::system_clock::now();
 

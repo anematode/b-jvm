@@ -194,6 +194,8 @@ scheduler_polled_info_t scheduler_poll(rr_scheduler *scheduler) {
 
 void scheduler_execute(vm *vm, scheduler_polled_info_t info, u64 preemption_us) {
   thread_info *impl_info = (thread_info *)info.thread_info;
+  if (unlikely((!impl_info))) return;
+
   vm_thread *thread = impl_info->thread;
   u64 time = get_unix_us();
 

@@ -257,6 +257,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
 
   options.classpath = (slice){.chars = (char *)classpath.c_str(), .len = static_cast<u16>(classpath.size())};
 
+  // todo: stdio functions need to be synchronized
   options.read_stdin = capture_stdio ? +[](char *buf, int len, void *param) {
     auto *result = (ScheduledTestCaseResult *) param;
     int remaining = result->stdin_.length();
@@ -322,14 +323,19 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
+//  // do some work just to get settled
+//  for (int i=0; i<5; i++) {
+//    scheduler_polled_info_t task = scheduler_poll(&scheduler);
+//    scheduler_execute(vm, task, scheduler.preemption_us);
+//    scheduler_push_execution_record(&scheduler, task);
+//  }
+
   pthread_t thread_1;
   pthread_create(&thread_1, nullptr, worker_thread_run_until_completion, &scheduler);
 
-//  usleep(1000000); // scuff trick to hopefully get the class intiialziation settled
-
 //  pthread_t thread_2;
 //  pthread_create(&thread_2, nullptr, worker_thread_run_until_completion, &scheduler);
-
+//
 //  ScheduledTestCaseResult *result_2;
 //  pthread_join(thread_2, reinterpret_cast<void **>(&result_2));
 //  result.yield_count += result_2->yield_count;
