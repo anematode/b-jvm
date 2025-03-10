@@ -774,7 +774,7 @@ Test
 )");
 }
 
-TEST_CASE("The algorithms") {
+TEST_CASE("[perf test] The algorithms") {
   auto result = run_test_case("test_files/share/assertj-core-3.26.3.jar:"
                               "test_files/share/commons-collections4-4.4.jar:"
                               "test_files/share/commons-lang3-3.17.0.jar:"
@@ -846,6 +846,15 @@ TEST_CASE("Fannkuch redux multithreaded") {
   auto result = run_scheduled_test_case("test_files/fannkuch_multithreaded/", true, "fannkuchredux");
   REQUIRE(result.stdout_ == R"(73196
 Pfannkuchen(10) = 38
+)");
+}
+
+TEST_CASE("getDeclaredClasses") {
+  auto result = run_test_case("test_files/get_declared_classes/", true, "GetDeclaredClasses");
+  REQUIRE(result.stdout_ == R"(GetDeclaredClasses$Hen
+GetDeclaredClasses$Omelette
+GetDeclaredClasses$Chicken
+GetDeclaredClasses$Egg
 )");
 }
 

@@ -296,17 +296,28 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/
   return (stack_value){.obj = result};
 }
 
-DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;") {
-  classdesc *classdesc = unmirror_class(obj->obj);
-  (void)classdesc;
-
-  // printf("Calling incompletely implemented getDeclaredClasses0\n");
-
+DECLARE_ASYNC_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;", locals(), invoked_methods()) {
+  classdesc *cd = unmirror_class(obj->obj);
+  attribute_inner_classes *inner_classes = cd->inner_classes;
   int count = 0;
-  stack_value ret;
-  ret.obj = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), count);
-  // TODO parse inner classes and return them here
-  return ret;
+  if (inner_classes) {
+    count = inner_classes->count;
+  }
+  handle *ret = make_handle(thread,
+    CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, count));
+  if (inner_classes) {
+    for (int i = 0; i < count; ++i) {
+      cp_class_info *info = inner_classes->classes[i];
+      resolve_class(thread, info);
+      if (!info->classdesc)
+        continue;
+      obj_header *mirror = (void *)get_class_mirror(thread, info->classdesc);
+      *((obj_header **)ArrayData(ret->obj) + i) = mirror;
+    }
+  }
+  object result = ret->obj;
+  drop_handle(thread, ret);
+  ASYNC_END((stack_value) { .obj = result });
 }
 
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {

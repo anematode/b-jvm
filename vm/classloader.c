@@ -1,11 +1,8 @@
-//
-// Created by Tim Herchen on 3/8/25.
-//
-
 #include "classloader.h"
 #include "cached_classdescs.h"
 #include "bjvm.h"
 
+// NOLINTNEXTLINE(misc-no-recursion)
 int classloader_init(vm *vm, classloader *cl, obj_header *java_mirror) {
   DCHECK(java_mirror == nullptr || instanceof(java_mirror->descriptor, cached_classes(vm)->class_loader),
     "Object is not a java/lang/ClassLoader");
@@ -24,6 +21,7 @@ int classloader_init(vm *vm, classloader *cl, obj_header *java_mirror) {
   return 0;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 classloader *unmirror_classloader(vm *vm, obj_header *java_mirror) {
   if (java_mirror == nullptr) {
     return vm->bootstrap_classloader;
