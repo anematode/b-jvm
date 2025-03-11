@@ -5,11 +5,10 @@ DECLARE_NATIVE("java/lang", ClassLoader, registerNatives, "()V") { return value_
 DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0, "(Ljava/lang/String;)Ljava/lang/Class;") {
   DCHECK(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
-  // Replace . with /
-  for (u32 i = 0; i < read.len; ++i)
-    if (read.chars[i] == '.')
-      read.chars[i] = '/';
-  classdesc *cd = hash_table_lookup(&thread->vm->classes, read.chars, read.len);
+  exchange_slashes_and_dots((slice*) &read, hslc(read)); // TODO unjank
+  classloader *cl = unmirror_classloader(thread->vm, obj->obj);
+  classdesc *cd = hash_table_lookup(&cl->loaded, read.chars, read.len);
+
   free_heap_str(read);
   return (stack_value){.obj = cd ? (void *)get_class_mirror(thread, cd) : nullptr};
 
@@ -38,9 +37,9 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBuiltinLib, "(Ljava/lang/String;)Lj
 
 static int incr = 0;
 
-enum { CREATION_ANONYMOUS = 8 };
+enum { FLAG_HIDDEN_CLASS = 8 };
 
-stack_value define_class(vm_thread *thread, handle *loader, handle *parent_class, handle *name, u8 *data_bytes,
+stack_value define_class_shared_impl(vm_thread *thread, handle *loader, handle *parent_class, handle *name, u8 *data_bytes,
                          int offset, int length, handle *pd, bool initialize, int flags, handle *source) {
   DCHECK(offset == 0);
 
@@ -51,15 +50,15 @@ stack_value define_class(vm_thread *thread, handle *loader, handle *parent_class
       name_str.chars[i] = '/';
 
   INIT_STACK_STRING(cf_name, 1000);
-  if (flags & CREATION_ANONYMOUS) {
+  bool is_hidden = flags & FLAG_HIDDEN_CLASS;
+  if (is_hidden) {
     cf_name = bprintf(cf_name, "%.*s.%d", fmt_slice(name_str), incr++);
   } else {
     cf_name = bprintf(cf_name, "%.*s", fmt_slice(name_str));
   }
 
   // Now append some random stuff to the name
-  classdesc *result = define_bootstrap_class(thread, cf_name, data_bytes, length);
-  result->classloader = loader->obj;
+  classdesc *result = define_class(thread, unmirror_classloader(thread->vm, loader->obj), cf_name, data_bytes, length);
 
   free_heap_str(name_str);
   if (initialize) {
@@ -69,7 +68,9 @@ stack_value define_class(vm_thread *thread, handle *loader, handle *parent_class
     CHECK(fut.status == FUTURE_READY);
     thread->stack.synchronous_depth--;
   }
+
   if (result) {
+    result->is_hidden = is_hidden;
     return (stack_value){.obj = (void *)get_class_mirror(thread, result)};
   }
 
@@ -90,7 +91,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass2,
 
   u8 *data_bytes = (u8 *)LoadFieldLong(b->obj, "address");
 
-  return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
+  return define_class_shared_impl(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
 }
 
 DECLARE_NATIVE("java/lang", ClassLoader, defineClass1,
@@ -106,7 +107,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass1,
   DCHECK(length <= ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
-  return define_class(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
+  return define_class_shared_impl(thread, loader, nullptr, name, data_bytes, offset, length, pd, false, 0, nullptr);
 }
 
 DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
@@ -126,5 +127,5 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
   DCHECK(length <= ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
-  return define_class(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);
+  return define_class_shared_impl(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);
 }

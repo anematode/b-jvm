@@ -39,7 +39,7 @@ if (NOT EMSCRIPTEN)
 else ()
     # DO NOT USE -O3 FOR EMSCRIPTEN. IT BREAKS THE POST-PROCESSOR BECAUSE IT MANGLES NAMES. IT ALSO BLOATS
     # THE BINARY.
-    target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-mtail-call" "-O2" "-matomics")
+    target_compile_options(vm PRIVATE "-sUSE_ZLIB" "-O2" "-matomics")
     target_link_options(vm PUBLIC "-sUSE_ZLIB" "-Wl,--whole-archive")
 endif ()
 

@@ -1454,6 +1454,24 @@ void check_unqualified_name(slice name, bool is_method, const char *reading) {
   }
 }
 
+void parse_inner_classes_attribute(cf_byteslice attr_reader, attribute * attr, classfile_parse_ctx * ctx) {
+  attr->kind = ATTRIBUTE_KIND_INNER_CLASSES;
+  u16 count = attr->inner_classes.count = reader_next_u16(&attr_reader, "inner classes count");
+  cp_class_info **classes = attr->inner_classes.classes = arena_alloc(ctx->arena, count, sizeof(cp_class_info *));
+  for (int i = 0; i < count; ++i) {
+    cp_class_info *inner = &checked_cp_entry(ctx->cp, reader_next_u16(&attr_reader, "inner class index"), CP_KIND_CLASS,
+                                            "inner class")->class_info;
+    classes[i] = inner;
+    u16 outer_index = reader_next_u16(&attr_reader, "outer class index");
+    u16 inner_name_index = reader_next_u16(&attr_reader, "inner class name index");
+    u16 access_flags = reader_next_u16(&attr_reader, "inner class access flags");
+    (void)outer_index;
+    (void)inner_name_index;
+    (void)access_flags;  // TODO are these useful?
+  }
+}
+
+
 void parse_attribute(cf_byteslice *reader, classfile_parse_ctx *ctx, attribute *attr) {
   u16 index = reader_next_u16(reader, "method attribute name");
   attr->name = checked_get_utf8(ctx->cp, index, "method attribute name");
@@ -1476,18 +1494,30 @@ void parse_attribute(cf_byteslice *reader, classfile_parse_ctx *ctx, attribute *
         CP_KIND_STRING | CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_LONG | CP_KIND_DOUBLE, "constant value");
   } else if (utf8_equals(attr->name, "BootstrapMethods")) {
     parse_bootstrap_methods_attribute(attr_reader, attr, ctx);
+  } else if (utf8_equals(attr->name, "InnerClasses")) {
+    parse_inner_classes_attribute(attr_reader, attr, ctx);
   } else if (utf8_equals(attr->name, "EnclosingMethod")) {
     attr->kind = ATTRIBUTE_KIND_ENCLOSING_METHOD;
     u16 enclosing_class_index = reader_next_u16(&attr_reader, "enclosing class index");
     u16 enclosing_method_index = reader_next_u16(&attr_reader, "enclosing method index");
     attr->enclosing_method = (attribute_enclosing_method){
-        enclosing_class_index
-            ? &checked_cp_entry(ctx->cp, enclosing_class_index, CP_KIND_CLASS, "enclosing class")->class_info
-            : nullptr,
-        enclosing_method_index
-            ? &checked_cp_entry(ctx->cp, enclosing_method_index, CP_KIND_NAME_AND_TYPE, "enclosing method")
-                   ->name_and_type
-            : nullptr};
+      enclosing_class_index
+          ? &checked_cp_entry(ctx->cp, enclosing_class_index, CP_KIND_CLASS, "enclosing class")->class_info
+          : nullptr,
+      enclosing_method_index
+          ? &checked_cp_entry(ctx->cp, enclosing_method_index, CP_KIND_NAME_AND_TYPE, "enclosing method")
+                 ->name_and_type
+          : nullptr};
+  } else if (utf8_equals(attr->name, "PermittedSubclasses")) {
+    attr->kind = ATTRIBUTE_KIND_PERMITTED_SUBCLASSES;
+    int count = attr->permitted_subclasses.entries_count = reader_next_u16(&attr_reader, "permitted subclasses count");
+    cp_class_info **entries = attr->permitted_subclasses.entries =
+        arena_alloc(ctx->arena, count, sizeof(cp_class_info *));
+    for (int i = 0; i < count; ++i) {
+      cp_class_info *entry = &checked_cp_entry(ctx->cp, reader_next_u16(&attr_reader, "permitted subclass index"),
+                                               CP_KIND_CLASS, "permitted subclass")->class_info;
+      entries[i] = entry;
+    }
   } else if (utf8_equals(attr->name, "SourceFile")) {
     attr->kind = ATTRIBUTE_KIND_SOURCE_FILE;
     attr->source_file.name =
@@ -1858,6 +1888,8 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
       cf->source_file = &attr->source_file;
     } else if (attr->kind == ATTRIBUTE_KIND_NEST_HOST) {
       cf->nest_host = attr->nest_host;
+    } else if (attr->kind == ATTRIBUTE_KIND_INNER_CLASSES) {
+      cf->inner_classes = &attr->inner_classes;
     }
   }
 

@@ -86,7 +86,7 @@ MAKE_PRIMITIVE_LOAD_STORE(Double, double)
 
 #undef MAKE_PRIMITIVE_LOAD_STORE
 
-classdesc *make_array_classdesc(vm_thread *thread, classdesc *classdesc);
+classdesc *get_or_create_array_classdesc(vm_thread *thread, classdesc *classdesc);
 
 obj_header *CreateArray(vm_thread *thread, classdesc *desc, int const *dim_sizes, int total_dimensions);
 

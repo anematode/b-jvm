@@ -7,7 +7,7 @@
 debugger_bkpt *list_breakpoints(vm *vm, slice filename, int line) {
   debugger_bkpt *lst = nullptr;
   classdesc *C;
-  hash_table_iterator it = hash_table_get_iterator(&vm->classes);
+  hash_table_iterator it = hash_table_get_iterator(&vm->bootstrap_classloader->loaded);
   char *key;
   size_t len;
   while (hash_table_iterator_has_next(it, &key, &len, (void **)&C)) {

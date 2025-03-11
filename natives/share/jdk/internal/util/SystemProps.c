@@ -129,7 +129,7 @@ DECLARE_NATIVE("jdk/internal/util", SystemProps_Raw, vmProperties, "()[Ljava/lan
 
   SET_PROP(1, java_home.chars);
   SET_PROP(2, "java.class.path");
-  SET_PROP(3, thread->vm->classpath.as_colon_separated.chars);
+  SET_PROP(3, thread->vm->application_classpath.chars);
 
   return (stack_value){.obj = props->obj};
 }

@@ -82,7 +82,7 @@
 #if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (1) {                                                                                                             \
+  if (tick++ > 16628000) {                                                                                                             \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
@@ -1713,12 +1713,18 @@ static int intrinsify(bytecode_insn *inst) {
   if (utf8_equals(method->my_class->name, "java/lang/Math")) {
     if (utf8_equals(method->name, "sqrt")) {
       inst->kind = insn_sqrt;
-      return 1;
-    }
-    if (utf8_equals(method->name, "pow")) {
+    } else if (utf8_equals(method->name, "pow")) {
       inst->kind = insn_pow;
-      return 1;
+    } else if (utf8_equals(method->name, "sin")) {
+      inst->kind = insn_sin;
+    } else if (utf8_equals(method->name, "cos")) {
+      inst->kind = insn_cos;
+    } else if (utf8_equals(method->name, "tan")) {
+      inst->kind = insn_tan;
+    } else {
+      return 0;
     }
+    return 1;
   }
   return 0;
 }
@@ -2583,6 +2589,36 @@ static s64 instanceof_resolved_impl_int(ARGS_INT) {
   NEXT_INT(result)
 }
 
+static s64 sin_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(sin(tos));
+}
+
+static s64 sin_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(sinf(tos));
+}
+
+static s64 cos_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(cos(tos));
+}
+
+static s64 cos_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(cosf(tos));
+}
+
+static s64 tan_impl_double(ARGS_DOUBLE) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(tan(tos));
+}
+
+static s64 tan_impl_float(ARGS_FLOAT) {
+  DEBUG_CHECK();
+  NEXT_DOUBLE(tanf(tos));
+}
+
 static s64 sqrt_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   NEXT_DOUBLE(sqrt(tos))
@@ -3233,6 +3269,9 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_putstatic_D] = putstatic_D_impl_double,
     [insn_drem] = drem_impl_double,
     [insn_pow] = pow_impl_double,
+    [insn_sin] = sin_impl_double,
+    [insn_cos] = cos_impl_double,
+    [insn_tan] = tan_impl_double,
     [insn_sqrt] = sqrt_impl_double};
 
 PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
@@ -3468,4 +3507,7 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_putstatic_F] = putstatic_F_impl_float,
     [insn_frem] = frem_impl_float,
     [insn_pow] = pow_impl_float,
+    [insn_sin] = sin_impl_float,
+    [insn_cos] = cos_impl_float,
+    [insn_tan] = tan_impl_float,
     [insn_sqrt] = sqrt_impl_float};

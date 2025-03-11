@@ -10,16 +10,6 @@
 #include <linkage.h>
 #include <stdlib.h>
 
-// Symmetry with make_array_classdesc
-static void free_array_classdesc(classdesc *classdesc) {
-  DCHECK(classdesc->kind == CD_KIND_ORDINARY_ARRAY || classdesc->kind == CD_KIND_PRIMITIVE_ARRAY);
-  if (classdesc->array_type)
-    free_array_classdesc(classdesc->array_type);
-  free_function_tables(classdesc);
-  arena_uninit(&classdesc->arena);
-  free(classdesc);
-}
-
 // Called for both primitive and object arrays
 static void fill_array_classdesc(vm_thread *thread, classdesc *base) {
   base->access_flags = ACCESS_PUBLIC | ACCESS_FINAL | ACCESS_ABSTRACT;
@@ -42,6 +32,7 @@ static void fill_array_classdesc(vm_thread *thread, classdesc *base) {
   base->interfaces[1] = Serializable;
 }
 
+// Make a class descriptor corresponding to an array of primitives.
 static classdesc *primitive_array_classdesc(vm_thread *thread, classdesc *component_type) {
   classdesc *result = calloc(1, sizeof(classdesc));
   result->state = CD_STATE_INITIALIZED;
@@ -58,7 +49,7 @@ static classdesc *primitive_array_classdesc(vm_thread *thread, classdesc *compon
   return result;
 }
 
-// Make a class descriptor corresponding to an array of components.
+// Make a class descriptor corresponding to an array of objects.
 static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *component) {
   classdesc *result = calloc(1, sizeof(classdesc));
   result->kind = CD_KIND_ORDINARY_ARRAY;
@@ -66,8 +57,7 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
   result->dimensions = component->dimensions + 1;
   result->one_fewer_dim = component;
 
-  INIT_STACK_STRING(name, 1000);
-  CHECK(component->name.len + 3 < 1000);
+  INIT_STACK_STRING(name, MAX_CF_NAME_LENGTH + 256);
   if (component->kind == CD_KIND_ORDINARY) {
     result->base_component = component;
     name = bprintf(name, "[L%.*s;", fmt_slice(component->name));
@@ -93,7 +83,7 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
 
 // Fill in the array_type class descriptor, corresponding to an array of the
 // given component. For example, J -> [J, [[J -> [[[J, Object -> [Object
-classdesc *make_array_classdesc(vm_thread *thread, classdesc *classdesc) {
+classdesc *get_or_create_array_classdesc(vm_thread *thread, classdesc *classdesc) {
   DCHECK(classdesc);
   if (!classdesc->array_type) {
     if (classdesc->kind == CD_KIND_PRIMITIVE) {
@@ -101,36 +91,36 @@ classdesc *make_array_classdesc(vm_thread *thread, classdesc *classdesc) {
     } else {
       classdesc->array_type = ordinary_array_classdesc(thread, classdesc);
     }
-    classdesc->array_type->dtor = free_array_classdesc;
     classdesc->array_type->classloader = classdesc->classloader;
   }
   return classdesc->array_type;
 }
 
-static obj_header *create_1d_primitive_array(vm_thread *thread, type_kind array_type, int count) {
+// Create a 1D primitive array of the given type and size.
+static object create_1d_primitive_array(vm_thread *thread, type_kind array_type, int count) {
   DCHECK(count >= 0);
 
   int size = sizeof_type_kind(array_type);
-  classdesc *array_desc = make_array_classdesc(thread, primitive_classdesc(thread, array_type));
+  classdesc *array_desc = get_or_create_array_classdesc(thread, primitive_classdesc(thread, array_type));
   DCHECK(array_desc);
 
   size_t allocation_size = kArrayDataOffset + count * size;
   obj_header *array = AllocateObject(thread, array_desc, allocation_size);
   if (array) {
     *(int *)((char *)array + kArrayLengthOffset) = count;
-    memset(ArrayData(array), 0, count * size);
+    memset(ArrayData(array), 0, count * size);  // zero initialize
+    DCHECK(size_of_object(array) == allocation_size);
   }
-
-  DCHECK(size_of_object(array) == allocation_size);
 
   return array;
 }
 
-static obj_header *create_1d_object_array(vm_thread *thread, classdesc *cd, int count) {
+// Create a 1D object array of the given type and size.
+obj_header *CreateObjectArray1D(vm_thread *thread, classdesc *cd, int count) {
   DCHECK(cd);
   DCHECK(count >= 0);
 
-  classdesc *array_desc = make_array_classdesc(thread, cd);
+  classdesc *array_desc = get_or_create_array_classdesc(thread, cd);
   DCHECK(array_desc);
 
   size_t allocation_size = kArrayDataOffset + count * sizeof(object);
@@ -138,13 +128,14 @@ static obj_header *create_1d_object_array(vm_thread *thread, classdesc *cd, int 
   if (array) {
     *(int *)((char *)array + kArrayLengthOffset) = count;
     memset(ArrayData(array), 0, count * sizeof(object));
+    DCHECK(size_of_object(array) == allocation_size);
   }
-
-  DCHECK(!array || size_of_object(array) == allocation_size);
 
   return array;
 }
 
+// Create a multi-dimensional array of the given type and dimensions. total_dimensions may equal 1, in which case
+// a one-dimensional array is created. The class descriptor may be a primitive class descriptor.
 obj_header *CreateArray(vm_thread *thread, classdesc *desc, int const *dim_sizes, int total_dimensions) {
   DCHECK(total_dimensions > 0);
 
@@ -153,13 +144,13 @@ obj_header *CreateArray(vm_thread *thread, classdesc *desc, int const *dim_sizes
     case CD_KIND_PRIMITIVE_ARRAY:
       return create_1d_primitive_array(thread, desc->primitive_component, dim_sizes[0]);
     case CD_KIND_ORDINARY_ARRAY:
-      return create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]);
+      return CreateObjectArray1D(thread, desc->one_fewer_dim, dim_sizes[0]);
     default:
       UNREACHABLE();
     }
   }
 
-  auto arr = make_handle(thread, create_1d_object_array(thread, desc->one_fewer_dim, dim_sizes[0]));
+  auto arr = make_handle(thread, CreateObjectArray1D(thread, desc->one_fewer_dim, dim_sizes[0]));
   obj_header *result = nullptr;
 
   for (int i = 0; i < dim_sizes[0]; i++) {
@@ -175,16 +166,13 @@ oom:
   return result;
 }
 
-obj_header *CreateObjectArray1D(vm_thread *thread, classdesc *inner_type, int size) {
-  auto desc = make_array_classdesc(thread, inner_type);
-  return CreateArray(thread, desc, &size, 1);
-}
-
+// Create a 1D primitive array of the given type and size.
 obj_header *CreatePrimitiveArray1D(vm_thread *thread, type_kind inner_type, int count) {
-  auto desc = make_array_classdesc(thread, primitive_classdesc(thread, inner_type));
+  auto desc = get_or_create_array_classdesc(thread, primitive_classdesc(thread, inner_type));
   return CreateArray(thread, desc, &count, 1);
 }
 
+// Create a byte array with the given data.
 obj_header *CreateByteArray(vm_thread *thread, u8 *data, int length) {
   obj_header *result = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, length);
   if (!result)

@@ -183,23 +183,28 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
   // Pending references
   PUSH_ROOT(&vm->reference_pending_list);
 
-  // Static fields of bootstrap-loaded classes
-  hash_table_iterator it = hash_table_get_iterator(&vm->classes);
+  // Static fields of classes
+  hash_table_iterator it;
   char *key;
   size_t key_len;
-  classdesc *desc;
-  while (hash_table_iterator_has_next(it, &key, &key_len, (void **)&desc)) {
-    if (desc->static_references) {
-      for (size_t i = 0; i < desc->static_references->count; ++i) {
-        u16 offs = desc->static_references->slots_unscaled[i];
-        object *root = ((object *)desc->static_fields) + offs;
-        PUSH_ROOT(root);
+  for (int classloader_i = 0; classloader_i < arrlen(vm->active_classloaders); classloader_i++) {
+    classloader *cl = vm->active_classloaders[classloader_i];
+    PUSH_ROOT(&cl->java_mirror);
+    it = hash_table_get_iterator(&cl->loaded);
+    classdesc *desc;
+    while (hash_table_iterator_has_next(it, &key, &key_len, (void **)&desc)) {
+      if (desc->static_references) {
+        for (size_t i = 0; i < desc->static_references->count; ++i) {
+          u16 offs = desc->static_references->slots_unscaled[i];
+          object *root = ((object *)desc->static_fields) + offs;
+          PUSH_ROOT(root);
+        }
       }
-    }
 
-    // Also, push things like Class, Method and Constructors
-    enumerate_reflection_roots(ctx, desc);
-    hash_table_iterator_next(&it);
+      // Also, push things like Class, Method and Constructors
+      enumerate_reflection_roots(ctx, desc);
+      hash_table_iterator_next(&it);
+    }
   }
 
   // main thread group

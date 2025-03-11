@@ -82,7 +82,7 @@ void profiler_main(profiler *prof) {
   string_hash_table methods = make_hash_table(nullptr, 0.75, 1000);
 
   classdesc *cd;
-  hash_table_iterator it = hash_table_get_iterator(&thread->vm->classes);
+  hash_table_iterator it = hash_table_get_iterator(&thread->vm->bootstrap_classloader->loaded);
   while (hash_table_iterator_has_next(it, nullptr, nullptr, (void **)&cd)) {
     for (int i = 0; i < cd->methods_count; ++i) {
       cp_method *method = cd->methods + i;

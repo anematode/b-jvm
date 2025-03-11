@@ -1,3 +1,6 @@
+#include "roundrobin_scheduler.h"
+
+
 #include <assert.h>
 
 #include <bjvm.h>
@@ -63,6 +66,10 @@ int main(int argc, char **argv) {
   vm_options options = default_vm_options();
 
   vm *vm = create_vm(options);
+  rr_scheduler scheduler;
+  rr_scheduler_init(&scheduler, vm);
+  vm->scheduler = &scheduler;
+
   vm_thread *thread = create_main_thread(vm, default_thread_options());
 
   // Read natives.txt line by line

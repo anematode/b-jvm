@@ -13,7 +13,7 @@ def process_file(filename):
     calls = ""
 
     for [klass_name, method_name, overload_idx] in matches:
-        overload_idx = 0 if overload_idx is '' else overload_idx
+        overload_idx = 0 if overload_idx == '' else overload_idx
         struct_name = f"NATIVE_INFO_{klass_name}_{method_name}_{overload_idx}"
         push_call = f'''\t&{struct_name},'''
 

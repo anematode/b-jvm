@@ -11,6 +11,7 @@
 
 #include "classfile.h"
 #include "classpath.h"
+#include "classloader.h"
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
@@ -337,16 +338,18 @@ typedef struct {
 
 struct cached_classdescs;
 typedef struct vm {
-  // Map class name (e.g. "java/lang/String") to classdesc*
-  string_hash_table classes;
   // Classes currently under creation -- used to detect circularity
   string_hash_table inchoate_classes;
 
   // Native methods in javah form
   string_hash_table natives;
 
-  // Bootstrap class loader will look for classes here
-  classpath classpath;
+  // Bootstrap class loader will look for classes here. The application classpath (i.e., the stuff after -cp) is
+  // the "application classpath" below.
+  classpath bootstrap_classpath;
+
+  // Passed to the system classloader via the system property "java.class.path"
+  heap_string application_classpath;
 
   // Main thread group
   obj_header *main_thread_group;
@@ -370,8 +373,12 @@ typedef struct vm {
   // Passed to write_stdout/write_stderr/read_stdin
   void *stdio_override_param;
 
-  // Primitive classes (int.class, etc.)
+  // Primitive classes (int.class, etc.) -- always loaded by the bootstrap class loader
   classdesc *primitive_classes[9];
+
+  // All active class loaders, including the bootstrap class loader
+  classloader **active_classloaders;
+  classloader *bootstrap_classloader;
 
   vm_thread **active_threads;
 
@@ -633,6 +640,7 @@ struct native_MethodType *resolve_method_type(vm_thread *thread, method_descript
 void pop_frame(vm_thread *thr, [[maybe_unused]] const stack_frame *reference);
 
 vm_options default_vm_options();
+void free_classdesc(void *cd);
 
 vm *create_vm(vm_options options);
 
@@ -658,9 +666,29 @@ void free_classfile(classdesc cf);
 
 void free_vm(vm *vm);
 
+// Synchronous variant of lookup_class specifically for the bootstrap class loader.
 classdesc *bootstrap_lookup_class(vm_thread *thread, slice name);
+
+// Load (but do not link or initialize) the class with the given binary name (using slashes, not dots).
+DECLARE_ASYNC(
+  classdesc *, lookup_class,
+  locals(
+    slice chars;
+  ),
+  arguments(
+    vm_thread *thread;
+    slice name;
+    classloader *cl;
+    bool raise_class_not_found;
+  ),
+  invoked_methods(
+    invoked_method(call_interpreter)
+  )
+);
+
 classdesc *bootstrap_lookup_class_impl(vm_thread *thread, slice name, bool raise_class_not_found);
 classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *classfile_bytes, size_t classfile_len);
+classdesc *define_class(vm_thread *thread, classloader *cl, slice chars, const u8 *classfile_bytes, size_t classfile_len);
 cp_method *method_lookup(classdesc *classdesc, const slice name, const slice descriptor, bool superclasses,
                          bool superinterfaces);
 
@@ -687,6 +715,7 @@ void dump_frame(FILE *stream, const stack_frame *frame);
 struct native_Class *primitive_class_mirror(vm_thread *thread, type_kind prim_kind);
 
 int resolve_class(vm_thread *thread, cp_class_info *info);
+int resolve_class_impl(vm_thread *thread, cp_class_info *info, classloader *loader);
 
 #include "natives_gen.h"
 

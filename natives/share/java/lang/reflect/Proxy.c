@@ -22,7 +22,7 @@ DECLARE_NATIVE("java/lang/reflect", Proxy, defineClass0,
     }
   }
 
-  classdesc *result = define_bootstrap_class(thread, hslc(name_str), bytes, length);
+  classdesc *result = define_class(thread, unmirror_classloader(thread->vm, loader), hslc(name_str), bytes, length);
 
   free_heap_str(name_str);
 

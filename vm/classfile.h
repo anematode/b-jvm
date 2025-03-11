@@ -260,6 +260,9 @@ typedef enum : u8 {
 
   /** intrinsics understood by the interpreter */
   insn_pow,  // (FF)F, (DD)D
+  insn_sin,  // (F)F, (D)D
+  insn_cos,  // (F)F, (D)D
+  insn_tan,  // (F)F, (D)D
   insn_sqrt  // (F)F, (D)D
 } insn_code_kind;
 
@@ -514,6 +517,8 @@ typedef enum {
   ATTRIBUTE_KIND_NEST_HOST,
   ATTRIBUTE_KIND_LOCAL_VARIABLE_TABLE,
   ATTRIBUTE_KIND_STACK_MAP_TABLE,
+  ATTRIBUTE_KIND_INNER_CLASSES,
+  ATTRIBUTE_KIND_PERMITTED_SUBCLASSES,
 } attribute_kind;
 
 typedef struct method_descriptor {
@@ -705,12 +710,22 @@ typedef struct {
   slice name;
 } attribute_source_file;
 
+typedef struct {
+  int count;
+  cp_class_info **classes;
+} attribute_inner_classes;
+
 // We leave the attribute unparsed until analysis time (which is technically incorrect I think, but whatever)
 typedef struct {
   uint8_t *data;
   int32_t length;
   int32_t entries_count;
 } attribute_stack_map_table;
+
+typedef struct {
+  u16 entries_count;
+  cp_class_info **entries;
+} attribute_permitted_subclasses;
 
 typedef struct attribute {
   attribute_kind kind;
@@ -732,6 +747,8 @@ typedef struct attribute {
     attribute_signature signature;
     attribute_local_variable_table lvt;
     attribute_stack_map_table smt;
+    attribute_inner_classes inner_classes;
+    attribute_permitted_subclasses permitted_subclasses;
     cp_class_info *nest_host;
   };
 } attribute;
@@ -811,9 +828,14 @@ typedef struct {
   u16 slots_unscaled[]; // must be scaled up by 4
 } reference_list;
 
+typedef struct classloader classloader;
+
+#define MAX_CF_NAME_LENGTH 1000
+
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct classdesc {
   classdesc_kind kind;
+  bool is_hidden;  // whether this is a hidden class (added in Java 15)
   classdesc_state state;
   constant_pool *pool;
 
@@ -834,6 +856,7 @@ typedef struct classdesc {
 
   attribute_bootstrap_methods *bootstrap_methods;
   attribute_source_file *source_file;
+  attribute_inner_classes *inner_classes;
 
   int attributes_count;
   attribute *attributes;
@@ -861,10 +884,8 @@ typedef struct classdesc {
   bytecode_insn **indy_insns;    // used to get GC roots to CallSites
   bytecode_insn **sigpoly_insns; // used to get GC roots to MethodTypes
 
-  void (*dtor)(classdesc *); // apoptosis
-
   module *module;
-  void *classloader; // parent classloader (static-ish lifetime)
+  classloader *classloader; // class loader which defined this class
   void *linkage_error;
 
   vtable vtable;

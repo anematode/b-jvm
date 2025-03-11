@@ -124,12 +124,33 @@ DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
 }
 
 DECLARE_NATIVE("java/lang", Class, getClassLoader, "()Ljava/lang/ClassLoader;") {
-  printf("TODO: getClassLoader\n");
-  return value_null(); // TODO
+  classloader *cl = unmirror_class(obj->obj)->classloader;
+  return (stack_value) { .obj = cl->java_mirror };
 }
 
 DECLARE_NATIVE("java/lang", Class, getPermittedSubclasses0, "()[Ljava/lang/Class;") {
-  return value_null(); // TODO
+  classdesc *desc = unmirror_class(obj->obj);
+  attribute *attr = find_attribute_by_kind(desc, ATTRIBUTE_KIND_PERMITTED_SUBCLASSES);
+  if (attr == nullptr)
+    return value_null();
+  attribute_permitted_subclasses *permitted = &attr->permitted_subclasses;
+  // Unmirror all classes first in case one of them triggers a GC
+  for (int i = 0; i < permitted->entries_count; ++i) {
+    cp_class_info *info = permitted->entries[i];
+    if (resolve_class(thread, info)) {
+      return value_null();
+    }
+    get_class_mirror(thread, info->classdesc);
+  }
+  // Create an array of the appropriate length and enjoy
+  handle *array = make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, permitted->entries_count));
+  if (array->obj == nullptr)
+    return value_null();
+  for (int i = 0; i < permitted->entries_count; ++i) {
+    cp_class_info *info = permitted->entries[i];
+    ((object*)ArrayData(array->obj))[i] = (void *)get_class_mirror(thread, info->classdesc);
+  }
+  return (stack_value){.obj = array->obj};
 }
 
 DECLARE_NATIVE("java/lang", Class, initClassName, "()Ljava/lang/String;") {
@@ -152,33 +173,39 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   obj_header *name_obj = args[0].handle->obj;
   obj_header *classloader = args[2].handle->obj;
 
+  bool should_initialize = args[1].i;
+
   heap_string name_str = AsHeapString(name_obj, oom);
-  for (size_t i = 0; i < name_str.len; ++i) {
-    name_str.chars[i] = name_str.chars[i] == '.' ? '/' : name_str.chars[i];
-  }
+  exchange_slashes_and_dots((slice*) &name_str, hslc(name_str));
   classdesc *c;
-  if (!classloader) {
+  if (classloader == nullptr) {
     c = bootstrap_lookup_class(thread, hslc(name_str));
+    if (thread->current_exception) { // e.g. ClassNotFoundException
+      return value_null();
+    }
   } else {
     // Invoke findClass on the classloader
     cp_method *find_class = method_lookup(classloader->descriptor, STR("loadClass"),
                                           STR("(Ljava/lang/String;)Ljava/lang/Class;"), true, false);
     CHECK(find_class);
-    stack_value args[2] = {{.obj = classloader}, {.obj = name_obj}};
-    stack_value result = call_interpreter_synchronous(thread, find_class, args);
-    if (!result.obj) {
+    stack_value loadClass_args[2] = {{.obj = classloader}, {.obj = name_obj}};
+    stack_value result = call_interpreter_synchronous(thread, find_class, loadClass_args);
+    if (thread->current_exception) {
+      // loadClass threw an exception, propagate it
+      return value_null();
+    }
+    if (result.obj == nullptr) {
+      // Raise ClassNotFoundException. Name uses slashes for some reason
+      raise_vm_exception(thread, STR("java/lang/ClassNotFoundException"), hslc(name_str));
       return value_null();
     }
     c = unmirror_class(result.obj);
   }
 
-  if (thread->current_exception)
-    return value_null();
-
   int error = link_class(thread, c);
   CHECK(!error);
 
-  if (c && args[1].i) {
+  if (c && should_initialize) {
     initialize_class_t ctx = {.args = {thread, c}};
     thread->stack.synchronous_depth++;
     future_t f = initialize_class(&ctx);
@@ -297,16 +324,27 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/
 }
 
 DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;") {
-  classdesc *classdesc = unmirror_class(obj->obj);
-  (void)classdesc;
-
-  // printf("Calling incompletely implemented getDeclaredClasses0\n");
-
+  classdesc *cd = unmirror_class(obj->obj);
+  attribute_inner_classes *inner_classes = cd->inner_classes;
   int count = 0;
-  stack_value ret;
-  ret.obj = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), count);
-  // TODO parse inner classes and return them here
-  return ret;
+  if (inner_classes) {
+    count = inner_classes->count;
+  }
+  handle *ret = make_handle(thread,
+    CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, count));
+  if (inner_classes) {
+    for (int i = 0; i < count; ++i) {
+      cp_class_info *info = inner_classes->classes[i];
+      resolve_class(thread, info);
+      if (!info->classdesc)
+        continue;
+      obj_header *mirror = (void *)get_class_mirror(thread, info->classdesc);
+      *((obj_header **)ArrayData(ret->obj) + i) = mirror;
+    }
+  }
+  object result = ret->obj;
+  drop_handle(thread, ret);
+  return (stack_value) { .obj = result };
 }
 
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
@@ -352,8 +390,9 @@ DECLARE_NATIVE("java/lang", Class, isArray, "()Z") {
   return (stack_value){.i = desc->kind == CD_KIND_ORDINARY_ARRAY || desc->kind == CD_KIND_PRIMITIVE_ARRAY};
 }
 
-DECLARE_NATIVE("java/lang", Class, isHidden, "()Z") { // TODO
-  return (stack_value){.i = 0};
+DECLARE_NATIVE("java/lang", Class, isHidden, "()Z") {
+  bool is_hidden = unmirror_class(obj->obj)->is_hidden;
+  return (stack_value){.i = is_hidden};
 }
 
 DECLARE_NATIVE("java/lang", Class, getNestHost0, "()Ljava/lang/Class;") {

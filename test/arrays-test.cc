@@ -22,7 +22,7 @@ TEST_CASE("Multi-dimensional boolean array") {
 
   auto kind = primitive_classdesc(thr, TYPE_KIND_BOOLEAN);
   for (int i = 0; i < 3; i++) {
-    kind = make_array_classdesc(thr, kind);
+    kind = get_or_create_array_classdesc(thr, kind);
   }
 
   auto array = CreateArray(thr, kind, testArrayDimensions, 3);

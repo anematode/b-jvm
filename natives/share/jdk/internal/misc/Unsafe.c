@@ -371,7 +371,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, defineClass,
   INIT_STACK_STRING(cf_name, 1000);
   cf_name = bprintf(cf_name, "%.*s.class", fmt_slice(name_str));
 
-  classdesc *result = define_bootstrap_class(thread, hslc(name_str), bytes, length);
+  classdesc *result = define_class(thread, unmirror_classloader(thread->vm, loader), hslc(name_str), bytes, length);
 
   free_heap_str(name_str);
 

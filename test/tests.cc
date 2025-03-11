@@ -775,7 +775,7 @@ Test
 )");
 }
 
-TEST_CASE("The algorithms") {
+TEST_CASE("[perf test] The algorithms") {
   auto result = run_test_case("test_files/share/assertj-core-3.26.3.jar:"
                               "test_files/share/commons-collections4-4.4.jar:"
                               "test_files/share/commons-lang3-3.17.0.jar:"
@@ -850,6 +850,15 @@ Pfannkuchen(10) = 38
 )");
 }
 
+TEST_CASE("getDeclaredClasses") {
+  auto result = run_test_case("test_files/get_declared_classes/", true, "GetDeclaredClasses");
+  REQUIRE(result.stdout_ == R"(GetDeclaredClasses$Hen
+GetDeclaredClasses$Omelette
+GetDeclaredClasses$Chicken
+GetDeclaredClasses$Egg
+)");
+}
+
 TEST_CASE("Array.get native") {
   auto result = run_test_case("test_files/array_get_native/", true, "ArrayGetNative");
   REQUIRE(result.stdout_ == R"(12345Caught ArrayIndexOutOfBoundsException
@@ -887,6 +896,30 @@ null
 Egg
 null
 null
+)");
+}
+
+TEST_CASE("Bad classloaders") {
+  auto result = run_test_case("test_files/bad_classloaders", true, "BadClassloaders");
+  REQUIRE(result.stdout_ == R"(Message:java/lang/String
+Caught security exception
+)");
+}
+
+TEST_CASE("Match exception") {
+  auto result = run_test_case("test_files/match_exception", true, "MatchException");
+  REQUIRE(result.stdout_ == R"(java.lang.MatchException
+java.lang.NullPointerException
+A
+B
+)");
+}
+
+TEST_CASE("PermittedSubclasses") {
+  auto result = run_test_case("test_files/permitted_subclasses", true, "PermittedSubclasses");
+  REQUIRE(result.stdout_ == R"(A
+B
+class C cannot implement sealed interface I
 )");
 }
 

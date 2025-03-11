@@ -9,6 +9,8 @@ jdk/internal/reflect/ConstantPool
   classdesc *reflected_class;
 java/lang/Class
   classdesc *reflected_class;
+java/lang/ClassLoader
+  classloader *reflected_loader;
 java/lang/reflect/Parameter
 java/lang/reflect/Field
   cp_field *reflected_field;
