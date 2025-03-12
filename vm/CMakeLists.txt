@@ -13,7 +13,7 @@ endif ()
 
 option(DCHECKS_ENABLED "Enable DCHECKs" ${DCHECK_DEFAULT})
 
-file(GLOB bjvm_SRC CONFIGURE_DEPENDS "*.c" "*.h")
+file(GLOB bjvm_SRC CONFIGURE_DEPENDS "*.c" "*.h" "compiler/*.c" "compiler/*.h")
 file(GLOB bjvm_wasm_SRC CONFIGURE_DEPENDS "wasm/*.c" "wasm/*.h")
 
 # this definitely should be wrapped in an if (EMSCRIPTEN), and we should run the tests cases by
