@@ -8,6 +8,7 @@
 #include "adt.h"
 #include "util.h"
 #include "vtable.h"
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -836,8 +837,10 @@ typedef struct classloader classloader;
 typedef struct classdesc {
   classdesc_kind kind;
   bool is_hidden;  // whether this is a hidden class (added in Java 15)
-  classdesc_state state;
-  constant_pool *pool;
+  classdesc_state state; // guarded by lock
+  constant_pool *pool; // guarded by lock
+
+  pthread_mutex_t lock; // protects classdesc state
 
   access_flags access_flags;
   slice name;
@@ -860,15 +863,15 @@ typedef struct classdesc {
 
   int attributes_count;
   attribute *attributes;
-  classdesc *array_type;
+  classdesc *array_type; // lazily initialized; synchronized access
 
   u8 *static_fields;
   // Number of bytes (including the object header) which an instance of this
   // class takes up. Unused for array types.
   size_t instance_bytes;
 
-  struct native_Class *mirror;
-  struct native_ConstantPool *cp_mirror;
+  struct native_Class *mirror; // protected by lock
+  struct native_ConstantPool *cp_mirror; // protected by lock
 
   // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets correspond to references that need to be
   // followed. Only defined at linkage time.
@@ -897,7 +900,7 @@ typedef struct classdesc {
   arena arena; // most things are allocated in here
 
   // The tid of the thread which is initializing this class
-  s32 initializing_thread;
+  s32 initializing_thread; // protected by lock
 } classdesc;
 
 heap_string insn_to_string(const bytecode_insn *insn, int insn_index);

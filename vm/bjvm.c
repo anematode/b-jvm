@@ -505,6 +505,7 @@ classdesc *make_primitive_classdesc(type_kind kind, const slice name) {
   desc->array_type = nullptr;
   desc->primitive_component = kind;
   desc->classloader = nullptr;
+  pthread_mutex_init(&desc->lock, nullptr); // todo: check return values?
 
   return desc;
 }
@@ -1776,10 +1777,11 @@ void wrap_in_exception_in_initializer_error(vm_thread *thread) {
 // NOLINTNEXTLINE(misc-no-recursion)
 DEFINE_ASYNC(initialize_class) {
 #define thread (args->thread)
-
   classdesc *cd = args->classdesc; // must be reloaded after await()
+  pthread_mutex_lock(&cd->lock);
   if (cd->kind == CD_KIND_ORDINARY_ARRAY) {
     // Initialize
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1789,6 +1791,7 @@ DEFINE_ASYNC(initialize_class) {
   DCHECK(cd);
   if (likely(cd->state == CD_STATE_INITIALIZED || cd->state == CD_STATE_LINKAGE_ERROR)) {
     // Class is already initialized
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1796,6 +1799,7 @@ DEFINE_ASYNC(initialize_class) {
     error = link_class(thread, cd);
     if (error) {
       DCHECK(thread->current_exception);
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
   }
@@ -1803,6 +1807,7 @@ DEFINE_ASYNC(initialize_class) {
   if (cd->state == CD_STATE_INITIALIZING) {
     if (cd->initializing_thread == thread->tid) {
       // The class is currently being initialized by this thread, so we can just return
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
 
@@ -1810,11 +1815,14 @@ DEFINE_ASYNC(initialize_class) {
     // This effectively busy waits, but this is an edge case so it doesn't matter for now.
     while (cd->state == CD_STATE_INITIALIZING) {
       ((rr_wakeup_info *)self->wakeup_info)->kind = RR_WAKEUP_YIELDING;
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_YIELD(self->wakeup_info);
       DEBUG_PEDANTIC_YIELD(*((rr_wakeup_info *)self->wakeup_info));
       cd = args->classdesc; // reload!
+      pthread_mutex_lock(&cd->lock); // reäcquire
     }
 
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0); // the class is done
   }
 
@@ -1822,6 +1830,7 @@ DEFINE_ASYNC(initialize_class) {
   if (cd->state == CD_STATE_LINKAGE_ERROR) {
     thread->current_exception = nullptr;
     raise_exception_object(thread, cd->linkage_error);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
@@ -1831,20 +1840,25 @@ DEFINE_ASYNC(initialize_class) {
   self->recursive_call_space = calloc(1, sizeof(initialize_class_t));
   if (!self->recursive_call_space) {
     out_of_memory(thread);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
   if (cd->super_class) {
+    pthread_mutex_unlock(&cd->lock);
     AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->super_class->classdesc);
     cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
 
     if ((error = self->recursive_call_space->_result))
       goto done;
   }
 
   for (self->i = 0; (int)self->i < cd->interfaces_count; ++self->i) {
+    pthread_mutex_unlock(&cd->lock);
     AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->interfaces[self->i]->classdesc);
     cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
 
     if ((error = self->recursive_call_space->_result))
       goto done;
@@ -1860,8 +1874,10 @@ DEFINE_ASYNC(initialize_class) {
   cp_method *clinit = method_lookup(cd, STR("<clinit>"), STR("()V"), false, false);
 
   if (clinit) {
-
+    pthread_mutex_unlock(&cd->lock);
     AWAIT(call_interpreter, thread, clinit, nullptr);
+    cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
     if (thread->current_exception && !is_error(thread->current_exception->descriptor)) {
       wrap_in_exception_in_initializer_error(thread);
       goto done;
@@ -1878,6 +1894,7 @@ done:
   while ((arr = arr->array_type)) {
     arr->state = args->classdesc->state;
   }
+  pthread_mutex_unlock(&cd->lock);
   ASYNC_END(error);
 
 #undef thread
@@ -2136,11 +2153,15 @@ cp_method *unmirror_method(obj_header *mirror) {
 struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdesc *cd) {
   if (!cd)
     return nullptr;
-  if (cd->cp_mirror)
+  pthread_mutex_lock(&cd->lock); // todo: check result?
+  if (cd->cp_mirror) {
+    pthread_mutex_unlock(&cd->lock);
     return cd->cp_mirror;
+  }
   classdesc *java_lang_ConstantPool = cached_classes(thread->vm)->constant_pool;
   struct native_ConstantPool *cp_mirror = cd->cp_mirror = (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = cd;
+  pthread_mutex_unlock(&cd->lock);
   return cp_mirror;
 }
 
@@ -2148,8 +2169,11 @@ struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdes
 struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
   if (!cd)
     return nullptr;
-  if (cd->mirror)
+  pthread_mutex_lock(&cd->lock); // todo: check result?
+  if (cd->mirror) {
+    pthread_mutex_unlock(&cd->lock);
     return cd->mirror;
+  }
 
   classdesc *java_lang_Class = bootstrap_lookup_class(thread, STR("java/lang/Class"));
   initialize_class_t init = {.args = {thread, java_lang_Class}};
@@ -2175,6 +2199,7 @@ struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
   }
   struct native_Class *result = class_mirror;
   drop_handle(thread, cm_handle);
+  pthread_mutex_unlock(&cd->lock);
   return result;
 #undef class_mirror
 }

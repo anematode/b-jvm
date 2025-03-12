@@ -74,7 +74,8 @@ void setup_super_hierarchy(classdesc *cd) {
   cd->hierarchy[cd->hierarchy_len - 1] = cd;
 }
 
-static int link_array_class(vm_thread *thread, classdesc *cd) {
+// assumes already holding lock
+static int link_array_class_impl(vm_thread *thread, classdesc *cd) {
   if (cd->state >= CD_STATE_LINKED)
     return 0;
 
@@ -139,7 +140,9 @@ void create_template_interpreter_frame(cp_method * method) {
 
 // Link the class.
 int link_class(vm_thread *thread, classdesc *cd) {
+  pthread_mutex_lock(&cd->lock); // todo: check result?
   if (cd->state != CD_STATE_LOADED) {
+    pthread_mutex_unlock(&cd->lock);
     return 0;
   }
   // Link superclasses
@@ -149,6 +152,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
       cd->linkage_error = thread->current_exception;
+      pthread_mutex_unlock(&cd->lock);
       return status;
     }
   }
@@ -161,17 +165,20 @@ int link_class(vm_thread *thread, classdesc *cd) {
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
       cd->linkage_error = thread->current_exception;
+      pthread_mutex_unlock(&cd->lock);
       return status;
     }
   }
   if (cd->kind != CD_KIND_ORDINARY) {
     DCHECK(cd->kind == CD_KIND_ORDINARY_ARRAY);
-    return link_array_class(thread, cd);
+    int status = link_array_class_impl(thread, cd);
+    pthread_mutex_unlock(&cd->lock);
+    return status;
   }
   cd->state = CD_STATE_LINKED;
   // Link the corresponding array type(s)
   if (cd->array_type) {
-    link_array_class(thread, cd->array_type);
+    link_array_class_impl(thread, cd->array_type); // for fun? idk why
   }
   // Analyze/rewrite all methods
   for (int method_i = 0; method_i < cd->methods_count; ++method_i) {
@@ -184,6 +191,7 @@ int link_class(vm_thread *thread, classdesc *cd) {
         raise_verify_error(thread, hslc(error_str));
         cd->linkage_error = thread->current_exception;
         free_heap_str(error_str);
+        pthread_mutex_unlock(&cd->lock);
         return -1;
       }
       create_template_interpreter_frame(method);
@@ -250,5 +258,6 @@ int link_class(vm_thread *thread, classdesc *cd) {
   // Set up vtable and itables
   set_up_function_tables(cd);
 
+  pthread_mutex_unlock(&cd->lock);
   return 0;
 }
