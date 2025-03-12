@@ -214,7 +214,7 @@ void *worker_thread_run_until_completion(void *param) {
 
   // chop chop time to work
   worker_thread_pool_register(&scheduler->thread_pool);
-  scheduler_polled_info_t task = scheduler_poll(scheduler);
+  scheduler_polled_info_t task = scheduler_poll(scheduler); // initialize before entering loop
   for (;;result->yield_count++) {
     gc_pause_if_requested(vm);
 
@@ -242,7 +242,7 @@ void *worker_thread_run_until_completion(void *param) {
 
     task = scheduler_push_execution_record_and_repoll(scheduler, task);
   }
-  // todo: unregister?
+  worker_thread_pool_deregister(&scheduler->thread_pool);
 
   return result;
 }

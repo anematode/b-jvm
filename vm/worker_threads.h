@@ -25,6 +25,7 @@ void worker_thread_pool_uninit(worker_thread_pool *pool);
 
 // todo: functions for adding or removing threads to this pool
 void worker_thread_pool_register(worker_thread_pool *pool);
+void worker_thread_pool_deregister(worker_thread_pool *pool);
 
 int thread_pool_lock(worker_thread_pool *pool);
 int thread_pool_unlock(worker_thread_pool *pool);

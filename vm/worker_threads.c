@@ -23,6 +23,13 @@ void worker_thread_pool_register(worker_thread_pool *pool) { // todo: should thi
   pthread_mutex_unlock(&pool->mutex);
 }
 
+void worker_thread_pool_deregister(worker_thread_pool *pool) { // todo: should this do anything else?
+  pthread_mutex_lock(&pool->mutex); // todo: check return values?
+  pool->num_registered--;
+  pthread_cond_broadcast(&pool->cond); // in case someone was waiting for this to GC
+  pthread_mutex_unlock(&pool->mutex);
+}
+
 int thread_pool_lock(worker_thread_pool *pool) {
   return pthread_mutex_lock(&pool->mutex);
 }
