@@ -214,6 +214,7 @@ void *worker_thread_run_until_completion(void *param) {
 
   // chop chop time to work
   worker_thread_pool_register(&scheduler->thread_pool);
+  // todo: scheduler_poll_blocking, so that we can wait on a condition until a task appears (or be told to sleep or exit)
   scheduler_polled_info_t task = scheduler_poll(scheduler); // initialize before entering loop
   for (;;result->yield_count++) {
     gc_pause_if_requested(vm);
@@ -323,24 +324,24 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
-//  // do some work just to get settled
-//  for (int i=0; i<5; i++) {
-//    scheduler_polled_info_t task = scheduler_poll(&scheduler);
-//    scheduler_execute(vm, task, scheduler.preemption_us);
-//    scheduler_push_execution_record(&scheduler, task);
-//  }
+  // do some work just to get settled
+  for (int i=0; i<5; i++) {
+    scheduler_polled_info_t task = scheduler_poll(&scheduler);
+    scheduler_execute(vm, task, scheduler.preemption_us);
+    scheduler_push_execution_record(&scheduler, task);
+  }
 
   pthread_t thread_1;
   pthread_create(&thread_1, nullptr, worker_thread_run_until_completion, &scheduler);
 
-//  pthread_t thread_2;
-//  pthread_create(&thread_2, nullptr, worker_thread_run_until_completion, &scheduler);
-//
-//  ScheduledTestCaseResult *result_2;
-//  pthread_join(thread_2, reinterpret_cast<void **>(&result_2));
-//  result.yield_count += result_2->yield_count;
-//  result.sleep_count += result_2->sleep_count;
-//  result.us_slept += result_2->us_slept;
+  pthread_t thread_2;
+  pthread_create(&thread_2, nullptr, worker_thread_run_until_completion, &scheduler);
+
+  ScheduledTestCaseResult *result_2;
+  pthread_join(thread_2, reinterpret_cast<void **>(&result_2));
+  result.yield_count += result_2->yield_count;
+  result.sleep_count += result_2->sleep_count;
+  result.us_slept += result_2->us_slept;
 
   ScheduledTestCaseResult *result_1;
   pthread_join(thread_1, reinterpret_cast<void **>(&result_1));

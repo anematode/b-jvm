@@ -498,6 +498,22 @@ static void major_gc(vm *vm) {
 }
 
 /**
+ * Executes all the pending instruction patches.
+ * Must only be called by one thread, while all the other threads are suspended.
+ */
+static void execute_instruction_patches(vm *vm) {
+  for (size_t i=0; i<vm->instruction_patch_queue.capacity; i++) {
+    bytecode_patch_request *req = &vm->instruction_patch_queue.buffer[i];
+    bytecode_insn *insn_location = req->location;
+    if (insn_location)
+      *insn_location = req->new_insn;
+
+    req->location = nullptr; // reset it
+  }
+  vm->instruction_patch_queue.num_used = 0;
+}
+
+/**
  * Garbage collects the heap.
  * Invoking this method will set vm->gc_pause_requested to true (if not already),
  * then wait for all threads to do call this function.
@@ -515,6 +531,7 @@ void scheduled_gc_pause(vm *vm) {
   if (is_leader) {
     arrive_await_all_suspended(thread_pool); // todo: check result of this?
     major_gc(vm);
+    execute_instruction_patches(vm);
     reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
   } else {
     arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?

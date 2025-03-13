@@ -634,6 +634,11 @@ vm *create_vm(const vm_options options) {
   vm->heap.true_heap_capacity = options.heap_size + OOM_SLOP_BYTES;
   vm->active_classloaders = nullptr;
 
+  size_t bytecode_patch_queue_size = 100; // todo: make a vm option
+  vm->instruction_patch_queue.buffer = calloc(bytecode_patch_queue_size, sizeof(bytecode_patch_request));
+  vm->instruction_patch_queue.num_used = 0;
+  vm->instruction_patch_queue.capacity = bytecode_patch_queue_size;
+
   vm->bootstrap_classloader = calloc(1, sizeof(classloader));
   classloader_init(vm, vm->bootstrap_classloader, nullptr);
   arrput(vm->active_classloaders, vm->bootstrap_classloader);
@@ -1693,6 +1698,21 @@ void *bump_allocate(vm_thread *thread, size_t bytes) {
   void *result = vm->heap.heap + heap_used;
   memset(result, 0, bytes);
   return result;
+}
+
+void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
+  static_assert(sizeof(vm->instruction_patch_queue.num_used) == sizeof(uintptr_t), "data size cannot be used in atomic addition operation!");
+  size_t reserved_slice_index;
+  for (;;) {
+    // bump allocate a slice optimistically
+    reserved_slice_index = __atomic_fetch_add(&vm->instruction_patch_queue.num_used, 1, __ATOMIC_SEQ_CST);
+    if (reserved_slice_index + 1 >= vm->instruction_patch_queue.capacity) {
+      // we need to trigger a GC
+      scheduled_gc_pause(vm);
+    }
+  }
+
+  vm->instruction_patch_queue.buffer[reserved_slice_index] = request;
 }
 
 inline void gc_pause_if_requested(vm *vm) {

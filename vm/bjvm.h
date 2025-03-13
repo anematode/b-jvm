@@ -336,6 +336,11 @@ typedef struct {
   size_t len;
 } mmap_allocation;
 
+typedef struct {
+  void *location; // bytecode_insn *; type erased to discourage unsafe accesses
+  bytecode_insn new_insn;
+} bytecode_patch_request;
+
 struct cached_classdescs;
 typedef struct vm {
   // Classes currently under creation -- used to detect circularity
@@ -400,6 +405,12 @@ typedef struct vm {
     // bjvm.c.
     size_t true_heap_capacity;
   } heap;
+
+  struct {
+    bytecode_patch_request *buffer; // an array of bytecode_patch_request[capacity]
+    size_t num_used; // atomically incremented as a 'bump allocation'
+    size_t capacity;
+  } instruction_patch_queue;
 
   // Handles referenced from JS
   obj_header **js_handles;
@@ -763,6 +774,7 @@ static inline stack_value *frame_beginning(const stack_frame *frame) {
 classdesc *primitive_classdesc(vm_thread *thread, type_kind prim_kind);
 void out_of_memory(vm_thread *thread);
 void *bump_allocate(vm_thread *thread, size_t bytes);
+void suggest_bytecode_patch(vm *vm, bytecode_patch_request request);
 
 #ifdef __cplusplus
 }

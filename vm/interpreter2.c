@@ -2019,26 +2019,36 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
   inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
 }
 
+
+
 static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
   SPILL_VOID
   NPE_ON_NULL(receiver);
-  if (unlikely(receiver->descriptor != insn->ic2)) {
-    if (insn->kind == insn_invokevtable_monomorphic)
-      make_invokevtable_polymorphic_(insn);
+  bytecode_insn execute_insn = *insn;
+  if (unlikely(receiver->descriptor != execute_insn.ic2)) {
+    if (execute_insn.kind == insn_invokevtable_monomorphic)
+      make_invokevtable_polymorphic_(&execute_insn);
     else
-      make_invokeitable_polymorphic_(insn);
-    JMP_VOID
+      make_invokeitable_polymorphic_(&execute_insn);
+    // patched, but only locally
+
+    // *insn = execute_insn; // for single-threaded VM, we can update it right away
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { insn, execute_insn });
+
+    // todo: interrpret bytecodes but using the execute_insn instead of the insns[0]
+    // i basically just want to interpret from here, but using this as the first instruction override
+    //  JMP_VOID; // todo: start interepreting, but with a diff instruction and then stuff
   }
 
-  ConsiderJitEntry(thread, ((cp_method *)insn->ic), sp - insn->args);
-  stack_frame *invoked_frame = push_frame(thread, insn->ic, sp - insn->args, insn->args);
+  ConsiderJitEntry(thread, ((cp_method *)execute_insn.ic), sp - execute_insn.args);
+  stack_frame *invoked_frame = push_frame(thread, execute_insn.ic, sp - execute_insn.args, execute_insn.args);
   if (!invoked_frame)
     return RETVAL_EXCEPTION_THROWN;
 
-  AttemptInvoke(thread, invoked_frame, insn->args, returns);
+  AttemptInvoke(thread, invoked_frame, execute_insn.args, returns); // todo: useless statement
 }
 FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
