@@ -2038,9 +2038,24 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     // *insn = execute_insn; // for single-threaded VM, we can update it right away
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { insn, execute_insn });
 
-    // todo: interrpret bytecodes but using the execute_insn instead of the insns[0]
-    // i basically just want to interpret from here, but using this as the first instruction override
-    //  JMP_VOID; // todo: start interepreting, but with a diff instruction and then stuff
+    //  JMP_VOID; // for single-threaded VM, we can execute it from memory using tailcall
+    // call invoke the method using the appropriate table lookup
+    cp_method *receiver_method = insn_invokevtable_monomorphic ?
+      vtable_lookup(receiver->descriptor, (size_t)execute_insn.ic2)
+        : itable_lookup(receiver->descriptor, execute_insn.ic, (size_t)execute_insn.ic2);
+    if (unlikely(!receiver_method)) {
+      raise_abstract_method_error(thread, execute_insn.cp->methodref.resolved);
+      return RETVAL_EXCEPTION_THROWN;
+    }
+    DCHECK(receiver_method);
+
+    ConsiderJitEntry(thread, receiver_method, sp - insn->args);
+
+    stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - execute_insn.args, execute_insn.args);
+    if (!invoked_frame)
+      return RETVAL_EXCEPTION_THROWN;
+
+    AttemptInvoke(thread, invoked_frame, insn->args, returns);
   }
 
   ConsiderJitEntry(thread, ((cp_method *)execute_insn.ic), sp - execute_insn.args);
