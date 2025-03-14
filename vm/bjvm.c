@@ -634,7 +634,7 @@ vm *create_vm(const vm_options options) {
   vm->heap.true_heap_capacity = options.heap_size + OOM_SLOP_BYTES;
   vm->active_classloaders = nullptr;
 
-  size_t bytecode_patch_queue_size = 100; // todo: make a vm option
+  size_t bytecode_patch_queue_size = 1000; // todo: make a vm option
   vm->instruction_patch_queue.buffer = calloc(bytecode_patch_queue_size, sizeof(bytecode_patch_request));
   vm->instruction_patch_queue.num_used = 0;
   vm->instruction_patch_queue.capacity = bytecode_patch_queue_size;
@@ -1709,10 +1709,19 @@ void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
     if (reserved_slice_index + 1 >= vm->instruction_patch_queue.capacity) {
       // we need to trigger a GC
       scheduled_gc_pause(vm);
+      continue;
     }
+    break;
   }
 
   vm->instruction_patch_queue.buffer[reserved_slice_index] = request;
+}
+
+void atomically_update_kind_and_ic(bytecode_insn *insn, const bytecode_insn *source) {
+  static_assert(sizeof(struct { insn_code_kind kind; void *ic; }) <= sizeof(insn->raw_patch_data_), "raw_patch_data_ is too small");
+
+  __atomic_store_n(&insn->ic2, source->ic2, __ATOMIC_SEQ_CST);
+   __atomic_store_n(&insn->raw_patch_data_, source->raw_patch_data_, __ATOMIC_SEQ_CST);
 }
 
 inline void gc_pause_if_requested(vm *vm) {
@@ -1738,6 +1747,7 @@ attribute *find_attribute(attribute *attrs, int attrc, attribute_kind kind) {
 // if they are provided in the class file.
 //
 // Returns true if an OOM occurred when initializing string fields.
+// only called when classdesc lock is held
 bool initialize_constant_value_fields(vm_thread *thread, classdesc *classdesc) {
   CHECK(classdesc->state >= CD_STATE_LINKED, "Class must be linked");
   for (int i = 0; i < classdesc->fields_count; ++i) {

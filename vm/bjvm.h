@@ -407,7 +407,7 @@ typedef struct vm {
   } heap;
 
   struct {
-    bytecode_patch_request *buffer; // an array of bytecode_patch_request[capacity]
+    bytecode_patch_request *volatile buffer; // an array of bytecode_patch_request[capacity]
     size_t num_used; // atomically incremented as a 'bump allocation'
     size_t capacity;
   } instruction_patch_queue;
@@ -775,6 +775,7 @@ classdesc *primitive_classdesc(vm_thread *thread, type_kind prim_kind);
 void out_of_memory(vm_thread *thread);
 void *bump_allocate(vm_thread *thread, size_t bytes);
 void suggest_bytecode_patch(vm *vm, bytecode_patch_request request);
+void atomically_update_kind_and_ic(bytecode_insn *insn, const bytecode_insn *source);
 
 #ifdef __cplusplus
 }

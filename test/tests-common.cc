@@ -253,30 +253,34 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
                                                 vm_options options) {
   printf("Classpath: %s\n", classpath.c_str());
 
-  ScheduledTestCaseResult result{};
+  ScheduledTestCaseResult result { };
   result.stdin_ = input;
 
-  options.classpath = (slice){.chars = (char *)classpath.c_str(), .len = static_cast<u16>(classpath.size())};
+  options.classpath = (slice){.chars = const_cast<char *>(classpath.c_str()), .len = static_cast<u16>(classpath.size())};
 
   // todo: stdio functions need to be synchronized
   options.read_stdin = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
-    int remaining = result->stdin_.length();
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
+    int remaining = static_cast<int>(result->stdin_.length());
     int num_bytes = std::min(len, remaining);
     result->stdin_.copy(buf, num_bytes);
     result->stdin_ = result->stdin_.substr(num_bytes);
     return num_bytes;
   } : nullptr;
   options.poll_available_stdin = capture_stdio ? +[](void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     return (int) result->stdin_.length();
   } : nullptr;
   options.write_stdout = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     result->stdout_.append(buf, len);
   } : nullptr;
   options.write_stderr = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     result->stderr_.append(buf, len);
   } : nullptr;
   options.stdio_override_param = &result;
@@ -295,7 +299,7 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
 
   vm_thread *thread = create_main_thread(vm, default_thread_options());
 
-  slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
+  slice m{.chars = const_cast<char *>(main_class.c_str()), .len = static_cast<u16>(main_class.size())};
 
   classdesc *desc = bootstrap_lookup_class(thread, m);
   if (!desc) {
@@ -312,10 +316,10 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   method = method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"), false, false);
 
   handle *string_args_as_object =
-      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, static_cast<int>(string_args.size())));
   for (size_t i = 0; i < string_args.size(); i++) {
     object str = MakeJStringFromCString(thread, string_args[i].c_str(), true);
-    ReferenceArrayStore(string_args_as_object->obj, (int)i, str);
+    ReferenceArrayStore(string_args_as_object->obj, static_cast<int>(i), str);
   }
 
   stack_value args[1] = {{.obj = string_args_as_object->obj}};

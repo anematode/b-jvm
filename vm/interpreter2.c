@@ -498,7 +498,7 @@ DEFINE_ASYNC(resolve_insn) {
     AWAIT(resolve_invokestatic, args->thread, args->inst);
     ASYNC_RETURN(get_async_result(resolve_invokestatic));
   }
-  UNREACHABLE();
+  // UNREACHABLE(); // idempotent
   ASYNC_END_VOID();
 }
 
@@ -719,10 +719,13 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
 
   // Select the appropriate resolved instruction kind.
   bool putstatic = inst->kind == insn_putstatic;
-  inst->kind = getstatic_putstatic_resolved_kind(putstatic, self->field_info->parsed_descriptor->repr_kind);
+  bytecode_insn new_insn = *inst;
+  new_insn.kind = getstatic_putstatic_resolved_kind(putstatic, self->field_info->parsed_descriptor->repr_kind);
 
   // Store the static address of the field in the instruction.
-  inst->ic = (void *)field->my_class->static_fields + field->byte_offset;
+  new_insn.ic = (void *)field->my_class->static_fields + field->byte_offset;
+
+  atomically_update_kind_and_ic(inst, &new_insn);
 
 #undef thread
 #undef inst
@@ -962,9 +965,11 @@ DEFINE_ASYNC(resolve_getfield_putfield) {
     ASYNC_RETURN(-1);
   }
 
-  inst->kind = getfield_putfield_resolved_kind(putfield, field_info->parsed_descriptor->repr_kind);
-  inst->ic = field_info->field;
-  inst->ic2 = (void *)field_info->field->byte_offset;
+  bytecode_insn new_insn = *inst;
+  new_insn.kind = getfield_putfield_resolved_kind(putfield, field_info->parsed_descriptor->repr_kind);
+  new_insn.ic = field_info->field;
+  new_insn.ic2 = (void *)field_info->field->byte_offset;
+  atomically_update_kind_and_ic(inst, &new_insn);
 
   ASYNC_END(0);
 
@@ -1615,8 +1620,10 @@ DEFINE_ASYNC(resolve_new_inst) {
   if (self->classdesc->state < CD_STATE_INITIALIZING) { // linkage error, etc.
     ASYNC_RETURN(-1);
   }
-  args->inst->kind = insn_new_resolved;
-  args->inst->classdesc = self->classdesc;
+  bytecode_insn new_insn = *args->inst;
+  new_insn.kind = insn_new_resolved;
+  __atomic_store_n(&args->inst->classdesc, self->classdesc, __ATOMIC_SEQ_CST);
+  atomically_update_kind_and_ic(args->inst, &new_insn);
   ASYNC_END(0);
 }
 
@@ -1736,11 +1743,14 @@ DEFINE_ASYNC(resolve_invokestatic) {
   }
 
   cp_method_info *info = &self->args.insn_->cp->methodref;
-  self->args.insn_->kind = insn_invokestatic_resolved;
-  self->args.insn_->ic = info->resolved;
   self->args.insn_->args = info->descriptor->args_count;
 
+  bytecode_insn new_insn = *self->args.insn_;
+  new_insn.kind = insn_invokestatic_resolved;
+  new_insn.ic = info->resolved;
+
   mark_insn_returns(self->args.insn_);
+  atomically_update_kind_and_ic(self->args.insn_, &new_insn);
 
   ASYNC_END(0);
 }
@@ -2021,7 +2031,7 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
 
 
 
-static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
+__attribute__ ((noinline)) static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *receiver = (sp - insn->args)->obj;
   bool returns = insn->returns;
@@ -2040,7 +2050,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
 
     //  JMP_VOID; // for single-threaded VM, we can execute it from memory using tailcall
     // call invoke the method using the appropriate table lookup
-    cp_method *receiver_method = insn_invokevtable_monomorphic ?
+    cp_method *receiver_method = execute_insn.kind == insn_invokevtable_polymorphic ?
       vtable_lookup(receiver->descriptor, (size_t)execute_insn.ic2)
         : itable_lookup(receiver->descriptor, execute_insn.ic, (size_t)execute_insn.ic2);
     if (unlikely(!receiver_method)) {
@@ -2049,7 +2059,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     }
     DCHECK(receiver_method);
 
-    ConsiderJitEntry(thread, receiver_method, sp - insn->args);
+    ConsiderJitEntry(thread, receiver_method, sp - execute_insn.args);
 
     stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - execute_insn.args, execute_insn.args);
     if (!invoked_frame)
@@ -2058,7 +2068,7 @@ static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
     AttemptInvoke(thread, invoked_frame, insn->args, returns);
   }
 
-  ConsiderJitEntry(thread, ((cp_method *)execute_insn.ic), sp - execute_insn.args);
+  // ConsiderJitEntry(thread, ((cp_method *)execute_insn.ic), sp - execute_insn.args); todo: broken
   stack_frame *invoked_frame = push_frame(thread, execute_insn.ic, sp - execute_insn.args, execute_insn.args);
   if (!invoked_frame)
     return RETVAL_EXCEPTION_THROWN;
