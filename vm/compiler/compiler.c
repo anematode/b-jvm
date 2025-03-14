@@ -8,7 +8,7 @@
     _Generic((x), ctl_inst*: (type *)x, const ctl_inst *: (const type *)x); \
   })
 
-#define get_argument(x) GET_INSTRUCTION(CTL_INST_GET_ARGUMENT, ctl_inst_get_argument, x)
+#define get_argument_inst(x) GET_INSTRUCTION(CTL_INST_GET_ARGUMENT, ctl_inst_get_argument, x)
 
 // Aborts if the instruction is invalid
 void validate_instruction(const ctl_function *function, const ctl_inst *inst) {
@@ -16,7 +16,7 @@ void validate_instruction(const ctl_function *function, const ctl_inst *inst) {
   case CTL_INST_CONST:
     return;
   case CTL_INST_GET_ARGUMENT: {
-    CHECK(get_argument(inst)->arg_i < arrlen(function->arguments));
+    CHECK(get_argument_inst(inst)->arg_i < arrlen(function->arguments));
     return;
   }
   case CTL_INST_BRANCH: {

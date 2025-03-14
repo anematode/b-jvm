@@ -15,7 +15,7 @@ typedef enum {
   CTL_INST_GET_ARGUMENT,
   CTL_INST_BRANCH,  // branch of some kind
   CTL_INST_CALL,    // call a function
-  CTL_INST_DEOPT,   // deoptimize with the given arguments
+  CTL_INST_DEOPT,   // deoptimize with the given arguments (construct an interpreter frame and call the de-opt handler)
   CTL_INST_UPSILON, // https://gist.github.com/pizlonator/cf1e72b8600b1437dda8153ea3fdb963
   CTL_INST_PHI,
   CTL_INST_RETURN,
@@ -25,7 +25,7 @@ typedef enum {
 } ctl_inst_kind;
 
 typedef enum {
-
+  CTL_OPC_CONST_FLOAT,
 } ctl_inst_opcode;
 
 typedef struct ctl_inst ctl_inst;
