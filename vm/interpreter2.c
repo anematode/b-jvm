@@ -100,12 +100,13 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 1
+#define DO_TAILS 0
 #endif
 
 #define MUSTTAIL // defined as empty here to allow compilation without -mtail-call
 
 #if DO_TAILS
+typedef stack_value *stack_pointer_t;
 #define sp sp_
 #define pc (insns - frame->code)
 #define FUEL fuel_
@@ -204,6 +205,7 @@
 #endif // ifdef EMSCRIPTEN
 #else  // !DO_TAILS
 
+typedef stack_value **stack_pointer_t;
 #define sp (*sp_)
 #define pc (insns - frame->code)
 #define tos (*tos_)
@@ -322,11 +324,11 @@ void *__interpreter_intrinsic_double_table_base() { return jmp_table_double; }
 EMSCRIPTEN_KEEPALIVE
 int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
-static s64 invokevirtual_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
-static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, bytecode_insn *target, bytecode_insn instruction, stack_value *sp_);
-static s64 invokeinterface_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
-static s64 invokespecial_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
-static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
+static s64 invokevirtual_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
+static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, bytecode_insn *target, bytecode_insn instruction, stack_pointer_t sp_);
+static s64 invokeinterface_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
+static s64 invokespecial_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
+static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
 
 // Same as SPILL(tos), but when no top-of-stack value is available
 #define SPILL_VOID                                                                                                     \
@@ -1849,7 +1851,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
                                         stack_frame *frame,
                                         bytecode_insn *target,
                                         bytecode_insn instruction,
-                                        obj_header *receiver, stack_value *sp_) {
+                                        obj_header *receiver, stack_pointer_t sp_) {
   DCHECK(instruction.kind == insn_invokevirtual);
 
   if (!receiver) {
@@ -1891,7 +1893,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
     instruction.kind = insn_invokeinterface;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    return invokeinterface_impl_void_impl(thread, frame, target, instruction, receiver, sp);
+    return invokeinterface_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
 
   if (method_info->resolved->access_flags & ACCESS_FINAL) { // if the method is FINAL, we can make it an invokespecial
@@ -1899,13 +1901,13 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
     instruction.ic = method_info->resolved;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp);
+    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
 
   instruction.kind = insn_invokevtable_monomorphic;
   instruction.ic = vtable_lookup(receiver->descriptor, method_info->resolved->vtable_index);
   instruction.ic2 = receiver->descriptor;
-  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp);
+  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp_);
 }
 
 __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
@@ -1916,7 +1918,7 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
 
   SPILL_VOID
 
-  s64 result = invokevirtual_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  s64 result = invokevirtual_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
   if (likely(result)) return result;
   NEXT_VOID
 }
@@ -1926,7 +1928,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
                                         stack_frame *frame,
                                         bytecode_insn *target,
                                         bytecode_insn instruction,
-                                        obj_header *receiver, stack_value *sp_) {
+                                        obj_header *receiver, stack_pointer_t sp_) {
   if (!receiver) {
     raise_null_pointer_exception(thread);
     return RETVAL_EXCEPTION_THROWN;
@@ -1983,7 +1985,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
   mark_insn_returns(&instruction);
 
   suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-  return invokespecial_resolved_impl_void_impl(thread, frame, target, instruction, receiver, sp);
+  return invokespecial_resolved_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
 }
 
 __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
@@ -1993,7 +1995,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
 
-  s64 result = invokespecial_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  s64 result = invokespecial_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
   if (likely(result)) return result;
   NEXT_VOID
 }
@@ -2004,7 +2006,7 @@ static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread,
                                         [[maybe_unused]] stack_frame *frame,
                                         [[maybe_unused]] bytecode_insn *target,
                                         bytecode_insn instruction,
-                                        obj_header *receiver, stack_value *sp_) {
+                                        obj_header *receiver, stack_pointer_t sp_) {
   DCHECK(instruction.kind == insn_invokespecial_resolved);
 
   if (unlikely(!receiver)) {
@@ -2030,7 +2032,7 @@ static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
   SPILL_VOID
 
   // guaranteed to need to yield back to the interpreter
-  return invokespecial_resolved_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  return invokespecial_resolved_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
 }
 FORWARD_TO_NULLARY(invokespecial_resolved)
 
@@ -2038,7 +2040,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
                                           stack_frame *frame,
                                           bytecode_insn *target,
                                           bytecode_insn instruction,
-                                          obj_header *receiver, stack_value *sp_) {
+                                          obj_header *receiver, stack_pointer_t sp_) {
   DCHECK(instruction.kind == insn_invokeinterface);
 
   if (!receiver) {
@@ -2059,7 +2061,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
     instruction.kind = insn_invokevirtual;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    return invokevirtual_impl_void_impl(thread, frame, target, instruction, receiver, sp);
+    return invokevirtual_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
   mark_insn_returns(&instruction);
 
@@ -2081,14 +2083,14 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
     instruction.ic = method_info->resolved;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp);
+    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
 
   instruction.ic = method;
   instruction.ic2 = receiver->descriptor;
   instruction.kind = insn_invokeitable_monomorphic;
   suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp);
+  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp_);
 }
 
 __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
@@ -2098,7 +2100,7 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   obj_header *receiver = (sp - argc)->obj;
 
   SPILL_VOID
-  s64 result = invokeinterface_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  s64 result = invokeinterface_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
   if (unlikely(result)) return result;
   NEXT_VOID
 }
@@ -2121,7 +2123,7 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
 
 
 // simplified version of impl, no extra patching, just call the dang method
-static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, [[maybe_unused]] bytecode_insn *target, bytecode_insn instruction, stack_value *sp_) {
+static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, [[maybe_unused]] bytecode_insn *target, bytecode_insn instruction, stack_pointer_t sp_) {
   DCHECK(instruction.kind == insn_invokeitable_monomorphic || instruction.kind == insn_invokevtable_monomorphic);
 
   stack_frame *invoked_frame = push_frame(thread, instruction.ic, sp - instruction.args, instruction.args);
