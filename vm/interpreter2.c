@@ -322,6 +322,12 @@ void *__interpreter_intrinsic_double_table_base() { return jmp_table_double; }
 EMSCRIPTEN_KEEPALIVE
 int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 
+static s64 invokevirtual_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
+static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, bytecode_insn *target, bytecode_insn instruction, stack_value *sp_);
+static s64 invokeinterface_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
+static s64 invokespecial_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
+static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_value *sp_);
+
 // Same as SPILL(tos), but when no top-of-stack value is available
 #define SPILL_VOID                                                                                                     \
   frame->program_counter = pc;                                                                                         \
@@ -444,32 +450,41 @@ static s64 float_to_long(float const x) {
 #endif
 }
 
+typedef struct {
+  int err;
+  bytecode_insn suggested;
+} resolved_insn_t;
+
+constexpr resolved_insn_t RESOLVE_FAILED = { .err = -1 };
+
+static int intrinsify(bytecode_insn *inst);
+
 // Convert getstatic and putstatic instructions into one of the resolved forms -- or throw a linkage error if
 // appropriate. The stack should be made consistent before this function is called, as it may interrupt.
-DECLARE_ASYNC(int, resolve_getstatic_putstatic,
+DECLARE_ASYNC(resolved_insn_t, resolve_getstatic_putstatic,
   locals(cp_field_info *field_info; cp_class_info *class),
   arguments(vm_thread *thread; bytecode_insn *inst;),
   invoked_methods(invoked_method(initialize_class)));
 
 // Convert getfield and putfield instructions into one of the resolved forms -- or throw a linkage error if
 // appropriate. The stack should be made consistent before this function is called, as it may interrupt.
-DECLARE_ASYNC(int, resolve_getfield_putfield,
+DECLARE_ASYNC(resolved_insn_t, resolve_getfield_putfield,
   locals(cp_field_info *field_info; cp_class_info *class),
   arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
   invoked_methods(invoked_method(initialize_class)));
 
-DECLARE_ASYNC(int, resolve_invokestatic,
+DECLARE_ASYNC(resolved_insn_t, resolve_invokestatic,
               locals(),
               arguments(vm_thread *thread; bytecode_insn *insn_),
               invoked_method(resolve_methodref)
 );
 
-DECLARE_ASYNC(int, resolve_new_inst,
+DECLARE_ASYNC(resolved_insn_t, resolve_new_inst,
   locals(classdesc *classdesc),
   arguments(vm_thread *thread; bytecode_insn *inst;),
   invoked_methods(invoked_method(initialize_class)));
 
-DECLARE_ASYNC(int, resolve_insn,
+DECLARE_ASYNC(resolved_insn_t, resolve_insn,
               locals(),
               arguments(vm_thread *thread; bytecode_insn *inst; stack_frame *frame; stack_value *sp_;),
               invoked_methods(
@@ -496,10 +511,13 @@ DEFINE_ASYNC(resolve_insn) {
   }
   if (kind == insn_invokestatic) {
     AWAIT(resolve_invokestatic, args->thread, args->inst);
+    intrinsify(&get_async_result(resolve_invokestatic).suggested);
     ASYNC_RETURN(get_async_result(resolve_invokestatic));
   }
+
   // UNREACHABLE(); // idempotent
-  ASYNC_END_VOID();
+  constexpr resolved_insn_t empty_result = { .err = 2 };
+  ASYNC_END(empty_result);
 }
 
 /// In the interpreter, we don't use the DECLARE_ASYNC/DEFINE_ASYNC macros;  instead, we manually
@@ -696,12 +714,12 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
 
   // First, attempt to resolve the class that the instruction is referring to.
   if (resolve_class(thread, self->class))
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
 
   // Then, attempt to initialize the class.
   AWAIT(initialize_class, thread, self->class->classdesc);
   if (thread->current_exception)
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
 
 #define field self->field_info->field
 
@@ -714,24 +732,22 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     bprintf(complaint, "Expected static field %.*s on class %.*s", fmt_slice(self->field_info->nat->name),
             fmt_slice(self->field_info->class_info->name));
     raise_incompatible_class_change_error(thread, complaint);
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
 
   // Select the appropriate resolved instruction kind.
   bool putstatic = inst->kind == insn_putstatic;
-  bytecode_insn new_insn = *inst;
-  new_insn.kind = getstatic_putstatic_resolved_kind(putstatic, self->field_info->parsed_descriptor->repr_kind);
+  resolved_insn_t result = { 0, *inst };
+  result.suggested.kind = getstatic_putstatic_resolved_kind(putstatic, self->field_info->parsed_descriptor->repr_kind);
 
   // Store the static address of the field in the instruction.
-  new_insn.ic = (void *)field->my_class->static_fields + field->byte_offset;
-
-  atomically_update_kind_and_ic(inst, &new_insn);
+  result.suggested.ic = (void *)field->my_class->static_fields + field->byte_offset;
 
 #undef thread
 #undef inst
 #undef field
 
-  ASYNC_END(0);
+  ASYNC_END(result);
 }
 
 #define TryResolve(thread_, insn_, frame_, sp_)                                                                        \
@@ -747,13 +763,17 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     }                                                                                                                  \
     if (thread->current_exception)                                                                                     \
       return RETVAL_EXCEPTION_THROWN;                                                                                  \
-  } while (0)
+    if (likely(!ctx._result.err)) {                                                                                    \
+      suggest_bytecode_patch(thread_->vm, (bytecode_patch_request) { insn_, ctx._result.suggested });                  \
+      scheduled_gc_pause_patch_only(thread_->vm);                                                                      \
+    }                                                                                                                  \
+  } while (0) // todo: suggesting the bytecode patch and doing a GC is a lazy workaround
 
 __attribute__((noinline)) static s64 getstatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   TryResolve(thread, insn, frame, sp);
-  JMP_VOID // we rewrote this instruction to a resolved form, so jump to that implementation
+  JMP_VOID // we rewrote this instruction to a resolved form, so jump to that implementation // todo: this trick won't work forever for performance reasons
 }
 FORWARD_TO_NULLARY(getstatic)
 
@@ -951,27 +971,26 @@ DEFINE_ASYNC(resolve_getfield_putfield) {
   obj_header *obj = (*(sp_ - 1 - putfield)).obj;
   if (!obj) {
     raise_null_pointer_exception(thread);
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
   cp_field_info *field_info = &inst->cp->field;
   if (resolve_field(thread, field_info)) {
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
   if (field_info->field->access_flags & ACCESS_STATIC) {
     INIT_STACK_STRING(complaint, 1000);
     bprintf(complaint, "Expected nonstatic field %.*s on class %.*s", fmt_slice(field_info->nat->name),
             fmt_slice(field_info->class_info->name));
     raise_incompatible_class_change_error(thread, complaint);
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
 
-  bytecode_insn new_insn = *inst;
-  new_insn.kind = getfield_putfield_resolved_kind(putfield, field_info->parsed_descriptor->repr_kind);
-  new_insn.ic = field_info->field;
-  new_insn.ic2 = (void *)field_info->field->byte_offset;
-  atomically_update_kind_and_ic(inst, &new_insn);
+  resolved_insn_t result = { 0, *inst };
+  result.suggested.kind = getfield_putfield_resolved_kind(putfield, field_info->parsed_descriptor->repr_kind);
+  result.suggested.ic = field_info->field;
+  result.suggested.ic2 = (void *)field_info->field->byte_offset;
 
-  ASYNC_END(0);
+  ASYNC_END(result);
 
 #undef frame
 #undef thread
@@ -1618,13 +1637,14 @@ DEFINE_ASYNC(resolve_new_inst) {
   classdesc *classdesc = self->classdesc = args->inst->cp->class_info.classdesc;
   AWAIT(initialize_class, args->thread, classdesc);
   if (self->classdesc->state < CD_STATE_INITIALIZING) { // linkage error, etc.
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
-  bytecode_insn new_insn = *args->inst;
-  new_insn.kind = insn_new_resolved;
-  __atomic_store_n(&args->inst->classdesc, self->classdesc, __ATOMIC_SEQ_CST);
-  atomically_update_kind_and_ic(args->inst, &new_insn);
-  ASYNC_END(0);
+
+  resolved_insn_t result = { 0, *args->inst };
+  result.suggested.kind = insn_new_resolved;
+  result.suggested.classdesc = self->classdesc;
+
+  ASYNC_END(result);
 }
 
 static s64 new_impl_void(ARGS_VOID) {
@@ -1739,20 +1759,19 @@ static int intrinsify(bytecode_insn *inst) {
 DEFINE_ASYNC(resolve_invokestatic) {
   AWAIT(resolve_methodref, self->args.thread, &self->args.insn_->cp->methodref);
   if (self->args.thread->current_exception) {
-    ASYNC_RETURN(-1);
+    ASYNC_RETURN(RESOLVE_FAILED);
   }
 
   cp_method_info *info = &self->args.insn_->cp->methodref;
   self->args.insn_->args = info->descriptor->args_count;
 
-  bytecode_insn new_insn = *self->args.insn_;
-  new_insn.kind = insn_invokestatic_resolved;
-  new_insn.ic = info->resolved;
+  resolved_insn_t result = { 0, *self->args.insn_ };
+  result.suggested.kind = insn_invokestatic_resolved;
+  result.suggested.ic = info->resolved;
 
   mark_insn_returns(self->args.insn_);
-  atomically_update_kind_and_ic(self->args.insn_, &new_insn);
 
-  ASYNC_END(0);
+  ASYNC_END(result);
 }
 
 __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
@@ -1825,13 +1844,14 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokestatic_resolved)
 
-__attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
-  DEBUG_CHECK();
-  cp_method_info *method_info = &insn->cp->methodref;
-  int argc = insn->args = method_info->descriptor->args_count + 1;
-  obj_header *receiver = (sp - argc)->obj;
+// the internal implementation for this single instruction
+static s64 invokevirtual_impl_void_impl(vm_thread *thread,
+                                        stack_frame *frame,
+                                        bytecode_insn *target,
+                                        bytecode_insn instruction,
+                                        obj_header *receiver, stack_value *sp_) {
+  DCHECK(instruction.kind == insn_invokevirtual);
 
-  SPILL_VOID
   if (!receiver) {
     raise_null_pointer_exception(thread);
     return RETVAL_EXCEPTION_THROWN;
@@ -1840,7 +1860,7 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
 
-  ctx.args.info = &insn->cp->methodref;
+  ctx.args.info = &instruction.cp->methodref;
   thread->stack.synchronous_depth++; // TODO remove
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
@@ -1848,44 +1868,65 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   if (thread->current_exception) {
     return RETVAL_EXCEPTION_THROWN;
   }
-  method_info = &insn->cp->methodref;
-  mark_insn_returns(insn);
+  cp_method_info *method_info = &instruction.cp->methodref;
+  mark_insn_returns(&instruction);
+
 
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
-    insn->kind = insn_invokesigpoly;
-    insn->ic = method_info->resolved;
-    insn->ic2 = resolve_method_type(thread, method_info->descriptor);
+    instruction.kind = insn_invokesigpoly;
+    instruction.ic = method_info->resolved;
+    instruction.ic2 = resolve_method_type(thread, method_info->descriptor);
 
-    arrput(frame->method->my_class->sigpoly_insns, insn); // so GC can move around ic2
-    JMP_VOID
+    // todo: VERY BAD AND NOT THREAD SAFE. JUST HERE FOR NOW TO GET IT TO WORK SOME OF THE TIME
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+    arrput(frame->method->my_class->sigpoly_insns, target); // so GC can move around ic2
+    scheduled_gc_pause_patch_only(thread->vm); // todo: this doesn't prevent race conditions, but hopefully mitigates enough until we get rid of this code here
+    frame->is_async_suspended = true;
+    return RETVAL_FUEL_CHECK; // todo: just return to a fake fuel check, I can't be bothered to implement something that we're gonna delete anyway
   }
 
   // If we found an interface method, transmogrify into a invokeinterface
   if (method_info->resolved->my_class->access_flags & ACCESS_INTERFACE) {
-    insn->kind = insn_invokeinterface;
-    JMP_VOID
+    instruction.kind = insn_invokeinterface;
+
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+    return invokeinterface_impl_void_impl(thread, frame, target, instruction, receiver, sp);
   }
 
   if (method_info->resolved->access_flags & ACCESS_FINAL) { // if the method is FINAL, we can make it an invokespecial
-    insn->kind = insn_invokespecial_resolved;
-    insn->ic = method_info->resolved;
-    JMP_VOID
+    instruction.kind = insn_invokespecial_resolved;
+    instruction.ic = method_info->resolved;
+
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp);
   }
 
-  insn->kind = insn_invokevtable_monomorphic;
-  insn->ic = vtable_lookup(receiver->descriptor, method_info->resolved->vtable_index);
-  insn->ic2 = receiver->descriptor;
-  JMP_VOID
+  instruction.kind = insn_invokevtable_monomorphic;
+  instruction.ic = vtable_lookup(receiver->descriptor, method_info->resolved->vtable_index);
+  instruction.ic2 = receiver->descriptor;
+  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp);
 }
-FORWARD_TO_NULLARY(invokevirtual)
 
-__attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
+
   SPILL_VOID
+
+  s64 result = invokevirtual_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  if (likely(result)) return result;
+  NEXT_VOID
+}
+FORWARD_TO_NULLARY(invokevirtual)
+
+static s64 invokespecial_impl_void_impl(vm_thread *thread,
+                                        stack_frame *frame,
+                                        bytecode_insn *target,
+                                        bytecode_insn instruction,
+                                        obj_header *receiver, stack_value *sp_) {
   if (!receiver) {
     raise_null_pointer_exception(thread);
     return RETVAL_EXCEPTION_THROWN;
@@ -1893,14 +1934,14 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
 
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
-  ctx.args.info = &insn->cp->methodref;
+  ctx.args.info = &instruction.cp->methodref;
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception) {
     return RETVAL_EXCEPTION_THROWN;
   }
 
-  method_info = &insn->cp->methodref;
+  cp_method_info *method_info = &instruction.cp->methodref;
   classdesc *lookup_on = method_info->resolved->my_class;
   cp_method *method = frame->method;
 
@@ -1934,40 +1975,72 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
 
   // If this is the <init> method of Object, make it a nop
   if (utf8_equals(candidate->my_class->name, "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
-    insn->kind = insn_pop;
+    instruction.kind = insn_pop;
   } else {
-    insn->kind = insn_invokespecial_resolved;
-    insn->ic = candidate;
+    instruction.kind = insn_invokespecial_resolved;
+    instruction.ic = candidate;
   }
-  mark_insn_returns(insn);
-  JMP_VOID
+  mark_insn_returns(&instruction);
+
+  suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+  return invokespecial_resolved_impl_void_impl(thread, frame, target, instruction, receiver, sp);
 }
-FORWARD_TO_NULLARY(invokespecial)
 
-static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
-  DEBUG_CHECK();
-  obj_header *receiver = (sp - insn->args)->obj;
-  bool returns = insn->returns;
-  SPILL_VOID
-  NPE_ON_NULL(receiver);
-
-  cp_method *receiver_method = insn->ic;
-  ConsiderJitEntry(thread, receiver_method, sp - insn->args);
-
-  stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - insn->args, insn->args);
-  if (!invoked_frame)
-    return RETVAL_EXCEPTION_THROWN;
-
-  AttemptInvoke(thread, invoked_frame, insn->args, returns);
-}
-FORWARD_TO_NULLARY(invokespecial_resolved)
-
-__attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
+__attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
+
+  s64 result = invokespecial_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  if (likely(result)) return result;
+  NEXT_VOID
+}
+FORWARD_TO_NULLARY(invokespecial)
+
+
+static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread,
+                                        [[maybe_unused]] stack_frame *frame,
+                                        [[maybe_unused]] bytecode_insn *target,
+                                        bytecode_insn instruction,
+                                        obj_header *receiver, stack_value *sp_) {
+  DCHECK(instruction.kind == insn_invokespecial_resolved);
+
+  if (unlikely(!receiver)) {
+    raise_null_pointer_exception(thread);
+    return RETVAL_EXCEPTION_THROWN;
+  }
+
+  cp_method *receiver_method = instruction.ic;
+
+  // bool returns = instruction.returns;
+  // ConsiderJitEntry(thread, receiver_method, sp - instruction.args); // todo: this macro is broken
+
+  stack_frame *invoked_frame = push_frame(thread, receiver_method, sp - instruction.args, instruction.args);
+  if (!invoked_frame)
+    return RETVAL_EXCEPTION_THROWN;
+
+  AttemptInvoke(thread, invoked_frame, insn->args, returns);
+}
+
+static s64 invokespecial_resolved_impl_void(ARGS_VOID) {
+  DEBUG_CHECK();
+  obj_header *receiver = (sp - insn->args)->obj;
+  SPILL_VOID
+
+  // guaranteed to need to yield back to the interpreter
+  return invokespecial_resolved_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+}
+FORWARD_TO_NULLARY(invokespecial_resolved)
+
+static s64 invokeinterface_impl_void_impl(vm_thread *thread,
+                                          stack_frame *frame,
+                                          bytecode_insn *target,
+                                          bytecode_insn instruction,
+                                          obj_header *receiver, stack_value *sp_) {
+  DCHECK(instruction.kind == insn_invokeinterface);
+
   if (!receiver) {
     raise_null_pointer_exception(thread);
     return RETVAL_EXCEPTION_THROWN;
@@ -1975,18 +2048,20 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
 
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
-  ctx.args.info = &insn->cp->methodref;
+  ctx.args.info = &instruction.cp->methodref;
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception)
     return RETVAL_EXCEPTION_THROWN;
 
-  method_info = &insn->cp->methodref;
+  cp_method_info *method_info = &instruction.cp->methodref;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
-    insn->kind = insn_invokevirtual;
-    JMP_VOID
+    instruction.kind = insn_invokevirtual;
+
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+    return invokevirtual_impl_void_impl(thread, frame, target, instruction, receiver, sp);
   }
-  mark_insn_returns(insn);
+  mark_insn_returns(&instruction);
 
   cp_method *method =
       itable_lookup(receiver->descriptor, method_info->resolved->my_class, method_info->resolved->itable_index);
@@ -2002,15 +2077,30 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   }
 
   if (method_info->resolved->access_flags & ACCESS_FINAL) { // if the method is FINAL, we can make it an invokespecial
-    insn->kind = insn_invokespecial_resolved;
-    insn->ic = method_info->resolved;
-    JMP_VOID
+    instruction.kind = insn_invokespecial_resolved;
+    instruction.ic = method_info->resolved;
+
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+    return invokespecial_impl_void_impl(thread, frame, target, instruction, receiver, sp);
   }
 
-  insn->ic = method;
-  insn->ic2 = receiver->descriptor;
-  insn->kind = insn_invokeitable_monomorphic;
-  JMP_VOID
+  instruction.ic = method;
+  instruction.ic2 = receiver->descriptor;
+  instruction.kind = insn_invokeitable_monomorphic;
+  suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
+  return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp);
+}
+
+__attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
+  DEBUG_CHECK();
+  cp_method_info *method_info = &insn->cp->methodref;
+  int argc = method_info->descriptor->args_count + 1;
+  obj_header *receiver = (sp - argc)->obj;
+
+  SPILL_VOID
+  s64 result = invokeinterface_impl_void_impl(thread, frame, insn, insn[0], receiver, sp);
+  if (unlikely(result)) return result;
+  NEXT_VOID
 }
 FORWARD_TO_NULLARY(invokeinterface)
 
@@ -2029,6 +2119,17 @@ __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *ins
   inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
 }
 
+
+// simplified version of impl, no extra patching, just call the dang method
+static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, [[maybe_unused]] bytecode_insn *target, bytecode_insn instruction, stack_value *sp_) {
+  DCHECK(instruction.kind == insn_invokeitable_monomorphic || instruction.kind == insn_invokevtable_monomorphic);
+
+  stack_frame *invoked_frame = push_frame(thread, instruction.ic, sp - instruction.args, instruction.args);
+  if (!invoked_frame)
+    return RETVAL_EXCEPTION_THROWN;
+
+  AttemptInvoke(thread, invoked_frame, execute_insn.args, returns); // todo: useless statement
+}
 
 
 __attribute__ ((noinline)) static s64 invokeitable_vtable_monomorphic_impl_void(ARGS_VOID) {
@@ -2856,17 +2957,20 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   future_t fut;
 
-  bool advance_pc = false;
+  bool skip_suspended_instruction = false; // for whether we think we are done and can just avoid calling it
   bool needs_polymorphic_jump = false;
 
   switch (cont.pnt) {
   case CONT_RESOLVE:
-    bytecode_insn *in = cont.ctx.resolve_insn.args.inst;
     fut = resolve_insn(&cont.ctx.resolve_insn);
 
-    int fail = cont.ctx.resolve_insn._result;
-    if (!fail && in->kind == insn_invokestatic && fut.status == FUTURE_READY) {
-      needs_polymorphic_jump = intrinsify(in);
+    int fail = cont.ctx.resolve_insn._result.err;
+    if (!fail && fut.status == FUTURE_READY) {
+      suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { insn, cont.ctx.resolve_insn._result.suggested });
+      scheduled_gc_pause_patch_only(thread->vm); // todo: lazy workaround (switch on the suggested result instead of the insn)
+
+      skip_suspended_instruction = true; // we just did all the work for it here above
+      needs_polymorphic_jump = true; // why not
     }
     break;
 
@@ -2879,12 +2983,12 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
   case CONT_MONITOR_ENTER:
     fut = monitor_acquire(&cont.ctx.acquire_monitor);
-    advance_pc = true;
+    skip_suspended_instruction = true;
     break;
 
   case CONT_INVOKESIGPOLY:
     fut = invokevirtual_signature_polymorphic(&cont.ctx.sigpoly);
-    advance_pc = true;
+    skip_suspended_instruction = true;
     break;
 
   default:
@@ -2899,7 +3003,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   }
 
   // Now calculate sp correctly depending on whether we're advancing an instruction or not
-  sp = frame->stack + frame->insn_index_to_sd[pc + advance_pc]; // correct sp
+  sp = frame->stack + frame->insn_index_to_sd[pc + skip_suspended_instruction]; // correct sp
 
   frame->is_async_suspended = false;
   if (unlikely(thread->current_exception)) {
@@ -2912,7 +3016,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
   arg_3 = &(sp - 1)->d;
 #endif
 
-  if (advance_pc) {
+  if (skip_suspended_instruction) {
     STACK_POLYMORPHIC_NEXT(*(sp - 1));
   } else if (needs_polymorphic_jump) {
     STACK_POLYMORPHIC_JMP(*(sp - 1));

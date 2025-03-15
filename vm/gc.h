@@ -12,6 +12,14 @@ int in_heap(const vm *vm, object field);
  * All invocaations to this function will block until the GC has been completed by one particuliar thread.
  */
 void scheduled_gc_pause(vm *vm);
+
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * This is useful early into VM initialization, where we can't GC without fully initialized classdescs.
+ */
+void scheduled_gc_pause_patch_only(vm *vm);
+
 size_t size_of_object(obj_header *obj);
 
 #endif

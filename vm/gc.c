@@ -538,3 +538,27 @@ void scheduled_gc_pause(vm *vm) {
   }
   thread_pool_unlock(thread_pool); // todo: check result of this?
 }
+
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * This is useful early into VM initialization, where we can't GC without fully initialized classdescs.
+ */
+void scheduled_gc_pause_patch_only(vm *vm) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
+}

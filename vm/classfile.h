@@ -607,6 +607,7 @@ struct iinc_data {
 
 typedef struct bytecode_insn {
   // todo: fix rewriter as the offsets of these things have changed
+  insn_code_kind kind;
   u8 args;
   reduced_tos_kind tos_before; // the (reduced) top-of-stack type before this instruction executes
   reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
@@ -644,20 +645,8 @@ typedef struct bytecode_insn {
     classdesc *classdesc;
   };
 
-  // Per-instruction inline cache data (various uses depending on the instruction)
-  union {
-    struct {
-      volatile insn_code_kind kind;
-      void *volatile ic;
-    };
-
-#if SIZEOF_POINTER == 4
-    u64 raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
-#else
-    _Alignas(16) __uint128_t raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
-#endif
-  };
-  void *volatile ic2;
+  void *ic;
+  void *ic2;
 } bytecode_insn;
 
 typedef struct {
