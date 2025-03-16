@@ -100,7 +100,7 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 1
+#define DO_TAILS 0
 #endif
 
 #define MUSTTAIL // defined as empty here to allow compilation without -mtail-call
