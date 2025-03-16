@@ -79,10 +79,10 @@
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
-#if 1
+#if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 0) {                                                                                                             \
+  if (tick++ > 16628000) {                                                                                             \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
@@ -1784,11 +1784,8 @@ __attribute__((noinline)) static s64 invokestatic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
   TryResolve(thread, insn, frame, sp);
-  if (intrinsify(insn)) {
-    STACK_POLYMORPHIC_JMP(*(sp - 1));
-  }
 
-  JMP_VOID
+  STACK_POLYMORPHIC_JMP(*(sp - 1));
 }
 FORWARD_TO_NULLARY(invokestatic)
 
@@ -1922,9 +1919,7 @@ __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
 
   SPILL_VOID
 
-  s64 result = invokevirtual_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
-  if (likely(result)) return result;
-  NEXT_VOID
+  return invokevirtual_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
 }
 FORWARD_TO_NULLARY(invokevirtual)
 
@@ -1979,13 +1974,8 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
   }
 
-  // If this is the <init> method of Object, make it a nop
-  if (utf8_equals(candidate->my_class->name, "java/lang/Object") && utf8_equals(candidate->name, "<init>")) {
-    instruction.kind = insn_pop;
-  } else {
-    instruction.kind = insn_invokespecial_resolved;
-    instruction.ic = candidate;
-  }
+  instruction.kind = insn_invokespecial_resolved;
+  instruction.ic = candidate;
   mark_insn_returns(&instruction);
 
   suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
@@ -1999,9 +1989,7 @@ __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
 
-  s64 result = invokespecial_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
-  if (likely(result)) return result;
-  NEXT_VOID
+  return invokespecial_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
 }
 FORWARD_TO_NULLARY(invokespecial)
 
@@ -2063,6 +2051,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
     instruction.kind = insn_invokevirtual;
+    instruction.args = method_info->descriptor->args_count + 1;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
     return invokevirtual_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
@@ -2081,6 +2070,8 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
            fmt_slice(method_info->resolved->my_class->name), fmt_slice(method_info->resolved->name),
            fmt_slice(receiver->descriptor->name), fmt_slice(method->my_class->name), fmt_slice(method->name));
   }
+
+  instruction.args = method_argc(method);
 
   if (method_info->resolved->access_flags & ACCESS_FINAL) { // if the method is FINAL, we can make it an invokespecial
     instruction.kind = insn_invokespecial_resolved;
@@ -2104,9 +2095,7 @@ __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   obj_header *receiver = (sp - argc)->obj;
 
   SPILL_VOID
-  s64 result = invokeinterface_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
-  if (unlikely(result)) return result;
-  NEXT_VOID
+  return invokeinterface_impl_void_impl(thread, frame, insn, insn[0], receiver, sp_);
 }
 FORWARD_TO_NULLARY(invokeinterface)
 
@@ -2980,7 +2969,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
     if (!fail && fut.status == FUTURE_READY) {
       atomically_patch_instruction_info(cont.ctx.resolve_insn.args.inst, &cont.ctx.resolve_insn._result.suggested);
 
-      skip_suspended_instruction = true; // we just did all the work for it here above
+      skip_suspended_instruction = false; // we just did all the work for it here above
       needs_polymorphic_jump = true; // why not
     }
     break;

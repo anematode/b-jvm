@@ -1720,7 +1720,10 @@ void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
 void atomically_patch_instruction_info(bytecode_insn *insn, const bytecode_insn *source) {
   static_assert(sizeof(struct { insn_code_kind kind; void *ic; }) <= sizeof(insn->raw_patch_data_), "raw_patch_data_ is too small");
 
-  insn->extra_data = source->extra_data;
+  // insn->extra_data = source->extra_data;
+  __atomic_store_n(&insn->args, source->args, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->tos_before, source->tos_before, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->tos_after, source->tos_after, __ATOMIC_SEQ_CST);
   __atomic_store_n(&insn->ic2, source->ic2, __ATOMIC_SEQ_CST);
   __atomic_store_n(&insn->raw_patch_data_, source->raw_patch_data_, __ATOMIC_SEQ_CST);
 }
