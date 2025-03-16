@@ -100,7 +100,7 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 0
+#define DO_TAILS 1
 #endif
 
 #define MUSTTAIL // defined as empty here to allow compilation without -mtail-call
@@ -1743,6 +1743,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
 
 static int intrinsify(bytecode_insn *inst) {
   cp_method *method = inst->ic;
+  if (unlikely(!method)) return 1;
   if (utf8_equals(method->my_class->name, "java/lang/Math")) {
     if (utf8_equals(method->name, "sqrt")) {
       inst->kind = insn_sqrt;
