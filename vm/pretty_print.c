@@ -387,29 +387,29 @@ heap_string insn_to_string(const bytecode_insn *insn, int insn_index) {
     // no operands
   } else if (insn->kind <= insn_ldc2_w || insn->kind == insn_invokeinterface) {
     // indexes into constant pool
-    char *cp_str = cp_entry_to_string(insn->cp);
+    char *cp_str = cp_entry_to_string(insn->extra_data.cp);
     build_str(&result, write, "%s", cp_str);
     free(cp_str);
   } else if (insn->kind <= insn_astore) {
     // indexes into local variables
-    build_str(&result, write, "#%d", insn->index);
+    build_str(&result, write, "#%d", insn->extra_data.index);
   } else if (insn->kind <= insn_ifnull) {
     // indexes into the instruction array
-    build_str(&result, write, "inst %d", insn->index);
+    build_str(&result, write, "inst %d", insn->extra_data.index);
   } else if (insn->kind == insn_lconst || insn->kind == insn_iconst) {
-    build_str(&result, write, "%" PRId64, insn->integer_imm);
+    build_str(&result, write, "%" PRId64, insn->extra_data.integer_imm);
   } else if (insn->kind == insn_dconst || insn->kind == insn_fconst) {
-    build_str(&result, write, "%.15g", insn->f_imm);
+    build_str(&result, write, "%.15g", insn->extra_data.f_imm);
   } else if (insn->kind == insn_tableswitch) {
-    write = build_str(&result, write, "[ default -> %d", insn->tableswitch->default_target);
-    for (int i = 0, j = insn->tableswitch->low; i < insn->tableswitch->targets_count; ++i, ++j) {
-      write = build_str(&result, write, ", %d -> %d", j, insn->tableswitch->targets[i]);
+    write = build_str(&result, write, "[ default -> %d", insn->extra_data.tableswitch->default_target);
+    for (int i = 0, j = insn->extra_data.tableswitch->low; i < insn->extra_data.tableswitch->targets_count; ++i, ++j) {
+      write = build_str(&result, write, ", %d -> %d", j, insn->extra_data.tableswitch->targets[i]);
     }
     build_str(&result, write, " ]");
   } else if (insn->kind == insn_lookupswitch) {
-    write = build_str(&result, write, "[ default -> %d", insn->lookupswitch->default_target);
-    for (int i = 0; i < insn->lookupswitch->targets_count; ++i) {
-      write = build_str(&result, write, ", %d -> %d", insn->lookupswitch->keys[i], insn->lookupswitch->targets[i]);
+    write = build_str(&result, write, "[ default -> %d", insn->extra_data.lookupswitch->default_target);
+    for (int i = 0; i < insn->extra_data.lookupswitch->targets_count; ++i) {
+      write = build_str(&result, write, ", %d -> %d", insn->extra_data.lookupswitch->keys[i], insn->extra_data.lookupswitch->targets[i]);
     }
     build_str(&result, write, " ]");
   } else {

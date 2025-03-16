@@ -79,10 +79,10 @@
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
-#if 0
+#if 1
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 16628000) {                                                                                                             \
+  if (tick++ > 0) {                                                                                                             \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
@@ -100,7 +100,7 @@
 #ifdef EMSCRIPTEN
 #define DO_TAILS 0 // not profitable on web
 #else
-#define DO_TAILS 0
+#define DO_TAILS 1
 #endif
 
 #define MUSTTAIL // defined as empty here to allow compilation without -mtail-call
@@ -457,7 +457,7 @@ typedef struct {
   bytecode_insn suggested;
 } resolved_insn_t;
 
-constexpr resolved_insn_t RESOLVE_FAILED = { .err = -1 };
+#define RESOLVE_FAILED ((resolved_insn_t) { .err = -1 })
 
 static int intrinsify(bytecode_insn *inst);
 
@@ -518,7 +518,7 @@ DEFINE_ASYNC(resolve_insn) {
   }
 
   // UNREACHABLE(); // idempotent
-  constexpr resolved_insn_t empty_result = { .err = 2 };
+  resolved_insn_t empty_result = { .err = 2 };
   ASYNC_END(empty_result);
 }
 
@@ -662,7 +662,7 @@ enum {
 #endif
 
 static void mark_insn_returns(bytecode_insn *inst) {
-  inst->returns = inst->cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
+  inst->returns = inst->extra_data.cp->methodref.descriptor->return_type.base_kind != TYPE_KIND_VOID;
 }
 
 /** BYTECODE IMPLEMENTATIONS */
@@ -711,7 +711,7 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
   // For brevity
 #define inst self->args.inst
 #define thread self->args.thread
-  self->field_info = &inst->cp->field;
+  self->field_info = &inst->extra_data.cp->field;
   self->class = self->field_info->class_info;
 
   // First, attempt to resolve the class that the instruction is referring to.
@@ -766,8 +766,7 @@ DEFINE_ASYNC(resolve_getstatic_putstatic) {
     if (thread->current_exception)                                                                                     \
       return RETVAL_EXCEPTION_THROWN;                                                                                  \
     if (likely(!ctx._result.err)) {                                                                                    \
-      suggest_bytecode_patch(thread_->vm, (bytecode_patch_request) { insn_, ctx._result.suggested });                  \
-      scheduled_gc_pause_patch_only(thread_->vm);                                                                      \
+      atomically_patch_instruction_info(insn_, &ctx._result.suggested);                                                    \
     }                                                                                                                  \
   } while (0) // todo: suggesting the bytecode patch and doing a GC is a lazy workaround
 
@@ -975,7 +974,7 @@ DEFINE_ASYNC(resolve_getfield_putfield) {
     raise_null_pointer_exception(thread);
     ASYNC_RETURN(RESOLVE_FAILED);
   }
-  cp_field_info *field_info = &inst->cp->field;
+  cp_field_info *field_info = &inst->extra_data.cp->field;
   if (resolve_field(thread, field_info)) {
     ASYNC_RETURN(RESOLVE_FAILED);
   }
@@ -1462,39 +1461,39 @@ static s64 dreturn_impl_double(ARGS_DOUBLE) {
 static s64 goto_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   FUEL_CHECK_VOID
-  insns = (bytecode_insn*)((char*)insns + insn->delta);
+  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
   JMP_VOID
 }
 
 static s64 goto_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->delta);
+  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
   JMP_DOUBLE(tos)
 }
 
 static s64 goto_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->delta);
+  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
   JMP_FLOAT(tos)
 }
 
 static s64 goto_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->delta);
+  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
   JMP_INT(tos)
 }
 
 static s64 tableswitch_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   s32 index = (s32)tos;
-  s32 low = insn->tableswitch->low;
-  s32 high = insn->tableswitch->high;
-  s32 *offsets = insn->tableswitch->targets;
+  s32 low = insn->extra_data.tableswitch->low;
+  s32 high = insn->extra_data.tableswitch->high;
+  s32 *offsets = insn->extra_data.tableswitch->targets;
   if (index < low || index > high) {
-    int delta = (s32)(insn->tableswitch->default_target - 1) - (s32)pc;
+    int delta = (s32)(insn->extra_data.tableswitch->default_target - 1) - (s32)pc;
 
     insns += delta;
   } else {
@@ -1508,7 +1507,7 @@ static s64 tableswitch_impl_int(ARGS_INT) {
 
 static s64 lookupswitch_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  struct lookupswitch_data data = *insn->lookupswitch;
+  struct lookupswitch_data data = *insn->extra_data.lookupswitch;
 
   s32 key = (s32)tos;
   s32 *keys = data.keys;
@@ -1537,7 +1536,7 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
   static s64 which##_impl_int(ARGS_INT) {                                                                              \
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
-    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->delta : (s32)sizeof(bytecode_insn);                                   \
+    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                                   \
     insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
     sp--;                                                                                                              \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
@@ -1557,7 +1556,7 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
     s64 a = (sp - 2)->i, b = (int)tos;                                                                                 \
-    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->delta : (s32)sizeof(bytecode_insn);                                \
+    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                                \
     insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
     sp -= 2;                                                                                                           \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
@@ -1574,7 +1573,7 @@ static s64 if_acmpeq_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
-  s32 offset = UNPREDICTABLE(a == b) ? insn->delta : (s32)sizeof(bytecode_insn);
+  s32 offset = UNPREDICTABLE(a == b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);
   insns = (bytecode_insn*)((char*)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
@@ -1584,7 +1583,7 @@ static s64 if_acmpne_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
-  s32 offset = UNPREDICTABLE(a != b) ? insn->delta : (s32)sizeof(bytecode_insn);
+  s32 offset = UNPREDICTABLE(a != b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);
   insns = (bytecode_insn*)((char*)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
@@ -1636,7 +1635,7 @@ static s64 monitorexit_impl_int(ARGS_INT) {
 /** New object creation */
 
 DEFINE_ASYNC(resolve_new_inst) {
-  classdesc *classdesc = self->classdesc = args->inst->cp->class_info.classdesc;
+  classdesc *classdesc = self->classdesc = args->inst->extra_data.cp->class_info.classdesc;
   AWAIT(initialize_class, args->thread, classdesc);
   if (self->classdesc->state < CD_STATE_INITIALIZING) { // linkage error, etc.
     ASYNC_RETURN(RESOLVE_FAILED);
@@ -1644,7 +1643,7 @@ DEFINE_ASYNC(resolve_new_inst) {
 
   resolved_insn_t result = { 0, *args->inst };
   result.suggested.kind = insn_new_resolved;
-  result.suggested.classdesc = self->classdesc;
+  result.suggested.ic = self->classdesc;
 
   ASYNC_END(result);
 }
@@ -1653,7 +1652,7 @@ static s64 new_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
-  cp_class_info *info = &insn->cp->class_info;
+  cp_class_info *info = &insn->extra_data.cp->class_info;
   int error = resolve_class(thread, info);
   if (error)
     return RETVAL_EXCEPTION_THROWN;
@@ -1666,7 +1665,7 @@ FORWARD_TO_NULLARY(new)
 static s64 new_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
-  obj_header *obj = new_object(thread, insn->classdesc);
+  obj_header *obj = new_object(thread, insn->ic);
   if (!obj)
     return RETVAL_EXCEPTION_THROWN;
 
@@ -1683,7 +1682,7 @@ static s64 newarray_impl_int(ARGS_INT) {
     raise_negative_array_size_exception(thread, count);
     return RETVAL_EXCEPTION_THROWN;
   }
-  obj_header *array = CreatePrimitiveArray1D(thread, insn->array_type, count);
+  obj_header *array = CreatePrimitiveArray1D(thread, insn->extra_data.array_type, count);
   if (unlikely(!array)) {
     return RETVAL_EXCEPTION_THROWN; // oom
   }
@@ -1693,7 +1692,11 @@ static s64 newarray_impl_int(ARGS_INT) {
 static s64 anewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL_VOID
-  cp_class_info *info = &insn->cp->class_info;
+  bytecode_insn resolved_insn = *insn;
+  if (resolved_insn.kind != insn_anewarray) {
+    JMP_INT(tos); // nextt
+  }
+  cp_class_info *info = &resolved_insn.extra_data.cp->class_info;
   if (resolve_class(thread, info)) {
     return RETVAL_EXCEPTION_THROWN;
   }
@@ -1701,8 +1704,9 @@ static s64 anewarray_impl_int(ARGS_INT) {
   if (link_class(thread, info->classdesc)) {
     return RETVAL_EXCEPTION_THROWN;
   }
-  insn->classdesc = info->classdesc;
-  insn->kind = insn_anewarray_resolved;
+  resolved_insn.ic = info->classdesc;
+  resolved_insn.kind = insn_anewarray_resolved;
+  atomically_patch_instruction_info(insn, &resolved_insn);
   JMP_INT(tos)
 }
 
@@ -1716,7 +1720,7 @@ static s64 anewarray_resolved_impl_int(ARGS_INT) {
     return RETVAL_EXCEPTION_THROWN;
     ;
   }
-  obj_header *array = CreateObjectArray1D(thread, insn->classdesc, count);
+  obj_header *array = CreateObjectArray1D(thread, (classdesc *)insn->ic, count);
   if (likely(array)) {
     NEXT_INT(array)
   }
@@ -1728,7 +1732,7 @@ static s64 multianewarray_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   SPILL(tos)
   u16 temp_sp = sp - frame_stack(frame);
-  if (multianewarray(thread, frame, insn->multianewarray, &temp_sp))
+  if (multianewarray(thread, frame, insn->extra_data.multianewarray, &temp_sp))
     return RETVAL_EXCEPTION_THROWN;
 
   sp = frame_stack(frame) + temp_sp;
@@ -1759,12 +1763,12 @@ static int intrinsify(bytecode_insn *inst) {
 }
 
 DEFINE_ASYNC(resolve_invokestatic) {
-  AWAIT(resolve_methodref, self->args.thread, &self->args.insn_->cp->methodref);
+  AWAIT(resolve_methodref, self->args.thread, &self->args.insn_->extra_data.cp->methodref);
   if (self->args.thread->current_exception) {
     ASYNC_RETURN(RESOLVE_FAILED);
   }
 
-  cp_method_info *info = &self->args.insn_->cp->methodref;
+  cp_method_info *info = &self->args.insn_->extra_data.cp->methodref;
   self->args.insn_->args = info->descriptor->args_count;
 
   resolved_insn_t result = { 0, *self->args.insn_ };
@@ -1833,7 +1837,7 @@ static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   stack_frame *invoked_frame;
   SPILL_VOID
   if (method->is_signature_polymorphic) {
-    invoked_frame = push_native_frame(thread, method, insn->cp->methodref.descriptor, sp - insn->args, insn->args);
+    invoked_frame = push_native_frame(thread, method, insn->extra_data.cp->methodref.descriptor, sp - insn->args, insn->args);
   } else {
     ConsiderJitEntry(thread, method, sp - insn->args);
     invoked_frame = push_frame(thread, method, sp - insn->args, insn->args);
@@ -1862,7 +1866,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
 
-  ctx.args.info = &instruction.cp->methodref;
+  ctx.args.info = &instruction.extra_data.cp->methodref;
   thread->stack.synchronous_depth++; // TODO remove
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
@@ -1870,7 +1874,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   if (thread->current_exception) {
     return RETVAL_EXCEPTION_THROWN;
   }
-  cp_method_info *method_info = &instruction.cp->methodref;
+  cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   mark_insn_returns(&instruction);
 
 
@@ -1912,7 +1916,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
 
 __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  cp_method_info *method_info = &insn->cp->methodref;
+  cp_method_info *method_info = &insn->extra_data.cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
 
@@ -1936,14 +1940,14 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
 
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
-  ctx.args.info = &instruction.cp->methodref;
+  ctx.args.info = &instruction.extra_data.cp->methodref;
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception) {
     return RETVAL_EXCEPTION_THROWN;
   }
 
-  cp_method_info *method_info = &instruction.cp->methodref;
+  cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   classdesc *lookup_on = method_info->resolved->my_class;
   cp_method *method = frame->method;
 
@@ -1990,7 +1994,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
 
 __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  cp_method_info *method_info = &insn->cp->methodref;
+  cp_method_info *method_info = &insn->extra_data.cp->methodref;
   int argc = insn->args = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
@@ -2050,13 +2054,13 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
 
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
-  ctx.args.info = &instruction.cp->methodref;
+  ctx.args.info = &instruction.extra_data.cp->methodref;
   future_t fut = resolve_methodref(&ctx);
   CHECK(fut.status == FUTURE_READY);
   if (thread->current_exception)
     return RETVAL_EXCEPTION_THROWN;
 
-  cp_method_info *method_info = &instruction.cp->methodref;
+  cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
     instruction.kind = insn_invokevirtual;
 
@@ -2095,7 +2099,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
 
 __attribute__((noinline)) static s64 invokeinterface_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  cp_method_info *method_info = &insn->cp->methodref;
+  cp_method_info *method_info = &insn->extra_data.cp->methodref;
   int argc = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
 
@@ -2117,8 +2121,8 @@ __attribute__((noinline)) void make_invokevtable_polymorphic_(bytecode_insn *ins
 __attribute__((noinline)) void make_invokeitable_polymorphic_(bytecode_insn *inst) {
   DCHECK(inst->kind == insn_invokeitable_monomorphic);
   inst->kind = insn_invokeitable_polymorphic;
-  inst->ic = (void *)inst->cp->methodref.resolved->my_class;
-  inst->ic2 = (void *)inst->cp->methodref.resolved->itable_index;
+  inst->ic = (void *)inst->extra_data.cp->methodref.resolved->my_class;
+  inst->ic2 = (void *)inst->extra_data.cp->methodref.resolved->itable_index;
 }
 
 
@@ -2157,7 +2161,7 @@ __attribute__ ((noinline)) static s64 invokeitable_vtable_monomorphic_impl_void(
       vtable_lookup(receiver->descriptor, (size_t)execute_insn.ic2)
         : itable_lookup(receiver->descriptor, execute_insn.ic, (size_t)execute_insn.ic2);
     if (unlikely(!receiver_method)) {
-      raise_abstract_method_error(thread, execute_insn.cp->methodref.resolved);
+      raise_abstract_method_error(thread, execute_insn.extra_data.cp->methodref.resolved);
       return RETVAL_EXCEPTION_THROWN;
     }
     DCHECK(receiver_method);
@@ -2219,7 +2223,7 @@ static s64 invokeitable_polymorphic_impl_void(ARGS_VOID) {
   NPE_ON_NULL(receiver);
   cp_method *receiver_method = itable_lookup(receiver->descriptor, insn->ic, (size_t)insn->ic2);
   if (unlikely(!receiver_method)) {
-    raise_abstract_method_error(thread, insn->cp->methodref.resolved);
+    raise_abstract_method_error(thread, insn->extra_data.cp->methodref.resolved);
     return RETVAL_EXCEPTION_THROWN;
   }
   DCHECK(receiver_method);
@@ -2257,7 +2261,7 @@ __attribute__((noinline)) static s64 invokedynamic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
-  cp_indy_info *indy = &insn->cp->indy_info;
+  cp_indy_info *indy = &insn->extra_data.cp->indy_info;
   indy_resolve_t ctx = {};
   ctx.args.thread = thread;
 #undef insn
@@ -2321,7 +2325,7 @@ static s64 invokecallsite_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(invokecallsite)
 
-static stack_value *get_local(stack_frame *frame, bytecode_insn *inst) { return (stack_value *)frame - inst->delta; }
+static stack_value *get_local(stack_frame *frame, bytecode_insn *inst) { return (stack_value *)frame - inst->extra_data.delta; }
 
 /** Local variable accessors */
 static s64 iload_impl_void(ARGS_VOID) {
@@ -2396,29 +2400,29 @@ static s64 lstore_impl_int(ARGS_INT) {
 
 static s64 iinc_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
-  int *a = &frame_locals(frame)[insn->iinc.index].i;
-  __builtin_add_overflow(*a, insn->iinc.const_, a);
+  int *a = &frame_locals(frame)[insn->extra_data.iinc.index].i;
+  __builtin_add_overflow(*a, insn->extra_data.iinc.const_, a);
   NEXT_VOID
 }
 
 static s64 iinc_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
-  int *a = &frame_locals(frame)[insn->iinc.index].i;
-  __builtin_add_overflow(*a, insn->iinc.const_, a);
+  int *a = &frame_locals(frame)[insn->extra_data.iinc.index].i;
+  __builtin_add_overflow(*a, insn->extra_data.iinc.const_, a);
   NEXT_DOUBLE(tos)
 }
 
 static s64 iinc_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
-  int *a = &frame_locals(frame)[insn->iinc.index].i;
-  __builtin_add_overflow(*a, insn->iinc.const_, a);
+  int *a = &frame_locals(frame)[insn->extra_data.iinc.index].i;
+  __builtin_add_overflow(*a, insn->extra_data.iinc.const_, a);
   NEXT_FLOAT(tos)
 }
 
 static s64 iinc_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  int *a = &frame_locals(frame)[insn->iinc.index].i;
-  __builtin_add_overflow(*a, insn->iinc.const_, a);
+  int *a = &frame_locals(frame)[insn->extra_data.iinc.index].i;
+  __builtin_add_overflow(*a, insn->extra_data.iinc.const_, a);
   NEXT_INT(tos)
 }
 
@@ -2434,7 +2438,7 @@ FORWARD_TO_NULLARY(aconst_null)
 static s64 ldc_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  cp_entry *ent = insn->cp;
+  cp_entry *ent = insn->extra_data.cp;
   switch (ent->kind) {
   case CP_KIND_INTEGER:
   case CP_KIND_FLOAT: {
@@ -2479,7 +2483,7 @@ FORWARD_TO_NULLARY(ldc)
 static s64 ldc2_w_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  cp_entry *ent = insn->cp;
+  cp_entry *ent = insn->extra_data.cp;
   switch (ent->kind) {
   case CP_KIND_DOUBLE: {
     NEXT_DOUBLE(ent->floating.value);
@@ -2496,28 +2500,28 @@ FORWARD_TO_NULLARY(ldc2_w)
 static s64 iconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  NEXT_INT(insn->integer_imm)
+  NEXT_INT(insn->extra_data.integer_imm)
 }
 FORWARD_TO_NULLARY(iconst)
 
 static s64 fconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  NEXT_FLOAT(insn->f_imm);
+  NEXT_FLOAT(insn->extra_data.f_imm);
 }
 FORWARD_TO_NULLARY(fconst)
 
 static s64 dconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  NEXT_DOUBLE(insn->d_imm);
+  NEXT_DOUBLE(insn->extra_data.d_imm);
 }
 FORWARD_TO_NULLARY(dconst)
 
 static s64 lconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
-  NEXT_INT(insn->integer_imm);
+  NEXT_INT(insn->extra_data.integer_imm);
 }
 FORWARD_TO_NULLARY(lconst)
 
@@ -2683,24 +2687,30 @@ static s64 athrow_impl_int(ARGS_INT) {
 
 static s64 checkcast_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  cp_class_info *info = &insn->cp->class_info;
   SPILL(tos)
+  bytecode_insn resolved_insn = *insn;
+  if (resolved_insn.kind != insn_checkcast) {
+    JMP_INT(tos); // nextt
+  }
+  cp_class_info *info = &resolved_insn.extra_data.cp->class_info;
   int error = resolve_class(thread, info) || link_class(thread, info->classdesc);
   if (error)
     return RETVAL_EXCEPTION_THROWN;
 
-  RELOAD(tos)
-  insn->classdesc = info->classdesc;
-  insn->kind = insn_checkcast_resolved;
+  RELOAD(tos) // todo: what is this actually for?
+  resolved_insn.ic = info->classdesc;
+  resolved_insn.kind = insn_checkcast_resolved;
+
+  atomically_patch_instruction_info(insn, &resolved_insn);
   JMP_INT(tos)
 }
 
 static s64 checkcast_resolved_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (obj_header *)tos;
-  if (obj && unlikely(!instanceof(obj->descriptor, insn->classdesc))) {
+  if (obj && unlikely(!instanceof(obj->descriptor, (classdesc *)insn->ic))) {
     SPILL(tos)
-    raise_class_cast_exception(thread, obj->descriptor, insn->classdesc);
+    raise_class_cast_exception(thread, obj->descriptor, (classdesc *)insn->ic);
     return RETVAL_EXCEPTION_THROWN;
   }
   NEXT_INT(tos)
@@ -2708,14 +2718,14 @@ static s64 checkcast_resolved_impl_int(ARGS_INT) {
 
 static s64 instanceof_impl_int(ARGS_INT) {
   DEBUG_CHECK();
-  cp_class_info *info = &insn->cp->class_info;
+  cp_class_info *info = &insn->extra_data.cp->class_info;
   SPILL(tos)
   int error = resolve_class(thread, info) || link_class(thread, info->classdesc);
   if (error)
     return RETVAL_EXCEPTION_THROWN;
 
   RELOAD(tos)
-  insn->classdesc = info->classdesc;
+  insn->ic = info->classdesc;
   insn->kind = insn_instanceof_resolved;
   JMP_INT(tos)
 }
@@ -2723,7 +2733,7 @@ static s64 instanceof_impl_int(ARGS_INT) {
 static s64 instanceof_resolved_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   obj_header *obj = (obj_header *)tos;
-  int result = obj ? instanceof(obj->descriptor, insn->classdesc) : 0;
+  int result = obj ? instanceof(obj->descriptor, insn->ic) : 0;
   NEXT_INT(result)
 }
 
@@ -2968,8 +2978,7 @@ static s64 async_resume_impl_void(ARGS_VOID) {
 
     int fail = cont.ctx.resolve_insn._result.err;
     if (!fail && fut.status == FUTURE_READY) {
-      suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { insn, cont.ctx.resolve_insn._result.suggested });
-      scheduled_gc_pause_patch_only(thread->vm); // todo: lazy workaround (switch on the suggested result instead of the insn)
+      atomically_patch_instruction_info(cont.ctx.resolve_insn.args.inst, &cont.ctx.resolve_insn._result.suggested);
 
       skip_suspended_instruction = true; // we just did all the work for it here above
       needs_polymorphic_jump = true; // why not

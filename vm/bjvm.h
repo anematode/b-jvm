@@ -775,6 +775,7 @@ classdesc *primitive_classdesc(vm_thread *thread, type_kind prim_kind);
 void out_of_memory(vm_thread *thread);
 void *bump_allocate(vm_thread *thread, size_t bytes);
 void suggest_bytecode_patch(vm *vm, bytecode_patch_request request);
+void atomically_patch_instruction_info(bytecode_insn *insn, const bytecode_insn *source); // usually unsafe- don't do this without good reason
 
 #ifdef __cplusplus
 }

@@ -209,12 +209,12 @@ static void calculate_tos_type(struct method_analysis_ctx *ctx, reduced_tos_kind
 
 // Calculate the delta field for instructions like aload, fstore
 static void calculate_local_modifying_insn_delta(bytecode_insn *insn, const struct method_analysis_ctx *ctx) {
-  insn->delta = (s32)ctx->code->max_locals - (s32)insn->index;
+  insn->extra_data.delta = (s32)ctx->code->max_locals - (s32)insn->extra_data.index;
 }
 
 // Calculate the delta field for branches (besides *switch)
 static void calculate_branch_delta(bytecode_insn * insn, int curr_index) {
-  insn->delta = ((s32)insn->index - (s32)curr_index) * (s32)sizeof(bytecode_insn);
+  insn->extra_data.delta = ((s32)insn->extra_data.index - (s32)curr_index) * (s32)sizeof(bytecode_insn);
 }
 
 /** Helper macros for analyze_instruction */
@@ -274,7 +274,7 @@ static void calculate_branch_delta(bytecode_insn * insn, int curr_index) {
 
 // Done like this because we still need to use the post-swizzled index in no-SMT mode, but we don't want to commit
 // the rewrite until filtration is complete.
-#define LOCAL_INDEX do_rewrite ? (s32)insn->index : ctx->locals_swizzle[insn->index]
+#define LOCAL_INDEX do_rewrite ? (s32)insn->extra_data.index : ctx->locals_swizzle[insn->extra_data.index]
 
 /**
  * Analyze the instruction.
@@ -593,7 +593,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     [[fallthrough]];
   case insn_getstatic: {
     field_descriptor *field =
-        check_cp_entry(insn->cp, CP_KIND_FIELD_REF, "getstatic/getfield argument")->field.parsed_descriptor;
+        check_cp_entry(insn->extra_data.cp, CP_KIND_FIELD_REF, "getstatic/getfield argument")->field.parsed_descriptor;
     PUSH_ENTRY(insn_source(field->repr_kind, insn_index));
     break;
   }
@@ -602,7 +602,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_invokedynamic: {
     method_descriptor *descriptor =
-        check_cp_entry(insn->cp, CP_KIND_INVOKE_DYNAMIC, "invokedynamic argument")->indy_info.method_descriptor;
+        check_cp_entry(insn->extra_data.cp, CP_KIND_INVOKE_DYNAMIC, "invokedynamic argument")->indy_info.method_descriptor;
     for (int j = descriptor->args_count - 1; j >= 0; --j) {
       field_descriptor *field = descriptor->args + j;
       POP_KIND(field->repr_kind);
@@ -630,7 +630,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_invokeinterface:
   case insn_invokestatic: {
     method_descriptor *descriptor =
-        check_cp_entry(insn->cp, CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF, "invoke* argument")
+        check_cp_entry(insn->extra_data.cp, CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF, "invoke* argument")
             ->methodref.descriptor;
     for (int j = descriptor->args_count - 1; j >= 0; --j) {
       field_descriptor *field = descriptor->args + j;
@@ -645,7 +645,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_ldc: {
     cp_entry *ent = check_cp_entry(
-        insn->cp, CP_KIND_INTEGER | CP_KIND_STRING | CP_KIND_FLOAT | CP_KIND_CLASS | CP_KIND_DYNAMIC_CONSTANT,
+        insn->extra_data.cp, CP_KIND_INTEGER | CP_KIND_STRING | CP_KIND_FLOAT | CP_KIND_CLASS | CP_KIND_DYNAMIC_CONSTANT,
         "ldc argument");
     type_kind kind = ent->kind == CP_KIND_INTEGER ? TYPE_KIND_INT
                      : ent->kind == CP_KIND_FLOAT ? TYPE_KIND_FLOAT
@@ -653,106 +653,106 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     PUSH_ENTRY(insn_source(kind, insn_index))
     if (ent->kind == CP_KIND_INTEGER && do_rewrite) { // rewrite to iconst or lconst
       insn->kind = insn_iconst;
-      insn->integer_imm = (s32)ent->integral.value;
+      insn->extra_data.integer_imm = (s32)ent->integral.value;
     } else if (ent->kind == CP_KIND_FLOAT && do_rewrite) {
       insn->kind = insn_fconst;
-      insn->f_imm = (float)ent->floating.value;
+      insn->extra_data.f_imm = (float)ent->floating.value;
     }
     break;
   }
   case insn_ldc2_w: {
-    cp_entry *ent = check_cp_entry(insn->cp, CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w argument");
+    cp_entry *ent = check_cp_entry(insn->extra_data.cp, CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w argument");
     type_kind kind = ent->kind == CP_KIND_DOUBLE ? TYPE_KIND_DOUBLE : TYPE_KIND_LONG;
     PUSH_ENTRY(insn_source(kind, insn_index))
     if (ent->kind == CP_KIND_LONG && do_rewrite) {
       insn->kind = insn_lconst;
-      insn->integer_imm = ent->integral.value;
+      insn->extra_data.integer_imm = ent->integral.value;
     } else if (do_rewrite) {
       insn->kind = insn_dconst;
-      insn->d_imm = ent->floating.value;
+      insn->extra_data.d_imm = ent->floating.value;
     }
     break;
   }
   case insn_dload: {
-    SWIZZLE_LOCAL(insn->index)
+    SWIZZLE_LOCAL(insn->extra_data.index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
-    CHECK_LOCAL(insn->index, DOUBLE)
+    CHECK_LOCAL(insn->extra_data.index, DOUBLE)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_fload: {
-    SWIZZLE_LOCAL(insn->index)
+    SWIZZLE_LOCAL(insn->extra_data.index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
-    CHECK_LOCAL(insn->index, FLOAT)
+    CHECK_LOCAL(insn->extra_data.index, FLOAT)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_iload: {
-    SWIZZLE_LOCAL(insn->index)
+    SWIZZLE_LOCAL(insn->extra_data.index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
-    CHECK_LOCAL(insn->index, INT)
+    CHECK_LOCAL(insn->extra_data.index, INT)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_lload: {
-    SWIZZLE_LOCAL(insn->index)
+    SWIZZLE_LOCAL(insn->extra_data.index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
-    CHECK_LOCAL(insn->index, LONG)
+    CHECK_LOCAL(insn->extra_data.index, LONG)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_dstore: {
     POP(DOUBLE)
-    SWIZZLE_LOCAL(insn->index)
-    SET_LOCAL(insn->index, DOUBLE)
+    SWIZZLE_LOCAL(insn->extra_data.index)
+    SET_LOCAL(insn->extra_data.index, DOUBLE)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_fstore: {
     POP(FLOAT)
-    SWIZZLE_LOCAL(insn->index)
-    SET_LOCAL(insn->index, FLOAT)
+    SWIZZLE_LOCAL(insn->extra_data.index)
+    SET_LOCAL(insn->extra_data.index, FLOAT)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_istore: {
     POP(INT)
-    SWIZZLE_LOCAL(insn->index)
-    SET_LOCAL(insn->index, INT)
+    SWIZZLE_LOCAL(insn->extra_data.index)
+    SET_LOCAL(insn->extra_data.index, INT)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_lstore: {
     POP(LONG)
-    SWIZZLE_LOCAL(insn->index)
-    SET_LOCAL(insn->index, LONG)
+    SWIZZLE_LOCAL(insn->extra_data.index)
+    SET_LOCAL(insn->extra_data.index, LONG)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_aload: {
-    SWIZZLE_LOCAL(insn->index)
+    SWIZZLE_LOCAL(insn->extra_data.index)
     PUSH_ENTRY(ctx->locals.entries[LOCAL_INDEX])
-    CHECK_LOCAL(insn->index, REFERENCE)
+    CHECK_LOCAL(insn->extra_data.index, REFERENCE)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_astore: {
     POP(REFERENCE)
-    SWIZZLE_LOCAL(insn->index)
-    SET_LOCAL(insn->index, REFERENCE)
+    SWIZZLE_LOCAL(insn->extra_data.index)
+    SET_LOCAL(insn->extra_data.index, REFERENCE)
     calculate_local_modifying_insn_delta(insn, ctx);
     break;
   }
   case insn_goto: {
     calculate_branch_delta(insn, insn_index);
-    if (push_branch_target(ctx, insn_index, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.index))
       goto error;
     *state_terminated = true;
     break;
   }
   case insn_jsr: {
     PUSH(REFERENCE)
-    if (push_branch_target(ctx, insn_index, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.index))
       goto error;
     break;
   }
@@ -761,7 +761,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     POP(REFERENCE)
     POP(REFERENCE)
     calculate_branch_delta(insn, insn_index);
-    if (push_branch_target(ctx, insn_index, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.index))
       goto error;
     break;
   }
@@ -781,7 +781,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_ifle: {
     POP(INT)
     calculate_branch_delta(insn, insn_index);
-    if (push_branch_target(ctx, insn_index, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.index))
       goto error;
     break;
   }
@@ -789,7 +789,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_ifnull: {
     POP(REFERENCE)
     calculate_branch_delta(insn, insn_index);
-    if (push_branch_target(ctx, insn_index, insn->index))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.index))
       goto error;
     break;
   }
@@ -802,10 +802,10 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   case insn_lconst:
     PUSH(LONG) break;
   case insn_iinc:
-    SWIZZLE_LOCAL(insn->iinc.index);
+    SWIZZLE_LOCAL(insn->extra_data.iinc.index);
     break;
   case insn_multianewarray: {
-    for (int i = 0; i < insn->multianewarray->dimensions; ++i)
+    for (int i = 0; i < insn->extra_data.multianewarray->dimensions; ++i)
       POP(INT)
     PUSH(REFERENCE)
     break;
@@ -815,20 +815,20 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
   }
   case insn_tableswitch: {
     POP(INT)
-    if (push_branch_target(ctx, insn_index, insn->tableswitch->default_target))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.tableswitch->default_target))
       goto error;
-    for (int i = 0; i < insn->tableswitch->targets_count; ++i)
-      if (push_branch_target(ctx, insn_index, insn->tableswitch->targets[i]))
+    for (int i = 0; i < insn->extra_data.tableswitch->targets_count; ++i)
+      if (push_branch_target(ctx, insn_index, insn->extra_data.tableswitch->targets[i]))
         goto error;
     *state_terminated = true;
     break;
   }
   case insn_lookupswitch: {
     POP(INT)
-    if (push_branch_target(ctx, insn_index, insn->lookupswitch->default_target))
+    if (push_branch_target(ctx, insn_index, insn->extra_data.lookupswitch->default_target))
       goto error;
-    for (int i = 0; i < insn->lookupswitch->targets_count; ++i)
-      if (push_branch_target(ctx, insn_index, insn->lookupswitch->targets[i]))
+    for (int i = 0; i < insn->extra_data.lookupswitch->targets_count; ++i)
+      if (push_branch_target(ctx, insn_index, insn->extra_data.lookupswitch->targets[i]))
         goto error;
     *state_terminated = true;
     break;
@@ -948,7 +948,7 @@ static void write_npe_sources(bytecode_insn *insn, const analy_stack_state *stac
   case insn_invokevirtual:
   case insn_invokeinterface:
   case insn_invokespecial: { // Trying to invoke on an object
-    int argc = insn->cp->methodref.descriptor->args_count;
+    int argc = insn->extra_data.cp->methodref.descriptor->args_count;
     DCHECK(argc + 1 <= sd);
     *a = stack->entries[sd - argc - 1].source; // just the one source, which is the object
     break;
@@ -1201,16 +1201,16 @@ int scan_basic_blocks(const attribute_code *code, code_analysis *analy) {
   for (int i = 0; i < code->insn_count; ++i) {
     const bytecode_insn *insn = code->code + i;
     if (insn->kind >= insn_goto && insn->kind <= insn_ifnull) {
-      ts[tc++] = insn->index;
+      ts[tc++] = insn->extra_data.index;
       if (insn->kind != insn_goto)
         ts[tc++] = i + 1; // fallthrough
     } else if (insn->kind == insn_tableswitch) {
-      const struct tableswitch_data *tsd = insn->tableswitch;
+      const struct tableswitch_data *tsd = insn->extra_data.tableswitch;
       ts[tc++] = tsd->default_target;
       memcpy(ts + tc, tsd->targets, tsd->targets_count * sizeof(int));
       tc += tsd->targets_count;
     } else if (insn->kind == insn_lookupswitch) {
-      const struct lookupswitch_data *lsd = insn->lookupswitch;
+      const struct lookupswitch_data *lsd = insn->extra_data.lookupswitch;
       ts[tc++] = lsd->default_target;
       memcpy(ts + tc, lsd->targets, lsd->targets_count * sizeof(int));
       tc += lsd->targets_count;
@@ -1228,23 +1228,23 @@ int scan_basic_blocks(const attribute_code *code, code_analysis *analy) {
     bs[i].insn_count = i + 1 < block_count ? ts[i + 1] - ts[i] : code->insn_count - ts[i];
     bs[i].my_index = i;
   }
-#define FIND_TARGET_BLOCK(index) &bs[(int *)bsearch(&index, ts, block_count, sizeof(int), cmp_ints) - ts]
+#define FIND_TARGET_BLOCK(index) &bs[(int *)bsearch((void *) &index, ts, block_count, sizeof(int), cmp_ints) - ts] // cope with casting a volatile pointer to (void *)
   // Then, record edges between bbs.
   for (int block_i = 0; block_i < block_count; ++block_i) {
     basic_block *b = bs + block_i;
     const bytecode_insn *last = b->start + b->insn_count - 1;
     if (last->kind >= insn_goto && last->kind <= insn_ifnull) {
-      push_bb_branch(b, FIND_TARGET_BLOCK(last->index));
+      push_bb_branch(b, FIND_TARGET_BLOCK(last->extra_data.index));
       if (last->kind == insn_goto)
         continue;
     } else if (last->kind == insn_tableswitch) {
-      const struct tableswitch_data *tsd = last->tableswitch;
+      const struct tableswitch_data *tsd = last->extra_data.tableswitch;
       push_bb_branch(b, FIND_TARGET_BLOCK(tsd->default_target));
       for (int i = 0; i < tsd->targets_count; ++i)
         push_bb_branch(b, FIND_TARGET_BLOCK(tsd->targets[i]));
       continue;
     } else if (last->kind == insn_lookupswitch) {
-      const struct lookupswitch_data *lsd = last->lookupswitch;
+      const struct lookupswitch_data *lsd = last->extra_data.lookupswitch;
       push_bb_branch(b, FIND_TARGET_BLOCK(lsd->default_target));
       for (int i = 0; i < lsd->targets_count; ++i)
         push_bb_branch(b, FIND_TARGET_BLOCK(lsd->targets[i]));
@@ -1523,10 +1523,10 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
     DCHECK(index >= 0 && index < method->code->insn_count);
     bytecode_insn *insn = method->code->code + index;
 
-    if (lvt && ((ent = lvt_lookup(insn->index, original_pc, lvt)))) {
+    if (lvt && ((ent = lvt_lookup(insn->extra_data.index, original_pc, lvt)))) {
       string_builder_append(builder, "%.*s", fmt_slice(*ent));
     } else {
-      string_builder_append(builder, "<local%d>", insn->index);
+      string_builder_append(builder, "<local%d>", insn->extra_data.index);
     }
     break;
   }
@@ -1554,13 +1554,13 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       if (!err) {
         string_builder_append(builder, ".");
       }
-      string_builder_append(builder, "%.*s", fmt_slice(insn->cp->field.nat->name));
+      string_builder_append(builder, "%.*s", fmt_slice(insn->extra_data.cp->field.nat->name));
       break;
     case insn_getstatic:
     case insn_getstatic_B ... insn_getstatic_L: {
       // Class.name
-      string_builder_append(builder, "%.*s.%.*s", fmt_slice(insn->cp->field.class_info->name),
-                            fmt_slice(insn->cp->field.nat->name));
+      string_builder_append(builder, "%.*s.%.*s", fmt_slice(insn->extra_data.cp->field.class_info->name),
+                            fmt_slice(insn->extra_data.cp->field.nat->name));
       break;
     }
     case insn_invokevirtual:
@@ -1576,11 +1576,11 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       if (is_first) {
         string_builder_append(builder, "the return value of ");
       }
-      npe_stringify_method(builder, &insn->cp->methodref);
+      npe_stringify_method(builder, &insn->extra_data.cp->methodref);
       break;
     }
     case insn_iconst: {
-      string_builder_append(builder, "%d", (int)insn->integer_imm);
+      string_builder_append(builder, "%d", (int)insn->extra_data.integer_imm);
       break;
     }
     default: {
@@ -1644,11 +1644,11 @@ int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result) {
     CASE(insn_monitorexit, "Cannot exit synchronized block")
   case insn_getfield:
   case insn_getfield_B ... insn_getfield_L:
-    string_builder_append(&builder, "Cannot read field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
+    string_builder_append(&builder, "Cannot read field \"%.*s\"", fmt_slice(faulting_insn->extra_data.cp->field.nat->name));
     break;
   case insn_putfield:
   case insn_putfield_B ... insn_putfield_L:
-    string_builder_append(&builder, "Cannot assign field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
+    string_builder_append(&builder, "Cannot assign field \"%.*s\"", fmt_slice(faulting_insn->extra_data.cp->field.nat->name));
     break;
   case insn_invokevirtual:
   case insn_invokeinterface:
@@ -1658,7 +1658,7 @@ int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result) {
   case insn_invokeitable_polymorphic:
   case insn_invokevtable_monomorphic:
   case insn_invokevtable_polymorphic: {
-    cp_method_info *invoked = &faulting_insn->cp->methodref;
+    cp_method_info *invoked = &faulting_insn->extra_data.cp->methodref;
     string_builder_append(&builder, "Cannot invoke \"");
     npe_stringify_method(&builder, invoked);
     string_builder_append(&builder, "\"");

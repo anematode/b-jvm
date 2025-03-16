@@ -499,7 +499,7 @@ bytecode_insn parse_tableswitch_insn(cf_byteslice *reader, int pc, classfile_par
     data->targets[i] = checked_pc(original_pc, reader_next_s32(reader, "tableswitch target"), ctx);
   }
 
-  return (bytecode_insn){.kind = insn_tableswitch, .original_pc = original_pc, .tableswitch = data};
+  return (bytecode_insn){.kind = insn_tableswitch, .original_pc = original_pc, .extra_data.tableswitch = data};
 }
 
 bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc, classfile_parse_ctx *ctx) {
@@ -530,7 +530,7 @@ bytecode_insn parse_lookupswitch_insn(cf_byteslice *reader, int pc, classfile_pa
                                      .keys_count = pairs_count,
                                      .targets = targets,
                                      .targets_count = pairs_count};
-  return (bytecode_insn){.kind = insn_lookupswitch, .original_pc = original_pc, .lookupswitch = data};
+  return (bytecode_insn){.kind = insn_lookupswitch, .original_pc = original_pc, .extra_data.lookupswitch = data};
 }
 
 type_kind parse_atype(u8 atype) {
@@ -780,70 +780,70 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
   case iconst_3:
   case iconst_4:
   case iconst_5:
-    return (bytecode_insn){.kind = insn_iconst, .integer_imm = opcode - iconst_0};
+    return (bytecode_insn){.kind = insn_iconst, .extra_data.integer_imm = opcode - iconst_0};
   case lconst_0:
   case lconst_1:
-    return (bytecode_insn){.kind = insn_lconst, .integer_imm = opcode - lconst_0};
+    return (bytecode_insn){.kind = insn_lconst, .extra_data.integer_imm = opcode - lconst_0};
   case fconst_0:
   case fconst_1:
   case fconst_2:
-    return (bytecode_insn){.kind = insn_fconst, .f_imm = (float)(opcode - fconst_0)};
+    return (bytecode_insn){.kind = insn_fconst, .extra_data.f_imm = (float)(opcode - fconst_0)};
   case dconst_0:
   case dconst_1:
-    return (bytecode_insn){.kind = insn_dconst, .d_imm = (double)(opcode - dconst_0)};
+    return (bytecode_insn){.kind = insn_dconst, .extra_data.d_imm = (double)(opcode - dconst_0)};
   case bipush:
-    return (bytecode_insn){.kind = insn_iconst, .integer_imm = reader_next_s8(reader, "bipush immediate")};
+    return (bytecode_insn){.kind = insn_iconst, .extra_data.integer_imm = reader_next_s8(reader, "bipush immediate")};
   case sipush:
-    return (bytecode_insn){.kind = insn_iconst, .integer_imm = reader_next_s16(reader, "sipush immediate")};
+    return (bytecode_insn){.kind = insn_iconst, .extra_data.integer_imm = reader_next_s16(reader, "sipush immediate")};
   case ldc:
     return (bytecode_insn){.kind = insn_ldc,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u8(reader, "ldc index"),
+                           .extra_data.cp = checked_cp_entry(ctx->cp, reader_next_u8(reader, "ldc index"),
                                                   CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_STRING | CP_KIND_CLASS,
                                                   "ldc index")};
   case ldc_w:
     return (bytecode_insn){.kind = insn_ldc,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc_w index"),
+                           .extra_data.cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc_w index"),
                                                   CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_STRING | CP_KIND_CLASS,
                                                   "ldc_w index")};
   case ldc2_w:
     return (bytecode_insn){.kind = insn_ldc2_w,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc2_w index"),
+                           .extra_data.cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc2_w index"),
                                                   CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w index")};
   case iload:
-    return (bytecode_insn){.kind = insn_iload, .index = reader_next_u8(reader, "iload index")};
+    return (bytecode_insn){.kind = insn_iload, .extra_data.index = reader_next_u8(reader, "iload index")};
   case lload:
-    return (bytecode_insn){.kind = insn_lload, .index = reader_next_u8(reader, "lload index")};
+    return (bytecode_insn){.kind = insn_lload, .extra_data.index = reader_next_u8(reader, "lload index")};
   case fload:
-    return (bytecode_insn){.kind = insn_fload, .index = reader_next_u8(reader, "fload index")};
+    return (bytecode_insn){.kind = insn_fload, .extra_data.index = reader_next_u8(reader, "fload index")};
   case dload:
-    return (bytecode_insn){.kind = insn_dload, .index = reader_next_u8(reader, "dload index")};
+    return (bytecode_insn){.kind = insn_dload, .extra_data.index = reader_next_u8(reader, "dload index")};
   case aload:
-    return (bytecode_insn){.kind = insn_aload, .index = reader_next_u8(reader, "aload index")};
+    return (bytecode_insn){.kind = insn_aload, .extra_data.index = reader_next_u8(reader, "aload index")};
   case iload_0:
   case iload_1:
   case iload_2:
   case iload_3:
-    return (bytecode_insn){.kind = insn_iload, .index = opcode - iload_0};
+    return (bytecode_insn){.kind = insn_iload, .extra_data.index = opcode - iload_0};
   case lload_0:
   case lload_1:
   case lload_2:
   case lload_3:
-    return (bytecode_insn){.kind = insn_lload, .index = opcode - lload_0};
+    return (bytecode_insn){.kind = insn_lload, .extra_data.index = opcode - lload_0};
   case fload_0:
   case fload_1:
   case fload_2:
   case fload_3:
-    return (bytecode_insn){.kind = insn_fload, .index = opcode - fload_0};
+    return (bytecode_insn){.kind = insn_fload, .extra_data.index = opcode - fload_0};
   case dload_0:
   case dload_1:
   case dload_2:
   case dload_3:
-    return (bytecode_insn){.kind = insn_dload, .index = opcode - dload_0};
+    return (bytecode_insn){.kind = insn_dload, .extra_data.index = opcode - dload_0};
   case aload_0:
   case aload_1:
   case aload_2:
   case aload_3:
-    return (bytecode_insn){.kind = insn_aload, .index = opcode - aload_0};
+    return (bytecode_insn){.kind = insn_aload, .extra_data.index = opcode - aload_0};
   case iaload:
     return (bytecode_insn){.kind = insn_iaload};
   case laload:
@@ -861,40 +861,40 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
   case saload:
     return (bytecode_insn){.kind = insn_saload};
   case istore:
-    return (bytecode_insn){.kind = insn_istore, .index = reader_next_u8(reader, "istore index")};
+    return (bytecode_insn){.kind = insn_istore, .extra_data.index = reader_next_u8(reader, "istore index")};
   case lstore:
-    return (bytecode_insn){.kind = insn_lstore, .index = reader_next_u8(reader, "lstore index")};
+    return (bytecode_insn){.kind = insn_lstore, .extra_data.index = reader_next_u8(reader, "lstore index")};
   case fstore:
-    return (bytecode_insn){.kind = insn_fstore, .index = reader_next_u8(reader, "fstore index")};
+    return (bytecode_insn){.kind = insn_fstore, .extra_data.index = reader_next_u8(reader, "fstore index")};
   case dstore:
-    return (bytecode_insn){.kind = insn_dstore, .index = reader_next_u8(reader, "dstore index")};
+    return (bytecode_insn){.kind = insn_dstore, .extra_data.index = reader_next_u8(reader, "dstore index")};
   case astore:
-    return (bytecode_insn){.kind = insn_astore, .index = reader_next_u8(reader, "astore index")};
+    return (bytecode_insn){.kind = insn_astore, .extra_data.index = reader_next_u8(reader, "astore index")};
   case istore_0:
   case istore_1:
   case istore_2:
   case istore_3:
-    return (bytecode_insn){.kind = insn_istore, .index = opcode - istore_0};
+    return (bytecode_insn){.kind = insn_istore, .extra_data.index = opcode - istore_0};
   case lstore_0:
   case lstore_1:
   case lstore_2:
   case lstore_3:
-    return (bytecode_insn){.kind = insn_lstore, .index = opcode - lstore_0};
+    return (bytecode_insn){.kind = insn_lstore, .extra_data.index = opcode - lstore_0};
   case fstore_0:
   case fstore_1:
   case fstore_2:
   case fstore_3:
-    return (bytecode_insn){.kind = insn_fstore, .index = opcode - fstore_0};
+    return (bytecode_insn){.kind = insn_fstore, .extra_data.index = opcode - fstore_0};
   case dstore_0:
   case dstore_1:
   case dstore_2:
   case dstore_3:
-    return (bytecode_insn){.kind = insn_dstore, .index = opcode - dstore_0};
+    return (bytecode_insn){.kind = insn_dstore, .extra_data.index = opcode - dstore_0};
   case astore_0:
   case astore_1:
   case astore_2:
   case astore_3:
-    return (bytecode_insn){.kind = insn_astore, .index = opcode - astore_0};
+    return (bytecode_insn){.kind = insn_astore, .extra_data.index = opcode - astore_0};
   case iastore:
     return (bytecode_insn){.kind = insn_iastore};
   case lastore:
@@ -1004,7 +1004,7 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
   case iinc: {
     u16 index = reader_next_u8(reader, "iinc index");
     s16 const_ = (s16)reader_next_s8(reader, "iinc const");
-    return (bytecode_insn){.kind = insn_iinc, .iinc = {index, const_}};
+    return (bytecode_insn){.kind = insn_iinc, .extra_data.iinc = {index, const_}};
   }
   case i2l:
     return (bytecode_insn){.kind = insn_i2l};
@@ -1048,49 +1048,49 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
     return (bytecode_insn){.kind = insn_dcmpg};
 
   case ifeq:
-    return (bytecode_insn){.kind = insn_ifeq, .index = checked_pc(pc, reader_next_s16(reader, "if_eq offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifeq, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_eq offset"), ctx)};
   case ifne:
-    return (bytecode_insn){.kind = insn_ifne, .index = checked_pc(pc, reader_next_s16(reader, "if_ne offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifne, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_ne offset"), ctx)};
   case iflt:
-    return (bytecode_insn){.kind = insn_iflt, .index = checked_pc(pc, reader_next_s16(reader, "if_lt offset"), ctx)};
+    return (bytecode_insn){.kind = insn_iflt, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_lt offset"), ctx)};
   case ifge:
-    return (bytecode_insn){.kind = insn_ifge, .index = checked_pc(pc, reader_next_s16(reader, "if_ge offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifge, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_ge offset"), ctx)};
   case ifgt:
-    return (bytecode_insn){.kind = insn_ifgt, .index = checked_pc(pc, reader_next_s16(reader, "if_gt offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifgt, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_gt offset"), ctx)};
   case ifle:
-    return (bytecode_insn){.kind = insn_ifle, .index = checked_pc(pc, reader_next_s16(reader, "if_le offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifle, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_le offset"), ctx)};
 
   case if_icmpeq:
     return (bytecode_insn){.kind = insn_if_icmpeq,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmpeq offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmpeq offset"), ctx)};
   case if_icmpne:
     return (bytecode_insn){.kind = insn_if_icmpne,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmpne offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmpne offset"), ctx)};
   case if_icmplt:
     return (bytecode_insn){.kind = insn_if_icmplt,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmplt offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmplt offset"), ctx)};
   case if_icmpge:
     return (bytecode_insn){.kind = insn_if_icmpge,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmpge offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmpge offset"), ctx)};
   case if_icmpgt:
     return (bytecode_insn){.kind = insn_if_icmpgt,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmpgt offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmpgt offset"), ctx)};
   case if_icmple:
     return (bytecode_insn){.kind = insn_if_icmple,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_icmple offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_icmple offset"), ctx)};
   case if_acmpeq:
     return (bytecode_insn){.kind = insn_if_acmpeq,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_acmpeq offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_acmpeq offset"), ctx)};
   case if_acmpne:
     return (bytecode_insn){.kind = insn_if_acmpne,
-                           .index = checked_pc(pc, reader_next_s16(reader, "if_acmpne offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "if_acmpne offset"), ctx)};
 
   case goto_:
-    return (bytecode_insn){.kind = insn_goto, .index = checked_pc(pc, reader_next_s16(reader, "goto offset"), ctx)};
+    return (bytecode_insn){.kind = insn_goto, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "goto offset"), ctx)};
   case jsr:
-    return (bytecode_insn){.kind = insn_jsr, .index = checked_pc(pc, reader_next_s16(reader, "jsr offset"), ctx)};
+    return (bytecode_insn){.kind = insn_jsr, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "jsr offset"), ctx)};
   case ret:
-    return (bytecode_insn){.kind = insn_ret, .index = reader_next_u8(reader, "ret index")};
+    return (bytecode_insn){.kind = insn_ret, .extra_data.index = reader_next_u8(reader, "ret index")};
   case tableswitch: {
     return parse_tableswitch_insn(reader, pc, ctx);
   }
@@ -1112,35 +1112,35 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
 
   case getstatic:
     return (bytecode_insn){.kind = insn_getstatic,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "getstatic index"),
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "getstatic index"),
                                                   CP_KIND_FIELD_REF, "getstatic field ref")};
   case putstatic:
     return (bytecode_insn){.kind = insn_putstatic,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "putstatic index"),
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "putstatic index"),
                                                   CP_KIND_FIELD_REF, "putstatic field ref")};
 
   case getfield:
     return (bytecode_insn){.kind = insn_getfield,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "getfield index"), CP_KIND_FIELD_REF,
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "getfield index"), CP_KIND_FIELD_REF,
                                                   "getfield field ref")};
   case putfield:
     return (bytecode_insn){.kind = insn_putfield,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "putfield index"), CP_KIND_FIELD_REF,
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "putfield index"), CP_KIND_FIELD_REF,
                                                   "putfield field ref")};
 
   case invokevirtual:
     return (bytecode_insn){.kind = insn_invokevirtual,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokevirtual index"),
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokevirtual index"),
                                                   CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF,
                                                   "invokevirtual method ref")};
   case invokespecial:
     return (bytecode_insn){.kind = insn_invokespecial,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokespecial index"),
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokespecial index"),
                                                   CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF,
                                                   "invokespecial method ref")};
   case invokestatic:
     return (bytecode_insn){.kind = insn_invokestatic,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokestatic index"),
+                           .extra_data.cp =checked_cp_entry(ctx->cp, reader_next_u16(reader, "invokestatic index"),
                                                   CP_KIND_METHOD_REF | CP_KIND_INTERFACE_METHOD_REF,
                                                   "invokestatic method ref")};
 
@@ -1149,32 +1149,32 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_INTERFACE_METHOD_REF, "invokeinterface method ref");
     reader_next_u8(reader, "invokeinterface count");
     reader_next_u8(reader, "invokeinterface zero");
-    return (bytecode_insn){.kind = insn_invokeinterface, .cp = entry};
+    return (bytecode_insn){.kind = insn_invokeinterface, .extra_data.cp =entry};
   }
 
   case invokedynamic: {
     u16 index = reader_next_u16(reader, "invokedynamic index");
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_INVOKE_DYNAMIC, "indy method ref");
     reader_next_u16(reader, "invokedynamic zero");
-    return (bytecode_insn){.kind = insn_invokedynamic, .cp = entry};
+    return (bytecode_insn){.kind = insn_invokedynamic, .extra_data.cp =entry};
   }
 
   case new_: {
     u16 index = reader_next_u16(reader, "new index");
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_CLASS, "new class");
-    return (bytecode_insn){.kind = insn_new, .cp = entry};
+    return (bytecode_insn){.kind = insn_new, .extra_data.cp =entry};
   }
 
   case newarray: {
     u8 atype = reader_next_u8(reader, "newarray type");
     type_kind parsed = parse_atype(atype);
-    return (bytecode_insn){.kind = insn_newarray, .array_type = parsed};
+    return (bytecode_insn){.kind = insn_newarray, .extra_data.array_type = parsed};
   }
 
   case anewarray: {
     u16 index = reader_next_u16(reader, "anewarray index");
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_CLASS, "anewarray class");
-    return (bytecode_insn){.kind = insn_anewarray, .cp = entry};
+    return (bytecode_insn){.kind = insn_anewarray, .extra_data.cp =entry};
   }
 
   case arraylength:
@@ -1184,13 +1184,13 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
   case checkcast: {
     u16 index = reader_next_u16(reader, "checkcast index");
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_CLASS, "checkcast class");
-    return (bytecode_insn){.kind = insn_checkcast, .cp = entry};
+    return (bytecode_insn){.kind = insn_checkcast, .extra_data.cp =entry};
   }
 
   case instanceof: {
     u16 index = reader_next_u16(reader, "instanceof index");
     cp_entry *entry = checked_cp_entry(ctx->cp, index, CP_KIND_CLASS, "instanceof class");
-    return (bytecode_insn){.kind = insn_instanceof, .cp = entry};
+    return (bytecode_insn){.kind = insn_instanceof, .extra_data.cp =entry};
   }
 
   case monitorenter:
@@ -1201,42 +1201,42 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
   case wide: {
     switch (reader_next_u8(reader, "widened opcode")) {
     case iload: {
-      return (bytecode_insn){.kind = insn_iload, .index = reader_next_u16(reader, "wide iload index")};
+      return (bytecode_insn){.kind = insn_iload, .extra_data.index = reader_next_u16(reader, "wide iload index")};
     }
     case lload: {
-      return (bytecode_insn){.kind = insn_lload, .index = reader_next_u16(reader, "wide lload index")};
+      return (bytecode_insn){.kind = insn_lload, .extra_data.index = reader_next_u16(reader, "wide lload index")};
     }
     case fload: {
-      return (bytecode_insn){.kind = insn_fload, .index = reader_next_u16(reader, "wide fload index")};
+      return (bytecode_insn){.kind = insn_fload, .extra_data.index = reader_next_u16(reader, "wide fload index")};
     }
     case dload: {
-      return (bytecode_insn){.kind = insn_dload, .index = reader_next_u16(reader, "wide dload index")};
+      return (bytecode_insn){.kind = insn_dload, .extra_data.index = reader_next_u16(reader, "wide dload index")};
     }
     case aload: {
-      return (bytecode_insn){.kind = insn_aload, .index = reader_next_u16(reader, "wide aload index")};
+      return (bytecode_insn){.kind = insn_aload, .extra_data.index = reader_next_u16(reader, "wide aload index")};
     }
     case istore: {
-      return (bytecode_insn){.kind = insn_istore, .index = reader_next_u16(reader, "wide istore index")};
+      return (bytecode_insn){.kind = insn_istore, .extra_data.index = reader_next_u16(reader, "wide istore index")};
     }
     case lstore: {
-      return (bytecode_insn){.kind = insn_lstore, .index = reader_next_u16(reader, "wide lstore index")};
+      return (bytecode_insn){.kind = insn_lstore, .extra_data.index = reader_next_u16(reader, "wide lstore index")};
     }
     case fstore: {
-      return (bytecode_insn){.kind = insn_fstore, .index = reader_next_u16(reader, "wide fstore index")};
+      return (bytecode_insn){.kind = insn_fstore, .extra_data.index = reader_next_u16(reader, "wide fstore index")};
     }
     case dstore: {
-      return (bytecode_insn){.kind = insn_dstore, .index = reader_next_u16(reader, "wide dstore index")};
+      return (bytecode_insn){.kind = insn_dstore, .extra_data.index = reader_next_u16(reader, "wide dstore index")};
     }
     case astore: {
-      return (bytecode_insn){.kind = insn_astore, .index = reader_next_u16(reader, "wide astore index")};
+      return (bytecode_insn){.kind = insn_astore, .extra_data.index = reader_next_u16(reader, "wide astore index")};
     }
     case iinc: {
       u16 index = reader_next_u16(reader, "wide iinc index");
       s16 const_ = reader_next_s16(reader, "wide iinc const");
-      return (bytecode_insn){.kind = insn_iinc, .iinc = {index, const_}};
+      return (bytecode_insn){.kind = insn_iinc, .extra_data.iinc = {index, const_}};
     }
     case ret: {
-      return (bytecode_insn){.kind = insn_ret, .index = reader_next_u16(reader, "wide ret index")};
+      return (bytecode_insn){.kind = insn_ret, .extra_data.index = reader_next_u16(reader, "wide ret index")};
     }
 
     default: {
@@ -1254,18 +1254,18 @@ bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx 
     struct multianewarray_data *data = arena_alloc(ctx->arena, 1, sizeof(*data));
     data->entry = entry;
     data->dimensions = dimensions;
-    return (bytecode_insn){.kind = insn_multianewarray, .multianewarray = data};
+    return (bytecode_insn){.kind = insn_multianewarray, .extra_data.multianewarray = data};
   }
 
   case ifnull:
-    return (bytecode_insn){.kind = insn_ifnull, .index = checked_pc(pc, reader_next_s16(reader, "ifnull offset"), ctx)};
+    return (bytecode_insn){.kind = insn_ifnull, .extra_data.index = checked_pc(pc, reader_next_s16(reader, "ifnull offset"), ctx)};
   case ifnonnull:
     return (bytecode_insn){.kind = insn_ifnonnull,
-                           .index = checked_pc(pc, reader_next_s16(reader, "ifnonnull offset"), ctx)};
+                           .extra_data.index = checked_pc(pc, reader_next_s16(reader, "ifnonnull offset"), ctx)};
   case goto_w:
-    return (bytecode_insn){.kind = insn_goto, .index = checked_pc(pc, reader_next_s32(reader, "goto_w offset"), ctx)};
+    return (bytecode_insn){.kind = insn_goto, .extra_data.index = checked_pc(pc, reader_next_s32(reader, "goto_w offset"), ctx)};
   case jsr_w:
-    return (bytecode_insn){.kind = insn_jsr, .index = checked_pc(pc, reader_next_s32(reader, "jsr_w offset"), ctx)};
+    return (bytecode_insn){.kind = insn_jsr, .extra_data.index = checked_pc(pc, reader_next_s32(reader, "jsr_w offset"), ctx)};
 
   default: {
     char buf[64];
@@ -1300,19 +1300,19 @@ void convert_pc_offsets_to_insn_offsets(bytecode_insn *code, int insn_count, int
   for (int i = 0; i < insn_count; ++i) {
     bytecode_insn *insn = &code[i];
     if (insn->kind == insn_tableswitch) {
-      insn->tableswitch->default_target = convert_pc_to_insn(insn->tableswitch->default_target, pc_to_insn, max_pc);
-      int count = insn->tableswitch->high - insn->tableswitch->low + 1;
+      insn->extra_data.tableswitch->default_target = convert_pc_to_insn(insn->extra_data.tableswitch->default_target, pc_to_insn, max_pc);
+      int count = insn->extra_data.tableswitch->high - insn->extra_data.tableswitch->low + 1;
       for (int j = 0; j < count; ++j) {
-        insn->tableswitch->targets[j] = convert_pc_to_insn(insn->tableswitch->targets[j], pc_to_insn, max_pc);
+        insn->extra_data.tableswitch->targets[j] = convert_pc_to_insn(insn->extra_data.tableswitch->targets[j], pc_to_insn, max_pc);
       }
     } else if (insn->kind == insn_lookupswitch) {
-      insn->lookupswitch->default_target = convert_pc_to_insn(insn->lookupswitch->default_target, pc_to_insn, max_pc);
-      for (int j = 0; j < insn->lookupswitch->targets_count; ++j) {
-        insn->lookupswitch->targets[j] = convert_pc_to_insn(insn->lookupswitch->targets[j], pc_to_insn, max_pc);
+      insn->extra_data.lookupswitch->default_target = convert_pc_to_insn(insn->extra_data.lookupswitch->default_target, pc_to_insn, max_pc);
+      for (int j = 0; j < insn->extra_data.lookupswitch->targets_count; ++j) {
+        insn->extra_data.lookupswitch->targets[j] = convert_pc_to_insn(insn->extra_data.lookupswitch->targets[j], pc_to_insn, max_pc);
       }
     } else if (insn->kind >= insn_goto && insn->kind <= insn_ifnull) {
       // instruction uses index to store PC; convert to instruction
-      insn->index = convert_pc_to_insn(insn->index, pc_to_insn,
+      insn->extra_data.index = convert_pc_to_insn(insn->extra_data.index, pc_to_insn,
                                        max_pc); // always decreases, so ok
     }
   }

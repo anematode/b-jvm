@@ -607,14 +607,13 @@ struct iinc_data {
 
 typedef struct bytecode_insn {
   // todo: fix rewriter as the offsets of these things have changed
-  insn_code_kind kind;
   u8 args;
   reduced_tos_kind tos_before; // the (reduced) top-of-stack type before this instruction executes
   reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
   u16 original_pc;
   bool returns; // whether the instruction returns a value
 
-  union {
+  volatile union {
     // for newarray
     type_kind array_type;
     // constant pool index or local variable index or branch target (instruction
@@ -641,12 +640,21 @@ typedef struct bytecode_insn {
     struct multianewarray_data *multianewarray;
     // non-owned pointer into the constant pool
     cp_entry *cp;
-    // anewarray_resolved, checkcast_resolved
-    classdesc *classdesc;
-  };
+  } extra_data; // todo: try to get rid of the stuff here and use inline cache instead...
 
-  void *ic;
-  void *ic2;
+  union {
+    struct {
+      volatile insn_code_kind kind;
+      void *volatile ic;
+    };
+
+#if SIZEOF_POINTER == 4
+    u64 raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
+#else
+    _Alignas(16) __uint128_t raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
+#endif
+  };
+  void *volatile ic2;
 } bytecode_insn;
 
 typedef struct {
