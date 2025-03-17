@@ -175,8 +175,8 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
   }
 
   // permanent roots (from sigpoly instructions, etc)
-  for (int i=0; i < arrlen(vm->permanent_roots); ++i) {
-    PUSH_ROOT(&vm->permanent_roots[i]);
+  for (int i=0; i < arrlen(vm->permanent_root_locations); ++i) {
+    PUSH_ROOT(vm->permanent_root_locations[i]);
   }
 
   // Pending references
@@ -505,13 +505,14 @@ static void execute_instruction_patches(vm *vm) {
   for (size_t i=0; i<vm->instruction_patch_queue.capacity; i++) {
     bytecode_patch_request *req = &vm->instruction_patch_queue.buffer[i];
     bytecode_insn *insn_location = req->location;
-    if (insn_location)
+    if (insn_location) {
       *insn_location = req->new_insn;
 
-    if (req->new_insn.kind == insn_invokesigpoly) {
-      // ic2 contains an object, the reference of which we should keep count of
-      if (insn_location->ic2)
-        arrput(vm->permanent_roots, (object) &insn_location->ic2);
+      if (req->new_insn.kind == insn_invokesigpoly) {
+        // ic2 contains an object, the reference of which we should keep count of
+        if (req->new_insn.ic2)
+          arrput(vm->permanent_root_locations, (object *) &insn_location->ic2);
+      }
     }
 
     req->location = nullptr; // reset it

@@ -628,7 +628,7 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
-  vm->permanent_roots = nullptr; // automatically alloced when growth needed
+  vm->permanent_root_locations = nullptr; // automatically alloced when growth needed
 
   vm->heap.heap = aligned_alloc(4096, options.heap_size + OOM_SLOP_BYTES);
   vm->heap.heap_used = 0;
@@ -726,7 +726,7 @@ void free_vm(vm *vm) {
     free_thread(vm->active_threads[i]);
   }
   arrfree(vm->active_threads);
-  arrfree(vm->permanent_roots);
+  arrfree(vm->permanent_root_locations);
   free(vm->heap.heap);
   free_unsafe_allocations(vm);
   free_zstreams(vm);
@@ -2356,10 +2356,10 @@ enum {
 };
 
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
+  self->provider_mt_handle = make_handle(args->thread, (obj_header *) args->provider_mt);
 #define target (args->target)
-#define provider_mt (*args->provider_mt)
+#define provider_methodtype ((struct native_MethodType *) self->provider_mt_handle->obj)
 #define thread (args->thread)
-
   DCHECK(args->method);
 
   struct native_MethodHandle *mh = (void *)target;
@@ -2371,7 +2371,7 @@ doit:
     struct native_MethodType *targ = (void *)mh->type;
     assert(targ && "Method type must be non-null");
 
-    bool mts_are_same = method_types_compatible(provider_mt, targ);
+    bool mts_are_same = method_types_compatible(provider_methodtype, targ);
     bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
     // only raw calls to MethodHandle.invoke involve "asType" conversions
     bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
@@ -2379,7 +2379,8 @@ doit:
 
     if (is_invoke_exact) {
       if (!mts_are_same) {
-        wrong_method_type_error(thread, provider_mt, targ);
+        drop_handle(thread, self->provider_mt_handle);
+        wrong_method_type_error(thread, provider_methodtype, targ);
         ASYNC_RETURN_VOID();
       }
     }
@@ -2392,10 +2393,12 @@ doit:
       if (!asType)
         UNREACHABLE();
 
-      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
+      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_methodtype}});
       stack_value result = get_async_result(call_interpreter);
-      if (thread->current_exception) // asType failed
+      if (thread->current_exception) { // asType failed
+        drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
+      }
       mh = (void *)result.obj;
     }
 
@@ -2446,6 +2449,7 @@ doit:
     AWAIT(call_interpreter, thread, valueFromMethodName, arg);
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2465,6 +2469,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2485,6 +2490,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2496,10 +2502,12 @@ doit:
     goto doit;
   }
 
+  drop_handle(thread, self->provider_mt_handle);
+
   ASYNC_END_VOID();
 
 #undef target
-#undef provider_mt
+#undef provider_methodtype
 #undef thread
 }
 

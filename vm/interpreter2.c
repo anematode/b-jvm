@@ -1876,6 +1876,8 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   mark_insn_returns(&instruction);
 
+  instruction.args = method_info->descriptor->args_count + 1;
+
 
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
@@ -1883,6 +1885,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
     instruction.ic = method_info->resolved;
     instruction.ic2 = resolve_method_type(thread, method_info->descriptor);
 
+    suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
     return invokesigpoly_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
 
@@ -1911,7 +1914,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
 __attribute__((noinline)) static s64 invokevirtual_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->extra_data.cp->methodref;
-  int argc = insn->args = method_info->descriptor->args_count + 1;
+  int argc = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
 
   SPILL_VOID
@@ -2187,7 +2190,7 @@ static s64 invokesigpoly_impl_void_impl(vm_thread *thread,
     .args = {.thread = thread,
              .method = instruction.ic,
              .sp_ = sp - instruction.args,
-             .provider_mt = (struct native_MethodType **)&instruction.ic2, // GC root
+             .provider_mt = (struct native_MethodType *) instruction.ic2,
              .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
@@ -2218,7 +2221,7 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
       .args = {.thread = thread,
                .method = insn->ic,
                .sp_ = sp - insn->args,
-               .provider_mt = (struct native_MethodType **)&insn->ic2, // GC root
+               .provider_mt = (struct native_MethodType *) insn->ic2,
                .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
