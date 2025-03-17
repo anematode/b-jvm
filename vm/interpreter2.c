@@ -1878,7 +1878,6 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
 
   instruction.args = method_info->descriptor->args_count + 1;
 
-
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
     instruction.kind = insn_invokesigpoly;
@@ -1943,6 +1942,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
   }
 
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
+  instruction.args = method_info->descriptor->args_count + 1;
   classdesc *lookup_on = method_info->resolved->my_class;
   cp_method *method = frame->method;
 
@@ -1985,7 +1985,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
 __attribute__((noinline)) static s64 invokespecial_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   cp_method_info *method_info = &insn->extra_data.cp->methodref;
-  int argc = insn->args = method_info->descriptor->args_count + 1;
+  int argc = method_info->descriptor->args_count + 1;
   obj_header *receiver = (sp - argc)->obj;
   SPILL_VOID
 
@@ -2049,9 +2049,9 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
 
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
+  instruction.args = method_info->descriptor->args_count + 1;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
     instruction.kind = insn_invokevirtual;
-    instruction.args = method_info->descriptor->args_count + 1;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
     return invokevirtual_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
@@ -2071,7 +2071,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
            fmt_slice(receiver->descriptor->name), fmt_slice(method->my_class->name), fmt_slice(method->name));
   }
 
-  instruction.args = method_argc(method);
+  // instruction.args = method_argc(method);
 
   if (method_info->resolved->access_flags & ACCESS_FINAL) { // if the method is FINAL, we can make it an invokespecial
     instruction.kind = insn_invokespecial_resolved;
