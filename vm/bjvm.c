@@ -628,6 +628,8 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
+  vm->permament_roots = nullptr; // automatically alloced when growth needed
+
   vm->heap.heap = aligned_alloc(4096, options.heap_size + OOM_SLOP_BYTES);
   vm->heap.heap_used = 0;
   vm->heap.heap_capacity = options.heap_size;

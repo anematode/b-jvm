@@ -180,6 +180,11 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
     PUSH_ROOT(&vm->js_handles[i]);
   }
 
+  // permanent roots (from sigpoly instructions, etc)
+  for (int i=0; i < arrlen(vm->permament_roots); ++i) {
+    PUSH_ROOT(&vm->permament_roots[i]);
+  }
+
   // Pending references
   PUSH_ROOT(&vm->reference_pending_list);
 
@@ -500,6 +505,7 @@ static void major_gc(vm *vm) {
 /**
  * Executes all the pending instruction patches.
  * Must only be called by one thread, while all the other threads are suspended.
+ * Must be called before doing a major gc, to keep track of gc roots.
  */
 static void execute_instruction_patches(vm *vm) {
   for (size_t i=0; i<vm->instruction_patch_queue.capacity; i++) {
@@ -507,6 +513,12 @@ static void execute_instruction_patches(vm *vm) {
     bytecode_insn *insn_location = req->location;
     if (insn_location)
       *insn_location = req->new_insn;
+
+    if (req->new_insn.kind == insn_invokesigpoly) {
+      // ic2 contains an object, the reference of which we should keep count of
+      if (insn_location->ic2)
+        arrput(vm->permament_roots, (object) insn_location->ic2);
+    }
 
     req->location = nullptr; // reset it
   }
@@ -530,8 +542,8 @@ void scheduled_gc_pause(vm *vm) {
   thread_pool_lock(thread_pool); // todo: check result of this?
   if (is_leader) {
     arrive_await_all_suspended(thread_pool); // todo: check result of this?
-    major_gc(vm);
     execute_instruction_patches(vm);
+    major_gc(vm);
     reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
   } else {
     arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
