@@ -891,7 +891,6 @@ typedef struct classdesc {
   type_kind primitive_component; // primitives and array types only
 
   bytecode_insn **indy_insns;    // used to get GC roots to CallSites
-  bytecode_insn **sigpoly_insns; // used to get GC roots to MethodTypes
 
   module *module;
   classloader *classloader; // class loader which defined this class

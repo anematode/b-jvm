@@ -60,7 +60,6 @@ void free_classfile(classdesc cf) {
   for (int i = 0; i < cf.methods_count; ++i)
     free_method(&cf.methods[i]);
   arrfree(cf.indy_insns);
-  arrfree(cf.sigpoly_insns);
   arena_uninit(&cf.arena);
 }
 
@@ -1857,7 +1856,6 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
 
   cf->bootstrap_methods = nullptr;
   cf->indy_insns = nullptr;
-  cf->sigpoly_insns = nullptr;
   cf->array_type = nullptr;
 
   bool in_MethodHandle =

@@ -96,12 +96,6 @@ static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
     bytecode_insn *insn = desc->indy_insns[i];
     PUSH_ROOT(&insn->ic);
   }
-
-  // Push all ICed method type objects
-  for (int i = 0; i < arrlen(desc->sigpoly_insns); ++i) {
-    bytecode_insn *insn = desc->sigpoly_insns[i];
-    PUSH_ROOT(&insn->ic2);
-  }
 }
 
 static void push_thread_roots(gc_ctx *ctx, vm_thread *thr) {
@@ -181,8 +175,8 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
   }
 
   // permanent roots (from sigpoly instructions, etc)
-  for (int i=0; i < arrlen(vm->permament_roots); ++i) {
-    PUSH_ROOT(&vm->permament_roots[i]);
+  for (int i=0; i < arrlen(vm->permanent_roots); ++i) {
+    PUSH_ROOT(&vm->permanent_roots[i]);
   }
 
   // Pending references
@@ -517,7 +511,7 @@ static void execute_instruction_patches(vm *vm) {
     if (req->new_insn.kind == insn_invokesigpoly) {
       // ic2 contains an object, the reference of which we should keep count of
       if (insn_location->ic2)
-        arrput(vm->permament_roots, (object) insn_location->ic2);
+        arrput(vm->permanent_roots, (object) &insn_location->ic2);
     }
 
     req->location = nullptr; // reset it

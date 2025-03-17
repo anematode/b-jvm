@@ -415,7 +415,7 @@ typedef struct vm {
   // Handles referenced from JS
   obj_header **js_handles;
 
-  object *permament_roots; // vm global handles which are never freed (used for sigpoly insns)
+  object *permanent_roots; // vm global handles which are never freed (used for sigpoly insns)
 
   /// Struct containing cached classdescs
   void *_cached_classdescs; // struct cached_classdescs* -- type erased to discourage unsafe accesses

@@ -628,7 +628,7 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
-  vm->permament_roots = nullptr; // automatically alloced when growth needed
+  vm->permanent_roots = nullptr; // automatically alloced when growth needed
 
   vm->heap.heap = aligned_alloc(4096, options.heap_size + OOM_SLOP_BYTES);
   vm->heap.heap_used = 0;
@@ -726,6 +726,7 @@ void free_vm(vm *vm) {
     free_thread(vm->active_threads[i]);
   }
   arrfree(vm->active_threads);
+  arrfree(vm->permanent_roots);
   free(vm->heap.heap);
   free_unsafe_allocations(vm);
   free_zstreams(vm);
