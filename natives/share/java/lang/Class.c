@@ -65,8 +65,7 @@ DECLARE_NATIVE("java/lang", Class, getEnclosingMethod0, "()[Ljava/lang/Object;")
   if (!enclosing_method.class_info) {
     return value_null();
   }
-  handle *array =
-      make_handle(thread, CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Object")), 3));
+  handle *array = make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->object, 3));
 #define data ((obj_header **)ArrayData(array->obj))
 
   int error = resolve_class(thread, enclosing_method.class_info);
@@ -125,7 +124,7 @@ DECLARE_NATIVE("java/lang", Class, getSuperclass, "()Ljava/lang/Class;") {
 
 DECLARE_NATIVE("java/lang", Class, getClassLoader, "()Ljava/lang/ClassLoader;") {
   classloader *cl = unmirror_class(obj->obj)->classloader;
-  return (stack_value) { .obj = cl->java_mirror };
+  return (stack_value){.obj = cl->java_mirror};
 }
 
 DECLARE_NATIVE("java/lang", Class, getPermittedSubclasses0, "()[Ljava/lang/Class;") {
@@ -143,12 +142,13 @@ DECLARE_NATIVE("java/lang", Class, getPermittedSubclasses0, "()[Ljava/lang/Class
     get_class_mirror(thread, info->classdesc);
   }
   // Create an array of the appropriate length and enjoy
-  handle *array = make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, permitted->entries_count));
+  handle *array =
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, permitted->entries_count));
   if (array->obj == nullptr)
     return value_null();
   for (int i = 0; i < permitted->entries_count; ++i) {
     cp_class_info *info = permitted->entries[i];
-    ((object*)ArrayData(array->obj))[i] = (void *)get_class_mirror(thread, info->classdesc);
+    ((object *)ArrayData(array->obj))[i] = (void *)get_class_mirror(thread, info->classdesc);
   }
   return (stack_value){.obj = array->obj};
 }
@@ -176,7 +176,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   bool should_initialize = args[1].i;
 
   heap_string name_str = AsHeapString(name_obj, oom);
-  exchange_slashes_and_dots((slice*) &name_str, hslc(name_str));
+  exchange_slashes_and_dots((slice *)&name_str, hslc(name_str));
   classdesc *c;
   if (classloader == nullptr) {
     c = bootstrap_lookup_class(thread, hslc(name_str));
@@ -243,7 +243,11 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredFields0, "(Z)[Ljava/lang/reflect/F
   for (int i = 0; i < class->fields_count; ++i) {
     cp_field *field = class->fields + i;
     if (include_field(field, public_only)) {
-      reflect_initialize_field(thread, class, field);
+      reflect_initialize_field_t ctx = {.args = {thread, class, field}};
+      thread->stack.synchronous_depth++;
+      future_t f = reflect_initialize_field(&ctx);
+      CHECK(f.status == FUTURE_READY);
+      thread->stack.synchronous_depth--;
       ++fields;
     }
   }
@@ -274,12 +278,16 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredConstructors0, "(Z)[Ljava/lang/ref
   for (int i = 0; i < class->methods_count; ++i) {
     cp_method *method = class->methods + i;
     if (include_ctor(method, public_only)) {
-      reflect_initialize_constructor(thread, class, method);
+      reflect_initialize_constructor_t ctx = {.args = {thread, class, method}};
+      thread->stack.synchronous_depth++;
+      future_t f = reflect_initialize_constructor(&ctx);
+      CHECK(f.status == FUTURE_READY);
+      thread->stack.synchronous_depth--;
       ++ctors;
     }
   }
   // Then create the array
-  classdesc *Ctor = bootstrap_lookup_class(thread, STR("java/lang/reflect/Constructor"));
+  classdesc *Ctor = cached_classes(thread->vm)->constructor;
   obj_header *result = CreateObjectArray1D(thread, Ctor, ctors);
   struct native_Constructor **data = ArrayData(result);
   int j = 0;
@@ -306,12 +314,16 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredMethods0, "(Z)[Ljava/lang/reflect/
   for (int i = 0; i < class->methods_count; ++i) {
     cp_method *method = class->methods + i;
     if (include_method(method, public_only)) {
-      reflect_initialize_method(thread, class, method);
+      reflect_initialize_method_t ctx = {.args = {thread, class, method}};
+      thread->stack.synchronous_depth++;
+      future_t f = reflect_initialize_method(&ctx);
+      CHECK(f.status == FUTURE_READY);
+      thread->stack.synchronous_depth--;
       ++methods;
     }
   }
   // Then create the array
-  classdesc *Method = bootstrap_lookup_class(thread, STR("java/lang/reflect/Method"));
+  classdesc *Method = cached_classes(thread->vm)->method;
   link_class(thread, Method);
   obj_header *result = CreateObjectArray1D(thread, Method, methods);
   struct native_Method **data = ArrayData(result);
@@ -330,8 +342,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;") 
   if (inner_classes) {
     count = inner_classes->count;
   }
-  handle *ret = make_handle(thread,
-    CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, count));
+  handle *ret = make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, count));
   if (inner_classes) {
     for (int i = 0; i < count; ++i) {
       cp_class_info *info = inner_classes->classes[i];
@@ -344,7 +355,7 @@ DECLARE_NATIVE("java/lang", Class, getDeclaredClasses0, "()[Ljava/lang/Class;") 
   }
   object result = ret->obj;
   drop_handle(thread, ret);
-  return (stack_value) { .obj = result };
+  return (stack_value){.obj = result};
 }
 
 DECLARE_NATIVE("java/lang", Class, isPrimitive, "()Z") {
@@ -437,8 +448,7 @@ DECLARE_NATIVE("java/lang", Class, getRawTypeAnnotations, "()[B") {
 DECLARE_NATIVE("java/lang", Class, getInterfaces0, "()[Ljava/lang/Class;") {
   classdesc *desc = unmirror_class(obj->obj);
   handle *array =
-      make_handle(thread, CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
-                                              desc->interfaces_count));
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, desc->interfaces_count));
 
   for (int i = 0; i < desc->interfaces_count; ++i) {
     cp_class_info *info = desc->interfaces[i];

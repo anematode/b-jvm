@@ -259,11 +259,11 @@ typedef enum : u8 {
   insn_putstatic_L,
 
   /** intrinsics understood by the interpreter */
-  insn_pow,  // (FF)F, (DD)D
-  insn_sin,  // (F)F, (D)D
-  insn_cos,  // (F)F, (D)D
-  insn_tan,  // (F)F, (D)D
-  insn_sqrt  // (F)F, (D)D
+  insn_pow, // (FF)F, (DD)D
+  insn_sin, // (F)F, (D)D
+  insn_cos, // (F)F, (D)D
+  insn_tan, // (F)F, (D)D
+  insn_sqrt // (F)F, (D)D
 } insn_code_kind;
 
 #define MAX_INSN_KIND (insn_sqrt + 1)
@@ -413,7 +413,10 @@ typedef struct {
 } cp_method_type_info;
 
 typedef struct {
-  bootstrap_method *method;
+  union {
+    bootstrap_method *method;
+    u16 _method_index; // used only when parsing, linked later
+  };
   cp_name_and_type *name_and_type;
   method_descriptor *method_descriptor;
 
@@ -566,7 +569,7 @@ typedef struct {
 
 // Look up an entry in the local variable table, according to a swizzled local index but the original instruction
 // program counter.
-const slice *lvt_lookup(int index, int original_pc, const attribute_local_variable_table *table);
+const slice *local_variable_table_lookup(int index, int original_pc, const attribute_local_variable_table *table);
 
 typedef struct {
   slice name;
@@ -579,8 +582,6 @@ typedef struct {
 } attribute_method_parameters;
 
 struct tableswitch_data {
-  // Note: If changing this, make sure the layout of the first three fields
-  // is the same as bc_lookupswitch_data.
   int default_target;
   int targets_count;
 
@@ -589,8 +590,6 @@ struct tableswitch_data {
 };
 
 struct lookupswitch_data {
-  // Note: If changing this, make sure the layout of the first three fields
-  // is the same as bc_tableswitch_data.
   int default_target;
   int *targets;
   int targets_count;
@@ -768,7 +767,7 @@ typedef struct cp_method {
   attribute *attributes;
   attribute_code *code;
 
-  char template_frame[40];  // holds a stack_frame that is a template for an interpreter entry
+  char template_frame[40]; // holds a stack_frame that is a template for an interpreter entry
 
   // Whether the method may be missing a StackMapTable because it's in an old class file
   bool missing_smt;
@@ -786,9 +785,10 @@ typedef struct cp_method {
   int my_index;        // index in the method table of the class
   void *native_handle; // native_callback
 
-  struct native_Constructor *reflection_ctor;
-  struct native_Method *reflection_method;
-  struct native_MethodType *method_type_obj;
+  union {
+    struct native_Constructor *reflection_ctor;
+    struct native_Method *reflection_method;
+  };
 
   // Rough number of times this method has been called. Used for JIT heuristics.
   // Not at all exact because of interrupts.
@@ -835,7 +835,7 @@ typedef struct classloader classloader;
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct classdesc {
   classdesc_kind kind;
-  bool is_hidden;  // whether this is a hidden class (added in Java 15)
+  bool is_hidden; // whether this is a hidden class (added in Java 15)
   classdesc_state state;
   constant_pool *pool;
 

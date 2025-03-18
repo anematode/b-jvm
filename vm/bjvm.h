@@ -10,8 +10,8 @@
 #include <wchar.h>
 
 #include "classfile.h"
-#include "classpath.h"
 #include "classloader.h"
+#include "classpath.h"
 
 #ifdef EMSCRIPTEN
 #include <emscripten.h>
@@ -233,12 +233,76 @@ DECLARE_ASYNC(
       )
 );
 
+typedef struct {
+  classdesc *rtype;
+  classdesc **ptypes;
+  u32 ptypes_count;
+} mh_type_info_t;
+
+// Load (but do not link or initialize) the class with the given binary name (using slashes, not dots).
+DECLARE_ASYNC(
+  classdesc *, lookup_class,
+  locals(
+    slice chars;
+  ),
+  arguments(
+    vm_thread *thread;
+    slice name;
+    classloader *cl;
+    bool raise_class_not_found;
+  ),
+  invoked_methods(
+    invoked_method(call_interpreter)
+  )
+);
+
+DECLARE_ASYNC(classdesc *, load_class_of_field_descriptor,
+  locals(),
+  arguments(vm_thread *thread; classloader *cl; slice name),
+  invoked_methods(
+    invoked_method(lookup_class)
+  )
+)
+
+DECLARE_ASYNC(struct native_MethodType *, resolve_method_type,
+  locals(handle *ptypes;),
+  arguments(vm_thread *thread; classloader *cl; method_descriptor *method;),
+  invoked_methods(
+    invoked_method(load_class_of_field_descriptor)
+  ));
+
+DECLARE_ASYNC(int, compute_mh_type_info,
+  locals(classdesc *rtype; classdesc **ptypes; cp_method_info *method; ),
+  arguments(vm_thread *thread; classloader *cl; cp_method_handle_info *info; mh_type_info_t *result;),
+  invoked_methods(
+    invoked_method(load_class_of_field_descriptor)
+  ))
+
 DECLARE_ASYNC(struct native_MethodType *, resolve_mh_mt, locals(handle *ptypes_array),
-              arguments(vm_thread *thread; cp_method_handle_info *info),
+              arguments(vm_thread *thread; cp_method_handle_info *info; classloader *cl; ),
               invoked_methods(
                 invoked_method(initialize_class)
                 invoked_method(call_interpreter)
+                invoked_method(compute_mh_type_info)
                 ));
+
+DECLARE_ASYNC_VOID(reflect_initialize_field,
+  locals(handle *field_mirror;),
+  arguments(vm_thread *thread; classdesc *cd; cp_field *field; ),
+  invoked_methods(invoked_method(load_class_of_field_descriptor))
+  )
+
+DECLARE_ASYNC_VOID(reflect_initialize_constructor,
+  locals(handle *result;),
+  arguments(vm_thread *thread; classdesc *cd; cp_method *method; ),
+  invoked_methods(invoked_method(load_class_of_field_descriptor))
+)
+
+DECLARE_ASYNC_VOID(reflect_initialize_method,
+  locals(handle *result;),
+  arguments(vm_thread *thread; classdesc *cd; cp_method *method; ),
+  invoked_methods(invoked_method(load_class_of_field_descriptor))
+)
 
 DECLARE_ASYNC(obj_header*, resolve_mh_vh,
   locals(),
@@ -246,6 +310,7 @@ DECLARE_ASYNC(obj_header*, resolve_mh_vh,
   invoked_methods(
     invoked_method(initialize_class)
     invoked_method(call_interpreter)
+    invoked_method(reflect_initialize_field)
   )
 );
 
@@ -255,13 +320,15 @@ DECLARE_ASYNC(obj_header*, resolve_mh_invoke,
   invoked_methods(
     invoked_method(initialize_class)
     invoked_method(call_interpreter)
+    invoked_method(reflect_initialize_method)
+    invoked_method(reflect_initialize_constructor)
   )
 );
 
 DECLARE_ASYNC(
     struct native_MethodHandle *, resolve_method_handle,
     locals(classdesc * DirectMethodHandle; classdesc * MemberName; cp_method * m; cp_field *f),
-    arguments(vm_thread *thread; cp_method_handle_info *info),
+    arguments(vm_thread *thread; cp_method_handle_info *info; classloader *cl; ),
     invoked_methods(
       invoked_method(initialize_class)
       invoked_method(resolve_mh_mt)
@@ -299,8 +366,12 @@ DECLARE_ASYNC(stack_value, resolve_indy_static_argument,
               arguments(
                 vm_thread *thread;
                 cp_entry *ent;
+                classloader *cl;
               ),
-              invoked_methods(invoked_method(resolve_method_handle))
+              invoked_methods(
+                invoked_method(resolve_method_handle)
+                invoked_method(resolve_method_type)
+              )
 );
 
 DECLARE_ASYNC(
@@ -313,6 +384,7 @@ DECLARE_ASYNC(
     arguments(vm_thread *thread; bytecode_insn *insn; cp_indy_info *indy),
     invoked_methods(
       invoked_method(resolve_method_handle)
+      invoked_method(resolve_method_type)
       invoked_method(resolve_indy_static_argument)
       invoked_method(invokevirtual_signature_polymorphic)
       invoked_method(call_interpreter)
@@ -425,6 +497,7 @@ typedef struct vm {
 
 struct cached_classdescs *cached_classes(vm *vm);
 void remove_unsafe_allocation(vm *vm, void *allocation);
+classloader *get_current_classloader(vm_thread *thread);
 
 // Java Module
 typedef struct module {
@@ -625,7 +698,6 @@ __attribute__((noinline)) stack_frame *push_plain_frame(vm_thread *thread, cp_me
 __attribute__((noinline)) stack_frame *push_native_frame(vm_thread *thread, cp_method *method,
                                                          const method_descriptor *descriptor, stack_value *args,
                                                          u8 argc);
-struct native_MethodType *resolve_method_type(vm_thread *thread, method_descriptor *method);
 
 /**
  * Pop the topmost frame from the stack, optionally passing a pointer as a debug
@@ -663,26 +735,10 @@ void free_vm(vm *vm);
 // Synchronous variant of lookup_class specifically for the bootstrap class loader.
 classdesc *bootstrap_lookup_class(vm_thread *thread, slice name);
 
-// Load (but do not link or initialize) the class with the given binary name (using slashes, not dots).
-DECLARE_ASYNC(
-  classdesc *, lookup_class,
-  locals(
-    slice chars;
-  ),
-  arguments(
-    vm_thread *thread;
-    slice name;
-    classloader *cl;
-    bool raise_class_not_found;
-  ),
-  invoked_methods(
-    invoked_method(call_interpreter)
-  )
-);
-
 classdesc *bootstrap_lookup_class_impl(vm_thread *thread, slice name, bool raise_class_not_found);
 classdesc *define_bootstrap_class(vm_thread *thread, slice chars, const u8 *classfile_bytes, size_t classfile_len);
-classdesc *define_class(vm_thread *thread, classloader *cl, slice chars, const u8 *classfile_bytes, size_t classfile_len);
+classdesc *define_class(vm_thread *thread, classloader *cl, slice chars, const u8 *classfile_bytes,
+                        size_t classfile_len);
 cp_method *method_lookup(classdesc *classdesc, const slice name, const slice descriptor, bool superclasses,
                          bool superinterfaces);
 
@@ -716,7 +772,6 @@ int resolve_class_impl(vm_thread *thread, cp_class_info *info, classloader *load
 struct native_Class *get_class_mirror(vm_thread *thread, classdesc *classdesc);
 struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdesc *classdesc);
 
-classdesc *load_class_of_field_descriptor(vm_thread *thread, slice name);
 int get_line_number(const attribute_code *method, u16 pc);
 void store_stack_value(void *field_location, stack_value value, type_kind kind);
 stack_value load_stack_value(void *field_location, type_kind kind);

@@ -65,7 +65,6 @@ static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
   for (int i = 0; i < desc->methods_count; ++i) {
     PUSH_ROOT(&desc->methods[i].reflection_method);
     PUSH_ROOT(&desc->methods[i].reflection_ctor);
-    PUSH_ROOT(&desc->methods[i].method_type_obj);
   }
 
   // Push all the field mirrors
