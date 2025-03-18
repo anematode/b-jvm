@@ -40,7 +40,6 @@ static inline obj_header *RawStringData([[maybe_unused]] vm_thread const *thread
 static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, size_t allocation_size) {
   DCHECK(descriptor);
   DCHECK(descriptor->state >= CD_STATE_LINKED); // important to know the size
-  printf("allocating an object of %.*s ! \n", descriptor->name.len, descriptor->name.chars);
   object obj = (object)bump_allocate(thread, allocation_size);
   if (obj) {
     obj->header_word.expanded_data = (monitor_data *)(uintptr_t)IS_MARK_WORD;

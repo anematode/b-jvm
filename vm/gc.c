@@ -496,6 +496,21 @@ static void major_gc(vm *vm) {
   vm->heap.heap_used = align_up(write_ptr - new_heap, 8);
 }
 
+static void execute_instruction_patch(vm *vm, bytecode_patch_request *req) {
+  bytecode_insn *insn_location = req->location;
+  if (insn_location) {
+    *insn_location = req->new_insn;
+
+    if (req->new_insn.kind == insn_invokesigpoly) {
+      // ic2 contains an object, the reference of which we should keep count of
+      if (req->new_insn.ic2)
+        arrput(vm->permanent_root_locations, (object *) &insn_location->ic2);
+    }
+  }
+
+  req->location = nullptr; // reset it
+}
+
 /**
  * Executes all the pending instruction patches.
  * Must only be called by one thread, while all the other threads are suspended.
@@ -504,18 +519,7 @@ static void major_gc(vm *vm) {
 static void execute_instruction_patches(vm *vm) {
   for (size_t i=0; i<vm->instruction_patch_queue.capacity; i++) {
     bytecode_patch_request *req = &vm->instruction_patch_queue.buffer[i];
-    bytecode_insn *insn_location = req->location;
-    if (insn_location) {
-      *insn_location = req->new_insn;
-
-      if (req->new_insn.kind == insn_invokesigpoly) {
-        // ic2 contains an object, the reference of which we should keep count of
-        if (req->new_insn.ic2)
-          arrput(vm->permanent_root_locations, (object *) &insn_location->ic2);
-      }
-    }
-
-    req->location = nullptr; // reset it
+    execute_instruction_patch(vm, req);
   }
   vm->instruction_patch_queue.num_used = 0;
 }
@@ -560,6 +564,31 @@ void scheduled_gc_pause_patch_only(vm *vm) {
   worker_thread_pool *thread_pool = &scheduler->thread_pool;
 
   thread_pool_lock(thread_pool); // todo: check result of this?
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
+}
+
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * Forces this instruction to be patched before a GC, even if the GC is requested first.
+ */
+void scheduled_gc_pause_require_patch(vm *vm, bytecode_patch_request *req) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  execute_instruction_patch(vm, req); // force this to happen while holding the lock before the gc
   if (is_leader) {
     arrive_await_all_suspended(thread_pool); // todo: check result of this?
     execute_instruction_patches(vm);

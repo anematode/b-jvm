@@ -1711,7 +1711,7 @@ void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
     reserved_slice_index = __atomic_fetch_add(&vm->instruction_patch_queue.num_used, 1, __ATOMIC_SEQ_CST);
     if (reserved_slice_index + 1 >= vm->instruction_patch_queue.capacity) {
       // we need to trigger a GC
-      scheduled_gc_pause_patch_only(vm);
+      scheduled_gc_pause_require_patch(vm, &request); // forces the request to be handled **before** the gc
       continue;
     }
     break;
@@ -1723,12 +1723,13 @@ void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
 void atomically_patch_instruction_info(bytecode_insn *insn, const bytecode_insn *source) {
   static_assert(sizeof(struct { insn_code_kind kind; void *ic; }) <= sizeof(insn->raw_patch_data_), "raw_patch_data_ is too small");
 
+  *insn = *source;
   // insn->extra_data = source->extra_data;
-  __atomic_store_n(&insn->args, source->args, __ATOMIC_SEQ_CST);
-  __atomic_store_n(&insn->tos_before, source->tos_before, __ATOMIC_SEQ_CST);
-  __atomic_store_n(&insn->tos_after, source->tos_after, __ATOMIC_SEQ_CST);
-  __atomic_store_n(&insn->ic2, source->ic2, __ATOMIC_SEQ_CST);
-  __atomic_store_n(&insn->raw_patch_data_, source->raw_patch_data_, __ATOMIC_SEQ_CST);
+  // __atomic_store_n(&insn->args, source->args, __ATOMIC_SEQ_CST);
+  // __atomic_store_n(&insn->tos_before, source->tos_before, __ATOMIC_SEQ_CST);
+  // __atomic_store_n(&insn->tos_after, source->tos_after, __ATOMIC_SEQ_CST);
+  // __atomic_store_n(&insn->ic2, source->ic2, __ATOMIC_SEQ_CST);
+  // __atomic_store_n(&insn->raw_patch_data_, source->raw_patch_data_, __ATOMIC_SEQ_CST);
 }
 
 inline void gc_pause_if_requested(vm *vm) {
