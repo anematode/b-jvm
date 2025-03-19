@@ -2702,7 +2702,7 @@ DEFINE_ASYNC(indy_resolve) {
     result = -1;
   } else {
     DCHECK(res.obj);
-    args->insn->ic = res.obj;
+    args->change_insn->ic = res.obj;
     result = 0;
   }
 

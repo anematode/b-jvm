@@ -79,10 +79,10 @@
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
-#if 0
+#if 1
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 16628000) {                                                                                             \
+  if (tick++ > 1662800) {                                                                                             \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
@@ -1811,23 +1811,24 @@ void attempt_jit(cp_method *method) {
   }
 }
 
-// Expects sp and insn->args to be in scope
-#define ConsiderJitEntry(thread, method, argz)                                                                         \
-  retry:                                                                                                               \
-  if (method->jit_entry) {                                                                                             \
-    ((jit_trampoline)(method)->trampoline)((method)->jit_entry, thread, method, argz);                                 \
-    if (thread->current_exception) {                                                                                   \
-      return RETVAL_EXCEPTION_THROWN;                                                                                  \
-    }                                                                                                                  \
-    sp -= insn->args;                                                                                                  \
-    sp += returns;                                                                                                     \
-    return 0;                                                                                                          \
-  } else if (method->call_count > JIT_THRESHOLD) {                                                                     \
-    attempt_jit(method);                                                                                               \
-    goto retry;                                                                                                        \
-  } else {                                                                                                             \
-    method->call_count += 15;                                                                                          \
-  }
+#define ConsiderJitEntry(thread, method, argz) do { (void) returns; } while (0);
+// // Expects sp and insn->args to be in scope
+// #define ConsiderJitEntry(thread, method, argz)                                                                         \
+//   retry:                                                                                                               \
+//   if (method->jit_entry) {                                                                                             \
+//     ((jit_trampoline)(method)->trampoline)((method)->jit_entry, thread, method, argz);                                 \
+//     if (thread->current_exception) {                                                                                   \
+//       return RETVAL_EXCEPTION_THROWN;                                                                                  \
+//     }                                                                                                                  \
+//     sp -= insn->args;                                                                                                  \
+//     sp += returns;                                                                                                     \
+//     return 0;                                                                                                          \
+//   } else if (method->call_count > JIT_THRESHOLD) {                                                                     \
+//     attempt_jit(method);                                                                                               \
+//     goto retry;                                                                                                        \
+//   } else {                                                                                                             \
+//     method->call_count += 15;                                                                                          \
+//   }
 
 static s64 invokestatic_resolved_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
@@ -1862,6 +1863,8 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
   }
 
+  instruction.args = instruction.extra_data.cp->methodref.descriptor->args_count + 1;
+
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
 
@@ -1876,7 +1879,7 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
   mark_insn_returns(&instruction);
 
-  instruction.args = method_info->descriptor->args_count + 1;
+  // instruction.args = method_info->descriptor->args_count + 1;
 
   // If we found a signature-polymorphic method, transmogrify into a insn_invokesigpoly
   if (method_info->resolved->is_signature_polymorphic) {
@@ -1907,6 +1910,8 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   instruction.kind = insn_invokevtable_monomorphic;
   instruction.ic = vtable_lookup(receiver->descriptor, method_info->resolved->vtable_index);
   instruction.ic2 = receiver->descriptor;
+
+  suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
   return invokeitable_vtable_monomorphic_impl_void_impl(thread, target, instruction, sp_);
 }
 
@@ -1932,6 +1937,8 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
   }
 
+  instruction.args = instruction.extra_data.cp->methodref.descriptor->args_count + 1;
+
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
   ctx.args.info = &instruction.extra_data.cp->methodref;
@@ -1942,7 +1949,7 @@ static s64 invokespecial_impl_void_impl(vm_thread *thread,
   }
 
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
-  instruction.args = method_info->descriptor->args_count + 1;
+  // instruction.args = method_info->descriptor->args_count + 1;
   classdesc *lookup_on = method_info->resolved->my_class;
   cp_method *method = frame->method;
 
@@ -2040,6 +2047,8 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
   }
 
+  instruction.args = instruction.extra_data.cp->methodref.descriptor->args_count + 1;
+
   resolve_methodref_t ctx = {};
   ctx.args.thread = thread;
   ctx.args.info = &instruction.extra_data.cp->methodref;
@@ -2049,7 +2058,7 @@ static s64 invokeinterface_impl_void_impl(vm_thread *thread,
     return RETVAL_EXCEPTION_THROWN;
 
   cp_method_info *method_info = &instruction.extra_data.cp->methodref;
-  instruction.args = method_info->descriptor->args_count + 1;
+  // instruction.args = method_info->descriptor->args_count + 1;
   if (!(method_info->resolved->my_class->access_flags & ACCESS_INTERFACE)) {
     instruction.kind = insn_invokevirtual;
 
@@ -2207,6 +2216,8 @@ static s64 invokesigpoly_impl_void_impl(vm_thread *thread,
   // this is just running once before we patch the instruction, it shouldn't be too bad
   // it does more harm to the control flow when we never return to the interpreter
   frame->is_async_suspended = true;
+  sp -= instruction.args;
+  sp += instruction.returns;
   return RETVAL_FUEL_CHECK;
 }
 
@@ -2287,13 +2298,12 @@ __attribute__((noinline)) static s64 invokedynamic_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   SPILL_VOID
 
-  cp_indy_info *indy = &insn->extra_data.cp->indy_info;
+  bytecode_insn instruction = insn[0];
+
+  cp_indy_info *indy = &instruction.extra_data.cp->indy_info;
   indy_resolve_t ctx = {};
   ctx.args.thread = thread;
-#undef insn
-  ctx.args.insn =
-#define insn (&insns[0])
-      insn;
+  ctx.args.change_insn = &instruction;
   ctx.args.indy = indy;
   thread->stack.synchronous_depth++;
   future_t fut = indy_resolve(&ctx);
@@ -2304,12 +2314,15 @@ __attribute__((noinline)) static s64 invokedynamic_impl_void(ARGS_VOID) {
     return RETVAL_EXCEPTION_THROWN;
   }
 
-  DCHECK(insn->ic);
-  insn->kind = insn_invokecallsite;
-  struct native_CallSite *cs = insn->ic;
+  DCHECK(instruction.ic);
+  instruction.kind = insn_invokecallsite;
+  struct native_CallSite *cs = instruction.ic;
   struct native_MethodHandle *mh = (void *)cs->target;
   struct native_LambdaForm *form = (void *)mh->form;
-  insn->args = form->arity;
+  instruction.args = form->arity;
+
+  atomically_patch_instruction_info(insn, &instruction);
+
   JMP_VOID
 }
 FORWARD_TO_NULLARY(invokedynamic)
@@ -2751,8 +2764,12 @@ static s64 instanceof_impl_int(ARGS_INT) {
     return RETVAL_EXCEPTION_THROWN;
 
   RELOAD(tos)
-  insn->ic = info->classdesc;
-  insn->kind = insn_instanceof_resolved;
+
+  bytecode_insn resolved_insn = *insn;
+  resolved_insn.ic = info->classdesc;
+  resolved_insn.kind = insn_instanceof_resolved;
+
+  atomically_patch_instruction_info(insn, &resolved_insn);
   JMP_INT(tos)
 }
 

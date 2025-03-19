@@ -314,7 +314,7 @@ DECLARE_ASYNC(
       handle *invoke_array;
       int static_i;
     ),
-    arguments(vm_thread *thread; bytecode_insn *insn; cp_indy_info *indy),
+    arguments(vm_thread *thread; bytecode_insn *change_insn; cp_indy_info *indy),
     invoked_methods(
       invoked_method(resolve_method_handle)
       invoked_method(resolve_indy_static_argument)
