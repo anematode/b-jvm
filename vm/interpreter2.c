@@ -79,10 +79,10 @@
 
 // Define this macro to print debug dumps upon the execution of every interpreter instruction. Useful for debugging.
 #define DEBUG_CHECK() ;
-#if 1
+#if 0
 #undef DEBUG_CHECK
 #define DEBUG_CHECK()                                                                                                  \
-  if (tick++ > 1662800) {                                                                                             \
+  if (tick++ > 16628000) {                                                                                             \
     SPILL_VOID                                                                                                         \
     printf("Frame method: %p\n", frame->method);                                                                       \
     cp_method *m = frame->method;                                                                                      \
@@ -196,12 +196,12 @@ typedef stack_value *stack_pointer_t;
   WITH_UNDEF(jmp_table_void[insns[1].kind](thread, frame, insns + 1, FUEL, sp, a_undef, b_undef, c_undef));
 
 #define STACK_POLYMORPHIC_NEXT(tos)                                                                                    \
-  MUSTTAIL return bytecode_tables[insns[1].tos_before][insns[1].kind](thread, frame, insns + 1, FUEL, sp, \
-    (sp - 1)->l, (sp - 1)->f, (sp - 1)->d);
+  MUSTTAIL return bytecode_tables[insns[1].tos_before][insns[1].kind](thread, frame, insns + 1, FUEL, sp, (sp - 1)->l, \
+                                                                      (sp - 1)->f, (sp - 1)->d);
 
 #define STACK_POLYMORPHIC_JMP(tos)                                                                                     \
-  MUSTTAIL return bytecode_tables[insns[0].tos_before][insns[0].kind](thread, frame, insns, FUEL, sp, \
-    (sp - 1)->l, (sp - 1)->f, (sp - 1)->d);
+  MUSTTAIL return bytecode_tables[insns[0].tos_before][insns[0].kind](thread, frame, insns, FUEL, sp, (sp - 1)->l,     \
+                                                                      (sp - 1)->f, (sp - 1)->d);
 #endif // ifdef EMSCRIPTEN
 #else  // !DO_TAILS
 
@@ -1462,28 +1462,28 @@ static s64 dreturn_impl_double(ARGS_DOUBLE) {
 static s64 goto_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   FUEL_CHECK_VOID
-  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
+  insns = (bytecode_insn *)((char *)insns + insn->extra_data.delta);
   JMP_VOID
 }
 
 static s64 goto_impl_double(ARGS_DOUBLE) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
+  insns = (bytecode_insn *)((char *)insns + insn->extra_data.delta);
   JMP_DOUBLE(tos)
 }
 
 static s64 goto_impl_float(ARGS_FLOAT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
+  insns = (bytecode_insn *)((char *)insns + insn->extra_data.delta);
   JMP_FLOAT(tos)
 }
 
 static s64 goto_impl_int(ARGS_INT) {
   DEBUG_CHECK();
   FUEL_CHECK
-  insns = (bytecode_insn*)((char*)insns + insn->extra_data.delta);
+  insns = (bytecode_insn *)((char *)insns + insn->extra_data.delta);
   JMP_INT(tos)
 }
 
@@ -1537,8 +1537,8 @@ static s64 lookupswitch_impl_int(ARGS_INT) {
   static s64 which##_impl_int(ARGS_INT) {                                                                              \
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
-    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                                   \
-    insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
+    s32 offset = UNPREDICTABLE((s32)tos op 0) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                              \
+    insns = (bytecode_insn *)((char *)insns + offset);                                                                 \
     sp--;                                                                                                              \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
   }
@@ -1557,8 +1557,8 @@ MAKE_INT_BRANCH_AGAINST_0(ifnonnull, !=)
     DEBUG_CHECK();                                                                                                     \
     FUEL_CHECK                                                                                                         \
     s64 a = (sp - 2)->i, b = (int)tos;                                                                                 \
-    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                                \
-    insns = (bytecode_insn*)((char*)insns + offset);                                                                   \
+    s32 offset = UNPREDICTABLE((s32)a op(s32) b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);                           \
+    insns = (bytecode_insn *)((char *)insns + offset);                                                                 \
     sp -= 2;                                                                                                           \
     STACK_POLYMORPHIC_JMP(*(sp - 1));                                                                                  \
   }
@@ -1575,7 +1575,7 @@ static s64 if_acmpeq_impl_int(ARGS_INT) {
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
   s32 offset = UNPREDICTABLE(a == b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);
-  insns = (bytecode_insn*)((char*)insns + offset);
+  insns = (bytecode_insn *)((char *)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
@@ -1585,7 +1585,7 @@ static s64 if_acmpne_impl_int(ARGS_INT) {
   FUEL_CHECK
   obj_header *a = (sp - 2)->obj, *b = (obj_header *)tos;
   s32 offset = UNPREDICTABLE(a != b) ? insn->extra_data.delta : (s32)sizeof(bytecode_insn);
-  insns = (bytecode_insn*)((char*)insns + offset);
+  insns = (bytecode_insn *)((char *)insns + offset);
   sp -= 2;
   STACK_POLYMORPHIC_JMP(*(sp - 1))
 }
@@ -1885,7 +1885,13 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
   if (method_info->resolved->is_signature_polymorphic) {
     instruction.kind = insn_invokesigpoly;
     instruction.ic = method_info->resolved;
-    instruction.ic2 = resolve_method_type(thread, method_info->descriptor);
+
+    resolve_method_type_t resolve = {.args = {thread, get_current_classloader(thread), method_info->descriptor}};
+    thread->stack.synchronous_depth++;
+    future_t resolve_fut = resolve_method_type(&resolve);
+    CHECK(resolve_fut.status == FUTURE_READY);
+    thread->stack.synchronous_depth--;
+    instruction.ic2 = resolve._result;
 
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
     return invokesigpoly_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
@@ -3097,7 +3103,7 @@ static bool do_entry_synchronization(future_t *fut, vm_thread *thread, stack_fra
   bool already_tried = frame->synchronized_state == SYNCHRONIZE_IN_PROGRESS;
 
   monitor_acquire_t ctx = (monitor_acquire_t){.args = {thread, synchronized_on}};
-  if (unlikely(already_tried)) {  // resume the previous call to monitor acuiqre
+  if (unlikely(already_tried)) { // resume the previous call to monitor acuiqre
     continuation_frame *cont = async_stack_pop(thread);
     DCHECK(cont->pnt == CONT_SYNCHRONIZED_METHOD);
     ctx = cont->ctx.acquire_monitor;

@@ -1,13 +1,13 @@
 #include "classloader.h"
-#include "cached_classdescs.h"
 #include "bjvm.h"
+#include "cached_classdescs.h"
 
 // NOLINTNEXTLINE(misc-no-recursion)
 int classloader_init(vm *vm, classloader *cl, obj_header *java_mirror) {
   DCHECK(java_mirror == nullptr || instanceof(java_mirror->descriptor, cached_classes(vm)->class_loader),
-    "Object is not a java/lang/ClassLoader");
+         "Object is not a java/lang/ClassLoader");
 
-  struct native_ClassLoader* mirror = (struct native_ClassLoader*)java_mirror;
+  struct native_ClassLoader *mirror = (struct native_ClassLoader *)java_mirror;
   DCHECK(mirror == nullptr || mirror->reflected_loader == nullptr, "Class loader is already registered");
 
   cl->java_mirror = java_mirror;
@@ -28,7 +28,7 @@ classloader *unmirror_classloader(vm *vm, obj_header *java_mirror) {
   }
 
   DCHECK(instanceof(java_mirror->descriptor, cached_classes(vm)->class_loader));
-  struct native_ClassLoader* mirror = (struct native_ClassLoader*)java_mirror;
+  struct native_ClassLoader *mirror = (struct native_ClassLoader *)java_mirror;
   if (mirror->reflected_loader == nullptr) {
     // Class loader is not yet registered: push a new one
     classloader *cl = calloc(1, sizeof(classloader));

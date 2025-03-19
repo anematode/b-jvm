@@ -14,10 +14,8 @@
 static void fill_array_classdesc(vm_thread *thread, classdesc *base) {
   base->access_flags = ACCESS_PUBLIC | ACCESS_FINAL | ACCESS_ABSTRACT;
 
-  slice name = STR("java/lang/Object");
   cp_class_info *info = arena_alloc(&base->arena, 1, sizeof(cp_class_info));
-  info->classdesc = bootstrap_lookup_class(thread, name);
-  info->name = name;
+  info->classdesc = bootstrap_lookup_class(thread, STR("java/lang/Object"));
   base->super_class = info;
 
   cp_class_info *Cloneable = arena_alloc(&base->arena, 2, sizeof(cp_class_info)), *Serializable = Cloneable + 1;
@@ -113,7 +111,7 @@ static object create_1d_primitive_array(vm_thread *thread, type_kind array_type,
   obj_header *array = AllocateObject(thread, array_desc, allocation_size);
   if (array) {
     *(int *)((char *)array + kArrayLengthOffset) = count;
-    memset(ArrayData(array), 0, count * size);  // zero initialize
+    memset(ArrayData(array), 0, count * size); // zero initialize
     DCHECK(size_of_object(array) == allocation_size);
   }
 

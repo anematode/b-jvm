@@ -21,8 +21,7 @@ DECLARE_NATIVE("java/lang", Throwable, fillInStackTrace, "(I)Ljava/lang/Throwabl
   // Called in the constructor of Throwable. We therefore need to ignore
   // frames which are constructing the current object, which we can do by
   // inspecting the stack.
-  classdesc *StackTraceElement = bootstrap_lookup_class(thread, STR("java/lang/StackTraceElement"));
-  link_class(thread, StackTraceElement);
+  classdesc *StackTraceElement = cached_classes(thread->vm)->stack_trace_element;
 
   // Find the first frame which is not an initializer of the current exception
   stack_frame *frame = thread->stack.top;
