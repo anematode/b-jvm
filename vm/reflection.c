@@ -30,7 +30,7 @@ DEFINE_ASYNC(reflect_initialize_field) {
   if (!mirror)
     goto oom;
   F->clazz = mirror;
-  AWAIT(load_class_of_field_descriptor, thread, get_current_classloader(thread), f->descriptor);
+  AWAIT(load_class_of_field_descriptor, thread, f->my_class->classloader, f->descriptor);
   mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
   F->type = mirror;
   F->modifiers = f->access_flags;
@@ -85,7 +85,7 @@ DEFINE_ASYNC(reflect_initialize_constructor) {
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
-    AWAIT(load_class_of_field_descriptor, thread, get_current_classloader(thread), desc);
+    AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, desc);
     struct native_Class *type = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
     ((struct native_Class **)ArrayData(C->parameterTypes))[i] = type;
   }
@@ -156,13 +156,13 @@ DEFINE_ASYNC(reflect_initialize_method) {
   M->parameterTypes = parameterTypes;
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
-    AWAIT(load_class_of_field_descriptor, thread, get_current_classloader(thread), desc);
+    AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, desc);
     object mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
     ((void **)ArrayData(M->parameterTypes))[i] = mirror;
   }
 
   slice ret_desc = method->descriptor->return_type.unparsed;
-  AWAIT(load_class_of_field_descriptor, thread, get_current_classloader(thread), ret_desc);
+  AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, ret_desc);
   mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
   M->returnType = mirror;
   object exceptionTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, 0);

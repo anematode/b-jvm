@@ -30,7 +30,7 @@ DEFINE_ASYNC(fill_mn_with_field) {
   M->vmindex = field->byte_offset; // field offset
   M->flags |= field->access_flags;
   M->flags |= MN_IS_FIELD;
-  AWAIT(load_class_of_field_descriptor, thread, get_current_classloader(thread), field->descriptor);
+  AWAIT(load_class_of_field_descriptor, thread, field->my_class->classloader, field->descriptor);
   M->vmtarget = field;
   object mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
   M->type = mirror;
