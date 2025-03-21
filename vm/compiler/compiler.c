@@ -32,3 +32,22 @@ break;case CTL_INST_OP:
 break;case CTL_INST_VAR:
 break;}
 }
+
+heap_string ctl_dump_basic_block(ctl_basic_block *bb) {
+
+}
+
+void ctl_dump_function(FILE* out, const ctl_function *func) {
+  fprintf(out, "digraph cfg {\n");
+  for (int bb_i = 0; bb_i < arrlen(func->blocks); ++bb_i) {
+    ctl_basic_block *bb = func->blocks[bb_i];
+    heap_string bb_dump = ctl_dump_basic_block(bb);
+    fprintf(out, "%d [label=\"%.*s\"];\n", bb_i, fmt_slice(bb_dump));
+    free_heap_str(bb_dump);
+
+    for (int succ_i = 0; succ_i < arrlen(bb->succ); ++succ_i) {
+      fprintf(out, "%d -> %d;\n", bb_i, bb->succ[succ_i]);
+    }
+  }
+  fprintf(out, "}\n");
+}

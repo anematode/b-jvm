@@ -75,9 +75,11 @@ typedef struct {
 
 typedef struct {
   cp_method *java_method;
-  ctl_basic_block *blocks;  // stbds array
+  ctl_basic_block **blocks;  // stbds array
   ctl_type *arguments;  // stbds array
   arena arena;
 } ctl_function;
+
+void ctl_dump_function(FILE* out, const ctl_function *func);
 
 #endif //COMPILER_H
