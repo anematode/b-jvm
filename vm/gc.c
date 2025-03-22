@@ -540,8 +540,8 @@ void scheduled_gc_pause(vm *vm) {
   thread_pool_lock(thread_pool); // todo: check result of this?
   if (is_leader) {
     arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm); // must happen before gc to update handles
     major_gc(vm);
-    execute_instruction_patches(vm);
     reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
   } else {
     arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
