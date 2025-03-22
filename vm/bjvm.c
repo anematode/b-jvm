@@ -712,6 +712,8 @@ void free_vm(vm *vm) {
   }
   arrfree(vm->active_classloaders);
 
+  arrfree(vm->permanent_gc_roots);
+
   free_classpath(&vm->bootstrap_classpath);
   free_heap_str(vm->application_classpath);
   free(cached_classes(vm));
