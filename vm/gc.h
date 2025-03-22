@@ -20,6 +20,13 @@ void scheduled_gc_pause(vm *vm);
  */
 void scheduled_gc_pause_patch_only(vm *vm);
 
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * Also forces the current patch request to get included even if it wasn't on the buffer
+ */
+void scheduled_gc_pause_patch_request(vm *vm, bytecode_patch_request req);
+
 size_t size_of_object(obj_header *obj);
 
 #endif

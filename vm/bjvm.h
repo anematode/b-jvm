@@ -415,6 +415,9 @@ typedef struct vm {
   // Handles referenced from JS
   obj_header **js_handles;
 
+  // vector of pointers to handles
+  object **permanent_gc_roots; // only changed by GC
+
   /// Struct containing cached classdescs
   void *_cached_classdescs; // struct cached_classdescs* -- type erased to discourage unsafe accesses
 

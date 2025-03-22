@@ -638,6 +638,7 @@ vm *create_vm(const vm_options options) {
   vm->instruction_patch_queue.buffer = calloc(bytecode_patch_queue_size, sizeof(bytecode_patch_request));
   vm->instruction_patch_queue.num_used = 0;
   vm->instruction_patch_queue.capacity = bytecode_patch_queue_size;
+  vm->permanent_gc_roots = nullptr;
 
   vm->bootstrap_classloader = calloc(1, sizeof(classloader));
   classloader_init(vm, vm->bootstrap_classloader, nullptr);
@@ -1708,8 +1709,8 @@ void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
     reserved_slice_index = __atomic_fetch_add(&vm->instruction_patch_queue.num_used, 1, __ATOMIC_SEQ_CST);
     if (reserved_slice_index + 1 >= vm->instruction_patch_queue.capacity) {
       // we need to trigger a GC
-      scheduled_gc_pause_patch_only(vm);
-      continue;
+      scheduled_gc_pause_patch_request(vm, request);
+      return;
     }
     break;
   }

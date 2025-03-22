@@ -1884,7 +1884,6 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
 
     // todo: VERY BAD AND NOT THREAD SAFE. JUST HERE FOR NOW TO GET IT TO WORK SOME OF THE TIME
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    arrput(frame->method->my_class->sigpoly_insns, target); // so GC can move around ic2
     scheduled_gc_pause_patch_only(thread->vm); // todo: this doesn't prevent race conditions, but hopefully mitigates enough until we get rid of this code here
     frame->is_async_suspended = true;
     return RETVAL_FUEL_CHECK; // todo: just return to a fake fuel check, I can't be bothered to implement something that we're gonna delete anyway
