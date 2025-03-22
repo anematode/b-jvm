@@ -7,18 +7,22 @@
 #include <cached_classdescs.h>
 #include <reflection.h>
 
-void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field) {
+DEFINE_ASYNC(reflect_initialize_field) {
+#define thread (self->args.thread)
+#define cd (self->args.cd)
+#define f (self->args.field)
+
   classdesc *reflect_Field = cached_classes(thread->vm)->field;
-  handle *field_mirror = make_handle(thread, new_object(thread, reflect_Field));
-  if (!field_mirror->obj) { // out of memory
-    return;
+  self->field_mirror = make_handle(thread, new_object(thread, reflect_Field));
+  if (!self->field_mirror->obj) { // out of memory
+    ASYNC_RETURN_VOID();
   }
 
-#define F ((struct native_Field *)field_mirror->obj)
-  field->reflection_field = (void *)F;
+#define F ((struct native_Field *)self->field_mirror->obj)
+  f->reflection_field = (void *)F;
 
-  F->reflected_field = field;
-  object name = MakeJStringFromModifiedUTF8(thread, field->name, true);
+  F->reflected_field = f;
+  object name = MakeJStringFromModifiedUTF8(thread, f->name, true);
   if (!name)
     goto oom;
   F->name = name;
@@ -26,19 +30,20 @@ void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field)
   if (!mirror)
     goto oom;
   F->clazz = mirror;
-  mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, field->descriptor));
+  AWAIT(load_class_of_field_descriptor, thread, f->my_class->classloader, f->descriptor);
+  mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
   F->type = mirror;
-  F->modifiers = field->access_flags;
+  F->modifiers = f->access_flags;
 
   // Find runtimevisibleannotations attribute and signature attribute
-  for (int i = 0; i < field->attributes_count; ++i) {
-    if (field->attributes[i].kind == ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
-      const attribute_runtime_visible_annotations a = field->attributes[i].annotations;
+  for (int i = 0; i < f->attributes_count; ++i) {
+    if (f->attributes[i].kind == ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
+      const attribute_runtime_visible_annotations a = f->attributes[i].annotations;
       object annotations = CreatePrimitiveArray1D(thread, TYPE_KIND_BYTE, a.length);
       F->annotations = annotations;
-      memcpy(ArrayData(F->annotations), a.data, field->attributes[i].length);
-    } else if (field->attributes[i].kind == ATTRIBUTE_KIND_SIGNATURE) {
-      const attribute_signature a = field->attributes[i].signature;
+      memcpy(ArrayData(F->annotations), a.data, f->attributes[i].length);
+    } else if (f->attributes[i].kind == ATTRIBUTE_KIND_SIGNATURE) {
+      const attribute_signature a = f->attributes[i].signature;
       object signature = MakeJStringFromModifiedUTF8(thread, a.utf8, true);
       F->signature = signature;
     }
@@ -46,10 +51,19 @@ void reflect_initialize_field(vm_thread *thread, classdesc *cd, cp_field *field)
 #undef F
 
 oom:
-  drop_handle(thread, field_mirror);
+  drop_handle(thread, self->field_mirror);
+
+#undef thread
+#undef cd
+#undef f
+  ASYNC_END_VOID()
 }
 
-void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method *method) {
+DEFINE_ASYNC(reflect_initialize_constructor) {
+#define method (self->args.method)
+#define thread (self->args.thread)
+#define cd (self->args.cd)
+
   DCHECK(method->is_ctor, "Method is not a constructor");
   classdesc *reflect_Constructor = cached_classes(thread->vm)->constructor;
 
@@ -64,28 +78,39 @@ void reflect_initialize_constructor(vm_thread *thread, classdesc *cd, cp_method 
   object parameterTypes =
       CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
   C->parameterTypes = parameterTypes;
-  object exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
+  object exceptionTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, 0);
   C->exceptionTypes = exceptionTypes;
   C->slot = (s32)method->my_index;
   // TODO parse these ^^
 
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
-    struct native_Class *type = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
+    AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, desc);
+    struct native_Class *type = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
     ((struct native_Class **)ArrayData(C->parameterTypes))[i] = type;
   }
 
 #undef C
   drop_handle(thread, result);
+
+#undef method
+#undef thread
+#undef cd
+  ASYNC_END_VOID()
 }
 
-void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *method) {
+DEFINE_ASYNC(reflect_initialize_method) {
+  classdesc *reflect_Method = cached_classes(self->args.thread->vm)->method;
+
+#define method (self->args.method)
+#define thread (self->args.thread)
+#define cd (self->args.cd)
+
   DCHECK(!method->is_ctor && !method->is_clinit, "Method is a constructor or <clinit>");
-  classdesc *reflect_Method = cached_classes(thread->vm)->method;
 
-  handle *result = make_handle(thread, new_object(thread, reflect_Method));
+  self->result = make_handle(thread, new_object(thread, reflect_Method));
 
-#define M ((struct native_Method *)result->obj)
+#define M ((struct native_Method *)self->result->obj)
 
   M->reflected_method = method;
   M->modifiers = method->access_flags;
@@ -126,19 +151,21 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
       goto oom;
   }
 
-  object parameterTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")),
-                                              method->descriptor->args_count);
+  object parameterTypes =
+      CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
   M->parameterTypes = parameterTypes;
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
-    object mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, desc));
+    AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, desc);
+    object mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
     ((void **)ArrayData(M->parameterTypes))[i] = mirror;
   }
 
   slice ret_desc = method->descriptor->return_type.unparsed;
-  mirror = (void *)get_class_mirror(thread, load_class_of_field_descriptor(thread, ret_desc));
+  AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, ret_desc);
+  mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
   M->returnType = mirror;
-  object exceptionTypes = CreateObjectArray1D(thread, bootstrap_lookup_class(thread, STR("java/lang/Class")), 0);
+  object exceptionTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, 0);
   M->exceptionTypes = exceptionTypes;
   M->slot = (s32)method->my_index;
   // TODO parse these ^^
@@ -146,7 +173,13 @@ void reflect_initialize_method(vm_thread *thread, classdesc *cd, cp_method *meth
   method->reflection_method = (void *)M;
 
 oom: // OOM while creating the Method
-  drop_handle(thread, result);
+  drop_handle(thread, self->result);
+
+#undef M
+#undef thread
+#undef method
+#undef cd
+  ASYNC_END_VOID()
 }
 
 static obj_header *get_method_parameters_impl(vm_thread *thread, cp_method *method,

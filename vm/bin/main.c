@@ -70,12 +70,16 @@ bool check_casts(vm_thread *thread, cp_method *method, stack_value *args) {
 
     classdesc *class;
     if (arg) {
-      class = load_class_of_field_descriptor(thread, arg->unparsed);
+      load_class_of_field_descriptor_t ctx = {.args = {thread, get_current_classloader(thread), arg->unparsed}};
+      thread->stack.synchronous_depth++;
+      future_t fut = load_class_of_field_descriptor(&ctx);
+      CHECK(fut.status == FUTURE_READY);
+      thread->stack.synchronous_depth--;
+      class = ctx._result;
     } else {
       class = method->my_class;
     }
 
-    printf("A: %.*s, B: %.*s\n", fmt_slice(class->name), fmt_slice(args[i].obj->descriptor->name));
     if (!instanceof(args[i].obj->descriptor, class)) {
       raise_class_cast_exception(thread, args[i].obj->descriptor, class);
       return true;

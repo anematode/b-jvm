@@ -39,4 +39,4 @@ void classloader_uninit(classloader *cl);
 }
 #endif
 
-#endif //CLASSLOADER_H
+#endif // CLASSLOADER_H

@@ -4,9 +4,6 @@
 void raise_exception_object(vm_thread *thread, object obj) {
   DCHECK(!thread->current_exception && "Exception is already raised");
   DCHECK(obj && "Exception object must be non-null");
-  // this check isn't possible early into vm setup
-  //  DCHECK(instanceof(obj->descriptor, cached_classes(thread->vm)->throwable) &&
-  //         "Exception is not subclass of Throwable");
 
   thread->current_exception = obj;
 

@@ -5,7 +5,7 @@ DECLARE_NATIVE("java/lang", ClassLoader, registerNatives, "()V") { return value_
 DECLARE_NATIVE("java/lang", ClassLoader, findLoadedClass0, "(Ljava/lang/String;)Ljava/lang/Class;") {
   DCHECK(argc == 1);
   heap_string read = AsHeapString(args[0].handle->obj, on_oom);
-  exchange_slashes_and_dots((slice*) &read, hslc(read)); // TODO unjank
+  exchange_slashes_and_dots((slice *)&read, hslc(read)); // TODO unjank
   classloader *cl = unmirror_classloader(thread->vm, obj->obj);
   classdesc *cd = hash_table_lookup(&cl->loaded, read.chars, read.len);
 
@@ -37,10 +37,11 @@ DECLARE_NATIVE("java/lang", ClassLoader, findBuiltinLib, "(Ljava/lang/String;)Lj
 
 static int incr = 0;
 
-enum { FLAG_HIDDEN_CLASS = 8 };
+enum { FLAG_HIDDEN_CLASS = 2 };
 
-stack_value define_class_shared_impl(vm_thread *thread, handle *loader, handle *parent_class, handle *name, u8 *data_bytes,
-                         int offset, int length, handle *pd, bool initialize, int flags, handle *source) {
+stack_value define_class_shared_impl(vm_thread *thread, handle *loader, handle *parent_class, handle *name,
+                                     u8 *data_bytes, int offset, int length, handle *pd, bool initialize, int flags,
+                                     handle *source) {
   DCHECK(offset == 0);
 
   heap_string name_str = AsHeapString(name->obj, on_oom);
@@ -127,5 +128,6 @@ DECLARE_NATIVE("java/lang", ClassLoader, defineClass0,
   DCHECK(length <= ArrayLength(data->obj));
   u8 *data_bytes = ArrayData(data->obj);
 
-  return define_class_shared_impl(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags, source);
+  return define_class_shared_impl(thread, loader, parent_class, name, data_bytes, offset, length, pd, initialize, flags,
+                                  source);
 }
