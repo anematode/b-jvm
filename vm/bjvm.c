@@ -2304,7 +2304,9 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
     return false;
   }
   for (int i = 0; i < ArrayLength(provider_mt->ptypes); ++i) {
+    printf("unmirror_class left\n");
     classdesc *left = unmirror_class(((obj_header **)ArrayData(provider_mt->ptypes))[i]);
+    printf("unmirror_class right\n");
     classdesc *right = unmirror_class(((obj_header **)ArrayData(targ->ptypes))[i]);
 
     if (left != right) {
@@ -2354,11 +2356,10 @@ enum {
 };
 
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
+  self->provider_mt_handle = make_handle(args->thread, (obj_header *) args->provider_mt);
 #define target (args->target)
+#define provider_methodtype ((struct native_MethodType *) self->provider_mt_handle->obj)
 #define thread (args->thread)
-  self->provider_mt_handle = make_handle(thread, (obj_header *) args->provider_mt);
-#define provider_mt ((struct native_MethodType *) self->provider_mt_handle->obj)
-
   DCHECK(args->method);
 
   struct native_MethodHandle *mh = (void *)target;
@@ -2370,7 +2371,7 @@ doit:
     struct native_MethodType *targ = (void *)mh->type;
     assert(targ && "Method type must be non-null");
 
-    bool mts_are_same = method_types_compatible(provider_mt, targ);
+    bool mts_are_same = method_types_compatible(provider_methodtype, targ);
     bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
     // only raw calls to MethodHandle.invoke involve "asType" conversions
     bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
@@ -2378,7 +2379,7 @@ doit:
 
     if (is_invoke_exact) {
       if (!mts_are_same) {
-        wrong_method_type_error(thread, provider_mt, targ);
+        wrong_method_type_error(thread, provider_methodtype, targ);
         drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
       }
@@ -2392,10 +2393,9 @@ doit:
       if (!asType)
         UNREACHABLE();
 
-      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
+      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_methodtype}});
       stack_value result = get_async_result(call_interpreter);
-      if (thread->current_exception) {
-        // asType failed
+      if (thread->current_exception) { // asType failed
         drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
       }
@@ -2503,10 +2503,11 @@ doit:
   }
 
   drop_handle(thread, self->provider_mt_handle);
+
   ASYNC_END_VOID();
 
 #undef target
-#undef provider_mt
+#undef provider_methodtype
 #undef thread
 }
 
