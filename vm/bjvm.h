@@ -281,6 +281,7 @@ DECLARE_ASYNC_VOID(invokevirtual_signature_polymorphic,
                     cp_method *method;
                     u8 argc;
                     stack_frame *frame;
+                    handle *provider_mt_handle;
                     handle *result;
                     handle *vh;
                     bool doing_var_handle;
@@ -289,7 +290,7 @@ DECLARE_ASYNC_VOID(invokevirtual_signature_polymorphic,
                     vm_thread *thread;
                     stack_value *sp_;
                     cp_method *method;
-                    struct native_MethodType **provider_mt;  // pointer to GC root
+                    struct native_MethodType *provider_mt;
                     obj_header *target;
                   ),
                   invoked_methods(

@@ -2355,8 +2355,9 @@ enum {
 
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
 #define target (args->target)
-#define provider_mt (*args->provider_mt)
 #define thread (args->thread)
+  self->provider_mt_handle = make_handle(thread, (obj_header *) args->provider_mt);
+#define provider_mt ((struct native_MethodType *) self->provider_mt_handle->obj)
 
   DCHECK(args->method);
 
@@ -2378,6 +2379,7 @@ doit:
     if (is_invoke_exact) {
       if (!mts_are_same) {
         wrong_method_type_error(thread, provider_mt, targ);
+        drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
       }
     }
@@ -2392,8 +2394,11 @@ doit:
 
       AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
       stack_value result = get_async_result(call_interpreter);
-      if (thread->current_exception) // asType failed
+      if (thread->current_exception) {
+        // asType failed
+        drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
+      }
       mh = (void *)result.obj;
     }
 
@@ -2444,6 +2449,7 @@ doit:
     AWAIT(call_interpreter, thread, valueFromMethodName, arg);
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2463,6 +2469,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2483,6 +2490,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2494,6 +2502,7 @@ doit:
     goto doit;
   }
 
+  drop_handle(thread, self->provider_mt_handle);
   ASYNC_END_VOID();
 
 #undef target

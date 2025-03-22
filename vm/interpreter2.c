@@ -327,6 +327,7 @@ int32_t __interpreter_intrinsic_max_insn() { return MAX_INSN_KIND; }
 static s64 invokevirtual_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
 static s64 invokeitable_vtable_monomorphic_impl_void_impl(vm_thread *thread, bytecode_insn *target, bytecode_insn instruction, stack_pointer_t sp_);
 static s64 invokeinterface_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
+static s64 invokesigpoly_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
 static s64 invokespecial_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
 static s64 invokespecial_resolved_impl_void_impl(vm_thread *thread, stack_frame *frame, bytecode_insn *target, bytecode_insn instruction, obj_header *receiver, stack_pointer_t sp_);
 
@@ -1882,11 +1883,8 @@ static s64 invokevirtual_impl_void_impl(vm_thread *thread,
     instruction.ic = method_info->resolved;
     instruction.ic2 = resolve_method_type(thread, method_info->descriptor);
 
-    // todo: VERY BAD AND NOT THREAD SAFE. JUST HERE FOR NOW TO GET IT TO WORK SOME OF THE TIME
     suggest_bytecode_patch(thread->vm, (bytecode_patch_request) { target, instruction });
-    scheduled_gc_pause_patch_only(thread->vm); // todo: this doesn't prevent race conditions, but hopefully mitigates enough until we get rid of this code here
-    frame->is_async_suspended = true;
-    return RETVAL_FUEL_CHECK; // todo: just return to a fake fuel check, I can't be bothered to implement something that we're gonna delete anyway
+    return invokesigpoly_impl_void_impl(thread, frame, target, instruction, receiver, sp_);
   }
 
   // If we found an interface method, transmogrify into a invokeinterface
@@ -2173,6 +2171,46 @@ __attribute__ ((noinline)) static s64 invokeitable_vtable_monomorphic_impl_void(
 }
 FORWARD_TO_NULLARY(invokeitable_vtable_monomorphic)
 
+static s64 invokesigpoly_impl_void_impl(vm_thread *thread,
+                                        stack_frame *frame,
+                                        bytecode_insn *target,
+                                        bytecode_insn instruction,
+                                        obj_header *receiver, stack_pointer_t sp_) {
+  DCHECK(instruction.kind == insn_invokesigpoly);
+
+  if (unlikely(!receiver)) {
+    raise_null_pointer_exception(thread);
+    return RETVAL_EXCEPTION_THROWN;
+  }
+
+  invokevirtual_signature_polymorphic_t ctx = {
+    .args = {
+      .thread = thread,
+      .method = instruction.ic,
+      .sp_ = sp - instruction.args,
+      .provider_mt = (struct native_MethodType *) instruction.ic2,
+      .target = receiver
+    }
+  };
+
+  future_t fut = invokevirtual_signature_polymorphic(&ctx);
+  if (unlikely(fut.status == FUTURE_NOT_READY)) {
+    continuation_frame *cont = async_stack_push(thread);
+    frame->is_async_suspended = true;
+    *cont = (continuation_frame){.pnt = CONT_INVOKESIGPOLY, .frame = frame, .wakeup = fut.wakeup, .ctx.sigpoly = ctx};
+    return RETVAL_ASYNC_SUSPEND;
+  }
+
+  if (thread->current_exception)
+    return RETVAL_EXCEPTION_THROWN;
+
+  // move on to the next insn by "spilling" it as the PC and fuel checking
+  u16 next_pc = target - frame->code + 1;
+  frame->program_counter = next_pc;
+  frame->is_async_suspended = true;
+  return RETVAL_FUEL_CHECK; // upon continuation, it will resume as the next insn
+}
+
 __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   obj_header *receiver = (sp - insn->args)->obj;
@@ -2184,7 +2222,7 @@ __attribute__((noinline)) static s64 invokesigpoly_impl_void(ARGS_VOID) {
       .args = {.thread = thread,
                .method = insn->ic,
                .sp_ = sp - insn->args,
-               .provider_mt = (struct native_MethodType **)&insn->ic2, // GC root
+               .provider_mt = (struct native_MethodType *) insn->ic2,
                .target = receiver}};
 
   future_t fut = invokevirtual_signature_polymorphic(&ctx);
