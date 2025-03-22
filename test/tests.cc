@@ -527,8 +527,16 @@ TEST_CASE("[perf test] Autodiff") {
 
   auto result = run_test_case("test_files/autodiff/", true, "Main");
   // last test
-  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+"
-                              "sin((x*y))))) = -3209354.522523045 == -3209354.522523045") != std::string::npos);
+  auto count = std::count(result.stdout_.begin(), result.stdout_.end(), '\n');
+  // std::cout << result.stdout_ << std::endl;
+  std::cout << "Num lines: " << count << std::endl;
+  std::cout << "Ending: " << result.stdout_.substr(result.stdout_.size() - 50) << std::endl;
+  REQUIRE(result.stdout_.find("((18.582937204562043*(-(sin((x*y))*x)+1.0))+((18.582937204562043*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = -26509.956731152495 == -26509.956731152495") != std::string::npos);
+  REQUIRE(result.stdout_.find("((8.0*(-(sin((x*y))*x)+1.0))+((8.0*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = 853.1568857652521 == 853.1568857652521") != std::string::npos);
+  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = -3209354.522523045 == -3209354.522523045") != std::string::npos);
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();

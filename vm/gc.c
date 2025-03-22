@@ -499,7 +499,7 @@ static void major_gc(vm *vm) {
 
 static void execute_instruction_patch(vm *vm, bytecode_patch_request *req) {
   bytecode_insn *insn_location = req->location;
-  if (insn_location) {
+  if (insn_location && insn_location->kind != insn_invokesigpoly) {
     *insn_location = req->new_insn;
 
     if (req->new_insn.kind == insn_invokesigpoly) {

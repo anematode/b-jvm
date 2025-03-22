@@ -2304,9 +2304,7 @@ bool method_types_compatible(struct native_MethodType *provider_mt, struct nativ
     return false;
   }
   for (int i = 0; i < ArrayLength(provider_mt->ptypes); ++i) {
-    printf("unmirror_class left\n");
     classdesc *left = unmirror_class(((obj_header **)ArrayData(provider_mt->ptypes))[i]);
-    printf("unmirror_class right\n");
     classdesc *right = unmirror_class(((obj_header **)ArrayData(targ->ptypes))[i]);
 
     if (left != right) {

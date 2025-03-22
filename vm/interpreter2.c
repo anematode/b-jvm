@@ -1745,6 +1745,10 @@ static s64 multianewarray_impl_int(ARGS_INT) {
 static int intrinsify(bytecode_insn *inst) {
   cp_method *method = inst->ic;
   if (unlikely(!method)) return 1;
+#define INTRINSIFY_MATHS 0 // todo: we don't have a lib with standard maths
+#if !INTRINSIFY_MATHS
+  if (1) return 1; // cope
+#endif
   if (utf8_equals(method->my_class->name, "java/lang/Math")) {
     if (utf8_equals(method->name, "sqrt")) {
       inst->kind = insn_sqrt;
