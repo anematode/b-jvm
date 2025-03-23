@@ -3338,7 +3338,7 @@ stack_value interpret_2(future_t *fut, vm_thread *thread, stack_frame *entry_fra
 
 /** Jump table definitions. Must be kept in sync with the enum order. */
 
-#define PAGE_ALIGN _Alignas(4096)
+#define PAGE_ALIGN alignas(4096)
 
 // This comment is searched by codegen and should precede the table list vvv
 // CODEGEN BEGIN TABLES

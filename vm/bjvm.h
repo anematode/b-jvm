@@ -8,6 +8,7 @@
 #include <async.h>
 #include <types.h>
 #include <wchar.h>
+#include <stdalign.h>
 
 #include "classfile.h"
 #include "classloader.h"

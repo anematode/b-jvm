@@ -650,7 +650,7 @@ typedef struct bytecode_insn {
 #if SIZEOF_POINTER == 4
     u64 raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
 #else
-    _Alignas(16) __uint128_t raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
+    alignas(16) __uint128_t raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
 #endif
   };
   void *volatile ic2;
