@@ -86,6 +86,10 @@ inline int set_unpark_permit(vm_thread *thread) {
 
 inline bool query_unpark_permit(vm_thread *thread) { return thread->unpark_permit; }
 
+inline bool should_gc_pause(vm *vm) {
+  return __atomic_load_n(&vm->should_gc_pause, __ATOMIC_ACQUIRE);
+}
+
 bool has_expanded_data(header_word *data) { return !((uintptr_t)data->expanded_data & IS_MARK_WORD); }
 
 mark_word_t *get_mark_word(vm *vm, header_word *data) {
@@ -496,6 +500,7 @@ classdesc *make_primitive_classdesc(vm *vm, type_kind kind, const slice name) {
   desc->array_type = nullptr;
   desc->primitive_component = kind;
   desc->classloader = vm->bootstrap_classloader;
+  pthread_mutex_init(&desc->lock, nullptr);
 
   return desc;
 }
@@ -618,11 +623,17 @@ vm *create_vm(const vm_options options) {
   vm->modules = make_hash_table(free, 0.75, 16);
   vm->main_thread_group = nullptr;
 
-  vm->heap = aligned_alloc(4096, options.heap_size);
-  vm->heap_used = 0;
-  vm->heap_capacity = options.heap_size;
-  vm->true_heap_capacity = vm->heap_capacity + OOM_SLOP_BYTES;
+  vm->heap.heap = aligned_alloc(4096, options.heap_size + OOM_SLOP_BYTES);
+  vm->heap.heap_used = 0;
+  vm->heap.heap_capacity = options.heap_size;
+  vm->heap.true_heap_capacity = options.heap_size + OOM_SLOP_BYTES;
   vm->active_classloaders = nullptr;
+
+  size_t bytecode_patch_queue_size = 1000; // todo: make a vm option
+  vm->instruction_patch_queue.buffer = calloc(bytecode_patch_queue_size, sizeof(bytecode_patch_request));
+  vm->instruction_patch_queue.num_used = 0;
+  vm->instruction_patch_queue.capacity = bytecode_patch_queue_size;
+  vm->permanent_gc_roots = nullptr;
 
   vm->bootstrap_classloader = calloc(1, sizeof(classloader));
   classloader_init(vm, vm->bootstrap_classloader, nullptr);
@@ -638,6 +649,7 @@ vm *create_vm(const vm_options options) {
 
   vm->next_tid = 0;
   vm->reference_pending_list = nullptr;
+  vm->should_gc_pause = false;
 
   for (size_t i = 0; i < bjvm_natives_count; ++i) {
     native_t const *native_ptr = bjvm_natives[i];
@@ -700,6 +712,8 @@ void free_vm(vm *vm) {
   }
   arrfree(vm->active_classloaders);
 
+  arrfree(vm->permanent_gc_roots);
+
   free_classpath(&vm->bootstrap_classpath);
   free_heap_str(vm->application_classpath);
   free(cached_classes(vm));
@@ -708,7 +722,7 @@ void free_vm(vm *vm) {
     free_thread(vm->active_threads[i]);
   }
   arrfree(vm->active_threads);
-  free(vm->heap);
+  free(vm->heap.heap);
   free_unsafe_allocations(vm);
   free_zstreams(vm);
 
@@ -1628,42 +1642,79 @@ classdesc *bootstrap_lookup_class(vm_thread *thread, const slice name) {
 }
 
 void out_of_memory(vm_thread *thread) {
-  vm *vm = thread->vm;
   thread->current_exception = nullptr;
-  if (vm->heap_capacity == vm->true_heap_capacity) {
-    // We're currently calling fillInStackTrace on the OOM instance, just
-    // shut up
-    return;
-  }
-
-  // temporarily expand the valid heap so that we can allocate the OOM error and
-  // its constituents
-  size_t original_capacity = vm->heap_capacity;
-  vm->heap_capacity = vm->true_heap_capacity;
 
   obj_header *oom = thread->out_of_mem_error;
-  // TODO call fillInStackTrace
+  // OOM does not need a stack trace
   raise_exception_object(thread, oom);
-
-  vm->heap_capacity = original_capacity;
 }
 
+// does atomic access to be thread-safe
 void *bump_allocate(vm_thread *thread, size_t bytes) {
   // round up to multiple of 8
   bytes = align_up(bytes, 8);
   vm *vm = thread->vm;
-  DCHECK(vm->heap_used % 8 == 0);
-  if (vm->heap_used + bytes > vm->heap_capacity) {
-    major_gc(thread->vm);
-    if (vm->heap_used + bytes > vm->heap_capacity) {
+
+  static_assert(sizeof(vm->heap.heap_used) == sizeof(uintptr_t), "data size cannot be used in atomic addition operation!");
+
+  // bump allocate a slice optimistically
+  size_t heap_used = __atomic_fetch_add(&vm->heap.heap_used, bytes, __ATOMIC_SEQ_CST);
+  DCHECK(heap_used % 8 == 0);
+  DCHECK(heap_used < __atomic_load_n(&vm->heap.heap_used, __ATOMIC_SEQ_CST));
+  size_t end;
+  [[maybe_unused]] bool overflow = __builtin_add_overflow(heap_used, bytes, &end);
+  DCHECK(!overflow); // todo: more strict overflow checking?
+  if (end > vm->heap.heap_capacity) {
+    scheduled_gc_pause(thread->vm);
+
+    // try again; bump allocate a slice
+    heap_used = __atomic_fetch_add(&vm->heap.heap_used, bytes, __ATOMIC_SEQ_CST);
+    DCHECK(heap_used % 8 == 0);
+    overflow = __builtin_add_overflow(heap_used, bytes, &end);
+    DCHECK(!overflow); // todo: more strict overflow checking?
+    if (end > vm->heap.heap_capacity) {
       out_of_memory(thread);
       return nullptr;
     }
   }
-  void *result = vm->heap + vm->heap_used;
+
+  void *result = vm->heap.heap + heap_used;
   memset(result, 0, bytes);
-  vm->heap_used += bytes;
   return result;
+}
+
+void suggest_bytecode_patch(vm *vm, bytecode_patch_request request) {
+  static_assert(sizeof(vm->instruction_patch_queue.num_used) == sizeof(uintptr_t), "data size cannot be used in atomic addition operation!");
+  size_t reserved_slice_index;
+  for (;;) {
+    // bump allocate a slice optimistically
+    reserved_slice_index = __atomic_fetch_add(&vm->instruction_patch_queue.num_used, 1, __ATOMIC_SEQ_CST);
+    if (reserved_slice_index + 1 >= vm->instruction_patch_queue.capacity) {
+      // we need to trigger a GC
+      scheduled_gc_pause_patch_request(vm, request);
+      return;
+    }
+    break;
+  }
+
+  vm->instruction_patch_queue.buffer[reserved_slice_index] = request;
+}
+
+void atomically_patch_instruction_info(bytecode_insn *insn, const bytecode_insn *source) {
+  static_assert(sizeof(struct { insn_code_kind kind; void *ic; }) <= sizeof(insn->raw_patch_data_), "raw_patch_data_ is too small");
+
+  // insn->extra_data = source->extra_data;
+  __atomic_store_n(&insn->args, source->args, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->tos_before, source->tos_before, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->tos_after, source->tos_after, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->ic2, source->ic2, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&insn->raw_patch_data_, source->raw_patch_data_, __ATOMIC_SEQ_CST);
+}
+
+inline void gc_pause_if_requested(vm *vm) {
+  if (unlikely(should_gc_pause(vm))) {
+    scheduled_gc_pause(vm);
+  }
 }
 
 // Returns true if the class descriptor is a subclass of java.lang.Error.
@@ -1683,6 +1734,7 @@ attribute *find_attribute(attribute *attrs, int attrc, attribute_kind kind) {
 // if they are provided in the class file.
 //
 // Returns true if an OOM occurred when initializing string fields.
+// only called when classdesc lock is held
 bool initialize_constant_value_fields(vm_thread *thread, classdesc *classdesc) {
   CHECK(classdesc->state >= CD_STATE_LINKED, "Class must be linked");
   for (int i = 0; i < classdesc->fields_count; ++i) {
@@ -1742,10 +1794,11 @@ void wrap_in_exception_in_initializer_error(vm_thread *thread) {
 // NOLINTNEXTLINE(misc-no-recursion)
 DEFINE_ASYNC(initialize_class) {
 #define thread (args->thread)
-
   classdesc *cd = args->classdesc; // must be reloaded after await()
+  pthread_mutex_lock(&cd->lock);
   if (cd->kind == CD_KIND_ORDINARY_ARRAY) {
     // Initialize
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1755,6 +1808,7 @@ DEFINE_ASYNC(initialize_class) {
   DCHECK(cd);
   if (likely(cd->state == CD_STATE_INITIALIZED || cd->state == CD_STATE_LINKAGE_ERROR)) {
     // Class is already initialized
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1762,6 +1816,7 @@ DEFINE_ASYNC(initialize_class) {
     error = link_class(thread, cd);
     if (error) {
       DCHECK(thread->current_exception);
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
   }
@@ -1769,6 +1824,7 @@ DEFINE_ASYNC(initialize_class) {
   if (cd->state == CD_STATE_INITIALIZING) {
     if (cd->initializing_thread == thread->tid) {
       // The class is currently being initialized by this thread, so we can just return
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
 
@@ -1776,11 +1832,14 @@ DEFINE_ASYNC(initialize_class) {
     // This effectively busy waits, but this is an edge case so it doesn't matter for now.
     while (cd->state == CD_STATE_INITIALIZING) {
       ((rr_wakeup_info *)self->wakeup_info)->kind = RR_WAKEUP_YIELDING;
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_YIELD(self->wakeup_info);
       DEBUG_PEDANTIC_YIELD(*((rr_wakeup_info *)self->wakeup_info));
       cd = args->classdesc; // reload!
+      pthread_mutex_lock(&cd->lock); // reäcquire
     }
 
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0); // the class is done
   }
 
@@ -1788,6 +1847,7 @@ DEFINE_ASYNC(initialize_class) {
   if (cd->state == CD_STATE_LINKAGE_ERROR) {
     thread->current_exception = nullptr;
     raise_exception_object(thread, cd->linkage_error);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
@@ -1797,20 +1857,25 @@ DEFINE_ASYNC(initialize_class) {
   self->recursive_call_space = calloc(1, sizeof(initialize_class_t));
   if (!self->recursive_call_space) {
     out_of_memory(thread);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
   if (cd->super_class) {
+    pthread_mutex_unlock(&cd->lock);
     AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->super_class->classdesc);
     cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
 
     if ((error = self->recursive_call_space->_result))
       goto done;
   }
 
   for (self->i = 0; (int)self->i < cd->interfaces_count; ++self->i) {
+    pthread_mutex_unlock(&cd->lock);
     AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->interfaces[self->i]->classdesc);
     cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
 
     if ((error = self->recursive_call_space->_result))
       goto done;
@@ -1826,8 +1891,10 @@ DEFINE_ASYNC(initialize_class) {
   cp_method *clinit = method_lookup(cd, STR("<clinit>"), STR("()V"), false, false);
 
   if (clinit) {
-
+    pthread_mutex_unlock(&cd->lock);
     AWAIT(call_interpreter, thread, clinit, nullptr);
+    cd = args->classdesc;
+    pthread_mutex_lock(&cd->lock); // reäcquire
     if (thread->current_exception && !is_error(thread->current_exception->descriptor)) {
       wrap_in_exception_in_initializer_error(thread);
       goto done;
@@ -1844,6 +1911,7 @@ done:
   while ((arr = arr->array_type)) {
     arr->state = args->classdesc->state;
   }
+  pthread_mutex_unlock(&cd->lock);
   ASYNC_END(error);
 
 #undef thread
@@ -2103,11 +2171,15 @@ cp_method *unmirror_method(obj_header *mirror) {
 struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdesc *cd) {
   if (!cd)
     return nullptr;
-  if (cd->cp_mirror)
+  pthread_mutex_lock(&cd->lock); // todo: check result?
+  if (cd->cp_mirror) {
+    pthread_mutex_unlock(&cd->lock);
     return cd->cp_mirror;
+  }
   classdesc *java_lang_ConstantPool = cached_classes(thread->vm)->constant_pool;
   struct native_ConstantPool *cp_mirror = cd->cp_mirror = (void *)new_object(thread, java_lang_ConstantPool);
   cp_mirror->reflected_class = cd;
+  pthread_mutex_unlock(&cd->lock);
   return cp_mirror;
 }
 
@@ -2115,8 +2187,11 @@ struct native_ConstantPool *get_constant_pool_mirror(vm_thread *thread, classdes
 struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
   if (!cd)
     return nullptr;
-  if (cd->mirror)
+  pthread_mutex_lock(&cd->lock); // todo: check result?
+  if (cd->mirror) {
+    pthread_mutex_unlock(&cd->lock);
     return cd->mirror;
+  }
 
   classdesc *java_lang_Class = bootstrap_lookup_class(thread, STR("java/lang/Class"));
   initialize_class_t init = {.args = {thread, java_lang_Class}};
@@ -2143,6 +2218,7 @@ struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
   }
   struct native_Class *result = class_mirror;
   drop_handle(thread, cm_handle);
+  pthread_mutex_unlock(&cd->lock);
   return result;
 #undef class_mirror
 }
@@ -2262,10 +2338,10 @@ enum {
 };
 
 DEFINE_ASYNC(invokevirtual_signature_polymorphic) {
+  self->provider_mt_handle = make_handle(args->thread, (obj_header *) args->provider_mt);
 #define target (args->target)
-#define provider_mt (*args->provider_mt)
+#define provider_methodtype ((struct native_MethodType *) self->provider_mt_handle->obj)
 #define thread (args->thread)
-
   DCHECK(args->method);
 
   struct native_MethodHandle *mh = (void *)target;
@@ -2277,7 +2353,7 @@ doit:
     struct native_MethodType *targ = (void *)mh->type;
     assert(targ && "Method type must be non-null");
 
-    bool mts_are_same = method_types_compatible(provider_mt, targ);
+    bool mts_are_same = method_types_compatible(provider_methodtype, targ);
     bool is_invoke_exact = utf8_equals_utf8(args->method->name, STR("invokeExact"));
     // only raw calls to MethodHandle.invoke involve "asType" conversions
     bool is_invoke = utf8_equals_utf8(args->method->name, STR("invoke")) &&
@@ -2285,7 +2361,8 @@ doit:
 
     if (is_invoke_exact) {
       if (!mts_are_same) {
-        wrong_method_type_error(thread, provider_mt, targ);
+        wrong_method_type_error(thread, provider_methodtype, targ);
+        drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
       }
     }
@@ -2298,10 +2375,12 @@ doit:
       if (!asType)
         UNREACHABLE();
 
-      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_mt}});
+      AWAIT(call_interpreter, thread, asType, (stack_value[]){{.obj = (void *)mh}, {.obj = (void *)provider_methodtype}});
       stack_value result = get_async_result(call_interpreter);
-      if (thread->current_exception) // asType failed
+      if (thread->current_exception) { // asType failed
+        drop_handle(thread, self->provider_mt_handle);
         ASYNC_RETURN_VOID();
+      }
       mh = (void *)result.obj;
     }
 
@@ -2352,6 +2431,7 @@ doit:
     AWAIT(call_interpreter, thread, valueFromMethodName, arg);
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2371,6 +2451,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2391,6 +2472,7 @@ doit:
     if (thread->current_exception) {
       drop_handle(thread, self->vh);
       drop_handle(thread, self->result);
+      drop_handle(thread, self->provider_mt_handle);
       ASYNC_RETURN_VOID();
     }
 
@@ -2402,10 +2484,12 @@ doit:
     goto doit;
   }
 
+  drop_handle(thread, self->provider_mt_handle);
+
   ASYNC_END_VOID();
 
 #undef target
-#undef provider_mt
+#undef provider_methodtype
 #undef thread
 }
 
@@ -2636,14 +2720,15 @@ DEFINE_ASYNC(run_native) {
   }
 
   self->native_struct = malloc(hand->async_ctx_bytes);
-  arrput(thread->vm->unsafe_allocations, self->native_struct);
+  // todo: commenting out the unsafe allocation stuff causes mallocations to not be tracked down
+//  arrput(thread->vm->unsafe_allocations, self->native_struct);
 
   *self->native_struct = (async_natives_args){{thread, target_handle, native_args, argc}, 0};
   AWAIT_FUTURE_EXPR(((native_callback *)frame->method->native_handle)->async(self->native_struct));
   // We've laid out the context struct so that the result is always at offset 0
   stack_value result = ((async_natives_args *)self->native_struct)->result;
   free(self->native_struct);
-  remove_unsafe_allocation(thread->vm, self->native_struct);
+//  remove_unsafe_allocation(thread->vm, self->native_struct);
 
   ASYNC_END(result);
 

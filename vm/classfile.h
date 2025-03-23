@@ -8,6 +8,7 @@
 #include "adt.h"
 #include "util.h"
 #include "vtable.h"
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -604,16 +605,14 @@ struct iinc_data {
 };
 
 typedef struct bytecode_insn {
-  // Please don't change the offsets of "kind" and "tos_before" as the interpreter intrinsic rewriter uses these offsets
-  // directly.
-  insn_code_kind kind;
+  // todo: fix rewriter as the offsets of these things have changed
   u8 args;
   reduced_tos_kind tos_before; // the (reduced) top-of-stack type before this instruction executes
   reduced_tos_kind tos_after;  // the (reduced) top-of-stack type after this instruction executes
   u16 original_pc;
   bool returns; // whether the instruction returns a value
 
-  union {
+  volatile union {
     // for newarray
     type_kind array_type;
     // constant pool index or local variable index or branch target (instruction
@@ -640,13 +639,21 @@ typedef struct bytecode_insn {
     struct multianewarray_data *multianewarray;
     // non-owned pointer into the constant pool
     cp_entry *cp;
-    // anewarray_resolved, checkcast_resolved
-    classdesc *classdesc;
-  };
+  } extra_data; // todo: try to get rid of the stuff here and use inline cache instead...
 
-  // Per-instruction inline cache data (various uses depending on the instruction)
-  void *ic;
-  void *ic2;
+  union {
+    struct {
+      volatile insn_code_kind kind;
+      void *volatile ic;
+    };
+
+#if SIZEOF_POINTER == 4
+    u64 raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
+#else
+    alignas(16) __uint128_t raw_patch_data_; // sized to encapsulate the rewrite_patch_group data in atomic operations
+#endif
+  };
+  void *volatile ic2;
 } bytecode_insn;
 
 typedef struct {
@@ -835,9 +842,11 @@ typedef struct classloader classloader;
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct classdesc {
   classdesc_kind kind;
-  bool is_hidden; // whether this is a hidden class (added in Java 15)
-  classdesc_state state;
-  constant_pool *pool;
+  bool is_hidden;  // whether this is a hidden class (added in Java 15)
+  classdesc_state state; // guarded by lock
+  constant_pool *pool; // guarded by lock
+
+  pthread_mutex_t lock; // protects classdesc state
 
   access_flags access_flags;
   slice name;
@@ -860,15 +869,15 @@ typedef struct classdesc {
 
   int attributes_count;
   attribute *attributes;
-  classdesc *array_type;
+  classdesc *array_type; // lazily initialized; synchronized access
 
   u8 *static_fields;
   // Number of bytes (including the object header) which an instance of this
   // class takes up. Unused for array types.
   size_t instance_bytes;
 
-  struct native_Class *mirror;
-  struct native_ConstantPool *cp_mirror;
+  struct native_Class *mirror; // protected by lock
+  struct native_ConstantPool *cp_mirror; // protected by lock
 
   // Non-array classes: which 4- (32-bit system) or 8-byte aligned offsets correspond to references that need to be
   // followed. Only defined at linkage time.
@@ -882,7 +891,6 @@ typedef struct classdesc {
   type_kind primitive_component; // primitives and array types only
 
   bytecode_insn **indy_insns;    // used to get GC roots to CallSites
-  bytecode_insn **sigpoly_insns; // used to get GC roots to MethodTypes
 
   module *module;
   classloader *classloader; // class loader which defined this class
@@ -897,7 +905,7 @@ typedef struct classdesc {
   arena arena; // most things are allocated in here
 
   // The tid of the thread which is initializing this class
-  s32 initializing_thread;
+  s32 initializing_thread; // protected by lock
 } classdesc;
 
 heap_string insn_to_string(const bytecode_insn *insn, int insn_index);

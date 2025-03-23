@@ -6,6 +6,7 @@
 #include "../vendor/stb_ds.h"
 #include "util.h"
 
+#include <analysis.h>
 #include <stdarg.h>
 #include <stdlib.h>
 
@@ -14,7 +15,7 @@ void arena_init(arena *a) { a->begin = nullptr; }
 constexpr size_t ARENA_REGION_BYTES = 1 << 12;
 // NOLINTNEXTLINE(misc-no-recursion)
 void *arena_alloc(arena *a, size_t count, size_t bytes) {
-  size_t allocate = align_up(count * bytes, 8);
+  size_t allocate = align_up(count * bytes, _Alignof(arena_region));
   if (allocate > ARENA_REGION_BYTES) {
     arena_region *region = calloc(1, sizeof(arena_region) + allocate);
     region->used = region->capacity = allocate;

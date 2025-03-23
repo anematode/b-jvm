@@ -44,6 +44,8 @@ static classdesc *primitive_array_classdesc(vm_thread *thread, classdesc *compon
   result->name = arena_make_str(&result->arena, name.chars, (int)name.len);
   setup_super_hierarchy(result);
   set_up_function_tables(result);
+  pthread_mutex_init(&result->lock, nullptr); // todo: check return values?
+
   return result;
 }
 
@@ -75,6 +77,7 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
     link_class(thread, result);
   }
   result->state = component->state;
+  pthread_mutex_init(&result->lock, nullptr); // todo: check return values?
 
   return result;
 }
@@ -83,6 +86,7 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
 // given component. For example, J -> [J, [[J -> [[[J, Object -> [Object
 classdesc *get_or_create_array_classdesc(vm_thread *thread, classdesc *classdesc) {
   DCHECK(classdesc);
+  pthread_mutex_lock(&classdesc->lock); // todo: check return values? todo: never do this reentrantly
   if (!classdesc->array_type) {
     if (classdesc->kind == CD_KIND_PRIMITIVE) {
       classdesc->array_type = primitive_array_classdesc(thread, classdesc);
@@ -91,6 +95,7 @@ classdesc *get_or_create_array_classdesc(vm_thread *thread, classdesc *classdesc
     }
     classdesc->array_type->classloader = classdesc->classloader;
   }
+  pthread_mutex_unlock(&classdesc->lock);
   return classdesc->array_type;
 }
 
