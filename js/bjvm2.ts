@@ -658,8 +658,8 @@ export class BovineVM<Classes> {
         this.primordialThread = this.createThread();
         this.activeThread = this.primordialThread;
 
-        this.stderr = os.options.stderr ?? buffered(console.error);
-        this.stdout = os.options.stdout ?? buffered(console.log);
+        this.stderr = os.options.stderr ?? buffered((x) => console.error(x));
+        this.stdout = os.options.stdout ?? buffered((x) => console.log(x));
     }
 
     setPreemptionFrequencyUs(us: number) {

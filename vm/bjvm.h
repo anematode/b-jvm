@@ -199,15 +199,13 @@ DECLARE_ASYNC(
 );
 
 typedef struct {
-  vm_thread *thread;
   stack_frame *frame;
-  stack_value *result;
   interpret_t interpreter_state;
 } async_run_ctx;
 
 // runs interpreter (async)
 DECLARE_ASYNC(stack_value, call_interpreter,
-  locals(async_run_ctx ctx),
+  locals(interpret_t state),
   arguments(
     vm_thread *thread;
     cp_method *method;
@@ -463,11 +461,6 @@ typedef struct vm {
   size_t heap_used;
   size_t heap_capacity;
 
-  // This capacity is used solely when handling an OutOfMemoryError, because
-  // fillInStackTrace allocates stuff. The reserved space is a constant in
-  // bjvm.c.
-  size_t true_heap_capacity;
-
   // Handles referenced from JS
   obj_header **js_handles;
 
@@ -573,7 +566,7 @@ typedef struct stack_frame {
 
   u16 program_counter; // In instruction indices. Unused by native frames.
   // 0 for native frames. End of the stack frame is at frame_base + sizeof(stack_frame) + current_stack *
-  // sizeof(stack_value)
+  // sizeof(stack_value) -- see get_next_frame_start
   u16 max_stack;
   u16 num_locals;
 

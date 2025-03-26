@@ -62,7 +62,6 @@ static void free_method(cp_method *method) { free_code_analysis(method->code_ana
 void free_classfile(classdesc cf) {
   for (int i = 0; i < cf.methods_count; ++i)
     free_method(&cf.methods[i]);
-  arrfree(cf.indy_insns);
   arrfree(cf.sigpoly_insns);
   arena_uninit(&cf.arena);
 }
@@ -149,6 +148,8 @@ typedef struct {
   arena *arena;
   int current_code_max_pc;
   void *temp_allocation;
+
+  int indy_insns_count;
 } classfile_parse_ctx;
 
 // See: 4.4.7. The CONSTANT_Utf8_info Structure
@@ -295,19 +296,19 @@ static cp_entry parse_constant_pool_entry(cf_byteslice *reader, classfile_parse_
   }
   case CONSTANT_Integer: {
     s32 value = reader_next_s32(reader, "integer value");
-    return (cp_entry){.kind = CP_KIND_INTEGER, .integral = {.value = (s64)value}};
+    return (cp_entry){.kind = CP_KIND_INTEGER, .number = {.ivalue = (s64)value}};
   }
   case CONSTANT_Float: {
     double value = reader_next_f32(reader, "double value");
-    return (cp_entry){.kind = CP_KIND_FLOAT, .floating = {.value = (double)value}};
+    return (cp_entry){.kind = CP_KIND_FLOAT, .number = {.dvalue = (double)value}};
   }
   case CONSTANT_Long: {
     s64 value = reader_next_s64(reader, "long value");
-    return (cp_entry){.kind = CP_KIND_LONG, .integral = {.value = value}};
+    return (cp_entry){.kind = CP_KIND_LONG, .number = {.ivalue = value}};
   }
   case CONSTANT_Double: {
     double value = reader_next_f64(reader, "double value");
-    return (cp_entry){.kind = CP_KIND_DOUBLE, .floating = {.value = value}};
+    return (cp_entry){.kind = CP_KIND_DOUBLE, .number = {.dvalue = value}};
   }
   case CONSTANT_NameAndType: {
     u16 name_index = reader_next_u16(reader, "name index");
@@ -562,210 +563,38 @@ static type_kind parse_atype(u8 atype) {
 
 static bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_parse_ctx *ctx) {
   /** Raw instruction codes (to be canonicalized). */
+  // clang-format off
   enum {
-    nop = 0x00,
-    aconst_null = 0x01,
-    iconst_m1 = 0x02,
-    iconst_0 = 0x03,
-    iconst_1 = 0x04,
-    iconst_2 = 0x05,
-    iconst_3 = 0x06,
-    iconst_4 = 0x07,
-    iconst_5 = 0x08,
-    lconst_0 = 0x09,
-    lconst_1 = 0x0a,
-    fconst_0 = 0x0b,
-    fconst_1 = 0x0c,
-    fconst_2 = 0x0d,
-    dconst_0 = 0x0e,
-    dconst_1 = 0x0f,
-    bipush = 0x10,
-    sipush = 0x11,
-    ldc = 0x12,
-    ldc_w = 0x13,
-    ldc2_w = 0x14,
-    iload = 0x15,
-    lload = 0x16,
-    fload = 0x17,
-    dload = 0x18,
-    aload = 0x19,
-    iload_0 = 0x1a,
-    iload_1 = 0x1b,
-    iload_2 = 0x1c,
-    iload_3 = 0x1d,
-    lload_0 = 0x1e,
-    lload_1 = 0x1f,
-    lload_2 = 0x20,
-    lload_3 = 0x21,
-    fload_0 = 0x22,
-    fload_1 = 0x23,
-    fload_2 = 0x24,
-    fload_3 = 0x25,
-    dload_0 = 0x26,
-    dload_1 = 0x27,
-    dload_2 = 0x28,
-    dload_3 = 0x29,
-    aload_0 = 0x2a,
-    aload_1 = 0x2b,
-    aload_2 = 0x2c,
-    aload_3 = 0x2d,
-    iaload = 0x2e,
-    laload = 0x2f,
-    faload = 0x30,
-    daload = 0x31,
-    aaload = 0x32,
-    baload = 0x33,
-    caload = 0x34,
-    saload = 0x35,
-    istore = 0x36,
-    lstore = 0x37,
-    fstore = 0x38,
-    dstore = 0x39,
-    astore = 0x3a,
-    istore_0 = 0x3b,
-    istore_1 = 0x3c,
-    istore_2 = 0x3d,
-    istore_3 = 0x3e,
-    lstore_0 = 0x3f,
-    lstore_1 = 0x40,
-    lstore_2 = 0x41,
-    lstore_3 = 0x42,
-    fstore_0 = 0x43,
-    fstore_1 = 0x44,
-    fstore_2 = 0x45,
-    fstore_3 = 0x46,
-    dstore_0 = 0x47,
-    dstore_1 = 0x48,
-    dstore_2 = 0x49,
-    dstore_3 = 0x4a,
-    astore_0 = 0x4b,
-    astore_1 = 0x4c,
-    astore_2 = 0x4d,
-    astore_3 = 0x4e,
-    iastore = 0x4f,
-    lastore = 0x50,
-    fastore = 0x51,
-    dastore = 0x52,
-    aastore = 0x53,
-    bastore = 0x54,
-    castore = 0x55,
-    sastore = 0x56,
-    pop = 0x57,
-    pop2 = 0x58,
-    dup = 0x59,
-    dup_x1 = 0x5a,
-    dup_x2 = 0x5b,
-    dup2 = 0x5c,
-    dup2_x1 = 0x5d,
-    dup2_x2 = 0x5e,
-    swap = 0x5f,
-    iadd = 0x60,
-    ladd = 0x61,
-    fadd = 0x62,
-    dadd = 0x63,
-    isub = 0x64,
-    lsub = 0x65,
-    fsub = 0x66,
-    dsub = 0x67,
-    imul = 0x68,
-    lmul = 0x69,
-    fmul = 0x6a,
-    dmul = 0x6b,
-    idiv = 0x6c,
-    ldiv = 0x6d,
-    fdiv = 0x6e,
-    ddiv = 0x6f,
-    irem = 0x70,
-    lrem = 0x71,
-    frem = 0x72,
-    drem = 0x73,
-    ineg = 0x74,
-    lneg = 0x75,
-    fneg = 0x76,
-    dneg = 0x77,
-    ishl = 0x78,
-    lshl = 0x79,
-    ishr = 0x7a,
-    lshr = 0x7b,
-    iushr = 0x7c,
-    lushr = 0x7d,
-    iand = 0x7e,
-    land = 0x7f,
-    ior = 0x80,
-    lor = 0x81,
-    ixor = 0x82,
-    lxor = 0x83,
-    iinc = 0x84,
-    i2l = 0x85,
-    i2f = 0x86,
-    i2d = 0x87,
-    l2i = 0x88,
-    l2f = 0x89,
-    l2d = 0x8a,
-    f2i = 0x8b,
-    f2l = 0x8c,
-    f2d = 0x8d,
-    d2i = 0x8e,
-    d2l = 0x8f,
-    d2f = 0x90,
-    i2b = 0x91,
-    i2c = 0x92,
-    i2s = 0x93,
-    lcmp = 0x94,
-    fcmpl = 0x95,
-    fcmpg = 0x96,
-    dcmpl = 0x97,
-    dcmpg = 0x98,
-    ifeq = 0x99,
-    ifne = 0x9a,
-    iflt = 0x9b,
-    ifge = 0x9c,
-    ifgt = 0x9d,
-    ifle = 0x9e,
-    if_icmpeq = 0x9f,
-    if_icmpne = 0xa0,
-    if_icmplt = 0xa1,
-    if_icmpge = 0xa2,
-    if_icmpgt = 0xa3,
-    if_icmple = 0xa4,
-    if_acmpeq = 0xa5,
-    if_acmpne = 0xa6,
-    goto_ = 0xa7,
-    jsr = 0xa8,
-    ret = 0xa9,
-    tableswitch = 0xaa,
-    lookupswitch = 0xab,
-    ireturn = 0xac,
-    lreturn = 0xad,
-    freturn = 0xae,
-    dreturn = 0xaf,
-    areturn = 0xb0,
-    return_ = 0xb1,
-    getstatic = 0xb2,
-    putstatic = 0xb3,
-    getfield = 0xb4,
-    putfield = 0xb5,
-    invokevirtual = 0xb6,
-    invokespecial = 0xb7,
-    invokestatic = 0xb8,
-    invokeinterface = 0xb9,
-    invokedynamic = 0xba,
-    new_ = 0xbb,
-    newarray = 0xbc,
-    anewarray = 0xbd,
-    arraylength = 0xbe,
-    athrow = 0xbf,
-    checkcast = 0xc0,
-    instanceof = 0xc1,
-    monitorenter = 0xc2,
-    monitorexit = 0xc3,
-    wide = 0xc4,
-    multianewarray = 0xc5,
-    ifnull = 0xc6,
-    ifnonnull = 0xc7,
-    goto_w = 0xc8,
-    jsr_w = 0xc9
+    nop = 0x00, aconst_null = 0x01, iconst_m1 = 0x02, iconst_0 = 0x03, iconst_1 = 0x04, iconst_2 = 0x05,
+    iconst_3 = 0x06, iconst_4 = 0x07, iconst_5 = 0x08, lconst_0 = 0x09, lconst_1 = 0x0a, fconst_0 = 0x0b,
+    fconst_1 = 0x0c, fconst_2 = 0x0d, dconst_0 = 0x0e, dconst_1 = 0x0f, bipush = 0x10, sipush = 0x11, ldc = 0x12,
+    ldc_w = 0x13, ldc2_w = 0x14, iload = 0x15, lload = 0x16, fload = 0x17, dload = 0x18, aload = 0x19, iload_0 = 0x1a,
+    iload_1 = 0x1b, iload_2 = 0x1c, iload_3 = 0x1d, lload_0 = 0x1e, lload_1 = 0x1f, lload_2 = 0x20, lload_3 = 0x21,
+    fload_0 = 0x22, fload_1 = 0x23, fload_2 = 0x24, fload_3 = 0x25, dload_0 = 0x26, dload_1 = 0x27, dload_2 = 0x28,
+    dload_3 = 0x29, aload_0 = 0x2a, aload_1 = 0x2b, aload_2 = 0x2c, aload_3 = 0x2d, iaload = 0x2e, laload = 0x2f,
+    faload = 0x30, daload = 0x31, aaload = 0x32, baload = 0x33, caload = 0x34, saload = 0x35, istore = 0x36,
+    lstore = 0x37, fstore = 0x38, dstore = 0x39, astore = 0x3a, istore_0 = 0x3b, istore_1 = 0x3c, istore_2 = 0x3d,
+    istore_3 = 0x3e, lstore_0 = 0x3f, lstore_1 = 0x40, lstore_2 = 0x41, lstore_3 = 0x42, fstore_0 = 0x43,
+    fstore_1 = 0x44, fstore_2 = 0x45, fstore_3 = 0x46, dstore_0 = 0x47, dstore_1 = 0x48, dstore_2 = 0x49,
+    dstore_3 = 0x4a, astore_0 = 0x4b, astore_1 = 0x4c, astore_2 = 0x4d, astore_3 = 0x4e, iastore = 0x4f, lastore = 0x50,
+    fastore = 0x51, dastore = 0x52, aastore = 0x53, bastore = 0x54, castore = 0x55, sastore = 0x56, pop = 0x57,
+    pop2 = 0x58, dup = 0x59, dup_x1 = 0x5a, dup_x2 = 0x5b, dup2 = 0x5c, dup2_x1 = 0x5d, dup2_x2 = 0x5e, swap = 0x5f,
+    iadd = 0x60, ladd = 0x61, fadd = 0x62, dadd = 0x63, isub = 0x64, lsub = 0x65, fsub = 0x66, dsub = 0x67, imul = 0x68,
+    lmul = 0x69, fmul = 0x6a, dmul = 0x6b, idiv = 0x6c, ldiv = 0x6d, fdiv = 0x6e, ddiv = 0x6f, irem = 0x70, lrem = 0x71,
+    frem = 0x72, drem = 0x73, ineg = 0x74, lneg = 0x75, fneg = 0x76, dneg = 0x77, ishl = 0x78, lshl = 0x79, ishr = 0x7a,
+    lshr = 0x7b, iushr = 0x7c, lushr = 0x7d, iand = 0x7e, land = 0x7f, ior = 0x80, lor = 0x81, ixor = 0x82, lxor = 0x83,
+    iinc = 0x84, i2l = 0x85, i2f = 0x86, i2d = 0x87, l2i = 0x88, l2f = 0x89, l2d = 0x8a, f2i = 0x8b, f2l = 0x8c,
+    f2d = 0x8d, d2i = 0x8e, d2l = 0x8f, d2f = 0x90, i2b = 0x91, i2c = 0x92, i2s = 0x93, lcmp = 0x94, fcmpl = 0x95,
+    fcmpg = 0x96, dcmpl = 0x97, dcmpg = 0x98, ifeq = 0x99, ifne = 0x9a, iflt = 0x9b, ifge = 0x9c, ifgt = 0x9d,
+    ifle = 0x9e, if_icmpeq = 0x9f, if_icmpne = 0xa0, if_icmplt = 0xa1, if_icmpge = 0xa2, if_icmpgt = 0xa3,
+    if_icmple = 0xa4, if_acmpeq = 0xa5, if_acmpne = 0xa6, goto_ = 0xa7, jsr = 0xa8, ret = 0xa9, tableswitch = 0xaa,
+    lookupswitch = 0xab, ireturn = 0xac, lreturn = 0xad, freturn = 0xae, dreturn = 0xaf, areturn = 0xb0, return_ = 0xb1,
+    getstatic = 0xb2, putstatic = 0xb3, getfield = 0xb4, putfield = 0xb5, invokevirtual = 0xb6, invokespecial = 0xb7,
+    invokestatic = 0xb8, invokeinterface = 0xb9, invokedynamic = 0xba, new_ = 0xbb, newarray = 0xbc, anewarray = 0xbd,
+    arraylength = 0xbe, athrow = 0xbf, checkcast = 0xc0, instanceof = 0xc1, monitorenter = 0xc2, monitorexit = 0xc3,
+    wide = 0xc4, multianewarray = 0xc5, ifnull = 0xc6, ifnonnull = 0xc7, goto_w = 0xc8, jsr_w = 0xc9
   };
+  // clang-format on
 
   u8 opcode = reader_next_u8(reader, "instruction opcode");
 
@@ -797,19 +626,26 @@ static bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_par
   case sipush:
     return (bytecode_insn){.kind = insn_iconst, .integer_imm = reader_next_s16(reader, "sipush immediate")};
   case ldc:
-    return (bytecode_insn){.kind = insn_ldc,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u8(reader, "ldc index"),
-                                                  CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_STRING | CP_KIND_CLASS,
-                                                  "ldc index")};
-  case ldc_w:
-    return (bytecode_insn){.kind = insn_ldc,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc_w index"),
-                                                  CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_STRING | CP_KIND_CLASS,
-                                                  "ldc_w index")};
-  case ldc2_w:
-    return (bytecode_insn){.kind = insn_ldc2_w,
-                           .cp = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc2_w index"),
-                                                  CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w index")};
+  case ldc_w: {
+    int index = opcode == ldc ? reader_next_u8(reader, "ldc index") : reader_next_u16(reader, "ldc_w index");
+    cp_entry *ent = checked_cp_entry(ctx->cp, index, CP_KIND_INTEGER | CP_KIND_FLOAT | CP_KIND_STRING | CP_KIND_CLASS,
+                                     "ldc/ldc_w index");
+    if (ent->kind == CP_KIND_INTEGER) {
+      return (bytecode_insn){.kind = insn_iconst, .integer_imm = ent->number.ivalue};
+    }
+    if (ent->kind == CP_KIND_FLOAT) {
+      return (bytecode_insn){.kind = insn_fconst, .f_imm = (float)ent->number.dvalue};
+    }
+    return (bytecode_insn){.kind = insn_ldc, .cp = ent};
+  }
+  case ldc2_w: {
+    cp_entry *ent = checked_cp_entry(ctx->cp, reader_next_u16(reader, "ldc2_w index"), CP_KIND_DOUBLE | CP_KIND_LONG,
+                                     "ldc2_w index");
+    if (ent->kind == CP_KIND_DOUBLE) {
+      return (bytecode_insn){.kind = insn_dconst, .d_imm = ent->number.dvalue};
+    }
+    return (bytecode_insn){.kind = insn_lconst, .integer_imm = ent->number.ivalue};
+  }
   case iload:
     return (bytecode_insn){.kind = insn_iload, .index = reader_next_u8(reader, "iload index")};
   case lload:
@@ -1286,7 +1122,7 @@ static bytecode_insn parse_insn(cf_byteslice *reader, u32 pc, classfile_parse_ct
   return insn;
 }
 
-static int convert_pc_to_insn(int pc, int *pc_to_insn, u32 max_pc) {
+static int convert_pc_to_insn(int pc, const int *pc_to_insn, u32 max_pc) {
   DCHECK(pc < (int)max_pc && pc >= 0); // checked pc should have caught this earlier
   int insn = pc_to_insn[pc];
   if (insn == -1) {
@@ -1297,7 +1133,8 @@ static int convert_pc_to_insn(int pc, int *pc_to_insn, u32 max_pc) {
   return insn;
 }
 
-static void convert_pc_offsets_to_insn_offsets(bytecode_insn *code, int insn_count, int *pc_to_insn, u32 max_pc) {
+// It's more convenient to have the targets be in instruction indices instead of a PC offset.
+static void convert_pcs_to_insn_indices(bytecode_insn *code, int insn_count, const int *pc_to_insn, u32 max_pc) {
   for (int i = 0; i < insn_count; ++i) {
     bytecode_insn *insn = &code[i];
     if (insn->kind == insn_tableswitch) {
@@ -1313,7 +1150,7 @@ static void convert_pc_offsets_to_insn_offsets(bytecode_insn *code, int insn_cou
       }
     } else if (insn->kind >= insn_goto && insn->kind <= insn_ifnull) {
       // instruction uses index to store PC; convert to instruction
-      insn->index = convert_pc_to_insn(insn->index, pc_to_insn,
+      insn->index = convert_pc_to_insn((s32)insn->index, pc_to_insn,
                                        max_pc); // always decreases, so ok
     }
   }
@@ -1366,10 +1203,11 @@ static attribute_code parse_code_attribute(cf_byteslice attr_reader, classfile_p
     int pc = code_reader.bytes - code_start;
     pc_to_insn[pc] = insn_count;
     code[insn_count] = parse_insn(&code_reader, pc, ctx);
+    ctx->indy_insns_count += code[insn_count].kind == insn_invokedynamic;
     ++insn_count;
   }
 
-  convert_pc_offsets_to_insn_offsets(code, insn_count, pc_to_insn, code_length);
+  convert_pcs_to_insn_indices(code, insn_count, pc_to_insn, code_length);
 
   u16 exception_table_length = reader_next_u16(&attr_reader, "exception table length");
   attribute_exception_table *table = nullptr;
@@ -1546,7 +1384,7 @@ static void parse_attribute(cf_byteslice *reader, classfile_parse_ctx *ctx, attr
       u16 name_index = reader_next_u16(&attr_reader, "method parameter name");
       // "If the value of the name_index item is zero, then this parameters
       // element indicates a formal parameter with no name"
-      if (name_index) {
+      if (name_index != 0) {
         slice param_name = checked_get_utf8(ctx->cp, name_index, "method parameter name");
         check_unqualified_name(param_name, false, "method parameter name");
         params[i].name = param_name;
@@ -1763,13 +1601,14 @@ static void link_bootstrap_methods(classdesc *cf) {
     if (cp->entries[i].kind == CP_KIND_INVOKE_DYNAMIC) {
       cp_indy_info *indy = &cp->entries[i].indy_info;
       int index = (int)indy->_method_index;
-      if (!cf->bootstrap_methods) {
+      attribute *attr = find_attribute_by_kind(cf, ATTRIBUTE_KIND_BOOTSTRAP_METHODS);
+      if (!attr) {
         format_error_static("Missing BootstrapMethods attribute");
       }
-      if (index < 0 || index >= cf->bootstrap_methods->count) {
+      if (index < 0 || index >= attr->bootstrap_methods.count) {
         format_error_static("Invalid bootstrap method index");
       }
-      indy->method = &cf->bootstrap_methods->methods[index];
+      indy->method = &attr->bootstrap_methods.methods[index];
     }
   }
 }
@@ -1858,8 +1697,6 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   cf->methods_count = reader_next_u16(&reader, "methods count");
   cf->methods = arena_alloc(ctx.arena, cf->methods_count, sizeof(cp_method));
 
-  cf->bootstrap_methods = nullptr;
-  cf->indy_insns = nullptr;
   cf->sigpoly_insns = nullptr;
   cf->array_type = nullptr;
 
@@ -1885,9 +1722,7 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
     attribute *attr = cf->attributes + i;
     parse_attribute(&reader, &ctx, attr);
 
-    if (attr->kind == ATTRIBUTE_KIND_BOOTSTRAP_METHODS) {
-      cf->bootstrap_methods = &attr->bootstrap_methods;
-    } else if (attr->kind == ATTRIBUTE_KIND_SOURCE_FILE) {
+    if (attr->kind == ATTRIBUTE_KIND_SOURCE_FILE) {
       cf->source_file = &attr->source_file;
     } else if (attr->kind == ATTRIBUTE_KIND_NEST_HOST) {
       cf->nest_host = attr->nest_host;
@@ -1905,14 +1740,17 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   result->state = CD_STATE_LOADED;
 
   // Add indy instruction pointers
-  for (int i = 0; i < cf->methods_count; ++i) {
+  cf->indy_insns_count = ctx.indy_insns_count;
+  cf->indy_insns = arena_alloc(&cf->arena, ctx.indy_insns_count, sizeof(bytecode_insn *));
+  for (int i = 0, indy_i = 0; i < cf->methods_count; ++i) {
     cp_method *method = cf->methods + i;
     if (method->code) {
       // Add pointers to indy instructions for their CallSites to be GC roots
       for (int j = 0; j < method->code->insn_count; ++j) {
         bytecode_insn *insn = method->code->code + j;
         if (insn->kind == insn_invokedynamic) {
-          arrput(cf->indy_insns, insn);
+          DCHECK(indy_i < ctx.indy_insns_count);
+          cf->indy_insns[indy_i++] = insn;
         }
       }
     }

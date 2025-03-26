@@ -42,7 +42,7 @@ static inline object AllocateObject(vm_thread *thread, classdesc *descriptor, si
   DCHECK(descriptor->state >= CD_STATE_LINKED); // important to know the size
   object obj = (object)bump_allocate(thread, allocation_size);
   if (obj) {
-    obj->header_word.expanded_data = (monitor_data *)(uintptr_t)IS_MARK_WORD;
+    obj->header_word.mark_word.data[0] = IS_MARK_WORD;
     obj->descriptor = descriptor;
     DCHECK(size_of_object(obj) <= allocation_size);
   }
@@ -130,6 +130,8 @@ GeneratePrimitiveLoadField(Boolean, jboolean, i, Z);
 
 #undef GenerateStoreField
 #undef GeneratePrimitiveLoadField
+
+obj_header *make_jstring_modified_utf8(vm_thread *thread, slice string);
 
 #ifdef __cplusplus
 }

@@ -72,6 +72,7 @@ extern "C" {
   X(byte, "java/lang/Byte")                                                                                            \
   X(reference, "java/lang/ref/Reference")                                                                              \
   X(class_loader, "java/lang/ClassLoader")                                                                             \
+  X(member_name, "java/lang/invoke/MemberName")                                                                        \
   X(throwable, "java/lang/Throwable")
 
 #define CACHED_CLASSDESCS(X)                                                                                           \

@@ -923,10 +923,7 @@ static void lower_checkcast_resolved(const bytecode_insn *insn) {
 }
 
 static int lower_ldc(const bytecode_insn *insn) {
-  DCHECK(insn->kind == insn_ldc2_w || insn->kind == insn_ldc);
-  if (insn->kind == insn_ldc2_w) {
-    UNREACHABLE(); // should have been removed at analysis time and converted to dconst or lconst
-  }
+  DCHECK(insn->kind == insn_ldc);
 
   cp_entry *ent = insn->cp;
   if (ent->kind == CP_KIND_STRING) {
@@ -1432,7 +1429,6 @@ static int lower_instruction(const bytecode_insn *insn) {
   case insn_invokestatic:
     break;
   case insn_ldc:
-  case insn_ldc2_w:
     if (lower_ldc(insn))
       break;
     return 0;

@@ -2342,23 +2342,6 @@ static s64 ldc_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(ldc)
 
-static s64 ldc2_w_impl_void(ARGS_VOID) {
-  DEBUG_CHECK();
-  sp++;
-  cp_entry *ent = insn->cp;
-  switch (ent->kind) {
-  case CP_KIND_DOUBLE: {
-    NEXT_DOUBLE(ent->floating.value);
-  }
-  case CP_KIND_LONG: {
-    NEXT_INT(ent->integral.value);
-  }
-  default:
-    UNREACHABLE();
-  }
-}
-FORWARD_TO_NULLARY(ldc2_w)
-
 static s64 iconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
@@ -3170,7 +3153,6 @@ PAGE_ALIGN static s64 (*jmp_table_void[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_invokevirtual] = invokevirtual_impl_void,
     [insn_invokestatic] = invokestatic_impl_void,
     [insn_ldc] = ldc_impl_void,
-    [insn_ldc2_w] = ldc2_w_impl_void,
     [insn_dload] = dload_impl_void,
     [insn_fload] = fload_impl_void,
     [insn_iload] = iload_impl_void,
@@ -3237,7 +3219,6 @@ PAGE_ALIGN static s64 (*jmp_table_double[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_invokespecial] = invokespecial_impl_double,
     [insn_invokestatic] = invokestatic_impl_double,
     [insn_ldc] = ldc_impl_double,
-    [insn_ldc2_w] = ldc2_w_impl_double,
     [insn_dload] = dload_impl_double,
     [insn_fload] = fload_impl_double,
     [insn_iload] = iload_impl_double,
@@ -3359,7 +3340,6 @@ PAGE_ALIGN static s64 (*jmp_table_int[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_invokespecial] = invokespecial_impl_int,
     [insn_invokestatic] = invokestatic_impl_int,
     [insn_ldc] = ldc_impl_int,
-    [insn_ldc2_w] = ldc2_w_impl_int,
     [insn_dload] = dload_impl_int,
     [insn_fload] = fload_impl_int,
     [insn_iload] = iload_impl_int,
@@ -3475,7 +3455,6 @@ PAGE_ALIGN static s64 (*jmp_table_float[MAX_INSN_KIND])(ARGS_VOID) = {
     [insn_invokespecial] = invokespecial_impl_float,
     [insn_invokestatic] = invokestatic_impl_float,
     [insn_ldc] = ldc_impl_float,
-    [insn_ldc2_w] = ldc2_w_impl_float,
     [insn_dload] = dload_impl_float,
     [insn_fload] = fload_impl_float,
     [insn_iload] = iload_impl_float,

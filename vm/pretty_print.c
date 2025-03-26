@@ -121,7 +121,6 @@ const char *insn_code_to_string(insn_code_kind code) {
     CASE(lastore)
     CASE(lcmp)
     CASE(ldc)
-    CASE(ldc2_w)
     CASE(ldiv)
     CASE(lmul)
     CASE(lneg)
@@ -317,16 +316,16 @@ char *cp_entry_to_string(const cp_entry *ent) {
   case CP_KIND_UTF8:
     return strndup(ent->utf8.chars, ent->utf8.len);
   case CP_KIND_INTEGER:
-    snprintf(result, sizeof(result), "%" PRId64, ent->integral.value);
+    snprintf(result, sizeof(result), "%" PRId64, ent->number.ivalue);
     break;
   case CP_KIND_FLOAT:
-    snprintf(result, sizeof(result), "%.9gf", (float)ent->floating.value);
+    snprintf(result, sizeof(result), "%.9gf", (float)ent->number.dvalue);
     break;
   case CP_KIND_LONG:
-    snprintf(result, sizeof(result), "%" PRId64 "L", ent->integral.value);
+    snprintf(result, sizeof(result), "%" PRId64 "L", ent->number.ivalue);
     break;
   case CP_KIND_DOUBLE:
-    snprintf(result, sizeof(result), "%.15gd", (float)ent->floating.value);
+    snprintf(result, sizeof(result), "%.15gd", ent->number.dvalue);
     break;
   case CP_KIND_MODULE:
     [[fallthrough]];
@@ -385,7 +384,7 @@ heap_string insn_to_string(const bytecode_insn *insn, int insn_index) {
   write = build_str(&result, write, "%s ", insn_code_to_string(insn->kind));
   if (insn->kind <= insn_swap) {
     // no operands
-  } else if (insn->kind <= insn_ldc2_w || insn->kind == insn_invokeinterface) {
+  } else if (insn->kind == insn_invokeinterface) {
     // indexes into constant pool
     char *cp_str = cp_entry_to_string(insn->cp);
     build_str(&result, write, "%s", cp_str);
