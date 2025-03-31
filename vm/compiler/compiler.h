@@ -70,7 +70,7 @@ typedef struct {
 
 typedef struct {
   ctl_inst *insts;  // stbds array
-  int *succ;        // likewise
+  int *succ;        // likewise, basic block indices
 } ctl_basic_block;
 
 typedef struct {
@@ -80,6 +80,8 @@ typedef struct {
   arena arena;
 } ctl_function;
 
+// Graphviz
 void ctl_dump_function(FILE* out, const ctl_function *func);
+void ctl_free_function(ctl_function *func);
 
 #endif //COMPILER_H
