@@ -49,6 +49,7 @@ export type JavaMethod = {
 	returnType: JavaType;
 	parameters: JavaMethodParameter[];
 	descriptor: string;
+	throws?: string[];
 };
 
 export type JavaField = {
