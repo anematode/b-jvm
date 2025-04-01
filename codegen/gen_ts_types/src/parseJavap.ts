@@ -324,7 +324,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 		if (line.match(/\bclass\b/)) {
 			// First, try to extract the basic parts of the class declaration
 			const classDeclarationParts = line.match(
-				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s{]+)(.*)$/
+				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s<{]+)(?:<[^>]+>)?(.*)$/
 			);
 
 			if (classDeclarationParts) {
@@ -356,7 +356,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 				// Now, separately handle extends and implements clauses
 				const extendsMatch = remainingDeclaration.match(
-					/\s+extends\s+([^\s{]+)/
+					/\s+extends\s+([^\s{]+(?:<[^>]+>)?)/
 				);
 				if (extendsMatch) {
 					result.superClass = extendsMatch[1].trim();
@@ -374,10 +374,152 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 		}
 
 		// Parse methods and constructors
-		const methodMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<[^>]+>\s+)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		// First, try to match constructor declarations (they don't have a return type)
+		const constructorMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
-		if (methodMatch) {
+
+		if (constructorMatch) {
+			const [, modifiersStr, fullName, paramsStr, throwsStr, descriptor] =
+				constructorMatch;
+
+			// Extract simple name from fully qualified name
+			let name = fullName;
+			const lastDotIndex = fullName.lastIndexOf(".");
+			if (lastDotIndex !== -1) {
+				name = fullName.substring(lastDotIndex + 1);
+			}
+
+			// Check if this is a constructor by comparing with the class name
+			if (name === result.className) {
+				const method: JavaMethod = {
+					name,
+					kind: "constructor",
+					returnType: {
+						kind: "class",
+						name: result.packageName
+							? `${result.packageName}.${result.className}`
+							: result.className,
+					},
+					modifiers: modifiersStr
+						? (modifiersStr
+								.trim()
+								.split(" ")
+								.filter(Boolean) as JavaModifier[])
+						: [],
+					parameters: parseParameters(paramsStr),
+					descriptor: descriptor || "",
+				};
+
+				// Parse throws clause if present
+				if (throwsStr) {
+					method.throws = parseCommaSeparatedList(throwsStr);
+				}
+
+				result.methods.push(method);
+				continue;
+			}
+		}
+
+		// Then try to match generic method declarations
+		// First, try with complex generic type parameters with bounds
+		const methodComplexGenericMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<.*?extends.*?>\s+)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		);
+
+		// Then try simpler generic methods
+		const methodGenericMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<(.+?)>\s+)(\S+)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		);
+
+		// And regular method declarations
+		const methodMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		);
+
+		if (methodComplexGenericMatch) {
+			// Handle complex generic method declaration
+			const [
+				,
+				modifiersStr,
+				returnType,
+				fullName,
+				paramsStr,
+				throwsStr,
+				descriptor,
+			] = methodComplexGenericMatch;
+
+			// Extract simple name from fully qualified name
+			let name = fullName;
+			const lastDotIndex = fullName.lastIndexOf(".");
+			if (lastDotIndex !== -1) {
+				name = fullName.substring(lastDotIndex + 1);
+			}
+
+			const method: JavaMethod = {
+				name,
+				kind: "method",
+				returnType: parseJavaType(returnType.trim()),
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				parameters: parseParameters(paramsStr),
+				descriptor: descriptor || "",
+			};
+
+			// Parse throws clause if present
+			if (throwsStr) {
+				method.throws = parseCommaSeparatedList(throwsStr);
+			}
+
+			result.methods.push(method);
+			continue;
+		} else if (methodGenericMatch) {
+			// Handle generic method declaration
+			const [
+				,
+				modifiersStr,
+				,
+				returnType,
+				fullName,
+				paramsStr,
+				throwsStr,
+				descriptor,
+			] = methodGenericMatch;
+
+			// Extract simple name from fully qualified name
+			let name = fullName;
+			const lastDotIndex = fullName.lastIndexOf(".");
+			if (lastDotIndex !== -1) {
+				name = fullName.substring(lastDotIndex + 1);
+			}
+
+			const method: JavaMethod = {
+				name,
+				kind: "method",
+				returnType: parseJavaType(returnType.trim()),
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				parameters: parseParameters(paramsStr),
+				descriptor: descriptor || "",
+			};
+
+			// Parse throws clause if present
+			if (throwsStr) {
+				method.throws = parseCommaSeparatedList(throwsStr);
+			}
+
+			result.methods.push(method);
+			continue;
+		} else if (methodMatch) {
+			// Handle regular method declaration
 			const [
 				,
 				modifiersStr,
@@ -395,24 +537,10 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				name = fullName.substring(lastDotIndex + 1);
 			}
 
-			// Check if this is a constructor by looking at the simple names
-			const isConstructor =
-				name === result.className ||
-				(!returnType && name === result.className);
-
 			const method: JavaMethod = {
-				name, // Use the simple name, not the fully qualified name
-				kind: isConstructor ? "constructor" : "method",
-				returnType: isConstructor
-					? {
-							kind: "class",
-							name: result.packageName
-								? `${result.packageName}.${result.className}`
-								: result.className,
-					  }
-					: returnType
-					? parseJavaType(returnType)
-					: { kind: "primitive", type: "void" },
+				name,
+				kind: "method",
+				returnType: parseJavaType(returnType.trim()),
 				modifiers: modifiersStr
 					? (modifiersStr
 							.trim()
