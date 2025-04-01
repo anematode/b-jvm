@@ -33,7 +33,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "simpleMethod",
@@ -44,7 +43,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 					],
 					fields: [
@@ -52,7 +50,6 @@ describe("parseJavap", () => {
 							name: "simpleField",
 							modifiers: ["public"],
 							type: { kind: "primitive", type: "int" },
-							descriptor: "",
 						},
 					],
 					isInterface: false,
@@ -88,7 +85,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "simpleParam",
@@ -104,7 +100,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "multipleParams",
@@ -134,7 +129,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "genericParam",
@@ -153,7 +147,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "arrayParam",
@@ -177,7 +170,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -213,7 +205,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "childMethod",
@@ -224,7 +215,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "parentOverride",
@@ -243,7 +233,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -278,7 +267,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "interfaceMethod",
@@ -294,7 +282,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "getDescription",
@@ -305,7 +292,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -358,7 +344,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "interface1Method",
@@ -369,7 +354,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "interface2Method",
@@ -385,7 +369,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "baseClassOverride",
@@ -408,7 +391,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "internalProcessing",
@@ -419,7 +401,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["private"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "create",
@@ -438,7 +419,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [
@@ -446,13 +426,11 @@ describe("parseJavap", () => {
 							name: "serialVersionUID",
 							modifiers: ["private", "static", "final"],
 							type: { kind: "primitive", type: "long" },
-							descriptor: "",
 						},
 						{
 							name: "helper",
 							modifiers: ["protected"],
 							type: { kind: "class", name: "com.example.Helper" },
-							descriptor: "",
 						},
 					],
 					isInterface: false,
@@ -488,7 +466,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public", "abstract"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "getName",
@@ -504,7 +481,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [
@@ -512,7 +488,6 @@ describe("parseJavap", () => {
 							name: "CONSTANT_VALUE",
 							modifiers: ["public", "static", "final"],
 							type: { kind: "primitive", type: "int" },
-							descriptor: "",
 						},
 					],
 					isInterface: true,
@@ -557,7 +532,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "method2",
@@ -576,7 +550,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [
@@ -584,7 +557,6 @@ describe("parseJavap", () => {
 							name: "VERSION",
 							modifiers: ["public", "static", "final"],
 							type: { kind: "class", name: "java.lang.String" },
-							descriptor: "",
 						},
 					],
 					isInterface: true,
@@ -621,7 +593,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "methodThrowsOne",
@@ -632,7 +603,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 							throws: ["java.io.IOException"],
 						},
 						{
@@ -649,7 +619,6 @@ describe("parseJavap", () => {
 									type: { kind: "primitive", type: "int" },
 								},
 							],
-							descriptor: "",
 							throws: [
 								"java.io.IOException",
 								"java.lang.IllegalArgumentException",
@@ -672,7 +641,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -708,7 +676,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "simpleVarargs",
@@ -732,7 +699,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "combineArrays",
@@ -754,7 +720,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 							typeParameters: [{ name: "T" }],
 						},
 						{
@@ -790,7 +755,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -832,7 +796,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "getFirst",
@@ -843,7 +806,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "transform",
@@ -869,7 +831,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 							typeParameters: [{ name: "U" }],
 						},
 						{
@@ -896,7 +857,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 							typeParameters: [
 								{ name: "K" },
 								{
@@ -914,7 +874,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 							throws: ["E"],
 							typeParameters: [
 								{ name: "E", bounds: ["java.lang.Exception"] },
@@ -929,7 +888,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 					],
 					fields: [],
@@ -966,7 +924,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "getNestedMap",
@@ -977,7 +934,6 @@ describe("parseJavap", () => {
 							},
 							modifiers: ["public"],
 							parameters: [],
-							descriptor: "",
 						},
 						{
 							name: "processNested",
@@ -996,7 +952,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 						},
 						{
 							name: "transformData",
@@ -1022,7 +977,6 @@ describe("parseJavap", () => {
 									},
 								},
 							],
-							descriptor: "",
 							typeParameters: [{ name: "T" }, { name: "R" }],
 						},
 					],
@@ -1034,7 +988,6 @@ describe("parseJavap", () => {
 								name: "java.util.HashMap<java.lang.String, java.util.concurrent.Future<java.util.Optional<java.lang.Object>>>",
 							},
 							modifiers: ["private"],
-							descriptor: "",
 						},
 					],
 					isInterface: false,

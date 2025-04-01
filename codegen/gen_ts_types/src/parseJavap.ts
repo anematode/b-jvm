@@ -66,7 +66,7 @@ export type JavaMethod = {
 	modifiers: JavaModifier[];
 	returnType: JavaType;
 	parameters: JavaMethodParameter[];
-	descriptor: string;
+	descriptor?: string;
 	throws?: string[];
 	/** Type parameters for generic methods, e.g., '<T>' or '<K, V extends Comparable<V>>' */
 	typeParameters?: TypeParameter[];
@@ -76,7 +76,7 @@ export type JavaField = {
 	name: string;
 	modifiers: JavaModifier[];
 	type: JavaType;
-	descriptor: string;
+	descriptor?: string;
 };
 
 export type ClassInfo = {
@@ -546,7 +546,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 									.filter(Boolean) as JavaModifier[])
 							: [],
 						parameters: [],
-						descriptor: descriptor || "",
+						...(descriptor ? { descriptor } : {}),
 					};
 
 					result.methods.push(method);
@@ -581,7 +581,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 									.filter(Boolean) as JavaModifier[])
 							: [],
 						parameters: parseParameters(paramsStr),
-						descriptor: descriptor || "",
+						...(descriptor ? { descriptor } : {}),
 					};
 
 					result.methods.push(method);
@@ -625,7 +625,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.filter(Boolean) as JavaModifier[])
 					: [],
 				parameters: parseParameters(paramsStr),
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 
 			// Parse throws clause if present
@@ -659,7 +659,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.filter(Boolean) as JavaModifier[])
 					: [],
 				parameters: parseParameters(paramsStr),
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 
 			// Parse type parameters
@@ -729,7 +729,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.filter(Boolean) as JavaModifier[])
 					: [],
 				parameters: parseParameters(paramsStr),
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 
 			// Parse type parameters
@@ -775,7 +775,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.filter(Boolean) as JavaModifier[])
 					: [],
 				parameters: parseParameters(paramsStr),
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 
 			// Parse type parameters
@@ -820,7 +820,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.filter(Boolean) as JavaModifier[])
 					: [],
 				parameters: parseParameters(paramsStr),
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 
 			// Parse throws clause if present
@@ -866,7 +866,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 							.split(" ")
 							.filter(Boolean) as JavaModifier[])
 					: [],
-				descriptor: descriptor || "",
+				...(descriptor ? { descriptor } : {}),
 			};
 			result.fields.push(field);
 			continue;
