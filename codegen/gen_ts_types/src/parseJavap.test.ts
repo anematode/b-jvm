@@ -774,119 +774,122 @@ describe("parseJavap", () => {
 		// 		]);
 		// 	});
 
-		// 	it("should parse methods with varargs parameters", () => {
-		// 		const javap = dedent`
-		// 			Compiled from "VarargsExample.java"
-		// 			public class com.example.VarargsExample {
-		// 				public com.example.VarargsExample();
-		// 				public void simpleVarargs(java.lang.String... messages);
-		// 				public <T> T[] combineArrays(T... elements);
-		// 				public void mixedParams(int count, java.lang.String name, java.lang.Object... items);
-		// 			}
-		// 		`;
+		it("should parse methods with varargs parameters", () => {
+			const javap = dedent`
+					Compiled from "VarargsExample.java"
+					public class com.example.VarargsExample {
+						public com.example.VarargsExample();
+						public void simpleVarargs(java.lang.String... messages);
+						public <T> T[] combineArrays(T... elements);
+						public void mixedParams(int count, java.lang.String name, java.lang.Object... items);
+					}
+				`;
 
-		// 		expectOutput(javap, [
-		// 			{
-		// 				className: "VarargsExample",
-		// 				modifiers: ["public"],
-		// 				interfaces: [],
-		// 				methods: [
-		// 					{
-		// 						name: "VarargsExample",
-		// 						kind: "constructor",
-		// 						returnType: {
-		// 							kind: "class",
-		// 							name: "com.example.VarargsExample",
-		// 						},
-		// 						modifiers: ["public"],
-		// 						parameters: [],
-		// 						descriptor: "",
-		// 					},
-		// 					{
-		// 						name: "simpleVarargs",
-		// 						kind: "method",
-		// 						returnType: {
-		// 							kind: "primitive",
-		// 							type: "void",
-		// 						},
-		// 						modifiers: ["public"],
-		// 						parameters: [
-		// 							{
-		// 								name: "messages",
-		// 								type: {
-		// 									kind: "array",
-		// 									type: {
-		// 										kind: "class",
-		// 										name: "java.lang.String",
-		// 									},
-		// 									dimensions: 1,
-		// 								},
-		// 							},
-		// 						],
-		// 						descriptor: "",
-		// 					},
-		// 					{
-		// 						name: "combineArrays",
-		// 						kind: "method",
-		// 						returnType: {
-		// 							kind: "array",
-		// 							type: { kind: "class", name: "T" },
-		// 							dimensions: 1,
-		// 						},
-		// 						modifiers: ["public"],
-		// 						parameters: [
-		// 							{
-		// 								name: "elements",
-		// 								type: {
-		// 									kind: "array",
-		// 									type: { kind: "class", name: "T" },
-		// 									dimensions: 1,
-		// 								},
-		// 							},
-		// 						],
-		// 						descriptor: "",
-		// 					},
-		// 					{
-		// 						name: "mixedParams",
-		// 						kind: "method",
-		// 						returnType: {
-		// 							kind: "primitive",
-		// 							type: "void",
-		// 						},
-		// 						modifiers: ["public"],
-		// 						parameters: [
-		// 							{
-		// 								name: "count",
-		// 								type: { kind: "primitive", type: "int" },
-		// 							},
-		// 							{
-		// 								name: "name",
-		// 								type: {
-		// 									kind: "class",
-		// 									name: "java.lang.String",
-		// 								},
-		// 							},
-		// 							{
-		// 								name: "items",
-		// 								type: {
-		// 									kind: "array",
-		// 									type: {
-		// 										kind: "class",
-		// 										name: "java.lang.Object",
-		// 									},
-		// 									dimensions: 1,
-		// 								},
-		// 							},
-		// 						],
-		// 						descriptor: "",
-		// 					},
-		// 				],
-		// 				fields: [],
-		// 				isInterface: false,
-		// 				packageName: "com.example",
-		// 			},
-		// 		]);
-		// 	});
+			expectOutput(javap, [
+				{
+					className: "VarargsExample",
+					modifiers: ["public"],
+					interfaces: [],
+					methods: [
+						{
+							name: "VarargsExample",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.VarargsExample",
+							},
+							modifiers: ["public"],
+							parameters: [],
+							descriptor: "",
+						},
+						{
+							name: "simpleVarargs",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "messages",
+									isVarargs: true,
+									type: {
+										kind: "array",
+										type: {
+											kind: "class",
+											name: "java.lang.String",
+										},
+										dimensions: 1,
+									},
+								},
+							],
+							descriptor: "",
+						},
+						{
+							name: "combineArrays",
+							kind: "method",
+							returnType: {
+								kind: "array",
+								type: { kind: "class", name: "T" },
+								dimensions: 1,
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "elements",
+									isVarargs: true,
+									type: {
+										kind: "array",
+										type: { kind: "class", name: "T" },
+										dimensions: 1,
+									},
+								},
+							],
+							descriptor: "",
+						},
+						{
+							name: "mixedParams",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "count",
+									type: { kind: "primitive", type: "int" },
+								},
+								{
+									name: "name",
+									type: {
+										kind: "class",
+										name: "java.lang.String",
+									},
+								},
+								{
+									name: "items",
+									isVarargs: true,
+									type: {
+										kind: "array",
+										type: {
+											kind: "class",
+											name: "java.lang.Object",
+										},
+										dimensions: 1,
+									},
+								},
+							],
+							descriptor: "",
+						},
+					],
+					fields: [],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
 
 		// 	it("should parse inner/nested classes", () => {
 		// 		const javap = dedent`

@@ -35,9 +35,16 @@ export type JavaModifier =
 	| "volatile"
 	| "transient";
 
+/**
+ * Represents a parameter in a Java method
+ */
 export type JavaMethodParameter = {
+	/** The type of the parameter */
 	type: JavaType;
+	/** The name of the parameter, if available */
 	name?: string;
+	/** Indicates if this parameter is a varargs parameter (e.g., String... args) */
+	isVarargs?: boolean;
 };
 
 export type JavaMethodKind = "constructor" | "method";
@@ -148,6 +155,14 @@ function parseParameters(paramsStr: string): JavaMethodParameter[] {
 }
 
 function parseParameter(paramStr: string): JavaMethodParameter {
+	// Check for varargs notation
+	const isVarargs = paramStr.includes("...");
+
+	// Remove the varargs ellipsis for further processing
+	if (isVarargs) {
+		paramStr = paramStr.replace("...", "");
+	}
+
 	// For complex generic types, we need to find the last space that's outside generic brackets
 	// This separates the type from the parameter name
 	let lastOutsideSpace = -1;
@@ -169,14 +184,56 @@ function parseParameter(paramStr: string): JavaMethodParameter {
 	if (lastOutsideSpace !== -1) {
 		const typeStr = paramStr.substring(0, lastOutsideSpace).trim();
 		const nameStr = paramStr.substring(lastOutsideSpace + 1).trim();
-		return {
-			type: parseJavaType(typeStr),
+
+		// Parse the type first
+		let type = parseJavaType(typeStr);
+
+		// For varargs, we need to convert the type to an array type if it's not already an array
+		if (isVarargs && type.kind !== "array") {
+			type = {
+				kind: "array",
+				type,
+				dimensions: 1,
+			};
+		}
+
+		// Create the parameter object with base properties
+		const param: JavaMethodParameter = {
+			type,
 			name: nameStr,
 		};
+
+		// Only add isVarargs property if it's true
+		if (isVarargs) {
+			param.isVarargs = true;
+		}
+
+		return param;
 	}
 
 	// No space found, the whole string is the type
-	return { type: parseJavaType(paramStr.trim()) };
+	let type = parseJavaType(paramStr.trim());
+
+	// For varargs, we need to convert the type to an array type if it's not already an array
+	if (isVarargs && type.kind !== "array") {
+		type = {
+			kind: "array",
+			type,
+			dimensions: 1,
+		};
+	}
+
+	// Create the parameter object with base properties
+	const param: JavaMethodParameter = {
+		type,
+	};
+
+	// Only add isVarargs property if it's true
+	if (isVarargs) {
+		param.isVarargs = true;
+	}
+
+	return param;
 }
 
 /**
@@ -318,7 +375,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 		// Parse methods and constructors
 		const methodMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<[^>]+>\s+)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
 		if (methodMatch) {
 			const [
