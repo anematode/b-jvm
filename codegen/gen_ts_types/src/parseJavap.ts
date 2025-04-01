@@ -368,9 +368,10 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			continue;
 		}
 
-		// Parse fields
+		// Parse fields - improved regex to handle both interface constants and class fields
+		// This needs to come after method parsing to avoid mismatches with method declarations
 		const fieldMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+)\s+(\S+);(?:\s*\/\/\s*(.+))?$/
+			/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+)\s+(\S+)(?:\s*=\s*[^;]*)?;(?:\s*\/\/\s*(.+))?$/
 		);
 		if (fieldMatch) {
 			const [, modifiersStr, type, name, descriptor] = fieldMatch;
@@ -386,6 +387,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				descriptor: descriptor || "",
 			};
 			result.fields.push(field);
+			continue;
 		}
 	}
 

@@ -461,4 +461,136 @@ describe("parseJavap", () => {
 			]);
 		});
 	});
+
+	describe("interface parsing", () => {
+		it("should parse a simple interface", () => {
+			const javap = dedent`
+				Compiled from "SimpleInterface.java"
+				public interface com.example.SimpleInterface {
+					public abstract void interfaceMethod();
+					public abstract java.lang.String getName(int id);
+					public static final int CONSTANT_VALUE = 100;
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "SimpleInterface",
+					modifiers: ["public"],
+					interfaces: [],
+					methods: [
+						{
+							name: "interfaceMethod",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [],
+							descriptor: "",
+						},
+						{
+							name: "getName",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "java.lang.String",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [
+								{
+									name: "id",
+									type: { kind: "primitive", type: "int" },
+								},
+							],
+							descriptor: "",
+						},
+					],
+					fields: [
+						{
+							name: "CONSTANT_VALUE",
+							modifiers: ["public", "static", "final"],
+							type: { kind: "primitive", type: "int" },
+							descriptor: "",
+						},
+					],
+					isInterface: true,
+					packageName: "com.example",
+				},
+			]);
+		});
+
+		it("should parse an interface that extends other interfaces", () => {
+			const javap = dedent`
+				Compiled from "ExtendingInterface.java"
+				public interface com.example.ExtendingInterface extends com.example.BaseInterface1, com.example.BaseInterface2 {
+					public abstract void method1(java.lang.String input);
+					public abstract int method2(java.util.List<java.lang.String> items);
+					public static final java.lang.String VERSION = "1.0";
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "ExtendingInterface",
+					modifiers: ["public"],
+					interfaces: [
+						"com.example.BaseInterface1",
+						"com.example.BaseInterface2",
+					],
+					methods: [
+						{
+							name: "method1",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [
+								{
+									name: "input",
+									type: {
+										kind: "class",
+										name: "java.lang.String",
+									},
+								},
+							],
+							descriptor: "",
+						},
+						{
+							name: "method2",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "int",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [
+								{
+									name: "items",
+									type: {
+										kind: "class",
+										name: "java.util.List<java.lang.String>",
+									},
+								},
+							],
+							descriptor: "",
+						},
+					],
+					fields: [
+						{
+							name: "VERSION",
+							modifiers: ["public", "static", "final"],
+							type: { kind: "class", name: "java.lang.String" },
+							descriptor: "",
+						},
+					],
+					isInterface: true,
+					packageName: "com.example",
+				},
+			]);
+		});
+	});
 });
