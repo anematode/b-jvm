@@ -996,4 +996,119 @@ describe("parseJavap", () => {
 			]);
 		});
 	});
+
+	describe("descriptor handling", () => {
+		it("should preserve non-empty descriptors", () => {
+			const javap = dedent`
+				Compiled from "DescriptorExample.java"
+				public class com.example.DescriptorExample {
+					public com.example.DescriptorExample(); // constructor descriptor
+					public void methodWithDescriptor(int value); // method descriptor
+					private java.lang.String fieldWithComment; // field descriptor
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "DescriptorExample",
+					modifiers: ["public"],
+					interfaces: [],
+					methods: [
+						{
+							name: "DescriptorExample",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.DescriptorExample",
+							},
+							modifiers: ["public"],
+							parameters: [],
+							descriptor: "constructor descriptor",
+						},
+						{
+							name: "methodWithDescriptor",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "value",
+									type: { kind: "primitive", type: "int" },
+								},
+							],
+							descriptor: "method descriptor",
+						},
+					],
+					fields: [
+						{
+							name: "fieldWithComment",
+							modifiers: ["private"],
+							type: { kind: "class", name: "java.lang.String" },
+							descriptor: "field descriptor",
+						},
+					],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
+
+		it("should omit descriptors when they don't exist", () => {
+			const javap = dedent`
+				Compiled from "NoDescriptorExample.java"
+				public class com.example.NoDescriptorExample {
+					public com.example.NoDescriptorExample();
+					public void methodWithoutDescriptor(int value);
+					private java.lang.String fieldWithoutComment;
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "NoDescriptorExample",
+					modifiers: ["public"],
+					interfaces: [],
+					methods: [
+						{
+							name: "NoDescriptorExample",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.NoDescriptorExample",
+							},
+							modifiers: ["public"],
+							parameters: [],
+						},
+						{
+							name: "methodWithoutDescriptor",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "value",
+									type: { kind: "primitive", type: "int" },
+								},
+							],
+						},
+					],
+					fields: [
+						{
+							name: "fieldWithoutComment",
+							modifiers: ["private"],
+							type: { kind: "class", name: "java.lang.String" },
+						},
+					],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
+	});
 });
