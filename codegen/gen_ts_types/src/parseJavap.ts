@@ -92,7 +92,28 @@ export type ClassInfo = {
 	typeParameters?: TypeParameter[];
 };
 
+/**
+ * Parse a Java type string into a structured JavaType object
+ * Enhanced to handle complex nested generics
+ */
 function parseJavaType(typeStr: string): JavaType {
+	// Handle generic types
+	if (typeStr.includes("<")) {
+		// Extract the base type and generic arguments
+		const baseType = typeStr.substring(0, typeStr.indexOf("<"));
+		const genericPart = extractGenericPart(typeStr);
+
+		// Process the extracted generic part if successful
+		if (genericPart) {
+			// For simplicity, we just store the full generic type as a class type
+			// A more advanced implementation could parse the generic arguments into a structured format
+			return {
+				kind: "class",
+				name: `${baseType}${genericPart}`,
+			};
+		}
+	}
+
 	// Handle array types
 	const arrayMatch = typeStr.match(/^(.+?)(\[\])+$/);
 	if (arrayMatch) {
@@ -129,6 +150,36 @@ function parseJavaType(typeStr: string): JavaType {
 		kind: "class",
 		name: typeStr,
 	};
+}
+
+/**
+ * Helper function to extract the generic part of a type, handling nested angle brackets
+ */
+function extractGenericPart(typeStr: string): string | null {
+	let nestLevel = 0;
+	let result = "";
+	let started = false;
+
+	for (let i = 0; i < typeStr.length; i++) {
+		const char = typeStr[i];
+
+		if (char === "<") {
+			nestLevel++;
+			result += char;
+			started = true;
+		} else if (char === ">") {
+			nestLevel--;
+			result += char;
+
+			if (nestLevel === 0 && started) {
+				return result;
+			}
+		} else if (started) {
+			result += char;
+		}
+	}
+
+	return null; // Return null if the generic part couldn't be properly extracted
 }
 
 function parseParameters(paramsStr: string): JavaMethodParameter[] {
@@ -344,9 +395,6 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 	let result: ClassInfo = null as never;
 	const results: ClassInfo[] = [];
 
-	let currentSection: "class" | "fields" | "methods" = "class";
-	let currentClassName = ""; // Store class name for constructor detection
-
 	for (const line of lines) {
 		if (line === "") {
 			continue;
@@ -378,7 +426,6 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			} else {
 				result.className = fullInterfaceName;
 			}
-			currentClassName = result.className;
 
 			// Set isInterface flag
 			result.isInterface = true;
@@ -428,7 +475,6 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				} else {
 					result.className = fullClassName;
 				}
-				currentClassName = result.className;
 
 				// Handle modifiers
 				if (modifiersStr) {
@@ -462,69 +508,195 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			continue;
 		}
 
-		// Parse methods and constructors
-		// First, try to match constructor declarations (they don't have a return type)
-		const constructorMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		// Exact constructor pattern - matches the specific format like "public com.example.ClassName();"
+		const exactConstructorMatch = line.match(
+			/^\s*((?:public |private |protected )*)([^(.\s]+(?:\.[^(.\s]+)+)\(\);(?:\s*\/\/\s*(.+))?$/
 		);
 
-		if (constructorMatch) {
-			const [, modifiersStr, fullName, paramsStr, throwsStr, descriptor] =
-				constructorMatch;
+		// More specific constructor pattern - for constructors with parameters
+		const constructorWithParamsMatch = line.match(
+			/^\s*((?:public |private |protected )*)([^(.\s]+(?:\.[^(.\s]+)+)\(([^)]*)\);(?:\s*\/\/\s*(.+))?$/
+		);
 
-			// Extract simple name from fully qualified name
-			let name = fullName;
-			const lastDotIndex = fullName.lastIndexOf(".");
+		if (exactConstructorMatch) {
+			const [, modifiersStr, fullConstructor, descriptor] =
+				exactConstructorMatch;
+
+			// Extract the constructor name and check if it matches the class name
+			const constructorAndParams = fullConstructor.split("(")[0];
+			const lastDotIndex = constructorAndParams.lastIndexOf(".");
+
 			if (lastDotIndex !== -1) {
-				name = fullName.substring(lastDotIndex + 1);
-			}
+				const simpleName = constructorAndParams.substring(
+					lastDotIndex + 1
+				);
 
-			// Check if this is a constructor by comparing with the class name
-			if (name === result.className) {
-				const method: JavaMethod = {
-					name,
-					kind: "constructor",
-					returnType: {
-						kind: "class",
-						name: result.packageName
-							? `${result.packageName}.${result.className}`
-							: result.className,
-					},
-					modifiers: modifiersStr
-						? (modifiersStr
-								.trim()
-								.split(" ")
-								.filter(Boolean) as JavaModifier[])
-						: [],
-					parameters: parseParameters(paramsStr),
-					descriptor: descriptor || "",
-				};
+				if (simpleName === result.className) {
+					const method: JavaMethod = {
+						name: simpleName,
+						kind: "constructor",
+						returnType: {
+							kind: "class",
+							name: constructorAndParams, // Full qualified name
+						},
+						modifiers: modifiersStr
+							? (modifiersStr
+									.trim()
+									.split(" ")
+									.filter(Boolean) as JavaModifier[])
+							: [],
+						parameters: [],
+						descriptor: descriptor || "",
+					};
 
-				// Parse throws clause if present
-				if (throwsStr) {
-					method.throws = parseCommaSeparatedList(throwsStr);
+					result.methods.push(method);
+					continue;
 				}
-
-				result.methods.push(method);
-				continue;
 			}
 		}
 
-		// Then try to match generic method declarations
+		if (constructorWithParamsMatch && !exactConstructorMatch) {
+			const [, modifiersStr, fullConstructor, paramsStr, descriptor] =
+				constructorWithParamsMatch;
+
+			// Extract the constructor name and check if it matches the class name
+			const constructorName = fullConstructor.split("(")[0];
+			const lastDotIndex = constructorName.lastIndexOf(".");
+
+			if (lastDotIndex !== -1) {
+				const simpleName = constructorName.substring(lastDotIndex + 1);
+
+				if (simpleName === result.className) {
+					const method: JavaMethod = {
+						name: simpleName,
+						kind: "constructor",
+						returnType: {
+							kind: "class",
+							name: constructorName, // Full qualified name
+						},
+						modifiers: modifiersStr
+							? (modifiersStr
+									.trim()
+									.split(" ")
+									.filter(Boolean) as JavaModifier[])
+							: [],
+						parameters: parseParameters(paramsStr),
+						descriptor: descriptor || "",
+					};
+
+					result.methods.push(method);
+					continue;
+				}
+			}
+		}
+
+		// Special case for methods with complex nested generic return types
+		const complexGenericMethodMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(java\.util\.[^<]+<.+>)\s+(\S+)\(([^)]*)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+		);
+
+		// Special case for generic methods with type parameters and complex return types
+		const genericWithTypeParamsMethodMatch =
+			!complexGenericMethodMatch &&
+			line.match(
+				/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)<([^>]+)>\s+([^<\s]+(?:<.+>)?)\s+(\S+)\(([^)]*)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			);
+
+		if (complexGenericMethodMatch) {
+			// Handle method with complex nested generic return type
+			const [
+				,
+				modifiersStr,
+				returnType,
+				name,
+				paramsStr,
+				throwsStr,
+				descriptor,
+			] = complexGenericMethodMatch;
+
+			const method: JavaMethod = {
+				name,
+				kind: "method",
+				returnType: parseJavaType(returnType.trim()),
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				parameters: parseParameters(paramsStr),
+				descriptor: descriptor || "",
+			};
+
+			// Parse throws clause if present
+			if (throwsStr) {
+				method.throws = parseCommaSeparatedList(throwsStr);
+			}
+
+			result.methods.push(method);
+			continue;
+		} else if (genericWithTypeParamsMethodMatch) {
+			// Handle generic method with type parameters
+			const [
+				,
+				modifiersStr,
+				typeParamsStr,
+				returnType,
+				name,
+				paramsStr,
+				throwsStr,
+				descriptor,
+			] = genericWithTypeParamsMethodMatch;
+
+			const method: JavaMethod = {
+				name,
+				kind: "method",
+				returnType: parseJavaType(returnType.trim()),
+				modifiers: modifiersStr
+					? (modifiersStr
+							.trim()
+							.split(" ")
+							.filter(Boolean) as JavaModifier[])
+					: [],
+				parameters: parseParameters(paramsStr),
+				descriptor: descriptor || "",
+			};
+
+			// Parse type parameters
+			if (typeParamsStr) {
+				method.typeParameters = parseTypeParameters(
+					`<${typeParamsStr}>`
+				);
+			}
+
+			// Parse throws clause if present
+			if (throwsStr) {
+				method.throws = parseCommaSeparatedList(throwsStr);
+			}
+
+			result.methods.push(method);
+			continue;
+		}
+
 		// First, try with complex generic type parameters with bounds
 		const methodComplexGenericMatch = line.match(
 			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:(<.*?extends.*?>)\s+)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
 
 		// Then try simpler generic methods
-		const methodGenericMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:(<.+?>)\s+)(\S+)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
-		);
+		const methodGenericMatch =
+			!methodComplexGenericMatch &&
+			line.match(
+				/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:(<.+?>)\s+)(\S+)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			);
 
 		// And regular method declarations
-		const methodMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
-		);
+		const methodMatch =
+			!methodComplexGenericMatch &&
+			!methodGenericMatch &&
+			line.match(
+				/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			);
 
 		if (methodComplexGenericMatch) {
 			// Handle complex generic method declaration
@@ -662,11 +834,29 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 		// Parse fields - improved regex to handle both interface constants and class fields
 		// This needs to come after method parsing to avoid mismatches with method declarations
-		const fieldMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+)\s+(\S+)(?:\s*=\s*[^;]*)?;(?:\s*\/\/\s*(.+))?$/
+		// First, try a more specific regex for fields with complex generic types
+		const complexFieldMatch = line.match(
+			/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+(?:<.+>))\s+(\S+)(?:\s*=\s*[^;]*)?;(?:\s*\/\/\s*(.+))?$/
 		);
-		if (fieldMatch) {
-			const [, modifiersStr, type, name, descriptor] = fieldMatch;
+
+		// Then try the simpler regex for regular fields
+		const fieldMatch =
+			!complexFieldMatch &&
+			line.match(
+				/^\s*((?:public |private |protected |static |final |volatile |transient )*)?(\S+)\s+(\S+)(?:\s*=\s*[^;]*)?;(?:\s*\/\/\s*(.+))?$/
+			);
+
+		// Ensure we don't match methods that were missed by the method regexes
+		const isLikelyMethod =
+			(complexFieldMatch || fieldMatch) &&
+			(complexFieldMatch
+				? complexFieldMatch[3]
+				: fieldMatch![3]
+			).includes("(");
+
+		if ((complexFieldMatch || fieldMatch) && !isLikelyMethod) {
+			const [, modifiersStr, type, name, descriptor] =
+				complexFieldMatch || fieldMatch!;
 			const field: JavaField = {
 				name,
 				type: parseJavaType(type),

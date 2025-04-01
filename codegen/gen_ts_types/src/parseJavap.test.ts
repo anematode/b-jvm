@@ -938,5 +938,109 @@ describe("parseJavap", () => {
 				},
 			]);
 		});
+
+		it("should parse complex nested generic types", () => {
+			const javap = dedent`
+				Compiled from "ComplexGenerics.java"
+				public class com.example.ComplexGenerics {
+					public com.example.ComplexGenerics();
+					public java.util.Map<java.lang.String, java.util.List<java.lang.Integer>> getNestedMap();
+					public void processNested(java.util.List<java.util.Map<java.lang.String, java.lang.Double>> dataList);
+					public <T, R> java.util.Map<R, java.util.List<T>> transformData(java.util.List<T> items, java.util.function.Function<T, R> transformer);
+					private java.util.HashMap<java.lang.String, java.util.concurrent.Future<java.util.Optional<java.lang.Object>>> deeplyNestedField;
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "ComplexGenerics",
+					modifiers: ["public"],
+					interfaces: [],
+					methods: [
+						{
+							name: "ComplexGenerics",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.ComplexGenerics",
+							},
+							modifiers: ["public"],
+							parameters: [],
+							descriptor: "",
+						},
+						{
+							name: "getNestedMap",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "java.util.Map<java.lang.String, java.util.List<java.lang.Integer>>",
+							},
+							modifiers: ["public"],
+							parameters: [],
+							descriptor: "",
+						},
+						{
+							name: "processNested",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "dataList",
+									type: {
+										kind: "class",
+										name: "java.util.List<java.util.Map<java.lang.String, java.lang.Double>>",
+									},
+								},
+							],
+							descriptor: "",
+						},
+						{
+							name: "transformData",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "java.util.Map<R, java.util.List<T>>",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "items",
+									type: {
+										kind: "class",
+										name: "java.util.List<T>",
+									},
+								},
+								{
+									name: "transformer",
+									type: {
+										kind: "class",
+										name: "java.util.function.Function<T, R>",
+									},
+								},
+							],
+							descriptor: "",
+							typeParameters: [{ name: "T" }, { name: "R" }],
+						},
+					],
+					fields: [
+						{
+							name: "deeplyNestedField",
+							type: {
+								kind: "class",
+								name: "java.util.HashMap<java.lang.String, java.util.concurrent.Future<java.util.Optional<java.lang.Object>>>",
+							},
+							modifiers: ["private"],
+							descriptor: "",
+						},
+					],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
 	});
 });
