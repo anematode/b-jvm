@@ -179,6 +179,20 @@ function parseParameter(paramStr: string): JavaMethodParameter {
 }
 
 /**
+ * Helper function to parse interfaces from an implements clause
+ */
+function parseInterfaces(interfacesStr: string): string[] {
+	if (!interfacesStr) return [];
+
+	// Clean up the string and split by commas
+	return interfacesStr
+		.trim()
+		.split(/\s*,\s*/)
+		.map((intf) => intf.trim())
+		.filter(Boolean);
+}
+
+/**
  * Parses a string of javap output and returns a structured representation
  */
 export function parseJavap(javapOutputString: string): ClassInfo[] {
@@ -209,7 +223,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 		// Handle interface declaration
 		const interfaceMatch = line.match(
-			/^((?:public |private |protected |abstract )*)?interface\s+([^\s{]+)(?:\s+extends\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?\s*\{?/
+			/^((?:public |private |protected |abstract )*)?interface\s+([^\s{]+)(?:\s+extends\s+([^{]+))?\s*\{?/
 		);
 		if (interfaceMatch) {
 			const [, modifiersStr, fullInterfaceName, extendedInterfaces] =
@@ -243,26 +257,21 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 			// Handle extended interfaces
 			if (extendedInterfaces) {
-				result.interfaces = extendedInterfaces
-					.split(",")
-					.map((i) => i.trim());
+				result.interfaces = parseInterfaces(extendedInterfaces);
 			}
 			continue;
 		}
 
 		// Handle class declaration - check this after interface to avoid mismatches
 		if (line.match(/\bclass\b/)) {
-			const classMatch = line.match(
-				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s{]+)(?:\s+extends\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?(?:\s+implements\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?\s*\{?/
+			// First, try to extract the basic parts of the class declaration
+			const classDeclarationParts = line.match(
+				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s{]+)(.*)$/
 			);
-			if (classMatch) {
-				const [
-					,
-					modifiersStr,
-					fullClassName,
-					superClass,
-					interfacesStr,
-				] = classMatch;
+
+			if (classDeclarationParts) {
+				const [, modifiersStr, fullClassName, remainingDeclaration] =
+					classDeclarationParts;
 
 				// Handle package and class name
 				const lastDotIndex = fullClassName.lastIndexOf(".");
@@ -277,7 +286,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				} else {
 					result.className = fullClassName;
 				}
-				currentClassName = result.className; // Store for constructor detection
+				currentClassName = result.className;
 
 				// Handle modifiers
 				if (modifiersStr) {
@@ -287,16 +296,20 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 						.filter(Boolean) as JavaModifier[];
 				}
 
-				// Handle superclass
-				if (superClass) {
-					result.superClass = superClass.trim();
+				// Now, separately handle extends and implements clauses
+				const extendsMatch = remainingDeclaration.match(
+					/\s+extends\s+([^\s{]+)/
+				);
+				if (extendsMatch) {
+					result.superClass = extendsMatch[1].trim();
 				}
 
-				// Handle interfaces
-				if (interfacesStr) {
-					result.interfaces = interfacesStr
-						.split(",")
-						.map((i) => i.trim());
+				const implementsMatch = remainingDeclaration.match(
+					/\s+implements\s+([^{]+)/
+				);
+				if (implementsMatch) {
+					const implementsStr = implementsMatch[1].trim();
+					result.interfaces = parseInterfaces(implementsStr);
 				}
 			}
 			continue;

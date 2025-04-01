@@ -1,6 +1,6 @@
 {
 	"compilerOptions": {
 		"types": ["jest"],
-		"lib": ["ESNext"]
+		"lib": ["ESNext", "DOM"]
 	}
 }
