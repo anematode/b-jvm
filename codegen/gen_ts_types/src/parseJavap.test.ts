@@ -997,6 +997,194 @@ describe("parseJavap", () => {
 		});
 	});
 
+	describe("abstract class parsing", () => {
+		it("should parse a simple abstract class", () => {
+			const javap = dedent`
+				Compiled from "AbstractBase.java"
+				public abstract class com.example.AbstractBase {
+					protected java.lang.String name;
+					public com.example.AbstractBase(java.lang.String name);
+					public final java.lang.String getName();
+					protected void setName(java.lang.String name);
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "AbstractBase",
+					modifiers: ["public", "abstract"],
+					interfaces: [],
+					methods: [
+						{
+							name: "AbstractBase",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.AbstractBase",
+							},
+							modifiers: ["public"],
+							parameters: [
+								{
+									name: "name",
+									type: {
+										kind: "class",
+										name: "java.lang.String",
+									},
+								},
+							],
+						},
+						{
+							name: "getName",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "java.lang.String",
+							},
+							modifiers: ["public", "final"],
+							parameters: [],
+						},
+						{
+							name: "setName",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["protected"],
+							parameters: [
+								{
+									name: "name",
+									type: {
+										kind: "class",
+										name: "java.lang.String",
+									},
+								},
+							],
+						},
+					],
+					fields: [
+						{
+							name: "name",
+							modifiers: ["protected"],
+							type: { kind: "class", name: "java.lang.String" },
+						},
+					],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
+
+		it("should parse an abstract class with abstract methods", () => {
+			const javap = dedent`
+				Compiled from "AbstractProcessor.java"
+				public abstract class com.example.AbstractProcessor<T, R> {
+					protected final java.util.Logger logger;
+					public com.example.AbstractProcessor();
+					public abstract R process(T input);
+					public abstract boolean canProcess(T input);
+					protected final void logProcessing(T input);
+					public static <T> com.example.AbstractProcessor<T, java.lang.String> stringProcessor();
+				}
+			`;
+
+			expectOutput(javap, [
+				{
+					className: "AbstractProcessor",
+					modifiers: ["public", "abstract"],
+					interfaces: [],
+					typeParameters: [{ name: "T" }, { name: "R" }],
+					methods: [
+						{
+							name: "AbstractProcessor",
+							kind: "constructor",
+							returnType: {
+								kind: "class",
+								name: "com.example.AbstractProcessor",
+							},
+							modifiers: ["public"],
+							parameters: [],
+						},
+						{
+							name: "process",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "R",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [
+								{
+									name: "input",
+									type: {
+										kind: "class",
+										name: "T",
+									},
+								},
+							],
+						},
+						{
+							name: "canProcess",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "boolean",
+							},
+							modifiers: ["public", "abstract"],
+							parameters: [
+								{
+									name: "input",
+									type: {
+										kind: "class",
+										name: "T",
+									},
+								},
+							],
+						},
+						{
+							name: "logProcessing",
+							kind: "method",
+							returnType: {
+								kind: "primitive",
+								type: "void",
+							},
+							modifiers: ["protected", "final"],
+							parameters: [
+								{
+									name: "input",
+									type: {
+										kind: "class",
+										name: "T",
+									},
+								},
+							],
+						},
+						{
+							name: "stringProcessor",
+							kind: "method",
+							returnType: {
+								kind: "class",
+								name: "com.example.AbstractProcessor<T, java.lang.String>",
+							},
+							modifiers: ["public", "static"],
+							parameters: [],
+							typeParameters: [{ name: "T" }],
+						},
+					],
+					fields: [
+						{
+							name: "logger",
+							modifiers: ["protected", "final"],
+							type: { kind: "class", name: "java.util.Logger" },
+						},
+					],
+					isInterface: false,
+					packageName: "com.example",
+				},
+			]);
+		});
+	});
+
 	describe("descriptor handling", () => {
 		it("should preserve non-empty descriptors", () => {
 			const javap = dedent`
