@@ -1,12 +1,42 @@
 import { ClassInfo, JavaType } from "./parseJavap";
 
+const uppercaseFirst = (str: string) =>
+	str.charAt(0).toUpperCase() + str.slice(1);
+
+const encodeJavaClassName = (name: string) => {
+	return name.replace(/_/g, "__").replace(/\./g, "_");
+};
+
 export const javaTypeToTsType = (javaType: JavaType): string => {
 	if (javaType.kind === "primitive") {
-		return `JavaPrimitive<"${javaType.type}">`;
+		const typeMap = {
+			boolean: "boolean",
+			byte: "number", // ?? what should this be?
+			char: "number", // ?? what should this be?
+			double: "number",
+			float: "number",
+			int: "number",
+			long: "number",
+			short: "number",
+			void: "void",
+		};
+		return typeMap[javaType.type];
 	} else if (javaType.kind === "array") {
-		return `JavaArray<${javaTypeToTsType(javaType.type)}>`;
+		if (javaType.type.kind === "primitive") {
+			return `Java${uppercaseFirst(javaType.type.type)}Array<${
+				javaType.dimensions
+			}>`;
+		} else {
+			return `JavaArray<${javaTypeToTsType(javaType.type)}, ${
+				javaType.dimensions
+			}>`;
+		}
 	} else if (javaType.kind === "class") {
-		return `JavaClass<"${javaType.name}">`;
+		// Special case for java.lang.String -> string
+		if (javaType.name === "java.lang.String") {
+			return "string";
+		}
+		return `${encodeJavaClassName(javaType.name)}`;
 	} else {
 		throw new Error(`Unknown java type: ${JSON.stringify(javaType)}`);
 	}
@@ -43,17 +73,25 @@ export const genTsTypeFromClassInfo = (classInfo: ClassInfo): string => {
 					.join(", ")}): ${javaTypeToTsType(methodInfo.returnType)}`
 		);
 
-	const type = `declare class ${classInfo.className}${
+	const implementsClause =
+		` implements ` +
+		classInfo.interfaces.map((i) => encodeJavaClassName(i)).join(", ");
+
+	const type = `declare ${
+		classInfo.isInterface ? "interface" : "class"
+	} ${encodeJavaClassName(
+		`${classInfo.packageName}.${classInfo.className}`
+	)}${
 		classInfo.superClass
-			? ` extends JavaClass<"${classInfo.superClass}">`
+			? ` extends ${encodeJavaClassName(classInfo.superClass)}`
 			: ""
-	} implements ${classInfo.interfaces
-		.map((i) => `JavaClass<"${i}">`)
-		.join(", ")} {
+	}${classInfo.interfaces.length ? implementsClause : ""} {
 	${[...constructors, ...fields, ...methods].join(";\n\t")}
 	[_BRAND]: {
 		${[classInfo.className, ...classInfo.interfaces]
-			.map((interfaceName) => `"${interfaceName}": true`)
+			.map(
+				(interfaceName) => `${encodeJavaClassName(interfaceName)}: true`
+			)
 			.join(";\n\t\t")}
 	};
 }`;

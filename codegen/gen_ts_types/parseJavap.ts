@@ -66,6 +66,7 @@ export type ClassInfo = {
 	interfaces: string[];
 	methods: JavaMethod[];
 	fields: JavaField[];
+	isInterface?: boolean;
 };
 
 function parseJavaType(typeStr: string): JavaType {
@@ -110,15 +111,71 @@ function parseJavaType(typeStr: string): JavaType {
 function parseParameters(paramsStr: string): JavaMethodParameter[] {
 	if (!paramsStr.trim()) return [];
 
-	return paramsStr
-		.split(",")
-		.filter(Boolean)
-		.map((param) => {
-			const parts = param.trim().split(/\s+/);
-			return parts.length > 1
-				? { type: parseJavaType(parts[0]), name: parts[1] }
-				: { type: parseJavaType(parts[0]) };
-		});
+	// Handle generic types with commas inside them
+	// We need to parse parameters more carefully to handle generics
+	const params: JavaMethodParameter[] = [];
+	let currentParam = "";
+	let angleBracketDepth = 0;
+
+	// Split parameters respecting generic type boundaries
+	for (let i = 0; i < paramsStr.length; i++) {
+		const char = paramsStr[i];
+
+		if (char === "<") {
+			angleBracketDepth++;
+			currentParam += char;
+		} else if (char === ">") {
+			angleBracketDepth--;
+			currentParam += char;
+		} else if (char === "," && angleBracketDepth === 0) {
+			// Only split on commas outside of generic types
+			if (currentParam.trim()) {
+				params.push(parseParameter(currentParam.trim()));
+			}
+			currentParam = "";
+		} else {
+			currentParam += char;
+		}
+	}
+
+	// Add the last parameter
+	if (currentParam.trim()) {
+		params.push(parseParameter(currentParam.trim()));
+	}
+
+	return params;
+}
+
+function parseParameter(paramStr: string): JavaMethodParameter {
+	// For complex generic types, we need to find the last space that's outside generic brackets
+	// This separates the type from the parameter name
+	let lastOutsideSpace = -1;
+	let angleBracketDepth = 0;
+
+	for (let i = 0; i < paramStr.length; i++) {
+		const char = paramStr[i];
+
+		if (char === "<") {
+			angleBracketDepth++;
+		} else if (char === ">") {
+			angleBracketDepth--;
+		} else if (char === " " && angleBracketDepth === 0) {
+			lastOutsideSpace = i;
+		}
+	}
+
+	// If we found a space outside generic brackets
+	if (lastOutsideSpace !== -1) {
+		const typeStr = paramStr.substring(0, lastOutsideSpace).trim();
+		const nameStr = paramStr.substring(lastOutsideSpace + 1).trim();
+		return {
+			type: parseJavaType(typeStr),
+			name: nameStr,
+		};
+	}
+
+	// No space found, the whole string is the type
+	return { type: parseJavaType(paramStr.trim()) };
 }
 
 /**
@@ -132,6 +189,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 		interfaces: [],
 		methods: [],
 		fields: [],
+		isInterface: false,
 	});
 	let result: ClassInfo = null as never;
 	const results: ClassInfo[] = [];
@@ -149,9 +207,53 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			continue;
 		}
 
-		if (currentSection === "class" && line.includes("class")) {
+		// Handle interface declaration
+		const interfaceMatch = line.match(
+			/^((?:public |private |protected |abstract )*)?interface\s+([^\s{]+)(?:\s+extends\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?\s*\{?/
+		);
+		if (interfaceMatch) {
+			const [, modifiersStr, fullInterfaceName, extendedInterfaces] =
+				interfaceMatch;
+
+			// Handle package and interface name
+			const lastDotIndex = fullInterfaceName.lastIndexOf(".");
+			if (lastDotIndex !== -1) {
+				result.packageName = fullInterfaceName.substring(
+					0,
+					lastDotIndex
+				);
+				result.className = fullInterfaceName.substring(
+					lastDotIndex + 1
+				);
+			} else {
+				result.className = fullInterfaceName;
+			}
+			currentClassName = result.className;
+
+			// Set isInterface flag
+			result.isInterface = true;
+
+			// Handle modifiers
+			if (modifiersStr) {
+				result.modifiers = modifiersStr
+					.trim()
+					.split(" ")
+					.filter(Boolean) as JavaModifier[];
+			}
+
+			// Handle extended interfaces
+			if (extendedInterfaces) {
+				result.interfaces = extendedInterfaces
+					.split(",")
+					.map((i) => i.trim());
+			}
+			continue;
+		}
+
+		// Handle class declaration - check this after interface to avoid mismatches
+		if (line.match(/\bclass\b/)) {
 			const classMatch = line.match(
-				/^((?:public |final |abstract )*)?class\s+(\S+)\s+(?:extends\s+(\S+)\s+)?(?:implements\s+(\S+)\s+)?\{/
+				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s{]+)(?:\s+extends\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?(?:\s+implements\s+([^\s{]+(?:\s*,\s*[^\s{]+)*))?\s*\{?/
 			);
 			if (classMatch) {
 				const [
@@ -187,7 +289,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 				// Handle superclass
 				if (superClass) {
-					result.superClass = superClass;
+					result.superClass = superClass.trim();
 				}
 
 				// Handle interfaces
@@ -205,16 +307,37 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+.+)?;\s*(?:\/\/\s*(.+))?$/
 		);
 		if (methodMatch) {
-			const [, modifiersStr, returnType, name, paramsStr, descriptor] =
-				methodMatch;
+			const [
+				,
+				modifiersStr,
+				returnType,
+				fullName,
+				paramsStr,
+				descriptor,
+			] = methodMatch;
 
-			const isConstructor = name === currentClassName;
+			// Extract simple name from fully qualified name
+			let name = fullName;
+			const lastDotIndex = fullName.lastIndexOf(".");
+			if (lastDotIndex !== -1) {
+				name = fullName.substring(lastDotIndex + 1);
+			}
+
+			// Check if this is a constructor by looking at the simple names
+			const isConstructor =
+				name === result.className ||
+				(!returnType && name === result.className);
 
 			const method: JavaMethod = {
-				name,
+				name, // Use the simple name, not the fully qualified name
 				kind: isConstructor ? "constructor" : "method",
 				returnType: isConstructor
-					? { kind: "class", name: currentClassName }
+					? {
+							kind: "class",
+							name: result.packageName
+								? `${result.packageName}.${result.className}`
+								: result.className,
+					  }
 					: returnType
 					? parseJavaType(returnType)
 					: { kind: "primitive", type: "void" },

@@ -9,48 +9,38 @@
 import { javap } from "./javap";
 import { parseJavap } from "./parseJavap";
 import { genTsTypeFromClassInfo } from "./genTsType";
-
+import fs from "node:fs";
 const fileToProcess = "test_files/Example.class";
 
 // const javapOutput = javap(fileToProcess);
 
 const javapOutput = `
-Compiled from "Conway2D.java"
-public class Conway2D {
-  public static GameOfLife game;
-  public Conway2D();
-  public static void main(java.lang.String[]);
-  public static java.lang.String enjoyment();
-  public static java.lang.String step();
-}
-Compiled from "Conway2D.java"
-class GameOfLife {
-  public GameOfLife();
-  public GameOfLife(int, int);
-  public void iterate();
-  public void randomSeed();
-  public byte[] getData();
-}
-
-Compiled from "FtpClient.java"
-class sun.net.ftp.impl.FtpClient$MLSxParser implements sun.net.ftp.FtpDirParser {
-  public sun.net.ftp.FtpDirEntry parseLine(java.lang.String);
-}
-
-Compiled from "LauncherHelper.java"
-final class sun.launcher.LauncherHelper$SizePrefix extends java.lang.Enum<sun.launcher.LauncherHelper$SizePrefix> {
-  public static final sun.launcher.LauncherHelper$SizePrefix KILO;
-  public static final sun.launcher.LauncherHelper$SizePrefix MEGA;
-  public static final sun.launcher.LauncherHelper$SizePrefix GIGA;
-  public static final sun.launcher.LauncherHelper$SizePrefix TERA;
-  public static sun.launcher.LauncherHelper$SizePrefix[] values();
-  public static sun.launcher.LauncherHelper$SizePrefix valueOf(java.lang.String);
+Compiled from "FileURLConnection.java"
+public class sun.net.www.protocol.file.FileURLConnection extends sun.net.www.URLConnection {
+  public void connect() throws java.io.IOException;
+  public synchronized void closeInputStream() throws java.io.IOException;
+  public java.util.Map<java.lang.String, java.util.List<java.lang.String>> getHeaderFields();
+  public java.lang.String getHeaderField(java.lang.String);
+  public java.lang.String getHeaderField(int);
+  public int getContentLength();
+  public long getContentLengthLong();
+  public java.lang.String getHeaderFieldKey(int);
+  public sun.net.www.MessageHeader getProperties();
+  public long getLastModified();
+  public synchronized java.io.InputStream getInputStream() throws java.io.IOException;
+  public java.security.Permission getPermission() throws java.io.IOException;
 }
 `;
+
+// const javapOutput = fs.readFileSync("DUMP.txt", "utf-8");
 
 const classesInfo = parseJavap(javapOutput);
 
 const tsTypes = classesInfo.map(genTsTypeFromClassInfo).join("\n\n");
 
+console.log(javapOutput);
 console.log(classesInfo);
-console.log(tsTypes);
+// console.log(tsTypes);
+
+fs.writeFileSync("DUMP.ts", tsTypes);
+fs.writeFileSync("DUMP.json", JSON.stringify(classesInfo, null, "\t"));
