@@ -15,20 +15,10 @@ const fileToProcess = "test_files/Example.class";
 // const javapOutput = javap(fileToProcess);
 
 const javapOutput = `
-Compiled from "FileURLConnection.java"
-public class sun.net.www.protocol.file.FileURLConnection extends sun.net.www.URLConnection {
-  public void connect() throws java.io.IOException;
-  public synchronized void closeInputStream() throws java.io.IOException;
-  public java.util.Map<java.lang.String, java.util.List<java.lang.String>> getHeaderFields();
-  public java.lang.String getHeaderField(java.lang.String);
-  public java.lang.String getHeaderField(int);
-  public int getContentLength();
-  public long getContentLengthLong();
-  public java.lang.String getHeaderFieldKey(int);
-  public sun.net.www.MessageHeader getProperties();
-  public long getLastModified();
-  public synchronized java.io.InputStream getInputStream() throws java.io.IOException;
-  public java.security.Permission getPermission() throws java.io.IOException;
+Compiled from "Simple.java"
+public class com.example.Simple {
+  public com.example.Simple();
+  public void simpleMethod();
 }
 `;
 

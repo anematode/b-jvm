@@ -1,170 +1,30 @@
 [
 	{
-		"className": "FileURLConnection",
+		"className": "Simple",
 		"modifiers": [
 			"public"
 		],
 		"interfaces": [],
 		"methods": [
 			{
-				"name": "connect",
+				"name": "Simple",
+				"kind": "constructor",
+				"returnType": {
+					"kind": "class",
+					"name": "com.example.Simple"
+				},
+				"modifiers": [
+					"public"
+				],
+				"parameters": [],
+				"descriptor": ""
+			},
+			{
+				"name": "simpleMethod",
 				"kind": "method",
 				"returnType": {
 					"kind": "primitive",
 					"type": "void"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "closeInputStream",
-				"kind": "method",
-				"returnType": {
-					"kind": "primitive",
-					"type": "void"
-				},
-				"modifiers": [
-					"public",
-					"synchronized"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getHeaderField",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "java.lang.String"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [
-					{
-						"type": {
-							"kind": "class",
-							"name": "java.lang.String"
-						}
-					}
-				],
-				"descriptor": ""
-			},
-			{
-				"name": "getHeaderField",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "java.lang.String"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [
-					{
-						"type": {
-							"kind": "primitive",
-							"type": "int"
-						}
-					}
-				],
-				"descriptor": ""
-			},
-			{
-				"name": "getContentLength",
-				"kind": "method",
-				"returnType": {
-					"kind": "primitive",
-					"type": "int"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getContentLengthLong",
-				"kind": "method",
-				"returnType": {
-					"kind": "primitive",
-					"type": "long"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getHeaderFieldKey",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "java.lang.String"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [
-					{
-						"type": {
-							"kind": "primitive",
-							"type": "int"
-						}
-					}
-				],
-				"descriptor": ""
-			},
-			{
-				"name": "getProperties",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "sun.net.www.MessageHeader"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getLastModified",
-				"kind": "method",
-				"returnType": {
-					"kind": "primitive",
-					"type": "long"
-				},
-				"modifiers": [
-					"public"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getInputStream",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "java.io.InputStream"
-				},
-				"modifiers": [
-					"public",
-					"synchronized"
-				],
-				"parameters": [],
-				"descriptor": ""
-			},
-			{
-				"name": "getPermission",
-				"kind": "method",
-				"returnType": {
-					"kind": "class",
-					"name": "java.security.Permission"
 				},
 				"modifiers": [
 					"public"
@@ -175,7 +35,6 @@
 		],
 		"fields": [],
 		"isInterface": false,
-		"packageName": "sun.net.www.protocol.file",
-		"superClass": "sun.net.www.URLConnection"
+		"packageName": "com.example"
 	}
 ]
