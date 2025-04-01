@@ -755,6 +755,7 @@ describe("parseJavap", () => {
 								},
 							],
 							descriptor: "",
+							typeParameters: [{ name: "T" }],
 						},
 						{
 							name: "mixedParams",
@@ -817,6 +818,10 @@ describe("parseJavap", () => {
 					className: "GenericExample",
 					modifiers: ["public"],
 					interfaces: [],
+					typeParameters: [
+						{ name: "T" },
+						{ name: "R", bounds: ["java.io.Serializable"] },
+					],
 					methods: [
 						{
 							name: "GenericExample",
@@ -865,6 +870,7 @@ describe("parseJavap", () => {
 								},
 							],
 							descriptor: "",
+							typeParameters: [{ name: "U" }],
 						},
 						{
 							name: "createMap",
@@ -891,6 +897,13 @@ describe("parseJavap", () => {
 								},
 							],
 							descriptor: "",
+							typeParameters: [
+								{ name: "K" },
+								{
+									name: "V",
+									bounds: ["java.lang.Comparable<V>"],
+								},
+							],
 						},
 						{
 							name: "withException",
@@ -903,6 +916,9 @@ describe("parseJavap", () => {
 							parameters: [],
 							descriptor: "",
 							throws: ["E"],
+							typeParameters: [
+								{ name: "E", bounds: ["java.lang.Exception"] },
+							],
 						},
 						{
 							name: "getItems",

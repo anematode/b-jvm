@@ -47,6 +47,17 @@ export type JavaMethodParameter = {
 	isVarargs?: boolean;
 };
 
+/**
+ * Represents a type parameter in a generic class or method
+ * e.g., 'T', 'E extends Exception', 'K extends Comparable<K>'
+ */
+export type TypeParameter = {
+	/** The name of the type parameter (e.g., 'T', 'E', 'K') */
+	name: string;
+	/** The bounds of the type parameter, if any (e.g., 'Comparable<T>', 'Exception') */
+	bounds?: string[];
+};
+
 export type JavaMethodKind = "constructor" | "method";
 
 export type JavaMethod = {
@@ -57,6 +68,8 @@ export type JavaMethod = {
 	parameters: JavaMethodParameter[];
 	descriptor: string;
 	throws?: string[];
+	/** Type parameters for generic methods, e.g., '<T>' or '<K, V extends Comparable<V>>' */
+	typeParameters?: TypeParameter[];
 };
 
 export type JavaField = {
@@ -75,6 +88,8 @@ export type ClassInfo = {
 	methods: JavaMethod[];
 	fields: JavaField[];
 	isInterface?: boolean;
+	/** Type parameters for generic classes, e.g., '<T>' or '<K, V extends Comparable<V>>' */
+	typeParameters?: TypeParameter[];
 };
 
 function parseJavaType(typeStr: string): JavaType {
@@ -251,6 +266,69 @@ function parseCommaSeparatedList(str: string): string[] {
 }
 
 /**
+ * Parse type parameters from a string like '<T>', '<K, V>', or '<E extends Exception>'
+ * @param typeParamsStr The string containing type parameters, including angle brackets
+ * @returns Array of TypeParameter objects
+ */
+function parseTypeParameters(typeParamsStr: string): TypeParameter[] {
+	if (!typeParamsStr || typeParamsStr.length < 3) return []; // Need at least '<T>'
+
+	// Strip the outer angle brackets
+	const content = typeParamsStr.substring(1, typeParamsStr.length - 1);
+
+	const typeParams: TypeParameter[] = [];
+	let currentParam = "";
+	let angleBracketDepth = 0;
+
+	// Parse each type parameter, being careful with nested angle brackets
+	for (let i = 0; i < content.length; i++) {
+		const char = content[i];
+
+		if (char === "<") {
+			angleBracketDepth++;
+			currentParam += char;
+		} else if (char === ">") {
+			angleBracketDepth--;
+			currentParam += char;
+		} else if (char === "," && angleBracketDepth === 0) {
+			// Only split on commas outside of nested angle brackets
+			if (currentParam.trim()) {
+				typeParams.push(parseTypeParameter(currentParam.trim()));
+			}
+			currentParam = "";
+		} else {
+			currentParam += char;
+		}
+	}
+
+	// Don't forget the last parameter
+	if (currentParam.trim()) {
+		typeParams.push(parseTypeParameter(currentParam.trim()));
+	}
+
+	return typeParams;
+}
+
+/**
+ * Parse a single type parameter like 'T' or 'E extends Exception'
+ * @param paramStr String representation of the type parameter
+ * @returns TypeParameter object
+ */
+function parseTypeParameter(paramStr: string): TypeParameter {
+	const parts = paramStr.split(/\s+extends\s+/);
+	const name = parts[0].trim();
+
+	if (parts.length > 1) {
+		// Has bounds (e.g., 'E extends Exception' or 'K extends Comparable<K>')
+		const boundsStr = parts.slice(1).join(" extends ");
+		const bounds = boundsStr.split(/\s*&\s*/); // Handle multiple bounds with &
+		return { name, bounds };
+	}
+
+	return { name };
+}
+
+/**
  * Parses a string of javap output and returns a structured representation
  */
 export function parseJavap(javapOutputString: string): ClassInfo[] {
@@ -323,13 +401,19 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 		// Handle class declaration - check this after interface to avoid mismatches
 		if (line.match(/\bclass\b/)) {
 			// First, try to extract the basic parts of the class declaration
+			// This improved regex captures the generic type parameters separately
 			const classDeclarationParts = line.match(
-				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s<{]+)(?:<[^>]+>)?(.*)$/
+				/^((?:public |private |protected |final |abstract )*)?class\s+([^\s<{]+)(?:(<[^>]+>))?(.*)$/
 			);
 
 			if (classDeclarationParts) {
-				const [, modifiersStr, fullClassName, remainingDeclaration] =
-					classDeclarationParts;
+				const [
+					,
+					modifiersStr,
+					fullClassName,
+					typeParamsStr,
+					remainingDeclaration,
+				] = classDeclarationParts;
 
 				// Handle package and class name
 				const lastDotIndex = fullClassName.lastIndexOf(".");
@@ -352,6 +436,11 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 						.trim()
 						.split(" ")
 						.filter(Boolean) as JavaModifier[];
+				}
+
+				// Parse type parameters if present
+				if (typeParamsStr) {
+					result.typeParameters = parseTypeParameters(typeParamsStr);
 				}
 
 				// Now, separately handle extends and implements clauses
@@ -424,12 +513,12 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 		// Then try to match generic method declarations
 		// First, try with complex generic type parameters with bounds
 		const methodComplexGenericMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<.*?extends.*?>\s+)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:(<.*?extends.*?>)\s+)(\S+(?:<[^>]+>)?)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
 
 		// Then try simpler generic methods
 		const methodGenericMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:<(.+?)>\s+)(\S+)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)(?:(<.+?>)\s+)(\S+)\s+(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
 
 		// And regular method declarations
@@ -442,6 +531,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			const [
 				,
 				modifiersStr,
+				typeParamsStr,
 				returnType,
 				fullName,
 				paramsStr,
@@ -470,6 +560,11 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				descriptor: descriptor || "",
 			};
 
+			// Parse type parameters
+			if (typeParamsStr) {
+				method.typeParameters = parseTypeParameters(typeParamsStr);
+			}
+
 			// Parse throws clause if present
 			if (throwsStr) {
 				method.throws = parseCommaSeparatedList(throwsStr);
@@ -482,7 +577,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 			const [
 				,
 				modifiersStr,
-				,
+				typeParamsStr,
 				returnType,
 				fullName,
 				paramsStr,
@@ -510,6 +605,11 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				parameters: parseParameters(paramsStr),
 				descriptor: descriptor || "",
 			};
+
+			// Parse type parameters
+			if (typeParamsStr) {
+				method.typeParameters = parseTypeParameters(typeParamsStr);
+			}
 
 			// Parse throws clause if present
 			if (throwsStr) {
