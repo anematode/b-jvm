@@ -182,11 +182,11 @@ function parseParameter(paramStr: string): JavaMethodParameter {
 /**
  * Helper function to parse interfaces from an implements clause
  */
-function parseInterfaces(interfacesStr: string): string[] {
-	if (!interfacesStr) return [];
+function parseCommaSeparatedList(str: string): string[] {
+	if (!str) return [];
 
 	// Clean up the string and split by commas
-	return interfacesStr
+	return str
 		.trim()
 		.split(/\s*,\s*/)
 		.map((intf) => intf.trim())
@@ -258,7 +258,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 			// Handle extended interfaces
 			if (extendedInterfaces) {
-				result.interfaces = parseInterfaces(extendedInterfaces);
+				result.interfaces = parseCommaSeparatedList(extendedInterfaces);
 			}
 			continue;
 		}
@@ -310,7 +310,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				);
 				if (implementsMatch) {
 					const implementsStr = implementsMatch[1].trim();
-					result.interfaces = parseInterfaces(implementsStr);
+					result.interfaces = parseCommaSeparatedList(implementsStr);
 				}
 			}
 			continue;
@@ -368,7 +368,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 			// Parse throws clause if present
 			if (throwsStr) {
-				method.throws = parseInterfaces(throwsStr);
+				method.throws = parseCommaSeparatedList(throwsStr);
 			}
 
 			result.methods.push(method);
