@@ -318,7 +318,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 
 		// Parse methods and constructors
 		const methodMatch = line.match(
-			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+.+)?;\s*(?:\/\/\s*(.+))?$/
+			/^\s*((?:public |private |protected |static |final |synchronized |abstract )*)?(?:(\S+)\s+)?(\S+)\((.*?)\)(?:\s+throws\s+(.+?))?;\s*(?:\/\/\s*(.+))?$/
 		);
 		if (methodMatch) {
 			const [
@@ -327,6 +327,7 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				returnType,
 				fullName,
 				paramsStr,
+				throwsStr,
 				descriptor,
 			] = methodMatch;
 
@@ -364,6 +365,11 @@ export function parseJavap(javapOutputString: string): ClassInfo[] {
 				parameters: parseParameters(paramsStr),
 				descriptor: descriptor || "",
 			};
+
+			// Parse throws clause if present
+			if (throwsStr) {
+				method.throws = parseInterfaces(throwsStr);
+			}
 
 			result.methods.push(method);
 			continue;
