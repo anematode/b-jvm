@@ -159,7 +159,7 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, addressSize, "()I") { return (stack_
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateMemory0, "(J)J") {
   DCHECK(argc == 1);
   void *l = malloc(args[0].l);
-  arrput(thread->vm->unsafe_allocations, l);
+  add_unsafe_allocation(thread->vm, l);
   return (stack_value){.l = (s64)l};
 }
 
@@ -172,8 +172,8 @@ DECLARE_NATIVE("jdk/internal/misc", Unsafe, allocateInstance, "(Ljava/lang/Class
 
 DECLARE_NATIVE("jdk/internal/misc", Unsafe, freeMemory0, "(J)V") {
   DCHECK(argc == 1);
-  free((void *)args[0].l);
-  remove_unsafe_allocation(thread->vm, (void *)args[0].l);
+  const bool found = remove_unsafe_allocation(thread->vm, (void *) args[0].l);
+  if (found) free((void *) args[0].l);
   return value_null();
 }
 

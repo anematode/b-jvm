@@ -497,12 +497,14 @@ typedef struct vm {
 
   s64 next_thread_id; // MUST BE 64 BITS
 
-  // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
-  // the finalizers aren't run
-  void **unsafe_allocations;
-
-  // Vector of allocations done via mmap, to be unmapped
-  mmap_allocation *mmap_allocations;
+  struct {
+    // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
+    // the finalizers aren't run
+    void **unsafe_allocations;
+    // Vector of allocations done via mmap, to be unmapped
+    mmap_allocation *mmap_allocations;
+    pthread_mutex_t lock;
+  } allocations;
 
   // Vector of z_streams, to be freed
   void **z_streams; // z_stream **
@@ -518,7 +520,13 @@ typedef struct vm {
 } vm;
 
 struct cached_classdescs *cached_classes(vm *vm);
-void remove_unsafe_allocation(vm *vm, void *allocation);
+void add_unsafe_allocation(vm *vm, void *allocation);
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_unsafe_allocation(vm *vm, void *allocation);
+
+void add_mmap_allocation(vm *vm, mmap_allocation allocation);
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_mmap_allocation(vm *vm, mmap_allocation allocation);
 classloader *get_current_classloader(vm_thread *thread);
 
 // Java Module

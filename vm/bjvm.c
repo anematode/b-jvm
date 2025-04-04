@@ -651,6 +651,10 @@ vm *create_vm(const vm_options options) {
   vm->reference_pending_list = nullptr;
   vm->should_gc_pause = false;
 
+  pthread_mutex_init(&vm->allocations.lock, nullptr); // todo: check return values?
+  vm->allocations.mmap_allocations = nullptr;
+  vm->allocations.unsafe_allocations = nullptr;
+
   for (size_t i = 0; i < bjvm_natives_count; ++i) {
     native_t const *native_ptr = bjvm_natives[i];
     register_native(vm, native_ptr->class_path, native_ptr->method_name, native_ptr->method_descriptor,
@@ -662,27 +666,62 @@ vm *create_vm(const vm_options options) {
   return vm;
 }
 
-void remove_unsafe_allocation(vm *vm, void *allocation) {
-  void **unsafe_allocations = vm->unsafe_allocations;
+void add_unsafe_allocation(vm *vm, void *allocation) {
+  pthread_mutex_lock(&vm->allocations.lock);
+  void **unsafe_allocations = vm->allocations.unsafe_allocations;
+  arrput(unsafe_allocations, allocation);
+  pthread_mutex_unlock(&vm->allocations.lock);
+}
+
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_unsafe_allocation(vm *vm, void *allocation) {
+  pthread_mutex_lock(&vm->allocations.lock);
+  void **unsafe_allocations = vm->allocations.unsafe_allocations;
   for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
     if (unsafe_allocations[i] == allocation) {
       arrdelswap(unsafe_allocations, i);
-      return;
+      pthread_mutex_unlock(&vm->allocations.lock);
+      return true;
     }
   }
-  CHECK(false);
+  pthread_mutex_unlock(&vm->allocations.lock);
+  return false;
+}
+
+void add_mmap_allocation(vm *vm, const mmap_allocation allocation) {
+  pthread_mutex_lock(&vm->allocations.lock);
+  mmap_allocation *mmap_allocations = vm->allocations.mmap_allocations;
+  arrput(mmap_allocations, allocation);
+  pthread_mutex_unlock(&vm->allocations.lock);
+}
+
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_mmap_allocation(vm *vm, const mmap_allocation allocation) {
+  pthread_mutex_lock(&vm->allocations.lock);
+  mmap_allocation *mmap_allocations = vm->allocations.mmap_allocations;
+  for (int i = 0; i < arrlen(mmap_allocations); ++i) {
+    if (mmap_allocations[i].ptr == allocation.ptr) { // surely this is a strong enough equality test
+      arrdelswap(mmap_allocations, i);
+      pthread_mutex_unlock(&vm->allocations.lock);
+      return true;
+    }
+  }
+  pthread_mutex_unlock(&vm->allocations.lock);
+  return false;
 }
 
 void free_unsafe_allocations(vm *vm) {
-  for (int i = 0; i < arrlen(vm->unsafe_allocations); ++i) {
-    free(vm->unsafe_allocations[i]);
+  pthread_mutex_lock(&vm->allocations.lock);
+  for (int i = 0; i < arrlen(vm->allocations.unsafe_allocations); ++i) {
+    free(vm->allocations.unsafe_allocations[i]);
   }
-  for (int i = 0; i < arrlen(vm->mmap_allocations); ++i) {
-    mmap_allocation A = vm->mmap_allocations[i];
+  for (int i = 0; i < arrlen(vm->allocations.mmap_allocations); ++i) {
+    mmap_allocation A = vm->allocations.mmap_allocations[i];
     munmap(A.ptr, A.len);
   }
-  arrfree(vm->mmap_allocations);
-  arrfree(vm->unsafe_allocations);
+  arrfree(vm->allocations.mmap_allocations);
+  arrfree(vm->allocations.unsafe_allocations);
+  pthread_mutex_unlock(&vm->allocations.lock);
 }
 
 void free_zstreams(vm *vm) {
@@ -724,6 +763,7 @@ void free_vm(vm *vm) {
   arrfree(vm->active_threads);
   free(vm->heap.heap);
   free_unsafe_allocations(vm);
+  pthread_mutex_destroy(&vm->allocations.lock);
   free_zstreams(vm);
 
   free(vm);
@@ -2720,15 +2760,14 @@ DEFINE_ASYNC(run_native) {
   }
 
   self->native_struct = malloc(hand->async_ctx_bytes);
-  // todo: commenting out the unsafe allocation stuff causes mallocations to not be tracked down
-//  arrput(thread->vm->unsafe_allocations, self->native_struct);
+  add_unsafe_allocation(thread->vm, self->native_struct);
 
   *self->native_struct = (async_natives_args){{thread, target_handle, native_args, argc}, 0};
   AWAIT_FUTURE_EXPR(((native_callback *)frame->method->native_handle)->async(self->native_struct));
   // We've laid out the context struct so that the result is always at offset 0
-  stack_value result = ((async_natives_args *)self->native_struct)->result;
-  free(self->native_struct);
-//  remove_unsafe_allocation(thread->vm, self->native_struct);
+  const stack_value result = ((async_natives_args *)self->native_struct)->result;
+  const bool found = remove_unsafe_allocation(thread->vm, self->native_struct);
+  if (found) free(self->native_struct);
 
   ASYNC_END(result);
 
