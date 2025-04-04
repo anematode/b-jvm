@@ -37,7 +37,7 @@ cp_entry *check_cp_entry(cp_entry *entry, cp_kind expected_kinds, const char *re
  */
 typedef enum : u8 {
   /** No operands */
-  insn_nop, // stack polymorphic
+  insn_nop,
 
   insn_aaload,
   insn_aastore,
@@ -146,7 +146,6 @@ typedef enum : u8 {
   insn_invokespecial,
   insn_invokestatic,
   insn_ldc,
-  insn_ldc2_w,
 
   /** Indexes into local variable table */
   insn_dload,
@@ -313,14 +312,12 @@ typedef enum {
   CD_STATE_INITIALIZED = 4
 } classdesc_state;
 
-typedef struct classdesc classdesc;
 typedef struct bootstrap_method bootstrap_method;
 
 typedef struct {
   classdesc *classdesc;
   slice name;
-
-  void *vm_object; // linkage error (todo) or resolved class
+  void *vm_object; // linkage error (todo) or resolved Class object
 } cp_class_info;
 
 typedef struct cp_name_and_type {
@@ -331,7 +328,7 @@ typedef struct cp_name_and_type {
 struct field_descriptor {
   // Base kind (e.g. B for [B, I for [[I, Ljava/lang/String; for Ljava/lang/String;)
   type_kind base_kind;
-  // Representable kind (e.g. REFERENCE for [B
+  // Representable kind (e.g. REFERENCE for [B)
   type_kind repr_kind;
   // Can be nonzero for any kind
   int dimensions;
@@ -367,14 +364,13 @@ typedef struct {
 } cp_string_info;
 
 typedef struct {
-  // Sign-extended if original entry was an Integer
-  s64 value;
-} cp_integral_info;
-
-typedef struct {
-  // Value-extended if original entry was a Float
-  double value;
-} cp_floating_info;
+  union {
+    // Sign-extended if original entry was an Integer
+    s64 ivalue;
+    // Value-extended if original entry was a Float
+    double dvalue;
+  };
+} cp_number_info;
 
 typedef enum {
   MH_KIND_GET_FIELD = 1,
@@ -416,7 +412,7 @@ typedef struct {
 typedef struct {
   union {
     bootstrap_method *method;
-    u16 _method_index; // used only when parsing, linked later
+    u16 _method_index; // used only when parsing, linked later in link_bootstrap_methods
   };
   cp_name_and_type *name_and_type;
   method_descriptor *method_descriptor;
@@ -447,10 +443,6 @@ enum cp_kind : u32 {
   CP_KIND_LAST = 1 << 16
 };
 
-static inline bool cp_kind_is_primitive(cp_kind kind) {
-  return kind == CP_KIND_INTEGER || kind == CP_KIND_FLOAT || kind == CP_KIND_LONG || kind == CP_KIND_DOUBLE;
-}
-
 typedef struct cp_entry {
   cp_kind kind;
   // Index of this entry within the constant pool
@@ -460,8 +452,7 @@ typedef struct cp_entry {
     slice utf8;
     cp_string_info string;
 
-    cp_floating_info floating;
-    cp_integral_info integral;
+    cp_number_info number;
 
     cp_name_and_type name_and_type;
     cp_class_info class_info;
@@ -527,8 +518,8 @@ typedef enum {
 
 typedef struct method_descriptor {
   field_descriptor *args;
-  int args_count;
   field_descriptor return_type;
+  int args_count;
 } method_descriptor;
 
 typedef struct {
@@ -842,32 +833,31 @@ typedef struct classloader classloader;
 // Class descriptor. (Roughly equivalent to HotSpot's InstanceKlass)
 typedef struct classdesc {
   classdesc_kind kind;
-  bool is_hidden;  // whether this is a hidden class (added in Java 15)
   classdesc_state state; // guarded by lock
   constant_pool *pool; // guarded by lock
 
   pthread_mutex_t lock; // protects classdesc state
 
-  access_flags access_flags;
   slice name;
   cp_class_info *self;
   cp_class_info *super_class;
   cp_class_info *nest_host;
 
-  int interfaces_count;
+  u16 interfaces_count;
+  u16 fields_count;
+  u16 methods_count;
+  u16 attributes_count;
+  access_flags access_flags;
+  u8 dimensions;  // array types only
+  bool is_hidden; // whether this is a hidden class (added in Java 15)
+
   cp_class_info **interfaces;
-
-  int fields_count;
   cp_field *fields;
-
-  int methods_count;
   cp_method *methods;
 
-  attribute_bootstrap_methods *bootstrap_methods;
   attribute_source_file *source_file;
   attribute_inner_classes *inner_classes;
 
-  int attributes_count;
   attribute *attributes;
   classdesc *array_type; // lazily initialized; synchronized access
 
@@ -887,9 +877,9 @@ typedef struct classdesc {
   classdesc *one_fewer_dim; // NULL for non-array types
   classdesc *base_component;
 
-  int dimensions;                // array types only
   type_kind primitive_component; // primitives and array types only
 
+  int indy_insns_count;
   bytecode_insn **indy_insns;    // used to get GC roots to CallSites
 
   module *module;
@@ -900,12 +890,11 @@ typedef struct classdesc {
   itables itables;
 
   classdesc **hierarchy; // 0 = java/lang/Object, etc. Used for fast instanceof checks
-  int hierarchy_len;
-
-  arena arena; // most things are allocated in here
+  s32 hierarchy_len;
 
   // The tid of the thread which is initializing this class
   s32 initializing_thread; // protected by lock
+  arena arena; // most things are allocated in here
 } classdesc;
 
 heap_string insn_to_string(const bytecode_insn *insn, int insn_index);

@@ -27,7 +27,7 @@ DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getIntAt0, "(Ljava/lang/Obj
   if (!entry) {
     return (stack_value){.obj = nullptr};
   }
-  return (stack_value){.i = (int)entry->integral.value};
+  return (stack_value){.i = (int)entry->number.ivalue};
 }
 
 DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getDoubleAt0, "(Ljava/lang/Object;I)D") {
@@ -35,7 +35,15 @@ DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getDoubleAt0, "(Ljava/lang/
   if (!entry) {
     return (stack_value){.obj = nullptr};
   }
-  return (stack_value){.d = entry->floating.value};
+  return (stack_value){.d = entry->number.dvalue};
+}
+
+DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getFloatAt0, "(Ljava/lang/Object;I)F") {
+  cp_entry *entry = lookup_entry(obj->obj, args[1].i, CP_KIND_FLOAT);
+  if (!entry) {
+    return (stack_value){.obj = nullptr};
+  }
+  return (stack_value){.f = (float)entry->number.dvalue};
 }
 
 DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getLongAt0, "(Ljava/lang/Object;I)J") {
@@ -43,5 +51,5 @@ DECLARE_NATIVE("jdk/internal/reflect", ConstantPool, getLongAt0, "(Ljava/lang/Ob
   if (!entry) {
     return (stack_value){.obj = nullptr};
   }
-  return (stack_value){.l = entry->integral.value};
+  return (stack_value){.l = entry->number.ivalue};
 }

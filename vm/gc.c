@@ -25,7 +25,7 @@ typedef struct gc_ctx {
 } gc_ctx;
 
 int in_heap(const vm *vm, object field) {
-  return (u8 *)field >= vm->heap.heap && (u8 *)field < vm->heap.heap + vm->heap.true_heap_capacity;
+  return (u8 *)field >= vm->heap.heap && (u8 *)field < vm->heap.heap + vm->heap.heap_capacity;
 }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
@@ -91,7 +91,7 @@ static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
   }
 
   // Push all CallSite objects
-  for (int i = 0; i < arrlen(desc->indy_insns); ++i) {
+  for (int i = 0; i < desc->indy_insns_count; ++i) {
     bytecode_insn *insn = desc->indy_insns[i];
     PUSH_ROOT(&insn->ic);
   }
@@ -267,7 +267,7 @@ static void mark_reachable(gc_ctx *ctx, object obj) {
   } else if (desc->kind == CD_KIND_ORDINARY_ARRAY || (desc->kind == CD_KIND_PRIMITIVE_ARRAY && desc->dimensions > 1)) {
     // Visit all components
     int arr_len = ArrayLength(obj);
-    for (size_t i = 0; i < (size_t)arr_len; ++i) {
+    for (int i = 0; i < arr_len; ++i) {
       object arr_element = ReferenceArrayLoad(obj, i);
       if (arr_element && in_heap(ctx->vm, arr_element) && !(*get_flags(ctx->vm, arr_element) & IS_REACHABLE)) {
         *get_flags(ctx->vm, arr_element) |= IS_REACHABLE;
@@ -287,10 +287,10 @@ size_t size_of_object(object obj) {
   return kArrayDataOffset + ArrayLength(obj) * sizeof_type_kind(obj->descriptor->primitive_component);
 }
 
-[[maybe_unused]] static void **binary_search_for_pointer(void *ptr, void **ptrs, s64 count) {
-  s64 low = 0, high = count - 1;
+[[maybe_unused]] static void **binary_search_for_pointer(void *ptr, void **ptrs, size_t count) {
+  ptrdiff_t low = 0, high = (ptrdiff_t)count - 1;
   while (low <= high) {
-    size_t mid = (low + high) / 2;
+    ptrdiff_t mid = (low + high) / 2;
     if ((uintptr_t)ptrs[mid] == (uintptr_t)ptr) {
       return &ptrs[mid];
     }
@@ -330,7 +330,7 @@ static void quicksort_pointers(void **ptrs, size_t count) {
 }
 
 // Returns false if the object could not be relocated
-static bool relocate_object(gc_ctx *ctx, object *obj) {
+static bool relocate_object(const gc_ctx *ctx, object *obj) {
   if (!*obj)
     return true; // object was nullptr
 
@@ -443,9 +443,9 @@ static void major_gc(vm *vm) {
 
   // Create a new heap of the same size so ASAN can enjoy itself
 #if NEW_HEAP_EACH_GC
-  u8 *new_heap = aligned_alloc(4096, vm->heap.true_heap_capacity), *end = new_heap + vm->heap.true_heap_capacity;
+  u8 *new_heap = aligned_alloc(4096, vm->heap.heap_capacity), *end = new_heap + vm->heap.heap_capacity;
 #else
-  u8 *new_heap = vm->heap.heap, *end = vm->heap.heap + vm->heap.true_heap_capacity;
+  u8 *new_heap = vm->heap.heap, *end = vm->heap.heap + vm->heap.heap_capacity;
 #endif
 
   u8 *write_ptr = new_heap;
@@ -476,7 +476,7 @@ static void major_gc(vm *vm) {
 
   // Go through all static and instance fields and rewrite in place
 
-  // this must come first because we read pending reference list
+  // this must come first because we read the pending reference list during collection, which is a static root
   for (int i = 0; i < arrlen(ctx.roots); ++i) {
     object *obj = ctx.roots[i];
     relocate_object(&ctx, obj);

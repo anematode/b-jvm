@@ -126,26 +126,21 @@ DEFINE_ASYNC(reflect_initialize_method) {
 
   for (int i = 0; i < method->attributes_count; ++i) {
     const attribute *attr = method->attributes + i;
-    object obj = (void *)8 /* just something non-null */;
-    switch (attr->kind) {
-    case ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS:
+    object obj;
+    if (attr->kind == ATTRIBUTE_KIND_RUNTIME_VISIBLE_ANNOTATIONS) {
       obj = CreateByteArray(thread, attr->annotations.data, attr->annotations.length);
       M->annotations = obj;
-      break;
-    case ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS:
+    } else if (attr->kind == ATTRIBUTE_KIND_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS) {
       obj = CreateByteArray(thread, attr->parameter_annotations.data, attr->parameter_annotations.length);
       M->parameterAnnotations = obj;
-      break;
-    case ATTRIBUTE_KIND_ANNOTATION_DEFAULT:
+    } else if (attr->kind == ATTRIBUTE_KIND_ANNOTATION_DEFAULT) {
       obj = CreateByteArray(thread, attr->annotation_default.data, attr->annotation_default.length);
       M->annotationDefault = obj;
-      break;
-    case ATTRIBUTE_KIND_SIGNATURE:
+    } else if (attr->kind == ATTRIBUTE_KIND_SIGNATURE) {
       obj = MakeJStringFromModifiedUTF8(thread, attr->signature.utf8, true);
       M->signature = obj;
-      break;
-    default:
-      break;
+    } else {
+      continue;
     }
     if (!obj)
       goto oom;
@@ -153,17 +148,23 @@ DEFINE_ASYNC(reflect_initialize_method) {
 
   object parameterTypes =
       CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, method->descriptor->args_count);
+  if (!parameterTypes)
+    goto oom;
   M->parameterTypes = parameterTypes;
   for (int i = 0; i < method->descriptor->args_count; ++i) {
     slice desc = method->descriptor->args[i].unparsed;
     AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, desc);
     object mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
+    if (!mirror)
+      goto oom;
     ((void **)ArrayData(M->parameterTypes))[i] = mirror;
   }
 
   slice ret_desc = method->descriptor->return_type.unparsed;
   AWAIT(load_class_of_field_descriptor, thread, method->my_class->classloader, ret_desc);
   mirror = (void *)get_class_mirror(thread, get_async_result(load_class_of_field_descriptor));
+  if (!mirror)
+    goto oom;
   M->returnType = mirror;
   object exceptionTypes = CreateObjectArray1D(thread, cached_classes(thread->vm)->klass, 0);
   M->exceptionTypes = exceptionTypes;
@@ -182,7 +183,7 @@ oom: // OOM while creating the Method
   ASYNC_END_VOID()
 }
 
-static obj_header *get_method_parameters_impl(vm_thread *thread, cp_method *method,
+static obj_header *get_method_parameters(vm_thread *thread, cp_method *method,
                                               attribute_method_parameters mparams) {
   classdesc *Parameter = cached_classes(thread->vm)->parameter;
   handle *params = make_handle(thread, CreateObjectArray1D(thread, Parameter, mparams.count));
@@ -224,8 +225,7 @@ obj_header *reflect_get_method_parameters(vm_thread *thread, cp_method *method) 
   for (int i = 0; i < method->attributes_count; ++i) {
     const attribute *attr = method->attributes + i;
     if (attr->kind == ATTRIBUTE_KIND_METHOD_PARAMETERS) {
-      attribute_method_parameters mparams = attr->method_parameters;
-      return get_method_parameters_impl(thread, method, mparams);
+      return get_method_parameters(thread, method, attr->method_parameters);
     }
   }
   return nullptr; // none to be found :(

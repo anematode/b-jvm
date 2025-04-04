@@ -1,4 +1,6 @@
+#include <arrays.h>
 #include <linkage.h>
+#include <objects.h>
 #include <reflection.h>
 
 DECLARE_ASYNC_VOID(fill_mn_with_field,
@@ -42,27 +44,42 @@ DEFINE_ASYNC(fill_mn_with_field) {
 #undef field
 }
 
-#include <natives-dsl.h>
+#undef M
+#define M ((struct native_MemberName *)args->mn->obj)
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, registerNatives, "()V") { return value_null(); }
+DECLARE_ASYNC_VOID(fill_mn_with_method, locals(),
+  arguments(vm_thread *thread; handle *mn; cp_method *method; bool dynamic_dispatch;),
+  invoked_methods(
+    invoked_method(reflect_initialize_constructor)
+    invoked_method(reflect_initialize_method)
+  ));
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getConstant, "(I)I") {
-  DCHECK(argc == 1);
-  enum { GC_COUNT_GWT = 4, GC_LAMBDA_SUPPORT = 5 };
-  switch (args[0].i) {
-  case GC_COUNT_GWT:
-    return (stack_value){.i = 1};
-  case GC_LAMBDA_SUPPORT:
-    return (stack_value){.i = 1};
-  default:
-    UNREACHABLE();
+DEFINE_ASYNC(fill_mn_with_method) {
+  CHECK(args->method);
+  cp_method *method = args->method;
+  classdesc *search_on = method->my_class;
+  if (method->is_ctor) {
+    AWAIT(reflect_initialize_constructor, args->thread, search_on, method);
+    M->flags |= MN_IS_CONSTRUCTOR;
+  } else {
+    AWAIT(reflect_initialize_method, args->thread, search_on, method);
+    M->flags |= MN_IS_METHOD;
   }
+
+  M->vmtarget = method;
+  M->vmindex = args->dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
+  M->flags |= method->access_flags;
+  if (!method->is_signature_polymorphic) {
+    object string = make_jstring_modified_utf8(args->thread, method->unparsed_descriptor);
+    M->type = string;
+  }
+  object mirror = (void *)get_class_mirror(args->thread, search_on);
+  M->clazz = mirror;
+
+  ASYNC_END_VOID()
 }
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getNamedCon, "(I[Ljava/lang/Object;)I") {
-  // Ignore this sanity check, which can be done by just not touching the array
-  return (stack_value){.i = 0};
-}
+typedef enum { METHOD_RESOLVE_OK, METHOD_RESOLVE_NOT_FOUND, METHOD_RESOLVE_EXCEPTION } method_resolve_result;
 
 method_handle_kind unpack_mn_kind(struct native_MemberName *mn) { return mn->flags >> 24 & 0xf; }
 
@@ -95,121 +112,108 @@ heap_string unparse_method_type(const struct native_MethodType *mt) {
   return make_heap_str_from(desc);
 }
 
-#undef M
-#define M ((struct native_MemberName *)mn->obj)
+DECLARE_ASYNC(method_resolve_result, resolve_mn,
+  locals(heap_string search_for; ),
+  arguments(vm_thread *thread; handle *mn; ),
+  invoked_methods(
+    invoked_method(fill_mn_with_field)
+    invoked_method(fill_mn_with_method)
+  ));
 
-void fill_mn_with_method(vm_thread *thread, handle *mn, cp_method *method, bool dynamic_dispatch) {
-  CHECK(method);
-  classdesc *search_on = method->my_class;
-  if (method->is_ctor) {
-    reflect_initialize_constructor_t ctx = {.args = {thread, search_on, method}};
-    thread->stack.synchronous_depth++;
-    future_t fut = reflect_initialize_constructor(&ctx);
-    CHECK(fut.status == FUTURE_READY);
-    thread->stack.synchronous_depth--;
-    M->flags |= MN_IS_CONSTRUCTOR;
+DEFINE_ASYNC(resolve_mn) {
+  if (M->name) {
+    read_string_to_utf8(args->thread, &self->search_for, M->name);
   } else {
-    reflect_initialize_method_t ctx = {.args = {thread, search_on, method}};
-    thread->stack.synchronous_depth++;
-    future_t fut = reflect_initialize_method(&ctx);
-    CHECK(fut.status == FUTURE_READY);
-    thread->stack.synchronous_depth--;
-    M->flags |= MN_IS_METHOD;
+    self->search_for = make_heap_str(0);
   }
-
-  M->vmtarget = method;
-  M->vmindex = dynamic_dispatch ? 1 : -1; // ultimately, itable or vtable entry index
-  M->flags |= method->access_flags;
-  if (!method->is_signature_polymorphic) {
-    object string = MakeJStringFromModifiedUTF8(thread, method->unparsed_descriptor, true);
-    M->type = string;
-  }
-  object mirror = (void *)get_class_mirror(thread, search_on);
-  M->clazz = mirror;
-}
-
-typedef enum { METHOD_RESOLVE_OK, METHOD_RESOLVE_NOT_FOUND, METHOD_RESOLVE_EXCEPTION } method_resolve_result;
-
-method_resolve_result resolve_mn(vm_thread *thread, handle *mn) {
-  heap_string search_for = M->name ? AsHeapString(M->name, on_oom) : make_heap_str(0);
   classdesc *search_on = ((struct native_Class *)M->clazz)->reflected_class;
-  link_class(thread, search_on);
+  link_class(args->thread, search_on);
 
   method_handle_kind kind = unpack_mn_kind(M); // TODO validate
   M->flags &= (int)0xFF000000U;
-  bool dynamic_dispatch = true, found = false;
+  bool dynamic_dispatch, found = false;
 
-  switch (kind) {
-  case MH_KIND_GET_STATIC:
-  case MH_KIND_PUT_STATIC:
-    [[fallthrough]];
-  case MH_KIND_GET_FIELD:
-  case MH_KIND_PUT_FIELD:
+  if (kind == MH_KIND_GET_STATIC || kind == MH_KIND_PUT_STATIC || kind == MH_KIND_GET_FIELD ||
+      kind == MH_KIND_PUT_FIELD) {
     classdesc *field_type = unmirror_class(M->type);
     INIT_STACK_STRING(field_str, 1000);
     slice field_desc = unparse_classdesc_to_field_descriptor(field_str, field_type);
-    cp_field *field = field_lookup(search_on, hslc(search_for), field_desc);
+    cp_field *field = field_lookup(search_on, hslc(self->search_for), field_desc);
     if (!field) {
-      break;
+      M->type = nullptr;
+    } else {
+      found = true;
+      AWAIT(fill_mn_with_field, args->thread, args->mn, field);
     }
-    found = true;
-    fill_mn_with_field_t ctx = {.args = {thread, mn, field}};
-    thread->stack.synchronous_depth++;
-    future_t fut = fill_mn_with_field(&ctx);
-    CHECK(fut.status == FUTURE_READY);
-    thread->stack.synchronous_depth--;
-    break;
-  case MH_KIND_INVOKE_STATIC:
-  case MH_KIND_INVOKE_SPECIAL:
-  case MH_KIND_NEW_INVOKE_SPECIAL:
-    dynamic_dispatch = false;
-    [[fallthrough]];
-  case MH_KIND_INVOKE_VIRTUAL:
-  case MH_KIND_INVOKE_INTERFACE:
+  } else if (kind == MH_KIND_INVOKE_STATIC || kind == MH_KIND_INVOKE_SPECIAL || kind == MH_KIND_NEW_INVOKE_SPECIAL ||
+             kind == MH_KIND_INVOKE_VIRTUAL || kind == MH_KIND_INVOKE_INTERFACE) {
+    dynamic_dispatch = kind == MH_KIND_INVOKE_VIRTUAL || kind == MH_KIND_INVOKE_INTERFACE;
+
     struct native_MethodType *mt = (void *)M->type;
     heap_string descriptor = unparse_method_type(mt);
 
-    cp_method *method = method_lookup(search_on, hslc(search_for), hslc(descriptor), true, false);
+    cp_method *method = method_lookup(search_on, hslc(self->search_for), hslc(descriptor), true, false);
     free_heap_str(descriptor);
 
     if (!method) {
       M->type = nullptr;
-      break;
+    } else {
+      found = true;
+      AWAIT(fill_mn_with_method, args->thread, args->mn, method, dynamic_dispatch);
     }
-
-    found = true;
-    fill_mn_with_method(thread, mn, method, dynamic_dispatch);
-    break;
-  default:
+  } else {
     UNREACHABLE();
   }
 
-  free_heap_str(search_for);
-  return found ? METHOD_RESOLVE_OK : METHOD_RESOLVE_NOT_FOUND;
+  free_heap_str(self->search_for);
+  ASYNC_RETURN(found ? METHOD_RESOLVE_OK : METHOD_RESOLVE_NOT_FOUND);
 
 on_oom:
-  return METHOD_RESOLVE_EXCEPTION;
+  ASYNC_END(METHOD_RESOLVE_EXCEPTION);
 }
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
-               "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;IZ)Ljava/lang/"
-               "invoke/MemberName;") {
+#include <natives-dsl.h>
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, registerNatives, "()V") { return value_null(); }
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getConstant, "(I)I") {
+  DCHECK(argc == 1);
+  enum { GC_COUNT_GWT = 4, GC_LAMBDA_SUPPORT = 5 };
+  switch (args[0].i) {
+  case GC_COUNT_GWT:
+    return (stack_value){.i = 1};
+  case GC_LAMBDA_SUPPORT:
+    return (stack_value){.i = 1};
+  default:
+    UNREACHABLE();
+  }
+}
+
+DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, getNamedCon, "(I[Ljava/lang/Object;)I") {
+  // Ignore this sanity check, which can be done by just not touching the array
+  return (stack_value){.i = 0};
+}
+
+DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, resolve,
+                     "(Ljava/lang/invoke/MemberName;Ljava/lang/Class;IZ)Ljava/lang/"
+                     "invoke/MemberName;",
+                     locals(handle *mn), invoked_methods(invoked_method(resolve_mn))) {
   DCHECK(argc == 4);
 
-  handle *mn = (void *)args[0].handle;
+  self->mn = (void *)args[0].handle;
 
-  method_resolve_result found = resolve_mn(thread, mn);
+  AWAIT(resolve_mn, thread, self->mn);
+  method_resolve_result found = get_async_result(resolve_mn);
   if (unlikely(found == METHOD_RESOLVE_EXCEPTION)) {
-    return value_null();
+    ASYNC_RETURN(value_null());
   }
 
   if (unlikely(found == METHOD_RESOLVE_NOT_FOUND)) {
-    // Raise LinkageError
     raise_vm_exception(thread, STR("java/lang/LinkageError"), STR("Failed to resolve MemberName"));
-    return value_null();
+    ASYNC_RETURN(value_null());
   }
 
-  return (stack_value){.obj = (void *)mn->obj};
+  ASYNC_END((stack_value){.obj = (void *)self->mn->obj});
 }
 
 DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
@@ -235,21 +239,15 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
   drop_handle(thread, vmindex_long);
 
   // either mn->type or mn itself depending on the kind
-  switch (unpack_mn_kind(mn)) {
-  case MH_KIND_GET_STATIC:
-  case MH_KIND_PUT_STATIC:
-  case MH_KIND_GET_FIELD:
-  case MH_KIND_PUT_FIELD:
+  method_handle_kind unpacked = unpack_mn_kind(mn);
+  if (unpacked == MH_KIND_GET_STATIC || unpacked == MH_KIND_PUT_STATIC || unpacked == MH_KIND_GET_FIELD ||
+      unpacked == MH_KIND_PUT_FIELD) {
     data[1] = mn->type;
-    break;
-  case MH_KIND_INVOKE_STATIC:
-  case MH_KIND_INVOKE_SPECIAL:
-  case MH_KIND_NEW_INVOKE_SPECIAL:
-  case MH_KIND_INVOKE_VIRTUAL:
-  case MH_KIND_INVOKE_INTERFACE:
+  } else if (unpacked == MH_KIND_INVOKE_STATIC || unpacked == MH_KIND_INVOKE_SPECIAL ||
+             unpacked == MH_KIND_NEW_INVOKE_SPECIAL || unpacked == MH_KIND_INVOKE_VIRTUAL ||
+             unpacked == MH_KIND_INVOKE_INTERFACE) {
     data[1] = (void *)mn;
-    break;
-  default:
+  } else {
     UNREACHABLE();
   }
 
@@ -257,31 +255,33 @@ DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, getMemberVMInfo,
 #undef mn
 }
 
-DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, init, "(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V") {
-  handle *mn = args[0].handle;
+DECLARE_ASYNC_NATIVE("java/lang/invoke", MethodHandleNatives, init,
+                     "(Ljava/lang/invoke/MemberName;Ljava/lang/Object;)V", locals(handle *mn),
+                     invoked_methods(invoked_method(fill_mn_with_method) invoked_method(fill_mn_with_field))) {
+  self->mn = args[0].handle;
   obj_header *target = args[1].handle->obj;
 
   slice s = target->descriptor->name;
   if (utf8_equals(s, "java/lang/reflect/Method")) {
     cp_method *m = unmirror_method(target);
-    fill_mn_with_method(thread, mn, m, true);
+    AWAIT(fill_mn_with_method, thread, self->mn, m, true);
+
+#undef M
+#define M ((struct native_MemberName *)self->mn->obj)
+
     M->flags |= (m->access_flags & ACCESS_STATIC) ? MH_KIND_INVOKE_STATIC << 24 : MH_KIND_INVOKE_VIRTUAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Constructor")) {
-    fill_mn_with_method(thread, mn, unmirror_ctor(target), true);
+    AWAIT(fill_mn_with_method, thread, self->mn, unmirror_ctor(target), true);
     M->flags |= MH_KIND_NEW_INVOKE_SPECIAL << 24;
   } else if (utf8_equals(s, "java/lang/reflect/Field")) {
     cp_field *field = *unmirror_field(target);
-    fill_mn_with_field_t ctx = {.args = {thread, mn, field}};
-    thread->stack.synchronous_depth++;
-    future_t fut = fill_mn_with_field(&ctx);
-    CHECK(fut.status == FUTURE_READY);
-    thread->stack.synchronous_depth--;
+    AWAIT(fill_mn_with_field, thread, self->mn, field);
     M->flags |= (field->access_flags & ACCESS_STATIC) ? MH_KIND_GET_STATIC << 24 : MH_KIND_GET_FIELD << 24;
   } else {
     UNREACHABLE();
   }
   M->resolution = nullptr;
-  return value_null();
+  ASYNC_END(value_null());
 }
 
 DECLARE_NATIVE("java/lang/invoke", MethodHandleNatives, objectFieldOffset, "(Ljava/lang/invoke/MemberName;)J") {

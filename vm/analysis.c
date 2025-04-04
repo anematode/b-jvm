@@ -644,33 +644,7 @@ int analyze_instruction(bytecode_insn *insn, int insn_index, struct method_analy
     break;
   }
   case insn_ldc: {
-    cp_entry *ent = check_cp_entry(
-        insn->extra_data.cp, CP_KIND_INTEGER | CP_KIND_STRING | CP_KIND_FLOAT | CP_KIND_CLASS | CP_KIND_DYNAMIC_CONSTANT,
-        "ldc argument");
-    type_kind kind = ent->kind == CP_KIND_INTEGER ? TYPE_KIND_INT
-                     : ent->kind == CP_KIND_FLOAT ? TYPE_KIND_FLOAT
-                                                  : TYPE_KIND_REFERENCE;
-    PUSH_ENTRY(insn_source(kind, insn_index))
-    if (ent->kind == CP_KIND_INTEGER && do_rewrite) { // rewrite to iconst or lconst
-      insn->kind = insn_iconst;
-      insn->extra_data.integer_imm = (s32)ent->integral.value;
-    } else if (ent->kind == CP_KIND_FLOAT && do_rewrite) {
-      insn->kind = insn_fconst;
-      insn->extra_data.f_imm = (float)ent->floating.value;
-    }
-    break;
-  }
-  case insn_ldc2_w: {
-    cp_entry *ent = check_cp_entry(insn->extra_data.cp, CP_KIND_DOUBLE | CP_KIND_LONG, "ldc2_w argument");
-    type_kind kind = ent->kind == CP_KIND_DOUBLE ? TYPE_KIND_DOUBLE : TYPE_KIND_LONG;
-    PUSH_ENTRY(insn_source(kind, insn_index))
-    if (ent->kind == CP_KIND_LONG && do_rewrite) {
-      insn->kind = insn_lconst;
-      insn->extra_data.integer_imm = ent->integral.value;
-    } else if (do_rewrite) {
-      insn->kind = insn_dconst;
-      insn->extra_data.d_imm = ent->floating.value;
-    }
+    PUSH_ENTRY(insn_source(TYPE_KIND_REFERENCE, insn_index)) // iconst and fconst got rewritten at parse time
     break;
   }
   case insn_dload: {
