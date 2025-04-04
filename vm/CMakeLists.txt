@@ -36,7 +36,7 @@ target_link_libraries(vm PRIVATE m)
 if (NOT EMSCRIPTEN)
     FetchContent_MakeAvailable(zlib)
     target_link_libraries(vm PRIVATE z)
-    target_compile_options(vm PRIVATE -mcx16 -latomic)
+    target_link_options(vm PRIVATE -latomic)
 else ()
     # DO NOT USE -O3 FOR EMSCRIPTEN. IT BREAKS THE POST-PROCESSOR BECAUSE IT MANGLES NAMES. IT ALSO BLOATS
     # THE BINARY.
