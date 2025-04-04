@@ -62,7 +62,6 @@ static void free_method(cp_method *method) { free_code_analysis(method->code_ana
 void free_classfile(classdesc cf) {
   for (int i = 0; i < cf.methods_count; ++i)
     free_method(&cf.methods[i]);
-  arrfree(cf.indy_insns);
   arena_uninit(&cf.arena);
 }
 
@@ -660,7 +659,7 @@ static bytecode_insn parse_insn_impl(cf_byteslice *reader, u32 pc, classfile_par
   case iload_1:
   case iload_2:
   case iload_3:
-    return (bytecode_insn){.kind = insn_iload, .index = opcode - iload_0};
+    return (bytecode_insn){.kind = insn_iload, .extra_data.index = opcode - iload_0};
   case lload_0:
   case lload_1:
   case lload_2:

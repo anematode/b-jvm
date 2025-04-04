@@ -2517,23 +2517,6 @@ static s64 ldc_impl_void(ARGS_VOID) {
 }
 FORWARD_TO_NULLARY(ldc)
 
-static s64 ldc2_w_impl_void(ARGS_VOID) {
-  DEBUG_CHECK();
-  sp++;
-  cp_entry *ent = insn->extra_data.cp;
-  switch (ent->kind) {
-  case CP_KIND_DOUBLE: {
-    NEXT_DOUBLE(ent->floating.value);
-  }
-  case CP_KIND_LONG: {
-    NEXT_INT(ent->integral.value);
-  }
-  default:
-    UNREACHABLE();
-  }
-}
-FORWARD_TO_NULLARY(ldc2_w)
-
 static s64 iconst_impl_void(ARGS_VOID) {
   DEBUG_CHECK();
   sp++;
