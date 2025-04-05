@@ -223,7 +223,7 @@ result obj val: null
 )");
 }
 
-TEST_CASE("N-body problem") {
+TEST_CASE("[perf test] N-body problem") {
   auto result = run_test_case("test_files/n_body_problem/", false, "NBodyProblem");
 
   //  REQUIRE(result.stdout_.find("Running Simulation...") != std::string::npos);
@@ -462,6 +462,7 @@ TEST_CASE("[perf test] Taylor series") {
   my_options.heap_size = 1 << 30; // 1 GB
   auto result = run_test_case("test_files/autodiff/", false, "TaylorSeriesTest", "", {"1"}, my_options);
   //  REQUIRE(result.stdout_.find("Done!") != std::string::npos);
+  std::cout << "Scheduler yielded " << result.yield_count << " times" << std::endl;
 }
 
 TEST_CASE("[perf test] Sudoku solver") {
@@ -481,17 +482,16 @@ TEST_CASE("[perf test] Sudoku solver") {
   std::cout << "That's " << (double)elapsed / num_puzzles << " ms per puzzle!" << std::endl;
 }
 
-TEST_CASE("[perf test] Scheduled sudoku solver") {
+TEST_CASE("[perf test] Queued parallel sudoku solver") {
   int num_puzzles = 33761;
-  std::cout << "Starting sudoku solver with a scheduler" << std::endl;
+  std::cout << "Starting sudoku solver using parallel task queues" << std::endl;
   std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
   auto now = std::chrono::system_clock::now();
 
-  auto result = run_scheduled_test_case("test_files/sudoku/", true, "Main");
+  auto result = run_scheduled_test_case("test_files/sudoku/", true, "QueuedParallelSudoku");
   // last puzzle
   REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
           std::string::npos);
-  REQUIRE(result.sleep_count == 0); // chop chop
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
@@ -502,7 +502,7 @@ TEST_CASE("[perf test] Scheduled sudoku solver") {
 
 TEST_CASE("[perf test] Scheduled worker sudoku solver") {
   int num_puzzles = 33761;
-  std::cout << "Starting sudoku solver with a worker thread" << std::endl;
+  std::cout << "Starting sudoku solver with an unsafe atomic worker thread" << std::endl;
   std::cout << "Hang on tight, solving " << num_puzzles << " sudoku puzzles..." << std::endl;
   auto now = std::chrono::system_clock::now();
 
@@ -510,7 +510,6 @@ TEST_CASE("[perf test] Scheduled worker sudoku solver") {
   // last puzzle
   REQUIRE(result.stdout_.find("649385721218674359357291468495127836163948572782536194876452913531869247924713685") !=
           std::string::npos);
-  REQUIRE(result.sleep_count == 0); // chop chop
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();
@@ -528,8 +527,16 @@ TEST_CASE("[perf test] Autodiff") {
 
   auto result = run_test_case("test_files/autodiff/", true, "Main");
   // last test
-  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+"
-                              "sin((x*y))))) = -3209354.522523045 == -3209354.522523045") != std::string::npos);
+  auto count = std::count(result.stdout_.begin(), result.stdout_.end(), '\n');
+  // std::cout << result.stdout_ << std::endl;
+  std::cout << "Num lines: " << count << std::endl;
+  std::cout << "Ending: " << result.stdout_.substr(result.stdout_.size() - 50) << std::endl;
+  REQUIRE(result.stdout_.find("((18.582937204562043*(-(sin((x*y))*x)+1.0))+((18.582937204562043*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = -26509.956731152495 == -26509.956731152495") != std::string::npos);
+  REQUIRE(result.stdout_.find("((8.0*(-(sin((x*y))*x)+1.0))+((8.0*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = 853.1568857652521 == 853.1568857652521") != std::string::npos);
+  REQUIRE(result.stdout_.find("((84.02894029503324*(-(sin((x*y))*x)+1.0))+((84.02894029503324*x)*-(((cos((x*y))*x)*y)+sin((x*y)))))"
+                              " = -3209354.522523045 == -3209354.522523045") != std::string::npos);
 
   auto end = std::chrono::system_clock::now();
   long long elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - now).count();

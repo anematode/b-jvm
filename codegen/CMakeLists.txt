@@ -1,2 +1,3 @@
 add_executable(gen_natives gen_natives.c)
 target_link_libraries(gen_natives PRIVATE bjvm_static)
+
