@@ -1,47 +1,33 @@
 add_executable(gen_natives gen_natives.c)
 target_link_libraries(gen_natives PRIVATE bjvm_static)
 
-include(CheckCXXSourceCompiles)
+include(CheckSourceCompiles)
 include(CheckLibraryExists)
 
-function(CHECK_WORKING_CXX_ATOMICS64 varname)
-    CHECK_CXX_SOURCE_COMPILES("
-        #include <atomic>
-        #include <cstdint>
-        std::atomic<uint64_t> x (0);
-        int main() {
-          uint64_t i = x.load(std::memory_order_relaxed);
-          return 0;
-        }
-        " ${varname})
-endfunction(CHECK_WORKING_CXX_ATOMICS64)
+function(CHECK_WORKING_ATOMICS varname)
+    CHECK_SOURCE_COMPILES(C "
+        #include <stdatomic.h>
+        #include <stdint.h>
 
-function(CHECK_WORKING_CXX_ATOMICS128 varname)
-    CHECK_CXX_SOURCE_COMPILES("
-        #include <atomic>
-        #include <cstdint>
-        std::atomic<uint128_t> x (0);
+        #define SIZEOF_POINTER (UINTPTR_MAX / 255 % 255)
+        #if SIZEOF_POINTER == 4
+        typedef uint64_t extended_data_t;
+        #else
+        typedef __uint128_t extended_data_t;
+        #endif
+
+        extended_data_t x; // sized to fit two void pointers
+
         int main() {
-          uint128_t i = x.load(std::memory_order_relaxed);
-          return 0;
+            extended_data_t i = __atomic_load_n(&x, __ATOMIC_SEQ_CST);
+            return 0;
         }
         " ${varname})
-endfunction(CHECK_WORKING_CXX_ATOMICS128)
+endfunction(CHECK_WORKING_ATOMICS)
 
 message("Pointer size: ${CMAKE_SIZEOF_VOID_P} bytes")
-
-if (${CMAKE_SIZEOF_VOID_P} EQUAL 8)
-    message("64 bit")
-    CHECK_WORKING_CXX_ATOMICS128(HAVE_CXX_ATOMICS128_WITHOUT_LIB)
-    if (NOT HAVE_CXX_ATOMICS128_WITHOUT_LIB)
-        message("adding link library atomic")
-        target_link_libraries(vm PRIVATE atomic)
-    endif ()
-else ()
-    message("32 bit")
-    CHECK_WORKING_CXX_ATOMICS64(HAVE_CXX_ATOMICS64_WITHOUT_LIB)
-    if (NOT HAVE_CXX_ATOMICS64_WITHOUT_LIB)
-        message("adding link library atomic")
-        target_link_libraries(vm PRIVATE atomic)
-    endif ()
-endif()
+CHECK_WORKING_ATOMICS(HAVE_ATOMICS_WITHOUT_LIB)
+if (NOT HAVE_ATOMICS_WITHOUT_LIB)
+    message("adding link library atomic")
+    target_link_libraries(vm PRIVATE atomic)
+endif ()
