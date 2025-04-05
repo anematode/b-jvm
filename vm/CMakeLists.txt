@@ -33,10 +33,29 @@ set_source_files_properties(
 target_link_libraries(vm PUBLIC stb_ds)
 target_link_libraries(vm PRIVATE m)
 
+include(CheckCXXSourceCompiles)
+include(CheckLibraryExists)
+
+function(CHECK_WORKING_CXX_ATOMICS64 varname)
+    CHECK_CXX_SOURCE_COMPILES("
+        #include <atomic>
+        #include <cstdint>
+        std::atomic<uint64_t> x (0);
+        int main() {
+          uint64_t i = x.load(std::memory_order_relaxed);
+          return 0;
+        }
+        " ${varname})
+endfunction(CHECK_WORKING_CXX_ATOMICS64)
+
+CHECK_WORKING_CXX_ATOMICS64(HAVE_CXX_ATOMICS64_WITHOUT_LIB)
+if (NOT HAVE_CXX_ATOMICS64_WITHOUT_LIB)
+    target_link_libraries(vm PRIVATE atomic)
+endif ()
+
 if (NOT EMSCRIPTEN)
     FetchContent_MakeAvailable(zlib)
     target_link_libraries(vm PRIVATE z)
-    target_compile_options(vm PRIVATE "-mcx16" "-latomic")
 else ()
     # DO NOT USE -O3 FOR EMSCRIPTEN. IT BREAKS THE POST-PROCESSOR BECAUSE IT MANGLES NAMES. IT ALSO BLOATS
     # THE BINARY.
