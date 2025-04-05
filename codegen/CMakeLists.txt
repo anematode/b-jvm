@@ -16,7 +16,10 @@ function(CHECK_WORKING_CXX_ATOMICS64 varname)
         " ${varname})
 endfunction(CHECK_WORKING_CXX_ATOMICS64)
 
+message("Pointer size: ${CMAKE_SIZEOF_VOID_P} bytes")
+
 CHECK_WORKING_CXX_ATOMICS64(HAVE_CXX_ATOMICS64_WITHOUT_LIB)
 if (NOT HAVE_CXX_ATOMICS64_WITHOUT_LIB)
+    message("adding link library atomic")
     target_link_libraries(vm PRIVATE atomic)
 endif ()
