@@ -227,13 +227,23 @@ DECLARE_ASYNC(stack_value, run_native,
 );
 
 DECLARE_ASYNC(
-    int, initialize_class,
-    locals(initialize_class_t *recursive_call_space; char wakeup_info[SCHEDULER_WAKEUP_INFO_SIZE]; u16 i),
+    int, initialize_class_impl,
+    locals(initialize_class_impl_t *recursive_call_space; char wakeup_info[SCHEDULER_WAKEUP_INFO_SIZE]; u16 i),
     arguments(vm_thread *thread; classdesc *classdesc),
     invoked_methods(
         invoked_method(call_interpreter)
       )
 );
+
+DECLARE_ASYNC(
+    int, initialize_class,
+    locals(),
+    arguments(vm_thread *thread; classdesc *classdesc),
+    invoked_methods(
+        invoked_method(initialize_class_impl)
+      )
+);
+
 
 typedef struct {
   classdesc *rtype;
