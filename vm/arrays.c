@@ -74,7 +74,7 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
   // linkage state of array class is same as component class
   result->state = CD_STATE_LOADED;
   if (component->state >= CD_STATE_LINKED) {
-    link_class(thread, result);
+    link_class_impl_super_impl(thread, result); // we own the mutex to component too
   }
   result->state = component->state;
   pthread_mutex_init(&result->lock, nullptr); // todo: check return values?
