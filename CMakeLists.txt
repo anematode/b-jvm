@@ -29,7 +29,7 @@ if (BUILD_TESTING)
 endif ()
 
 add_library(bjvm_static STATIC)
-include(AtomicsSupport)
+include(ThreadingSupport)
 # This keeps names fixed for the post-processor
 target_link_libraries(bjvm_static PUBLIC vm PRIVATE natives)
 
