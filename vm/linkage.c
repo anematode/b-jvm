@@ -83,7 +83,7 @@ static int link_array_class_impl(vm_thread *thread, classdesc *cd) {
   cd->state = st;
   int status = 0;
   if (cd->base_component) {
-    status = link_class(thread, cd->base_component);
+    status = link_class_impl(thread, cd->base_component); // already holding lock
     if (status) {
       st = CD_STATE_LINKAGE_ERROR;
     }
@@ -137,11 +137,16 @@ void create_template_interpreter_frame(cp_method *method) {
   memcpy(method->template_frame, &frame, sizeof(frame));
 }
 
-// Link the class.
 int link_class(vm_thread *thread, classdesc *cd) {
   pthread_mutex_lock(&cd->lock); // todo: check result?
+  int result = link_class_impl(thread, cd);
+  pthread_mutex_unlock(&cd->lock);
+  return result;
+}
+
+// Link the class.
+int link_class_impl(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
-    pthread_mutex_unlock(&cd->lock);
     return 0;
   }
   // Link superclasses
@@ -151,7 +156,6 @@ int link_class(vm_thread *thread, classdesc *cd) {
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
       cd->linkage_error = thread->current_exception;
-      pthread_mutex_unlock(&cd->lock);
       return status;
     }
   }
@@ -164,14 +168,12 @@ int link_class(vm_thread *thread, classdesc *cd) {
     if (status) {
       cd->state = CD_STATE_LINKAGE_ERROR;
       cd->linkage_error = thread->current_exception;
-      pthread_mutex_unlock(&cd->lock);
       return status;
     }
   }
   if (cd->kind != CD_KIND_ORDINARY) {
     DCHECK(cd->kind == CD_KIND_ORDINARY_ARRAY);
     int status = link_array_class_impl(thread, cd);
-    pthread_mutex_unlock(&cd->lock);
     return status;
   }
   cd->state = CD_STATE_LINKED;
@@ -190,7 +192,6 @@ int link_class(vm_thread *thread, classdesc *cd) {
         raise_verify_error(thread, hslc(error_str));
         cd->linkage_error = thread->current_exception;
         free_heap_str(error_str);
-        pthread_mutex_unlock(&cd->lock);
         return -1;
       }
       create_template_interpreter_frame(method);
@@ -257,6 +258,5 @@ int link_class(vm_thread *thread, classdesc *cd) {
   // Set up vtable and itables
   set_up_function_tables(cd);
 
-  pthread_mutex_unlock(&cd->lock);
   return 0;
 }

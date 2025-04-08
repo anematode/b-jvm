@@ -1844,7 +1844,7 @@ DEFINE_ASYNC(initialize_class) {
   }
 
   if (cd->state < CD_STATE_LINKED) {
-    error = link_class(thread, cd);
+    error = link_class_impl(thread, cd); // directly call impl since we hold lock
     if (error) {
       DCHECK(thread->current_exception);
       pthread_mutex_unlock(&cd->lock);
