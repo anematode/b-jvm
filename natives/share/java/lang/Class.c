@@ -181,6 +181,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
   if (classloader == nullptr) {
     c = bootstrap_lookup_class(thread, hslc(name_str));
     if (thread->current_exception) { // e.g. ClassNotFoundException
+      free_heap_str(name_str);
       return value_null();
     }
   } else {
@@ -192,11 +193,13 @@ DECLARE_NATIVE("java/lang", Class, forName0,
     stack_value result = call_interpreter_synchronous(thread, find_class, loadClass_args);
     if (thread->current_exception) {
       // loadClass threw an exception, propagate it
+      free_heap_str(name_str);
       return value_null();
     }
     if (result.obj == nullptr) {
       // Raise ClassNotFoundException. Name uses slashes for some reason
       raise_vm_exception(thread, STR("java/lang/ClassNotFoundException"), hslc(name_str));
+      free_heap_str(name_str);
       return value_null();
     }
     c = unmirror_class(result.obj);
@@ -213,6 +216,7 @@ DECLARE_NATIVE("java/lang", Class, forName0,
     CHECK(f.status == FUTURE_READY);
 
     if (ctx._result) {
+      free_heap_str(name_str);
       return value_null();
     }
   }
