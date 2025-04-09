@@ -652,15 +652,16 @@ vm *create_vm(const vm_options options) {
 
 void add_unsafe_allocation(vm *vm, void *allocation) {
   pthread_mutex_lock(&vm->allocations.lock);
-  void **unsafe_allocations = vm->allocations.unsafe_allocations;
+#define unsafe_allocations vm->allocations.unsafe_allocations
   arrput(unsafe_allocations, allocation);
+#undef unsafe_allocations
   pthread_mutex_unlock(&vm->allocations.lock);
 }
 
 /** returns whether we found and removed it (so we don't double free) */
 bool remove_unsafe_allocation(vm *vm, void *allocation) {
   pthread_mutex_lock(&vm->allocations.lock);
-  void **unsafe_allocations = vm->allocations.unsafe_allocations;
+#define unsafe_allocations vm->allocations.unsafe_allocations
   for (int i = 0; i < arrlen(unsafe_allocations); ++i) {
     if (unsafe_allocations[i] == allocation) {
       arrdelswap(unsafe_allocations, i);
@@ -668,21 +669,23 @@ bool remove_unsafe_allocation(vm *vm, void *allocation) {
       return true;
     }
   }
+#undef unsafe_allocations
   pthread_mutex_unlock(&vm->allocations.lock);
   return false;
 }
 
 void add_mmap_allocation(vm *vm, const mmap_allocation allocation) {
   pthread_mutex_lock(&vm->allocations.lock);
-  mmap_allocation *mmap_allocations = vm->allocations.mmap_allocations;
+#define mmap_allocations vm->allocations.mmap_allocations
   arrput(mmap_allocations, allocation);
+#undef mmap_allocations
   pthread_mutex_unlock(&vm->allocations.lock);
 }
 
 /** returns whether we found and removed it (so we don't double free) */
 bool remove_mmap_allocation(vm *vm, const mmap_allocation allocation) {
   pthread_mutex_lock(&vm->allocations.lock);
-  mmap_allocation *mmap_allocations = vm->allocations.mmap_allocations;
+#define mmap_allocations vm->allocations.mmap_allocations
   for (int i = 0; i < arrlen(mmap_allocations); ++i) {
     if (mmap_allocations[i].ptr == allocation.ptr) { // surely this is a strong enough equality test
       arrdelswap(mmap_allocations, i);
@@ -690,6 +693,7 @@ bool remove_mmap_allocation(vm *vm, const mmap_allocation allocation) {
       return true;
     }
   }
+#undef mmap_allocations
   pthread_mutex_unlock(&vm->allocations.lock);
   return false;
 }
@@ -749,6 +753,8 @@ void free_vm(vm *vm) {
   free_unsafe_allocations(vm);
   pthread_mutex_destroy(&vm->allocations.lock);
   free_zstreams(vm);
+
+  free(vm->instruction_patch_queue.buffer);
 
   free(vm);
 }
