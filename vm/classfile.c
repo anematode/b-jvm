@@ -1625,6 +1625,12 @@ parse_result_t parse_classfile(const u8 *bytes, size_t len, classdesc *result, h
   arena_init(&cf->arena);
   classfile_parse_ctx ctx = {.arena = &cf->arena, .cp = nullptr};
 
+  // init mutex
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&cf->lock, &attr);
+
   if (setjmp(format_error_jmp_buf)) {
     arena_uninit(&cf->arena);
     free(ctx.temp_allocation);

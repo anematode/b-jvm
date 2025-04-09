@@ -836,7 +836,7 @@ typedef struct classdesc {
   classdesc_state state; // guarded by lock
   constant_pool *pool; // guarded by lock
 
-  pthread_mutex_t lock; // protects classdesc state
+  pthread_mutex_t lock; // protects classdesc state; recursive for now // todo: should this be non-recursive for performance?
 
   slice name;
   cp_class_info *self;

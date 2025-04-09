@@ -44,7 +44,10 @@ static classdesc *primitive_array_classdesc(vm_thread *thread, classdesc *compon
   result->name = arena_make_str(&result->arena, name.chars, (int)name.len);
   setup_super_hierarchy(result);
   set_up_function_tables(result);
-  pthread_mutex_init(&result->lock, nullptr); // todo: check return values?
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&result->lock, &attr); // todo: check return values?
 
   return result;
 }
@@ -77,7 +80,10 @@ static classdesc *ordinary_array_classdesc(vm_thread *thread, classdesc *compone
     link_class_impl_super_impl(thread, result); // we own the mutex to component too
   }
   result->state = component->state;
-  pthread_mutex_init(&result->lock, nullptr); // todo: check return values?
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&result->lock, &attr); // todo: check return values?
 
   return result;
 }

@@ -484,7 +484,10 @@ classdesc *make_primitive_classdesc(vm *vm, type_kind kind, const slice name) {
   desc->array_type = nullptr;
   desc->primitive_component = kind;
   desc->classloader = vm->bootstrap_classloader;
-  pthread_mutex_init(&desc->lock, nullptr);
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+  pthread_mutex_init(&desc->lock, &attr);
 
   return desc;
 }
