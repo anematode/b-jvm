@@ -137,8 +137,6 @@ void create_template_interpreter_frame(cp_method *method) {
   memcpy(method->template_frame, &frame, sizeof(frame));
 }
 
-// Link the class.
-// NOLINTNEXTLINE(misc-no-recursion)
 int link_class(vm_thread *thread, classdesc *cd) {
   pthread_mutex_lock(&cd->lock); // todo: check result?
   int result = link_class_impl(thread, cd);
@@ -147,8 +145,6 @@ int link_class(vm_thread *thread, classdesc *cd) {
 }
 
 // Link the class.
-// assumes the lock is held for the input classdesc.
-// NOLINTNEXTLINE(misc-no-recursion)
 int link_class_impl(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
     return 0;
@@ -266,7 +262,6 @@ int link_class_impl(vm_thread *thread, classdesc *cd) {
 }
 
 // assumes the class and the super class are locked
-// NOLINTNEXTLINE(misc-no-recursion)
 int link_class_impl_super_impl(vm_thread *thread, classdesc *cd) {
   if (cd->state != CD_STATE_LOADED) {
     return 0;

@@ -1824,23 +1824,12 @@ void wrap_in_exception_in_initializer_error(vm_thread *thread) {
 // Call <clinit> on the class, if it hasn't already been called.
 // NOLINTNEXTLINE(misc-no-recursion)
 DEFINE_ASYNC(initialize_class) {
-  classdesc *cd = args->classdesc;
-
-  pthread_mutex_lock(&cd->lock);
-  AWAIT(initialize_class_impl, args->thread, args->classdesc);
-  pthread_mutex_unlock(&cd->lock);
-
-  ASYNC_END(get_async_result(initialize_class_impl));
-}
-
-// Call <clinit> on the class, if it hasn't already been called.
-// Assumes that the lock for args->classdesc is already held.
-// NOLINTNEXTLINE(misc-no-recursion)
-DEFINE_ASYNC(initialize_class_impl) {
 #define thread (args->thread)
   classdesc *cd = args->classdesc; // must be reloaded after await()
+  pthread_mutex_lock(&cd->lock);
   if (cd->kind == CD_KIND_ORDINARY_ARRAY) {
     // Initialize
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1850,6 +1839,7 @@ DEFINE_ASYNC(initialize_class_impl) {
   DCHECK(cd);
   if (likely(cd->state == CD_STATE_INITIALIZED || cd->state == CD_STATE_LINKAGE_ERROR)) {
     // Class is already initialized
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0);
   }
 
@@ -1857,6 +1847,7 @@ DEFINE_ASYNC(initialize_class_impl) {
     error = link_class_impl(thread, cd); // directly call impl since we hold lock
     if (error) {
       DCHECK(thread->current_exception);
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
   }
@@ -1864,6 +1855,7 @@ DEFINE_ASYNC(initialize_class_impl) {
   if (cd->state == CD_STATE_INITIALIZING) {
     if (cd->initializing_thread == thread->tid) {
       // The class is currently being initialized by this thread, so we can just return
+      pthread_mutex_unlock(&cd->lock);
       ASYNC_RETURN(0);
     }
 
@@ -1878,6 +1870,7 @@ DEFINE_ASYNC(initialize_class_impl) {
       pthread_mutex_lock(&cd->lock); // reäcquire
     }
 
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(0); // the class is done
   }
 
@@ -1885,6 +1878,7 @@ DEFINE_ASYNC(initialize_class_impl) {
   if (cd->state == CD_STATE_LINKAGE_ERROR) {
     thread->current_exception = nullptr;
     raise_exception_object(thread, cd->linkage_error);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
@@ -1894,32 +1888,25 @@ DEFINE_ASYNC(initialize_class_impl) {
   self->recursive_call_space = calloc(1, sizeof(initialize_class_t));
   if (!self->recursive_call_space) {
     out_of_memory(thread);
+    pthread_mutex_unlock(&cd->lock);
     ASYNC_RETURN(-1);
   }
 
   if (cd->super_class) {
-#define target_cd cd->super_class->classdesc
     pthread_mutex_unlock(&cd->lock);
-    pthread_mutex_lock(&target_cd->lock);
-    AWAIT_INNER(self->recursive_call_space, initialize_class_impl, thread, cd->super_class->classdesc);
+    AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->super_class->classdesc);
     cd = args->classdesc;
-    pthread_mutex_unlock(&target_cd->lock);
     pthread_mutex_lock(&cd->lock); // reäcquire
-#undef target_cd
 
     if ((error = self->recursive_call_space->_result))
       goto done;
   }
 
   for (self->i = 0; (int)self->i < cd->interfaces_count; ++self->i) {
-#define target_cd cd->interfaces[self->i]->classdesc
     pthread_mutex_unlock(&cd->lock);
-    pthread_mutex_lock(&target_cd->lock);
-    AWAIT_INNER(self->recursive_call_space, initialize_class_impl, thread, target_cd);
+    AWAIT_INNER(self->recursive_call_space, initialize_class, thread, cd->interfaces[self->i]->classdesc);
     cd = args->classdesc;
-    pthread_mutex_unlock(&target_cd->lock);
     pthread_mutex_lock(&cd->lock); // reäcquire
-#undef target_cd
 
     if ((error = self->recursive_call_space->_result))
       goto done;
@@ -1955,6 +1942,7 @@ done:
   while ((arr = arr->array_type)) {
     arr->state = args->classdesc->state;
   }
+  pthread_mutex_unlock(&cd->lock);
   ASYNC_END(error);
 
 #undef thread
@@ -2234,8 +2222,8 @@ struct native_Class *get_class_mirror(vm_thread *thread, classdesc *cd) {
   }
 
   classdesc *java_lang_Class = bootstrap_lookup_class(thread, STR("java/lang/Class"));
-  initialize_class_impl_t init = {.args = {thread, java_lang_Class}};
-  future_t klass_init_state = initialize_class_impl(&init); // we already hold lock, call impl
+  initialize_class_t init = {.args = {thread, java_lang_Class}};
+  future_t klass_init_state = initialize_class(&init);
   CHECK(klass_init_state.status == FUTURE_READY);
   if (init._result) {
     // TODO raise exception
