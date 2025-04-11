@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <roundrobin_scheduler.h>
+#include <worker_threads.h>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -205,34 +206,81 @@ ScheduledTestCaseResult run_test_case(std::string classpath, bool capture_stdio,
 static void busy_wait(double us) { EM_ASM("const endAt = Date.now() + $0 / 1000; while (Date.now() < endAt) {}", us); }
 #endif
 
+
+void *worker_thread_run_until_completion(void *param) {
+  auto *scheduler = (rr_scheduler *)param;
+  auto *vm = scheduler->vm;
+  auto *result = new ScheduledTestCaseResult {};
+
+  // chop chop time to work
+  worker_thread_pool_register(&scheduler->thread_pool);
+  // todo: scheduler_poll_blocking, so that we can wait on a condition until a task appears (or be told to sleep or exit)
+  scheduler_polled_info_t task = scheduler_poll(scheduler); // initialize before entering loop
+  for (;;result->yield_count++) {
+    gc_pause_if_requested(vm);
+
+    if (task.current_status == SCHEDULER_RESULT_DONE) {
+      break; // probably, idk
+    }
+
+    if (task.thread_info) {
+      scheduler_execute(vm, task, scheduler->preemption_us);
+      task = scheduler_push_execution_record_and_repoll(scheduler, task);
+      continue;
+    }
+
+    u64 sleep_for = task.may_sleep_us;
+    if (sleep_for) { // we've been told to sleep
+      result->sleep_count++;
+      result->us_slept += sleep_for;
+#ifdef EMSCRIPTEN
+      // long-term, we will use the JS scheduler instead of this hack
+      busy_wait(sleep_for);
+#else
+      usleep(sleep_for);
+#endif
+    }
+
+    task = scheduler_push_execution_record_and_repoll(scheduler, task);
+  }
+  worker_thread_pool_deregister(&scheduler->thread_pool);
+
+  return result;
+}
+
 ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capture_stdio, std::string main_class,
                                                 std::string input, std::vector<std::string> string_args,
                                                 vm_options options) {
   printf("Classpath: %s\n", classpath.c_str());
 
-  ScheduledTestCaseResult result{};
+  ScheduledTestCaseResult result { };
   result.stdin_ = input;
 
-  options.classpath = (slice){.chars = (char *)classpath.c_str(), .len = static_cast<u16>(classpath.size())};
+  options.classpath = (slice){.chars = const_cast<char *>(classpath.c_str()), .len = static_cast<u16>(classpath.size())};
 
+  // todo: stdio functions need to be synchronized
   options.read_stdin = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
-    int remaining = result->stdin_.length();
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
+    int remaining = static_cast<int>(result->stdin_.length());
     int num_bytes = std::min(len, remaining);
     result->stdin_.copy(buf, num_bytes);
     result->stdin_ = result->stdin_.substr(num_bytes);
     return num_bytes;
   } : nullptr;
   options.poll_available_stdin = capture_stdio ? +[](void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     return (int) result->stdin_.length();
   } : nullptr;
   options.write_stdout = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     result->stdout_.append(buf, len);
   } : nullptr;
   options.write_stderr = capture_stdio ? +[](char *buf, int len, void *param) {
-    auto *result = (ScheduledTestCaseResult *) param;
+    auto *result = static_cast<ScheduledTestCaseResult *>(param);
+    std::lock_guard guard(*result->lock);
     result->stderr_.append(buf, len);
   } : nullptr;
   options.stdio_override_param = &result;
@@ -247,9 +295,11 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   rr_scheduler_init(&scheduler, vm);
   vm->scheduler = &scheduler;
 
+  // todo: should we register as a worker thread here? or only later when we actually call interpreter
+
   vm_thread *thread = create_main_thread(vm, default_thread_options());
 
-  slice m{.chars = (char *)main_class.c_str(), .len = static_cast<u16>(main_class.size())};
+  slice m{.chars = const_cast<char *>(main_class.c_str()), .len = static_cast<u16>(main_class.size())};
 
   classdesc *desc = bootstrap_lookup_class(thread, m);
   if (!desc) {
@@ -266,10 +316,10 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   method = method_lookup(desc, STR("main"), STR("([Ljava/lang/String;)V"), false, false);
 
   handle *string_args_as_object =
-      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, (int)string_args.size()));
+      make_handle(thread, CreateObjectArray1D(thread, cached_classes(thread->vm)->string, static_cast<int>(string_args.size())));
   for (size_t i = 0; i < string_args.size(); i++) {
     object str = MakeJStringFromCString(thread, string_args[i].c_str(), true);
-    ReferenceArrayStore(string_args_as_object->obj, (int)i, str);
+    ReferenceArrayStore(string_args_as_object->obj, static_cast<int>(i), str);
   }
 
   stack_value args[1] = {{.obj = string_args_as_object->obj}};
@@ -278,26 +328,31 @@ ScheduledTestCaseResult run_scheduled_test_case(std::string classpath, bool capt
   call_interpreter_t ctx = {{thread, method, args}};
   execution_record *record = rr_scheduler_run(&scheduler, ctx);
 
-  while (true) {
-    auto status = rr_scheduler_step(&scheduler);
-    if (status == SCHEDULER_RESULT_DONE) {
-      break;
-    }
-
-    result.yield_count++;
-
-    u64 sleep_for = rr_scheduler_may_sleep_us(&scheduler);
-    if (sleep_for) {
-      result.sleep_count++;
-      result.us_slept += sleep_for;
-#ifdef EMSCRIPTEN
-      // long-term, we will use the JS scheduler instead of this hack
-      busy_wait(sleep_for);
-#else
-      usleep(sleep_for);
-#endif
-    }
+  // do some work just to get settled
+  for (int i=0; i<5; i++) {
+    scheduler_polled_info_t task = scheduler_poll(&scheduler);
+    scheduler_execute(vm, task, scheduler.preemption_us);
+    scheduler_push_execution_record(&scheduler, task);
   }
+
+  pthread_t thread_1;
+  pthread_create(&thread_1, nullptr, worker_thread_run_until_completion, &scheduler);
+
+  // pthread_t thread_2;
+  // pthread_create(&thread_2, nullptr, worker_thread_run_until_completion, &scheduler);
+  //
+  // ScheduledTestCaseResult *result_2;
+  // pthread_join(thread_2, reinterpret_cast<void **>(&result_2));
+  // result.yield_count += result_2->yield_count;
+  // result.sleep_count += result_2->sleep_count;
+  // result.us_slept += result_2->us_slept;
+
+  ScheduledTestCaseResult *result_1;
+  pthread_join(thread_1, reinterpret_cast<void **>(&result_1));
+  result.yield_count += result_1->yield_count;
+  result.sleep_count += result_1->sleep_count;
+  result.us_slept += result_1->us_slept;
+  delete result_1;
 
   if (thread->current_exception) {
     method =

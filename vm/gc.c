@@ -25,7 +25,7 @@ typedef struct gc_ctx {
 } gc_ctx;
 
 int in_heap(const vm *vm, object field) {
-  return (u8 *)field >= vm->heap && (u8 *)field < vm->heap + vm->heap_capacity;
+  return (u8 *)field >= vm->heap.heap && (u8 *)field < vm->heap.heap + vm->heap.heap_capacity;
 }
 
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
@@ -94,12 +94,6 @@ static void enumerate_reflection_roots(gc_ctx *ctx, classdesc *desc) {
   for (int i = 0; i < desc->indy_insns_count; ++i) {
     bytecode_insn *insn = desc->indy_insns[i];
     PUSH_ROOT(&insn->ic);
-  }
-
-  // Push all ICed method type objects
-  for (int i = 0; i < arrlen(desc->sigpoly_insns); ++i) {
-    bytecode_insn *insn = desc->sigpoly_insns[i];
-    PUSH_ROOT(&insn->ic2);
   }
 }
 
@@ -177,6 +171,12 @@ static void major_gc_enumerate_gc_roots(gc_ctx *ctx) {
   // JS Handles
   for (int i = 0; i < arrlen(vm->js_handles); ++i) {
     PUSH_ROOT(&vm->js_handles[i]);
+  }
+
+  // permanent roots
+  for (int i=0; i<arrlen(vm->permanent_gc_roots); ++i) {
+    object *root_location = vm->permanent_gc_roots[i];
+    PUSH_ROOT(root_location);
   }
 
   // Pending references
@@ -411,9 +411,11 @@ void relocate_instance_fields(gc_ctx *ctx) {
 #define NEW_HEAP_EACH_GC 0
 #endif
 
-void major_gc(vm *vm) {
-  // TODO wait for all threads to get ready (for now we'll just call this from
-  // an already-running thread)
+/**
+ * Cleans up the heap.
+ * Must only be called by one thread, while all the other threads are suspended.
+ */
+static void major_gc(vm *vm) {
   gc_ctx ctx = {.vm = vm, .Reference = cached_classes(vm)->reference};
   major_gc_enumerate_gc_roots(&ctx);
 
@@ -441,9 +443,9 @@ void major_gc(vm *vm) {
 
   // Create a new heap of the same size so ASAN can enjoy itself
 #if NEW_HEAP_EACH_GC
-  u8 *new_heap = aligned_alloc(4096, vm->heap_capacity), *end = new_heap + vm->heap_capacity;
+  u8 *new_heap = aligned_alloc(4096, vm->heap.heap_capacity), *end = new_heap + vm->heap.heap_capacity;
 #else
-  u8 *new_heap = vm->heap, *end = vm->heap + vm->heap_capacity;
+  u8 *new_heap = vm->heap.heap, *end = vm->heap.heap + vm->heap.heap_capacity;
 #endif
 
   u8 *write_ptr = new_heap;
@@ -487,9 +489,110 @@ void major_gc(vm *vm) {
   arrfree(ctx.relocations);
 
 #if NEW_HEAP_EACH_GC
-  free(vm->heap);
+  free(vm->heap.heap);
 #endif
 
-  vm->heap = new_heap;
-  vm->heap_used = align_up(write_ptr - new_heap, 8);
+  vm->heap.heap = new_heap;
+  vm->heap.heap_used = align_up(write_ptr - new_heap, 8);
+}
+
+static void execute_instruction_patch(vm *vm, bytecode_patch_request *req) {
+  bytecode_insn *insn_location = req->location;
+  if (insn_location && insn_location->kind != insn_invokesigpoly) {
+    *insn_location = req->new_insn;
+
+    if (req->new_insn.kind == insn_invokesigpoly) {
+      object *root_location = (object *) &insn_location->ic2;
+      arrput(vm->permanent_gc_roots, root_location);
+    }
+  }
+
+  req->location = nullptr; // reset it
+}
+
+/**
+ * Executes all the pending instruction patches.
+ * Must only be called by one thread, while all the other threads are suspended.
+ */
+static void execute_instruction_patches(vm *vm) {
+  for (size_t i=0; i<vm->instruction_patch_queue.capacity; i++) {
+    bytecode_patch_request *req = &vm->instruction_patch_queue.buffer[i];
+    execute_instruction_patch(vm, req);
+  }
+  vm->instruction_patch_queue.num_used = 0;
+}
+
+/**
+ * Garbage collects the heap.
+ * Invoking this method will set vm->gc_pause_requested to true (if not already),
+ * then wait for all threads to do call this function.
+ * All invocaations to this function will block until the GC has been completed by one particuliar thread.
+ */
+void scheduled_gc_pause(vm *vm) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm); // must happen before gc to update handles
+    major_gc(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
+}
+
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * This is useful early into VM initialization, where we can't GC without fully initialized classdescs.
+ */
+void scheduled_gc_pause_patch_only(vm *vm) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
+}
+
+/**
+ * Pauses all execution to patch vm instructions.
+ * If this thread is the leader of the GC, it will only patch instructions, without executing a GC.
+ * Also forces the current patch request to get included even if it wasn't on the buffer
+ */
+void scheduled_gc_pause_patch_request(vm *vm, bytecode_patch_request req) {
+  // if this flag hasn't already been true, we're the first and therefore the leader
+  bool is_leader = !__atomic_exchange_n(&vm->should_gc_pause, true, __ATOMIC_ACQ_REL);
+
+  // Wait for all threads to pause
+  rr_scheduler *scheduler = vm->scheduler;
+  worker_thread_pool *thread_pool = &scheduler->thread_pool;
+
+  thread_pool_lock(thread_pool); // todo: check result of this?
+  execute_instruction_patch(vm, &req);
+  if (is_leader) {
+    arrive_await_all_suspended(thread_pool); // todo: check result of this?
+    execute_instruction_patches(vm);
+    reset_notify_gc_finished(thread_pool, vm); // todo: check result of this?
+  } else {
+    arrive_await_gc_finished(thread_pool, vm); // todo: check result of this?
+  }
+  thread_pool_unlock(thread_pool); // todo: check result of this?
 }

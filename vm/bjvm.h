@@ -8,6 +8,7 @@
 #include <async.h>
 #include <types.h>
 #include <wchar.h>
+#include <stdalign.h>
 
 #include "classfile.h"
 #include "classloader.h"
@@ -156,9 +157,13 @@ typedef enum : u32 {
 } mark_word_flags;
 
 struct vm;
+typedef struct vm vm;
+
+bool should_gc_pause(vm *vm); // atomically checks if a GC pause is needed
+void gc_pause_if_requested(vm *vm); // only pauses if another thread needs us to
 
 bool has_expanded_data(header_word *data);
-mark_word_t *get_mark_word(struct vm *vm, header_word *data);
+mark_word_t *get_mark_word(vm *vm, header_word *data);
 // nullptr if the object has never been locked, otherwise a pointer to a lock_record.
 monitor_data *inspect_monitor(header_word *data);
 // only call this if inspect_monitor returns nullptr
@@ -168,7 +173,6 @@ monitor_data *allocate_monitor_for(vm_thread *thread, obj_header *obj); // doesn
 void read_string(vm_thread *thread, obj_header *obj, s8 **buf,
                  size_t *len); // todo: get rid of
 int read_string_to_utf8(vm_thread *thread, heap_string *result, obj_header *obj);
-typedef struct vm vm;
 
 typedef void (*write_bytes)(char *buf, int len, void *param); // writes all the data in the buffer's length
 typedef int (*read_bytes)(char *buf, int len,
@@ -343,6 +347,7 @@ DECLARE_ASYNC_VOID(invokevirtual_signature_polymorphic,
                     cp_method *method;
                     u8 argc;
                     stack_frame *frame;
+                    handle *provider_mt_handle;
                     handle *result;
                     handle *vh;
                     bool doing_var_handle;
@@ -351,7 +356,7 @@ DECLARE_ASYNC_VOID(invokevirtual_signature_polymorphic,
                     vm_thread *thread;
                     stack_value *sp_;
                     cp_method *method;
-                    struct native_MethodType **provider_mt;  // pointer to GC root
+                    struct native_MethodType *provider_mt;
                     obj_header *target;
                   ),
                   invoked_methods(
@@ -403,6 +408,11 @@ typedef struct {
   size_t len;
 } mmap_allocation;
 
+typedef struct {
+  void *location; // bytecode_insn *; type erased to discourage unsafe accesses
+  bytecode_insn new_insn;
+} bytecode_patch_request;
+
 struct cached_classdescs;
 typedef struct vm {
   // Classes currently under creation -- used to detect circularity
@@ -453,28 +463,41 @@ typedef struct vm {
   // available (even if it isn't running anything)
   vm_thread *primordial_thread;
 
-  // The compacting heap.
-  u8 *heap;
+  struct {
+    // The compacting heap.
+    u8 *heap;
 
-  // Next object should be allocated here. Should always be 8-byte aligned
-  // which is the alignment of BJVM objects.
-  size_t heap_used;
-  size_t heap_capacity;
+    // Next object should be allocated here. Should always be 8-byte aligned
+    // which is the alignment of BJVM objects.
+    size_t heap_used;
+    size_t heap_capacity;
+  } heap;
+
+  struct {
+    bytecode_patch_request *volatile buffer; // an array of bytecode_patch_request[capacity]
+    size_t num_used; // atomically incremented as a 'bump allocation'
+    size_t capacity;
+  } instruction_patch_queue;
 
   // Handles referenced from JS
   obj_header **js_handles;
+
+  // vector of pointers to handles
+  object **permanent_gc_roots; // only changed by GC
 
   /// Struct containing cached classdescs
   void *_cached_classdescs; // struct cached_classdescs* -- type erased to discourage unsafe accesses
 
   s64 next_thread_id; // MUST BE 64 BITS
 
-  // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
-  // the finalizers aren't run
-  void **unsafe_allocations;
-
-  // Vector of allocations done via mmap, to be unmapped
-  mmap_allocation *mmap_allocations;
+  struct {
+    // Vector of allocations done via Unsafe.allocateMemory0, to be freed in case
+    // the finalizers aren't run
+    void **unsafe_allocations;
+    // Vector of allocations done via mmap, to be unmapped
+    mmap_allocation *mmap_allocations;
+    pthread_mutex_t lock;
+  } allocations;
 
   // Vector of z_streams, to be freed
   void **z_streams; // z_stream **
@@ -484,12 +507,19 @@ typedef struct vm {
   struct native_Reference *reference_pending_list; // for java/lang/ref/Reference implementation
 
   bool vm_initialized;
+  bool should_gc_pause; // only atomic access permitted; implicitly guarded by mutex
   void *scheduler; // rr_scheduler or null
   void *debugger;  // standard_debugger or null
 } vm;
 
 struct cached_classdescs *cached_classes(vm *vm);
-void remove_unsafe_allocation(vm *vm, void *allocation);
+void add_unsafe_allocation(vm *vm, void *allocation);
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_unsafe_allocation(vm *vm, void *allocation);
+
+void add_mmap_allocation(vm *vm, mmap_allocation allocation);
+/** returns whether we found and removed it (so we don't double free) */
+bool remove_mmap_allocation(vm *vm, mmap_allocation allocation);
 classloader *get_current_classloader(vm_thread *thread);
 
 // Java Module
@@ -635,7 +665,7 @@ typedef struct vm_thread {
 
   bool js_jit_enabled;
 
-  bool unpark_permit; // set by unpark, queried by park
+  volatile bool unpark_permit; // set by unpark, queried by park
 
   // Instance of java.lang.Thread
   struct native_Thread *thread_obj;
@@ -805,6 +835,8 @@ static inline stack_value *frame_beginning(const stack_frame *frame) {
 classdesc *primitive_classdesc(vm_thread *thread, type_kind prim_kind);
 void out_of_memory(vm_thread *thread);
 void *bump_allocate(vm_thread *thread, size_t bytes);
+void suggest_bytecode_patch(vm *vm, bytecode_patch_request request);
+void atomically_patch_instruction_info(bytecode_insn *insn, const bytecode_insn *source); // usually unsafe- don't do this without good reason
 
 #ifdef __cplusplus
 }

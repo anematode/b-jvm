@@ -15,6 +15,8 @@
 
 #include "doctest/doctest.h"
 
+#include <mutex>
+
 using std::basic_string_view;
 using std::optional;
 using std::string;
@@ -33,9 +35,14 @@ std::optional<std::vector<u8>> ReadFile(const std::string &file);
 std::string ReadFileAsString(const std::string &file);
 
 struct TestCaseResult {
+  std::shared_ptr<std::mutex> lock;
   std::string_view stdin_;
   std::string stdout_;
   std::string stderr_;
+
+  TestCaseResult() {
+    lock = std::make_shared<std::mutex>();
+  }
 };
 
 struct ScheduledTestCaseResult : TestCaseResult {

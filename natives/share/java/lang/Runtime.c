@@ -5,7 +5,7 @@ DECLARE_NATIVE("java/lang", Runtime, availableProcessors, "()I") { return (stack
 DECLARE_NATIVE("java/lang", Runtime, maxMemory, "()J") { return (stack_value){.l = LLONG_MAX}; }
 
 DECLARE_NATIVE("java/lang", Runtime, gc, "()V") {
-  major_gc(thread->vm);
+  scheduled_gc_pause(thread->vm);
   return value_null();
 }
 

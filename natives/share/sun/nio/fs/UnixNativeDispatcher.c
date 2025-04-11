@@ -182,20 +182,15 @@ DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, map0, "(Ljava/io/FileDescri
     thread->current_exception = create_unix_exception(thread, errno);
     return value_null();
   }
-  arrput(thread->vm->mmap_allocations, ((mmap_allocation){result, len}));
+  add_mmap_allocation(thread->vm, (mmap_allocation) { result, len });
   return (stack_value){.l = (s64)result};
 }
 
 DECLARE_NATIVE("sun/nio/ch", UnixFileDispatcherImpl, unmap0, "(JJ)V") {
   void *addr = (void *)args[0].l;
   size_t len = args[1].l;
-  for (size_t i = 0; i < arrlenu(thread->vm->mmap_allocations); ++i) {
-    if (thread->vm->mmap_allocations[i].ptr == addr) {
-      arrdelswap(thread->vm->mmap_allocations, i);
-      break;
-    }
-  }
-  int result = munmap(addr, len);
+  [[maybe_unused]] bool found = remove_mmap_allocation(thread->vm, (mmap_allocation) { addr, len });
+  int result = munmap(addr, len); // todo: only do if found? i'm not sure if double unmap causes problems here
   if (result) {
     thread->current_exception = create_unix_exception(thread, errno);
   }
