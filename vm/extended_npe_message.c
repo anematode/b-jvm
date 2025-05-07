@@ -59,10 +59,10 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
     DCHECK(index >= 0 && index < method->code->insn_count);
     bytecode_insn *insn = method->code->code + index;
 
-    if (lvt && ((ent = local_variable_table_lookup(insn->index, original_pc, lvt)))) {
+    if (lvt && ((ent = local_variable_table_lookup(insn->extra_data.index, original_pc, lvt)))) {
       string_builder_append(builder, "%.*s", fmt_slice(*ent));
     } else {
-      string_builder_append(builder, "<local%d>", insn->index);
+      string_builder_append(builder, "<local%d>", insn->extra_data.index);
     }
     break;
   }
@@ -90,13 +90,14 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       if (!err) {
         string_builder_append(builder, ".");
       }
-      string_builder_append(builder, "%.*s", fmt_slice(insn->cp->field.nat->name));
+      string_builder_append(builder, "%.*s", fmt_slice(insn->extra_data.cp->field.nat->name));
       break;
+    }
     case insn_getstatic:
     case insn_getstatic_B ... insn_getstatic_L: {
       // Class.name
-      string_builder_append(builder, "%.*s.%.*s", fmt_slice(insn->cp->field.class_info->name),
-                            fmt_slice(insn->cp->field.nat->name));
+      string_builder_append(builder, "%.*s.%.*s", fmt_slice(insn->extra_data.cp->field.class_info->name),
+                            fmt_slice(insn->extra_data.cp->field.nat->name));
       break;
     }
     case insn_invokevirtual:
@@ -112,11 +113,11 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
       if (is_first) {
         string_builder_append(builder, "the return value of ");
       }
-      npe_stringify_method(builder, &insn->cp->methodref);
+      npe_stringify_method(builder, &insn->extra_data.cp->methodref);
       break;
     }
     case insn_iconst: {
-      string_builder_append(builder, "%d", (int)insn->integer_imm);
+      string_builder_append(builder, "%d", (int)insn->extra_data.integer_imm);
       break;
     }
     default: {
@@ -128,7 +129,6 @@ static int extended_npe_phase2(const cp_method *method, stack_variable_source *s
   case VARIABLE_SRC_KIND_UNK: {
     string_builder_append(builder, "...");
     return -1;
-  }
   }
   }
   return 0;
@@ -180,11 +180,11 @@ int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result) {
     CASE(insn_monitorexit, "Cannot exit synchronized block")
   case insn_getfield:
   case insn_getfield_B ... insn_getfield_L:
-    string_builder_append(&builder, "Cannot read field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
+    string_builder_append(&builder, "Cannot read field \"%.*s\"", fmt_slice(faulting_insn->extra_data.cp->field.nat->name));
     break;
   case insn_putfield:
   case insn_putfield_B ... insn_putfield_L:
-    string_builder_append(&builder, "Cannot assign field \"%.*s\"", fmt_slice(faulting_insn->cp->field.nat->name));
+    string_builder_append(&builder, "Cannot assign field \"%.*s\"", fmt_slice(faulting_insn->extra_data.cp->field.nat->name));
     break;
   case insn_invokevirtual:
   case insn_invokeinterface:
@@ -194,7 +194,7 @@ int get_extended_npe_message(cp_method *method, u16 pc, heap_string *result) {
   case insn_invokeitable_polymorphic:
   case insn_invokevtable_monomorphic:
   case insn_invokevtable_polymorphic: {
-    cp_method_info *invoked = &faulting_insn->cp->methodref;
+    cp_method_info *invoked = &faulting_insn->extra_data.cp->methodref;
     string_builder_append(&builder, "Cannot invoke \"");
     npe_stringify_method(&builder, invoked);
     string_builder_append(&builder, "\"");

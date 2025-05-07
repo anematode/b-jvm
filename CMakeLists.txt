@@ -13,6 +13,7 @@ include(CTest)
 include(AsanSupport)
 include(LtoSupport)
 include(PostprocessWasm)
+include(ThreadingSupport)
 
 if(NOT EMSCRIPTEN)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -29,6 +30,7 @@ if (BUILD_TESTING)
 endif ()
 
 add_library(bjvm_static STATIC)
+add_threading_support(bjvm_static)
 # This keeps names fixed for the post-processor
 target_link_libraries(bjvm_static PUBLIC vm PRIVATE natives)
 

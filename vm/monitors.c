@@ -69,7 +69,7 @@ DEFINE_ASYNC(monitor_acquire) {
 
     // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
-    self->wakeup_info.wakeup_us = 0;
+    self->wakeup_info.wakeup_us = 0; // no timeout
     self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
     DEBUG_PEDANTIC_YIELD(self->wakeup_info);
@@ -109,14 +109,14 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
     }
 
     if (read_tid == args->thread->tid) {
-      // we already own the monitor, this should be illegal
-      drop_handle(args->thread, self->handle);
-      ASYNC_RETURN(-1);
+      // thanks to the scheduler for reserving it for us!!
+      lock->hold_count = args->hold_count;
+      break;
     }
 
     // since the strong CAS failed, we need to wait on the read_tid
     self->wakeup_info.kind = RR_MONITOR_ENTER_WAITING;
-    self->wakeup_info.wakeup_us = 0;
+    self->wakeup_info.wakeup_us = 0; // no timeout
     self->wakeup_info.monitor_wakeup.monitor = self->handle;
     ASYNC_YIELD((void *)&self->wakeup_info);
     DEBUG_PEDANTIC_YIELD(self->wakeup_info);
@@ -126,6 +126,26 @@ DEFINE_ASYNC(monitor_reacquire_hold_count) {
 #undef shared_header
   drop_handle(args->thread, self->handle);
   ASYNC_END(0);
+}
+
+bool attempt_monitor_reserve(vm_thread *thread, obj_header *obj) {
+  header_word fetched_header;
+
+  __atomic_load(&obj->header_word, &fetched_header, __ATOMIC_ACQUIRE);
+  monitor_data *lock = inspect_monitor(&fetched_header);
+  if (unlikely(!lock))
+    return false;
+
+  s32 read_tid = NOT_HELD_TID;
+
+  // try to acquire mutex- loop again if CAS fails
+  if (__atomic_compare_exchange_n(&lock->tid, &read_tid, thread->tid, false, __ATOMIC_ACQ_REL,
+                                  __ATOMIC_ACQUIRE)) {
+    lock->hold_count = 0;
+    return true;
+  }
+
+  return read_tid == thread->tid; // if we already hold it
 }
 
 u32 current_thread_hold_count(vm_thread *thread, obj_header *obj) {
@@ -161,10 +181,6 @@ u32 monitor_release_all_hold_count(vm_thread *thread, obj_header *obj) {
   lock->hold_count = 0;
   __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
 
-  // todo: this only works if the scheduler is synchronized/single-threaded
-  rr_scheduler *scheduler = thread->vm->scheduler;
-  assert(scheduler && "Cannot synchronize without a scheduler!");
-  monitor_exit_handler(scheduler, obj);
   return hold_count;
 }
 
@@ -187,11 +203,6 @@ int monitor_release(vm_thread *thread, obj_header *obj) {
 
   if (new_hold_count == 0) {
     __atomic_store_n(&lock->tid, NOT_HELD_TID, __ATOMIC_RELEASE);
-
-    // todo: this only works if the scheduler is synchronized/single-threaded
-    rr_scheduler *scheduler = thread->vm->scheduler;
-    assert(scheduler && "Cannot synchronize without a scheduler!");
-    monitor_exit_handler(scheduler, obj);
   }
 
   return 0;

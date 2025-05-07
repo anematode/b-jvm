@@ -20,7 +20,7 @@ extern "C" {
 typedef struct arena_region {
   struct arena_region *next; // null if final segment
   size_t used, capacity;
-  __attribute((aligned(8))) char data[];
+  alignas(16) char data[]; // todo: make the alignment portable instead of hard coding
 } arena_region;
 
 typedef struct {

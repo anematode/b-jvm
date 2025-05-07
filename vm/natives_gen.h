@@ -197,10 +197,10 @@ struct native_Thread {
   vm_thread *vm_thread;
 
   // my fields
-  s64 eetop;                                 // J
+  volatile s64 eetop;                        // J
   s64 tid;                                   // J
   obj_header *name;                          // Ljava/lang/String;
-  s32 interrupted;                           // Z
+  volatile s32 interrupted;                  // Z
   obj_header *contextClassLoader;            // Ljava/lang/ClassLoader;
   obj_header *inheritedAccessControlContext; // Ljava/security/AccessControlContext;
   obj_header *holder;                        // Ljava/lang/Thread$FieldHolder;
