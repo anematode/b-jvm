@@ -133,7 +133,7 @@ typedef struct {
 
 typedef struct {
   s32 tid;
-  volatile u32 hold_count; // only changed by owner thread; therefore volatile is safe here
+  u32 hold_count; // only changed by owner thread, protected by lock/unlock acq/rel semantics
   mark_word_t mark_word;
 } monitor_data;
 
